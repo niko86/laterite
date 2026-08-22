@@ -22,9 +22,11 @@ import {
 import {
   SEEDED,
   addRow as addRowTo,
+  deleteGroup as deleteGroupFrom,
   deleteRow as deleteRowFrom,
   emit,
   parse,
+  restoreGroup as restoreGroupTo,
   setCell as setCellIn,
   type Delivery,
 } from "./delivery";
@@ -142,6 +144,18 @@ export function setCell(
 export function addRow(group: string, parent: string | null): void {
   arm();
   commit((d) => addRowTo(d, group, parent, keyHeadings(group)));
+}
+
+export function deleteGroup(group: string): void {
+  arm();
+  commit((d) => deleteGroupFrom(d, group));
+  /* No pick handling of its own: dropStalePick reads an absent group as zero
+     rows, so a pick inside the deleted group already closes in commit(). */
+}
+
+export function restoreGroup(group: string): void {
+  arm();
+  commit((d) => restoreGroupTo(d, group));
 }
 
 export function deleteRow(group: string, row: number): void {

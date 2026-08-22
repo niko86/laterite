@@ -14,10 +14,12 @@ import seededText from "./seeded-delivery.ags?raw";
 import {
   SEEDED,
   addRow,
+  deleteGroup,
   deleteRow,
   emit,
   lineOfRow,
   parse,
+  restoreGroup,
   seededFinalDepth,
   setCell,
 } from "./delivery";
@@ -234,5 +236,64 @@ describe("deleteRow", () => {
   it("answers the same delivery for a row or group that is not there", () => {
     expect(deleteRow(SEEDED, "PROJ", 5)).toBe(SEEDED);
     expect(deleteRow(SEEDED, "NOPE", 0)).toBe(SEEDED);
+  });
+});
+
+describe("deleteGroup", () => {
+  it("removes the whole group and leaves the survivors in file order", () => {
+    const next = deleteGroup(SEEDED, "TRAN");
+    expect(next.find((g) => g.code === "TRAN")).toBeUndefined();
+    expect(next.map((g) => g.code)).toEqual(
+      SEEDED.map((g) => g.code).filter((c) => c !== "TRAN"),
+    );
+  });
+
+  it("answers the same delivery for a group that is not there", () => {
+    expect(deleteGroup(SEEDED, "NOPE")).toBe(SEEDED);
+  });
+});
+
+describe("restoreGroup", () => {
+  it("round-trips: delete then restore emits the seeded file byte-for-byte", () => {
+    // Position matters, not just membership — the group must come back where
+    // the seed had it, or the emitted file (and every finding line number
+    // derived from it) shifts.
+    const next = restoreGroup(deleteGroup(SEEDED, "TRAN"), "TRAN");
+    expect(emit(next)).toBe(emit(SEEDED));
+  });
+
+  it("returns the SEEDED rows, not the pre-delete edits", () => {
+    // Restore-to-seeded is the honest contract (#529): keeping edits through
+    // a delete/restore cycle would need shadow state that can rot.
+    const edited = setCell(SEEDED, "TRAN", 0, 3, "Draft");
+    const next = restoreGroup(deleteGroup(edited, "TRAN"), "TRAN");
+    const tran = next.find((g) => g.code === "TRAN");
+    const col = tran?.headings.indexOf("TRAN_STAT") ?? -1;
+    expect(tran?.rows[0]?.[col]).toBe("Final");
+  });
+
+  it("inserts by seeded order relative to the groups still standing", () => {
+    // With LOCA also gone, TRAN's seeded neighbour is missing — the insert
+    // must fall back to the next surviving group, not throw or append.
+    const gutted = deleteGroup(deleteGroup(SEEDED, "LOCA"), "TRAN");
+    const next = restoreGroup(gutted, "TRAN");
+    const codes = next.map((g) => g.code);
+    expect(codes.indexOf("TRAN")).toBe(codes.indexOf("PROJ") + 1);
+    expect(codes.indexOf("TRAN")).toBeLessThan(codes.indexOf("SAMP"));
+  });
+
+  it("any delete set, restored in any order, reproduces the seeded file", () => {
+    // The property the insertion logic exists for: the delivery is always a
+    // seed-order subsequence, so restores commute. Both orders, byte-for-byte.
+    const gutted = deleteGroup(deleteGroup(SEEDED, "LOCA"), "TRAN");
+    const locaFirst = restoreGroup(restoreGroup(gutted, "LOCA"), "TRAN");
+    const tranFirst = restoreGroup(restoreGroup(gutted, "TRAN"), "LOCA");
+    expect(emit(locaFirst)).toBe(emit(SEEDED));
+    expect(emit(tranFirst)).toBe(emit(SEEDED));
+  });
+
+  it("answers the same delivery when the group is present or unknown", () => {
+    expect(restoreGroup(SEEDED, "TRAN")).toBe(SEEDED);
+    expect(restoreGroup(SEEDED, "NOPE")).toBe(SEEDED);
   });
 });

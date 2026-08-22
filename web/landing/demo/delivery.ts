@@ -206,6 +206,36 @@ export function addRow(
   );
 }
 
+/** Remove a whole group (#529) — the model half of the missing-group teach
+ *  loop. Identity for a code that is not there, so a no-op burns no undo
+ *  step. */
+export function deleteGroup(delivery: Delivery, code: string): Delivery {
+  return delivery.some((g) => g.code === code)
+    ? delivery.filter((g) => g.code !== code)
+    : delivery;
+}
+
+/** Put a deleted group back AS SEEDED — rows, position and all (#529).
+ *
+ * Restore is honest rather than magical: carrying the reader's edits through
+ * a delete/restore cycle would need shadow state that can rot, so the
+ * contract is the seed's rows, reinserted where the seed had the group
+ * relative to whichever groups still stand — position matters, because every
+ * finding's line number is derived from the emitted file. Identity when the
+ * group is already present, or is not in the seed at all. */
+export function restoreGroup(delivery: Delivery, code: string): Delivery {
+  if (delivery.some((g) => g.code === code)) return delivery;
+  const group = SEEDED.find((g) => g.code === code);
+  if (!group) return delivery;
+  const seededAt = SEEDED.indexOf(group);
+  const order = new Map(SEEDED.map((g, i) => [g.code, i]));
+  const at = delivery.findIndex(
+    (g) => (order.get(g.code) ?? Number.POSITIVE_INFINITY) > seededAt,
+  );
+  const head = at === -1 ? delivery.length : at;
+  return [...delivery.slice(0, head), group, ...delivery.slice(head)];
+}
+
 /** The seeded delivery, parsed once. The fixture is committed and gated by
  *  tests/test_landing_demo_delivery.py, which asserts the exact seeded-finding
  *  set this page narrates. */

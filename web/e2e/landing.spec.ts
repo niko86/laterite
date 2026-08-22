@@ -468,3 +468,120 @@ test("the transport aside tells the packed story without running it", async ({
   expect(wasmRequests).toEqual([]);
   await expectViewportWide(page);
 });
+
+test("fine: a deleted group leaves a restore stub — restore means the seed, undo means the edits", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#529)");
+  await page.goto("/");
+
+  // Every rendered table carries the control — the descent four and TRAN —
+  // and ONLY those: the groups that render solely in the output pane
+  // (UNIT/TYPE/ABBR) have no table, so they get no control (#529).
+  for (const code of ["PROJ", "LOCA", "SAMP", "LLPL", "TRAN"]) {
+    await expect(
+      page.getByRole("button", { name: `Delete the ${code} group` }),
+    ).toBeVisible();
+  }
+  await expect(
+    page.getByRole("button", { name: /Delete the (UNIT|TYPE|ABBR) group/ }),
+  ).toHaveCount(0);
+
+  // Edit TRAN_STAT first, so restore-vs-undo semantics become observable:
+  // the two verbs answer differently AFTER an edit, and only then.
+  const file = page.locator("section#file");
+  await file
+    .getByRole("button", { name: "Edit TRAN_STAT on row 1 of TRAN" })
+    .click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Draft");
+  await page.keyboard.press("Enter");
+
+  // Delete the group, keyboard-activated (#529's keyboard-only criterion):
+  // the stub stands in the table's place and Rule 14 fires live.
+  await file
+    .getByRole("button", { name: "Delete the TRAN group" })
+    .press("Enter");
+  await expect(file.getByText("TRAN deleted")).toBeVisible();
+  await expect(file.locator("table")).toHaveCount(0);
+  const strip = page.getByRole("list", { name: "TRAN findings" });
+  await expect(strip.getByText("Rule 14")).toBeVisible();
+  // The stub must hold the page's width discipline while it stands in.
+  await expectViewportWide(page);
+
+  // Restore, also from the keyboard: the finding clears and the SEEDED value
+  // returns — restore is the seed's rows, not the reader's edits.
+  await file.getByRole("button", { name: "Restore TRAN" }).press("Enter");
+  await expect(strip).toBeHidden();
+  await expect(
+    file.getByRole("button", { name: "Edit TRAN_STAT on row 1 of TRAN" }),
+  ).toContainText("Final");
+
+  // Undo is the OTHER verb: walk the timeline back through restore and
+  // delete, and the pre-delete edit is still there.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(file.getByText("TRAN deleted")).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(
+    file.getByRole("button", { name: "Edit TRAN_STAT on row 1 of TRAN" }),
+  ).toContainText("Draft");
+
+  // Redo walks forward over a group op like any other commit.
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(file.getByText("TRAN deleted")).toBeVisible();
+});
+
+test("fine: a descent group's stub restores from its own button, and Reset clears a deletion too", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "shares the fine lane with the TRAN loop (#529)");
+  await page.goto("/");
+
+  // GroupSection's fallback branch — the TRAN loop above exercises only the
+  // cover sheet's. LOCA's table swaps for the stub, in the same section.
+  const loca = page.locator("section#loca");
+  await loca.getByRole("button", { name: "Delete the LOCA group" }).click();
+  await expect(loca.getByText("LOCA deleted")).toBeVisible();
+  await expect(loca.locator("table")).toHaveCount(0);
+  await loca.getByRole("button", { name: "Restore LOCA" }).click();
+  await expect(loca.locator("table")).toHaveCount(1);
+
+  // "Reset the delivery" is the everything-at-once verb: it must clear a
+  // deleted-group state exactly like any edit.
+  await loca.getByRole("button", { name: "Delete the LOCA group" }).click();
+  await expect(loca.getByText("LOCA deleted")).toBeVisible();
+  await page.getByRole("button", { name: "Reset the delivery" }).click();
+  await expect(loca.locator("table")).toHaveCount(1);
+});
+
+test("touch: the delete/restore loop works from a tap, and closes an open carousel", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the coarse-pointer path for #529's controls");
+  await page.goto("/");
+
+  // Open the row editor first: deleting the group under it must close it —
+  // the pick's group is GONE, and a carousel over a deleted group would be
+  // editing a ghost.
+  await page
+    .getByRole("button", { name: "Edit TRAN_ISNO on row 1 of TRAN" })
+    .click();
+  const carousel = page.getByRole("group", { name: "Editing row 1 of TRAN" });
+  await expect(carousel).toBeVisible();
+
+  const file = page.locator("section#file");
+  await file.getByRole("button", { name: "Delete the TRAN group" }).click();
+  await expect(carousel).toBeHidden();
+  await expect(file.getByText("TRAN deleted")).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "TRAN findings" }).getByText("Rule 14"),
+  ).toBeVisible();
+  await expectViewportWide(page);
+
+  await file.getByRole("button", { name: "Restore TRAN" }).click();
+  await expect(file.getByText("TRAN deleted")).toBeHidden();
+  await expect(file.locator("table")).toHaveCount(1);
+});

@@ -18,6 +18,7 @@ import { For, Show, createMemo, createSignal, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
 import { FindingsStrip } from "./FindingsStrip";
+import { GroupStub } from "./GroupStub";
 import { GroupTable } from "./GroupTable";
 import { RowCarousel } from "./RowCarousel";
 import { DEMO_GROUPS } from "./schema";
@@ -27,6 +28,7 @@ import {
   arm,
   armed,
   busy,
+  deleteGroup,
   deleteRow,
   delivery,
   findingsForGroup,
@@ -34,6 +36,7 @@ import {
   picked,
   reset,
   report,
+  restoreGroup,
   setCell,
   setFocusLine,
   setPicked,
@@ -66,9 +69,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
   const findings = createMemo(() => report()?.findings ?? []);
 
-  /* The TRAN cover sheet (#527) — same all-or-nothing narrowing as
-     GroupSection's `bits`: schema without data is a generated-file/fixture
-     mismatch the Python gate fails on. */
+  /* The TRAN cover sheet (#527). Since #529 schema-without-data is no longer
+     a fixture mismatch — it means the reader DELETED the group, and the
+     narrowing's fallback answers with the restore stub, mirroring
+     GroupSection. */
   const tran = createMemo(() => {
     const schema = DEMO_GROUPS.find((g) => g.code === "TRAN");
     const data = delivery().find((g) => g.code === "TRAN");
@@ -155,57 +159,88 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           a permanent seeded finding no interaction could clear; the seed now
           carries a clean TRAN, and the rule only fires when the reader
           deletes its one row — a finding they can cause, read, and undo. */}
-      <Show when={tran()}>
-        {(t) => (
-          <div class="mt-8 max-w-[46rem]">
-            <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
-              The cover sheet — TRAN
-            </p>
-            <p class="mt-1 max-w-[60ch] text-caption text-fg-soft">
-              Every delivery opens with its transmission header: who produced
-              the file, for whom, and against which AGS edition. Delete its row
-              and Rule 14 has something to say.
-            </p>
-            <div class="mt-3">
-              <GroupTable
-                schema={t().schema}
-                data={t().data}
-                band={props.band}
-                picked={tranOpen()}
-                onPick={(row, col) => {
-                  arm();
-                  setPicked({ group: "TRAN", row, col });
-                }}
-                onCommit={(row, col, value) => {
-                  setCell("TRAN", row, col, value);
-                }}
-                onDeleteRow={(row) => {
-                  deleteRow("TRAN", row);
-                }}
-              />
-            </div>
-            <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
-            <Show when={coarsePointer() ? tranOpen() : null}>
-              {(cell) => (
-                <RowCarousel
+      <div class="mt-8 max-w-[46rem]">
+        <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+          The cover sheet — TRAN
+        </p>
+        <p class="mt-1 max-w-[60ch] text-caption text-fg-soft">
+          Every delivery opens with its transmission header: who produced the
+          file, for whom, and against which AGS edition. Delete its row — or the
+          whole group — and Rule 14 has something to say.
+        </p>
+        <Show
+          when={tran()}
+          fallback={
+            <>
+              <div class="mt-3">
+                <GroupStub
+                  code="TRAN"
+                  band={props.band}
+                  onRestore={() => {
+                    restoreGroup("TRAN");
+                  }}
+                />
+              </div>
+              <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
+            </>
+          }
+        >
+          {(t) => (
+            <>
+              <div class="mt-3">
+                <GroupTable
                   schema={t().schema}
                   data={t().data}
                   band={props.band}
-                  row={cell().row}
-                  col={cell().col}
-                  onMove={(col) =>
-                    setPicked({ group: "TRAN", row: cell().row, col })
-                  }
-                  onClose={() => setPicked(null)}
-                  onDelete={() => {
-                    deleteRow("TRAN", cell().row);
+                  picked={tranOpen()}
+                  onPick={(row, col) => {
+                    arm();
+                    setPicked({ group: "TRAN", row, col });
+                  }}
+                  onCommit={(row, col, value) => {
+                    setCell("TRAN", row, col, value);
+                  }}
+                  onDeleteRow={(row) => {
+                    deleteRow("TRAN", row);
                   }}
                 />
-              )}
-            </Show>
-          </div>
-        )}
-      </Show>
+              </div>
+              <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
+              <div class="mt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  tone="danger"
+                  aria-label="Delete the TRAN group"
+                  onClick={() => {
+                    deleteGroup("TRAN");
+                  }}
+                >
+                  delete group
+                </Button>
+              </div>
+              <Show when={coarsePointer() ? tranOpen() : null}>
+                {(cell) => (
+                  <RowCarousel
+                    schema={t().schema}
+                    data={t().data}
+                    band={props.band}
+                    row={cell().row}
+                    col={cell().col}
+                    onMove={(col) =>
+                      setPicked({ group: "TRAN", row: cell().row, col })
+                    }
+                    onClose={() => setPicked(null)}
+                    onDelete={() => {
+                      deleteRow("TRAN", cell().row);
+                    }}
+                  />
+                )}
+              </Show>
+            </>
+          )}
+        </Show>
+      </div>
 
       {/* The transport aside (#528): TRAN taken literally. The delivery is
           built to travel, so the envelope gets told as a story beside the

@@ -12,15 +12,18 @@ import { Button } from "@shared/components";
 import { FindingsStrip } from "./FindingsStrip";
 import { DEMO_GROUPS } from "./schema";
 import { RowCarousel } from "./RowCarousel";
+import { GroupStub } from "./GroupStub";
 import { GroupTable } from "./GroupTable";
 import { coarsePointer } from "./pointer";
 import {
   addRow,
   arm,
+  deleteGroup,
   deleteRow,
   delivery,
   findingsForGroup,
   picked,
+  restoreGroup,
   setCell,
   setPicked,
 } from "./store";
@@ -40,14 +43,19 @@ export const GroupSection: Component<{
   band: string;
   tableFirst: boolean;
 }> = (props) => {
-  /* One memo rather than two accessors, so a single `Show` narrows both. The
-     lint rule forbids the non-null assertions this would otherwise take, and
-     the pair is genuinely all-or-nothing: a schema without matching data is a
-     generated-file/fixture mismatch, which the Python gate already fails on. */
+  /* Since #529 the pair is no longer all-or-nothing: a schema without
+     matching data now means the reader DELETED the group, and the section
+     answers with the restore stub instead of vanishing. A missing schema is
+     still the old story — a generated-file/fixture mismatch the Python gate
+     fails on — so the outer narrowing stays on the schema alone. */
+  const schema = createMemo(() =>
+    DEMO_GROUPS.find((g) => g.code === props.code),
+  );
+  const data = createMemo(() => delivery().find((g) => g.code === props.code));
   const bits = createMemo(() => {
-    const schema = DEMO_GROUPS.find((g) => g.code === props.code);
-    const data = delivery().find((g) => g.code === props.code);
-    return schema && data ? { schema, data } : undefined;
+    const sch = schema();
+    const dat = data();
+    return sch && dat ? { schema: sch, data: dat } : undefined;
   });
 
   const open = createMemo(() => {
@@ -58,8 +66,8 @@ export const GroupSection: Component<{
   const groupFindings = createMemo(() => findingsForGroup(props.code));
 
   return (
-    <Show when={bits()}>
-      {(b) => (
+    <Show when={schema()}>
+      {(sch) => (
         <div
           class="grid gap-8 min-[64rem]:items-start"
           classList={{
@@ -93,7 +101,7 @@ export const GroupSection: Component<{
               }}
             >
               {props.code}
-              <Show when={b().schema.parent}>
+              <Show when={sch().parent}>
                 {(parent) => (
                   <span class="font-normal text-fg-muted">
                     child of {parent()}
@@ -103,7 +111,7 @@ export const GroupSection: Component<{
             </p>
 
             <h2 class="mt-3 font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
-              {b().schema.description}
+              {sch().description}
             </h2>
             <p class="mt-2 text-fg-soft">{BLURB[props.code]}</p>
           </div>
@@ -112,69 +120,100 @@ export const GroupSection: Component<{
             class="min-w-0"
             classList={{ "min-[64rem]:order-1": props.tableFirst }}
           >
-            <GroupTable
-              schema={b().schema}
-              data={b().data}
-              band={props.band}
-              picked={open()}
-              onPick={(row, col) => {
-                arm();
-                setPicked({ group: props.code, row, col });
-              }}
-              onCommit={(row, col, value) => {
-                setCell(props.code, row, col, value);
-              }}
-              onDeleteRow={(row) => {
-                deleteRow(props.code, row);
-              }}
-            />
+            <Show
+              when={bits()}
+              fallback={
+                <>
+                  <GroupStub
+                    code={props.code}
+                    band={props.band}
+                    onRestore={() => {
+                      restoreGroup(props.code);
+                    }}
+                  />
+                  <FindingsStrip code={props.code} findings={groupFindings()} />
+                </>
+              }
+            >
+              {(b) => (
+                <>
+                  <GroupTable
+                    schema={b().schema}
+                    data={b().data}
+                    band={props.band}
+                    picked={open()}
+                    onPick={(row, col) => {
+                      arm();
+                      setPicked({ group: props.code, row, col });
+                    }}
+                    onCommit={(row, col, value) => {
+                      setCell(props.code, row, col, value);
+                    }}
+                    onDeleteRow={(row) => {
+                      deleteRow(props.code, row);
+                    }}
+                  />
 
-            <FindingsStrip code={props.code} findings={groupFindings()} />
+                  <FindingsStrip code={props.code} findings={groupFindings()} />
 
-            <div class="mt-3 flex flex-wrap items-center gap-3">
-              <Button
-                variant="add"
-                onClick={() => {
-                  addRow(props.code, b().schema.parent);
-                }}
-              >
-                + row
-                <Show when={b().schema.parent}>
-                  {(parent) => (
-                    <span class="text-fg-faint">
-                      {" "}
-                      (inherits {parent()}'s key)
+                  <div class="mt-3 flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="add"
+                      onClick={() => {
+                        addRow(props.code, b().schema.parent);
+                      }}
+                    >
+                      + row
+                      <Show when={b().schema.parent}>
+                        {(parent) => (
+                          <span class="text-fg-faint">
+                            {" "}
+                            (inherits {parent()}'s key)
+                          </span>
+                        )}
+                      </Show>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      tone="danger"
+                      aria-label={`Delete the ${props.code} group`}
+                      onClick={() => {
+                        deleteGroup(props.code);
+                      }}
+                    >
+                      delete group
+                    </Button>
+                    <span class="text-caption text-fg-faint">
+                      {/* The hint follows the editor the reader actually has (#525). */}
+                      {coarsePointer()
+                        ? "Tap any cell to edit the row."
+                        : "Click a cell, then type — Enter commits, Esc cancels."}
                     </span>
-                  )}
-                </Show>
-              </Button>
-              <span class="text-caption text-fg-faint">
-                {/* The hint follows the editor the reader actually has (#525). */}
-                {coarsePointer()
-                  ? "Tap any cell to edit the row."
-                  : "Click a cell, then type — Enter commits, Esc cancels."}
-              </span>
-            </div>
+                  </div>
 
-            {/* The carousel is the COARSE pointer's editor (#525); on a fine
+                  {/* The carousel is the COARSE pointer's editor (#525); on a fine
                 pointer the pick is a spreadsheet selection and opening a tray
                 under the table would double the editing surface. */}
-            <Show when={coarsePointer() ? open() : null}>
-              {(cell) => (
-                <RowCarousel
-                  schema={b().schema}
-                  data={b().data}
-                  band={props.band}
-                  row={cell().row}
-                  col={cell().col}
-                  onMove={(col) =>
-                    setPicked({ group: props.code, row: cell().row, col })
-                  }
-                  onClose={() => setPicked(null)}
-                  onDelete={() => {
-                    deleteRow(props.code, cell().row);
-                  }}
-                />
+                  <Show when={coarsePointer() ? open() : null}>
+                    {(cell) => (
+                      <RowCarousel
+                        schema={b().schema}
+                        data={b().data}
+                        band={props.band}
+                        row={cell().row}
+                        col={cell().col}
+                        onMove={(col) =>
+                          setPicked({ group: props.code, row: cell().row, col })
+                        }
+                        onClose={() => setPicked(null)}
+                        onDelete={() => {
+                          deleteRow(props.code, cell().row);
+                        }}
+                      />
+                    )}
+                  </Show>
+                </>
               )}
             </Show>
           </div>
