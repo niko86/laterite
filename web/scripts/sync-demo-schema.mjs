@@ -30,9 +30,12 @@ const src = path.resolve(
 );
 const dst = path.resolve(here, "../landing/demo/schema.ts");
 
-/** The chain the demo draws, parent first. Order is the page's, not the
- *  dictionary's — but every heading below it comes from the dictionary. */
-const CHAIN = ["PROJ", "LOCA", "SAMP", "LLPL"];
+/** Every group the demo DRAWS: the descent chain parent-first, then TRAN,
+ *  the cover sheet the File section renders (#527) — not part of the
+ *  descent, but its headings come from the dictionary exactly like the
+ *  chain's. Named like the Python gate's DRAWN so the two lists that must
+ *  agree share a vocabulary. */
+const DRAWN = ["PROJ", "LOCA", "SAMP", "LLPL", "TRAN"];
 
 /** The headings each group DRAWS: its full KEY chain plus the few OTHER columns
  *  the demo needs to have something to say. Listing the extras here rather than
@@ -44,6 +47,9 @@ const EXTRAS = {
   LOCA: ["LOCA_TYPE", "LOCA_GL", "LOCA_REM", "LOCA_FDEP"],
   SAMP: [],
   LLPL: ["LLPL_LL", "LLPL_PL"],
+  // The cover sheet draws its KEY plus every REQUIRED heading — leaving a
+  // REQUIRED one out would seed a Rule 10b finding the page never narrates.
+  TRAN: ["TRAN_DATE", "TRAN_PROD", "TRAN_STAT", "TRAN_AGS", "TRAN_RECV"],
 };
 
 let dict;
@@ -55,7 +61,7 @@ try {
 }
 
 const groups = [];
-for (const code of CHAIN) {
+for (const code of DRAWN) {
   const g = dict.groups[code];
   if (!g) throw new Error(`sync-demo-schema: ${code} is not in the dictionary`);
 
