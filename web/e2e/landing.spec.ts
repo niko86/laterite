@@ -1232,3 +1232,32 @@ test("fine: motion rides the tokens — the probed elements transition like the 
   );
   expect(await durationOf("footer a"), "footer link").toBe(reference);
 });
+
+test("anchor jumps ease under normal motion, and stay instant under reduced", async ({
+  page,
+}) => {
+  // Two halves, deliberately: the computed value is the CONTRACT (frame
+  // capture is machine-dependent; `scroll-behavior` is what the one
+  // document-level rule promises — smooth when motion is welcome, the
+  // browser's instant default when the reader asked for reduced), and the
+  // pill click is the JOURNEY — scrollIntoView with no `behavior` key
+  // resolves through that computed value, and a broken handler would leave
+  // the contract green while the reader goes nowhere (#589).
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const behavior = () =>
+    page.evaluate(
+      () => getComputedStyle(document.documentElement).scrollBehavior,
+    );
+  expect(await behavior()).toBe("smooth");
+
+  await page
+    .getByRole("button", { name: /jump to the findings panel/ })
+    .first()
+    .click();
+  await expect(page.locator("#findings")).toBeInViewport();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await behavior()).toBe("auto");
+});
