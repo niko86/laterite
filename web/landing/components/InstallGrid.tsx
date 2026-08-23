@@ -14,7 +14,7 @@
  * job.
  */
 
-import { createSignal, For, Show, type Component } from "solid-js";
+import { createSignal, For, Match, Show, Switch, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { Carousel } from "./Carousel";
 import { INSTALL_CHANNELS, type InstallChannel } from "../installChannels";
@@ -118,6 +118,13 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
   </div>
 );
 
+/* PROTOTYPE (#641): four desktop presentations behind ?stack= —
+   grid (status quo) | deck (the sketch: one-card + dots) | tabs (five
+   names visible, one detail card) | row5 (one row at wide). Throwaway:
+   it exists to pick a layout, then dies. */
+const stackVariant = (): string =>
+  new URLSearchParams(window.location.search).get("stack") ?? "grid";
+
 export const InstallGrid: Component = () => (
   <div>
     <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
@@ -172,15 +179,76 @@ export const InstallGrid: Component = () => (
         />
       }
     >
-      <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
-        <For each={INSTALL_CHANNELS}>
-          {(channel) => (
-            <li>
-              <Card channel={channel} />
-            </li>
-          )}
-        </For>
-      </ul>
+      <Switch>
+        <Match when={stackVariant() === "deck"}>
+          <Carousel
+            label="Install channels"
+            items={INSTALL_CHANNELS}
+            chrome="dots"
+            noun="card"
+            class="mx-auto mt-6 max-w-[28rem]"
+            card={(c) => <Card channel={c()} />}
+          />
+        </Match>
+        <Match when={stackVariant() === "tabs"}>
+          <StackTabs />
+        </Match>
+        <Match when={stackVariant() === "row5"}>
+          <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-5">
+            <For each={INSTALL_CHANNELS}>
+              {(channel) => (
+                <li>
+                  <Card channel={channel} />
+                </li>
+              )}
+            </For>
+          </ul>
+        </Match>
+        <Match when={true}>
+          <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
+            <For each={INSTALL_CHANNELS}>
+              {(channel) => (
+                <li>
+                  <Card channel={channel} />
+                </li>
+              )}
+            </For>
+          </ul>
+        </Match>
+      </Switch>
     </Show>
   </div>
 );
+
+/* PROTOTYPE (#641): the tab-strip variant — every surface name stays
+   visible, one detail card shows. */
+const StackTabs: Component = () => {
+  const [tab, setTab] = createSignal(0);
+  const active = () => INSTALL_CHANNELS[tab()] ?? INSTALL_CHANNELS[0];
+  return (
+    <div class="mt-6">
+      <div role="tablist" class="flex flex-wrap items-center gap-2">
+        <For each={INSTALL_CHANNELS}>
+          {(channel, i) => (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab() === i()}
+              class="rounded-md border px-3 py-1.5 font-mono text-caption transition-colors"
+              classList={{
+                "border-accent bg-accent-quiet text-accent": tab() === i(),
+                "border-line text-fg-soft hover:text-accent": tab() !== i(),
+              }}
+              onClick={() => setTab(i())}
+            >
+              {channel.label}
+            </button>
+          )}
+        </For>
+      </div>
+      <div class="mt-3 max-w-[34rem]">
+        <Show when={active()}>{(c) => <Card channel={c()} />}</Show>
+      </div>
+    </div>
+  );
+};
