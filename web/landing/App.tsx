@@ -34,7 +34,10 @@ const Section: Component<{
     id={props.id}
     class="border-t border-line first:border-t-0 scroll-mt-16"
   >
-    <div class="mx-auto max-w-[72rem] px-4 py-12 sm:px-6 min-[68rem]:py-16">
+    {/* The rhythm steps: phones pay py-8 (#596 — the desktop rhythm ran the
+        390px page seventeen screens tall), the sm boundary restores py-12,
+        and the 68rem step keeps the desktop's py-16. */}
+    <div class="mx-auto max-w-[72rem] px-4 py-8 sm:px-6 sm:py-12 min-[68rem]:py-16">
       {props.children}
     </div>
   </section>
