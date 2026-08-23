@@ -10,6 +10,7 @@
 
 import { test, expect } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
+import { expectErrBorder } from "./tokens";
 
 test("dark: the canvas swaps at the token level, and a dark: class really applies", async ({
   page,
@@ -79,4 +80,13 @@ test("dark: the page still fits the viewport", async ({ page }) => {
     timeout: 15_000,
   });
   await expectViewportWide(page);
+});
+
+test("dark: the delete-group control keeps its danger border", async ({
+  page,
+}) => {
+  // The light half lives in landing.spec.ts (#593); same shared contract
+  // (tokens.ts), here under the dark token set.
+  await page.goto("/");
+  await expectErrBorder(page, "Delete the PROJ group");
 });

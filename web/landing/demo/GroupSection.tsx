@@ -94,15 +94,7 @@ export const GroupSection: Component<{
             class="min-w-0"
             classList={{ "min-[64rem]:order-1": props.tableFirst }}
           >
-            {/* Both affordances, unlike the cover sheet: a descent group takes
-                as many rows as the reader wants, and this is where the page
-                first says how to edit one. */}
-            <EditableGroup
-              code={props.code}
-              band={props.band}
-              canAddRow
-              showEditHint
-            />
+            <EditableGroup code={props.code} band={props.band} />
           </div>
         </div>
       )}

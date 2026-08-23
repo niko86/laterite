@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
+import { expectErrBorder } from "./tokens";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -1405,4 +1406,96 @@ test("the file region reads explainer, pane, reset, pill, findings — and the c
       Math.min(scroller!.y + scroller!.height, proseCol!.y + proseCol!.height),
     );
   }
+});
+
+test("fine: column widths hold still while a cell is edited", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the carousel is the coarse pointer's editor (#525)");
+  // #593: the in-place editor must not re-solve the table under the reader's
+  // keystrokes — on the unfixed layout, thirteen characters into SAMP_TYPE
+  // grew that column by ~100px and shrank every sibling. Cancel closes the
+  // session, so before/during/after all measure the same geometry.
+  await page.goto("/");
+  const samp = page.locator("section#samp");
+  await expect(
+    samp.getByRole("button", { name: "Edit SAMP_TYPE on row 1 of SAMP" }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  const widths = () =>
+    samp
+      .locator("th")
+      .evaluateAll((ths) => ths.map((t) => t.getBoundingClientRect().width));
+  const before = await widths();
+
+  await samp
+    .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of SAMP" })
+    .click();
+  await page.keyboard.type("PISTON SAMPLE");
+  await expect(samp.getByRole("textbox")).toHaveValue(/PISTON SAMPLE$/);
+
+  const during = await widths();
+  during.forEach((w, i) => {
+    expect(Math.abs(w - before[i]!), `column ${i} during typing`).toBeLessThan(
+      0.5,
+    );
+  });
+
+  await page.keyboard.press("Escape");
+  await expect(samp.getByRole("textbox")).not.toBeVisible();
+  const after = await widths();
+  after.forEach((w, i) => {
+    expect(Math.abs(w - before[i]!), `column ${i} after cancel`).toBeLessThan(
+      0.5,
+    );
+  });
+
+  // The commit path releases the freeze too — proven with the value it
+  // already had, where "identical after" is the contract. (A LONGER commit
+  // legitimately re-solves once for the new text; that release is the
+  // point of unfreezing rather than a regression.)
+  await page.keyboard.press("Enter");
+  await expect(samp.getByRole("textbox")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(samp.getByRole("textbox")).not.toBeVisible();
+  const afterCommit = await widths();
+  afterCommit.forEach((w, i) => {
+    expect(Math.abs(w - before[i]!), `column ${i} after commit`).toBeLessThan(
+      0.5,
+    );
+  });
+});
+
+test("the cover sheet carries the full toolbar, and a second TRAN row is a teachable state", async ({
+  page,
+}) => {
+  // #593, superseding #527's recorded "+ row is meaningless on a one-row
+  // header": the owner's review chose the opposite — the affordance grammar
+  // is worth more than the guard, and the engine has its own verdict about
+  // an extra transmission row, which is the demo working as intended.
+  await page.goto("/");
+  const file = page.locator("section#file");
+  await expect(file.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await expect(file.getByRole("button", { name: "+ row" })).toBeVisible();
+  await expect(file.getByText(/Click a cell|Tap any cell/)).toBeVisible();
+
+  await file.getByRole("button", { name: "+ row" }).click();
+  const strip = page.getByRole("list", { name: "TRAN findings" });
+  await expect(strip).toBeVisible();
+  await expect(strip.locator("li").first()).toBeVisible();
+});
+
+test("the delete-group control reads as a button, not a caption", async ({
+  page,
+}) => {
+  // #593: the ghost variant's transparent border is what made "delete group"
+  // read as bare text. The control now wears the toolbar button's border,
+  // repainted by the danger tone — the shared contract in tokens.ts, which
+  // the dark spec asserts under its own token set.
+  await page.goto("/");
+  await expectErrBorder(page, "Delete the PROJ group");
 });

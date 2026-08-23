@@ -7,12 +7,12 @@
  * every ticket that touched it (#527 seeded it, #529 added the restore stub
  * and the delete button, #530 the per-table fix budget).
  *
- * TRAN was a strict SUBSET of a descent group, not a parallel implementation:
- * everything it rendered, GroupSection rendered too, with the same props in
- * the same order. So the two affordances it lacks are named boolean props
- * rather than a children slot — there are exactly two, both fixed per caller,
- * and "+ row" on a one-row transmission header is meaningless rather than
- * merely unwanted. A slot would buy flexibility nothing is asking for.
+ * TRAN used to be a strict SUBSET of a descent group — #527 held "+ row"
+ * off a one-row transmission header as meaningless, and two boolean props
+ * carved that subset. #593 superseded the ruling deliberately: a second TRAN
+ * row is itself a teachable state, because the engine has a verdict about
+ * it, so every caller now gets the full toolbar and the props went with the
+ * distinction they encoded.
  *
  * LAYOUT STAYS WITH THE CALLERS. This emits the table, the strip, the actions
  * row and the carousel; the grid column GroupSection places them in and the
@@ -53,13 +53,6 @@ import {
 export const EditableGroup: Component<{
   code: string;
   band: string;
-  /** The "+ row" affordance. Off for the cover sheet: TRAN is the delivery's
-   *  one transmission header, so a second row is not a thing a reader can
-   *  mean. */
-  canAddRow?: boolean;
-  /** The line that names the editor the reader actually has (#525). Off for
-   *  the cover sheet, which sits below four tables that have already said it. */
-  showEditHint?: boolean;
 }> = (props) => {
   /* Since #529 the pair is no longer all-or-nothing: a schema without matching
      data now means the reader DELETED the group, and the harness answers with
@@ -120,42 +113,27 @@ export const EditableGroup: Component<{
 
           <FindingsStrip code={props.code} findings={groupFindings()} />
 
-          {/* A ROW only when there is a row's worth of controls. With one
-              control the box stays block, which is what the cover sheet had
-              before this extraction — and the two are not the same height: an
-              inline-flex Button in a block box is sized by the line-box strut,
-              which at this button's size is the taller of the two. Flexing it
-              would have lifted everything below the cover sheet's table by a
-              couple of pixels, and #549's contract is that neither caller's
-              spacing moves. */}
-          <div
-            class="mt-3"
-            classList={{
-              "flex flex-wrap items-center gap-3":
-                props.canAddRow || props.showEditHint,
-            }}
-          >
-            <Show when={props.canAddRow}>
-              <Button
-                variant="add"
-                onClick={() => {
-                  addRow(props.code, b().schema.parent);
-                }}
-              >
-                + row
-                <Show when={b().schema.parent}>
-                  {(parent) => (
-                    <span class="text-fg-faint">
-                      {" "}
-                      (inherits {parent()}'s key)
-                    </span>
-                  )}
-                </Show>
-              </Button>
-            </Show>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
             <Button
-              variant="ghost"
-              size="sm"
+              variant="add"
+              onClick={() => {
+                addRow(props.code, b().schema.parent);
+              }}
+            >
+              + row
+              <Show when={b().schema.parent}>
+                {(parent) => (
+                  <span class="text-fg-faint">
+                    {" "}
+                    (inherits {parent()}'s key)
+                  </span>
+                )}
+              </Show>
+            </Button>
+            {/* The toolbar button, danger-repainted (#593) — the ghost's
+                transparent border made this verb read as a caption. */}
+            <Button
+              variant="default"
               tone="danger"
               aria-label={`Delete the ${props.code} group`}
               onClick={() => {
@@ -164,13 +142,11 @@ export const EditableGroup: Component<{
             >
               delete group
             </Button>
-            <Show when={props.showEditHint}>
-              <span class="text-caption text-fg-faint">
-                {coarsePointer()
-                  ? "Tap any cell to edit the row."
-                  : "Click a cell, then type. Enter commits, Esc cancels."}
-              </span>
-            </Show>
+            <span class="text-caption text-fg-faint">
+              {coarsePointer()
+                ? "Tap any cell to edit the row."
+                : "Click a cell, then type. Enter commits, Esc cancels."}
+            </span>
           </div>
 
           {/* The carousel is the COARSE pointer's editor (#525); on a fine
