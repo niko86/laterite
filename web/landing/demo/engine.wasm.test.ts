@@ -3,7 +3,14 @@
  * The real wasm's behaviour on the seeded delivery is the landing e2e's
  * job; what this file owns is the plumbing between the page and whichever
  * module arrives: init exactly once, bytes in, decoded text out, and the
- * engine's error envelope passed through rather than swallowed. */
+ * engine's error envelope passed through rather than swallowed.
+ *
+ * The mock is keyed by the STUB module (test-stubs/ags4_wasm.ts), not the
+ * real id: this lane runs without the wasm build on purpose, so
+ * vitest.config.ts aliases the id to the stub for resolution — and the
+ * mock has to name the module the import actually lands on, or the
+ * registry misses and the stub throws. On a machine where src/wasm happens
+ * to exist the alias still applies, so both machines run one path. */
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,7 +19,7 @@ const validate = vi.fn();
 const compute_fixes = vi.fn();
 const apply_fixes = vi.fn();
 
-vi.mock("../../src/wasm/ags4_wasm", () => ({
+vi.mock("../../test-stubs/ags4_wasm", () => ({
   default: init,
   validate,
   compute_fixes,

@@ -84,7 +84,9 @@ export const EditableGroup: Component<{
               restoreGroup(props.code);
             }}
           />
-          <FindingsStrip code={props.code} findings={groupFindings()} />
+          <Show when={coarsePointer()}>
+            <FindingsStrip code={props.code} findings={groupFindings()} />
+          </Show>
         </>
       }
     >
@@ -111,7 +113,13 @@ export const EditableGroup: Component<{
             }}
           />
 
-          <FindingsStrip code={props.code} findings={groupFindings()} />
+          {/* The strip is the COARSE pointer's surface now (#591): fine
+              pointers read the same callouts on the failing cell itself,
+              and the panel beside the file stays the one complete list.
+              Coarse keeps the strip until the carousel replaces it. */}
+          <Show when={coarsePointer()}>
+            <FindingsStrip code={props.code} findings={groupFindings()} />
+          </Show>
 
           <div class="mt-3 flex flex-wrap items-center gap-3">
             <Button

@@ -33,5 +33,6 @@ export {
 export { SummaryBanner, type BannerKind } from "./SummaryBanner";
 export { Toast, ToastHost, retractToast, toast } from "./Toast";
 export { ThemeToggle } from "./ThemeToggle";
+export { Popover } from "./Popover";
 export { Tooltip } from "./Tooltip";
 export type { IconName } from "../icons/icons";

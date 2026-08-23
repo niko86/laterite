@@ -25,5 +25,5 @@
     // import, and the two builds would agree while the editor disagreed.
     "paths": { "@shared/*": ["./src/shared/*"] }
   },
-  "include": ["src", "bench", "landing", "vite.config.ts"]
+  "include": ["src", "bench", "landing", "test-stubs", "vite.config.ts"]
 }
