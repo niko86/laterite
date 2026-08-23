@@ -9,7 +9,25 @@
       content="Validate, fix, explore and write AGS4 geotechnical transfer files — from Python, Rust, Node, the CLI, DuckDB or the browser."
     />
     <link rel="canonical" href="https://laterite.dev/" />
-    <link rel="icon" type="image/png" href="/icons/icon-128.png" />
+    <!-- The icon set ships from THIS build's public/ — byte-identical copies
+         of the app's web/public/icons/ set, pinned by icons.test.ts. The
+         landing previously linked /icons/icon-128.png while shipping no
+         public/ directory at all, so every icon request 404ed (#598).
+         /favicon.ico is committed unlinked for the agents that probe it
+         blind; tools/gen_landing_favicon.py is its provenance. -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="128x128"
+      href="/icons/icon-128.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="256x256"
+      href="/icons/icon-256.png"
+    />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <!-- Tracks the SYSTEM scheme, as the app's does: theme-color has no class
          form, so it follows the OS while the page itself follows the stored
          choice. Values mirror --canvas in each theme. -->

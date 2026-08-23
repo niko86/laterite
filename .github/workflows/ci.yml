@@ -401,6 +401,9 @@ jobs:
       - name: install grid names only what we publish
         run: uv run --no-project python tools/gen_install_channels.py --check
 
+      - name: landing favicon derives from the brand asset
+        run: uv run --no-project --with pillow python tools/gen_landing_favicon.py --check
+
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
 
