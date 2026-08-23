@@ -45,6 +45,7 @@ import {
 import { keyHeadings } from "./schema";
 import { fixesForGroup, isManual } from "./fixes";
 import {
+  abbreviationCells,
   applyFixesText,
   computeFixesText,
   engine,
@@ -327,16 +328,46 @@ export function isManualFinding(finding: Finding): boolean {
 /** The findings that land on one cell — used to mark it in the table and to
  *  write the failing rule under its field card. Matched on (group, data row,
  *  heading), which is the identity the engine reports; a line-number match would
- *  break the moment a row is added above. */
+ *  break the moment a row is added above. Since #590 this also resolves Rule
+ *  16's prose-addressed findings against the CURRENT delivery, so every cell
+ *  carrying the undefined abbreviation is marked — all of them or none, never
+ *  an arbitrary first. The resolve rescans the group's rows per call, and the
+ *  table calls this per cell: fine at the demo's table sizes, and the
+ *  per-cell memos in GroupTable are what keep it off the keystroke path. */
 export function findingsForCell(
   group: string,
   rowIndex: number,
   heading: string,
 ): Finding[] {
-  return (report()?.findings ?? []).filter(
+  const findings = report()?.findings ?? [];
+  const direct = findings.filter(
     (f) =>
       f.group === group &&
       f.heading === heading &&
+      f.dataRow !== null &&
+      f.dataRow - 1 === rowIndex,
+  );
+  const data = delivery().find((g) => g.code === group);
+  if (!data) return direct;
+  const abbr = findings.filter(
+    (f) =>
+      f.group === group &&
+      abbreviationCells(f, data.headings, data.rows).some(
+        (c) => c.row === rowIndex && data.headings[c.col] === heading,
+      ),
+  );
+  return [...direct, ...abbr];
+}
+
+/** Findings that condemn a whole ROW — heading-less but row-pinned, the
+ *  shape Rule 10c's orphan arrives in (#590). Rendered as the row variant of
+ *  the severity grammar, distinct from a cell verdict: the engine is saying
+ *  "this row has no parent", not "this value is wrong". */
+export function findingsForRow(group: string, rowIndex: number): Finding[] {
+  return (report()?.findings ?? []).filter(
+    (f) =>
+      f.group === group &&
+      f.heading === null &&
       f.dataRow !== null &&
       f.dataRow - 1 === rowIndex,
   );
@@ -358,10 +389,12 @@ export function findingsForGroup(group: string): Finding[] {
  * asks the field card to write the failing rule under the field being edited,
  * and a reader typing in SAMP_TYPE needs to see it.
  *
- * So the carousel shows these ALONGSIDE the cell findings rather than as them.
- * The distinction is kept: the cell is not marked failing (no ✗, no red value),
- * because attaching a group finding to row 1 would be a lie in a file where rows
- * 1 and 3 both carried the bad value. */
+ * Since #590 the same findings ALSO map to the cells carrying the value
+ * (findingsForCell resolves them against the delivery — all carrying cells,
+ * which answers the old caveat that pinning one row would lie). This broader
+ * name-match remains for the field card being EDITED: a reader typing into a
+ * clean SAMP_TYPE cell still needs to see what the column's rule says, and
+ * the carousel dedupes the overlap at its call site. */
 export function groupFindingsNaming(group: string, heading: string): Finding[] {
   return findingsForGroup(group).filter((f) => f.desc.includes(heading));
 }

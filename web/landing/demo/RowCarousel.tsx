@@ -78,7 +78,13 @@ export const RowCarousel: Component<{
   const explains = createMemo(() => {
     const h = heading();
     if (!h) return [];
-    return [...failing(), ...groupFindingsNaming(props.schema.code, h.name)];
+    // #590 maps Rule 16 onto carrying cells, so on THIS card the same
+    // finding can arrive both ways; the name-match keeps its job only for
+    // the findings the cell mapping did not already deliver.
+    const named = groupFindingsNaming(props.schema.code, h.name).filter(
+      (f) => !failing().includes(f),
+    );
+    return [...failing(), ...named];
   });
 
   const step = (by: number) => {

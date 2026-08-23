@@ -16,10 +16,12 @@
  *
  * ## Band colour means group identity, never severity
  *
- * The band appears in exactly three places for a group: its chip, its table cap,
- * and its KEY-column region. Nowhere else on the page uses band colour, so it
- * can never be read as "how bad is this". Severity is carried by the error tint
- * and the ✗ marker, which are the same on every group.
+ * The band appears in exactly two places for a group: its chip and its table
+ * cap. It was three until #590 retired the band-coloured KEY region — on the
+ * red-brown ramp it read as a verdict anyway, the exact confusion this rule
+ * exists to prevent — so the region now wears the theme's structural stone
+ * tint (landing.css). Severity is carried by the error tint and the ✗ marker,
+ * which are the same on every group.
  *
  * The seven KEY columns of LLPL are tinted as ONE continuous region rather than
  * seven striped columns — same tint, no per-column edges, and a single solid
@@ -47,8 +49,13 @@ import { Button, Tooltip } from "@shared/components";
 import type { DemoGroup } from "./schema";
 import { singleLine, type Group } from "./delivery";
 import { coarsePointer } from "./pointer";
-import { severityCellTint, worstSeverity } from "./severity";
-import { findingsForCell, isManualFinding } from "./store";
+import {
+  severityCellTint,
+  severityRowEdge,
+  severityRowTint,
+  worstSeverity,
+} from "./severity";
+import { findingsForCell, findingsForRow, isManualFinding } from "./store";
 
 /** The in-place value input (#525), its own component for two reasons: mount
  *  focus/select read PROPS rather than signals inside a lifecycle callback,
@@ -284,12 +291,7 @@ export const GroupTable: Component<{
          dark ("no card depends on a shadow to read as raised"). Following the
          token keeps one answer instead of two. */
       class="overflow-hidden rounded-lg border border-laterite-200 bg-surface dark:bg-surface-raised"
-      style={{
-        "--band": `var(${props.band})`,
-        // 18% in light. #400 dials every tint down to 14% on the dark canvas,
-        // where a saturated wash glows instead of tinting.
-        "--key-tint": `color-mix(in srgb, var(${props.band}) var(--key-tint-pct), transparent)`,
-      }}
+      style={{ "--band": `var(${props.band})` }}
     >
       {/* The cap: a single solid band, not the masthead's four-band gradient —
           a gradient here would read as four groups rather than one. */}
@@ -372,150 +374,167 @@ export const GroupTable: Component<{
           </thead>
           <tbody>
             <For each={props.data.rows}>
-              {(row, rowIndex) => (
-                <tr class="border-b border-line-subtle last:border-b-0">
-                  <For each={props.schema.headings}>
-                    {(heading, col) => {
-                      /* `createMemo` + `classList`, not a joined class string.
+              {(row, rowIndex) => {
+                /* The row's own verdict (#590), worst-of like the cell's. */
+                const rowWorst = createMemo(() =>
+                  worstSeverity(findingsForRow(props.schema.code, rowIndex())),
+                );
+                const rowFailing = () => rowWorst() !== null;
+                return (
+                  <tr class="border-b border-line-subtle last:border-b-0">
+                    <For each={props.schema.headings}>
+                      {(heading, col) => {
+                        /* `createMemo` + `classList`, not a joined class string.
                          A `class={[...].join(" ")}` here computed ONCE and never
                          re-ran when the report arrived, so a failing cell stayed
                          unmarked while the findings panel beside it was correct
                          — the page contradicting itself in the one place a
                          reader is looking. classList takes accessors and is
                          unambiguously reactive. */
-                      const cellFindings = createMemo(() =>
-                        findingsForCell(
-                          props.schema.code,
-                          rowIndex(),
-                          heading.name,
-                        ),
-                      );
-                      const failing = () => cellFindings().length > 0;
-                      /* The engine's worst tier on this cell drives tint,
+                        const cellFindings = createMemo(() =>
+                          findingsForCell(
+                            props.schema.code,
+                            rowIndex(),
+                            heading.name,
+                          ),
+                        );
+                        const failing = () => cellFindings().length > 0;
+                        /* The engine's worst tier on this cell drives tint,
                          text and marker alike — one severity grammar across
                          every table on the page (#526), never decided
                          here. */
-                      const worst = createMemo(() =>
-                        worstSeverity(cellFindings()),
-                      );
-                      const isPicked = createMemo(() => {
-                        const p = props.picked;
-                        return p?.row === rowIndex() && p.col === col();
-                      });
-                      const isEditing = createMemo(() => {
-                        const open = editing();
-                        return open?.row === rowIndex() && open.col === col();
-                      });
-                      return (
-                        <td
-                          class="px-3 py-1.5 text-caption whitespace-nowrap"
-                          classList={{
-                            // One region, one tint — no per-column striping.
-                            // A failing cell's severity tint REPLACES the key
-                            // tint: the verdict outranks the region colour.
-                            "bg-(--key-tint)": heading.key && !failing(),
-                            "border-r-[3px] border-r-(--band)":
-                              col() === lastKey(),
-                            "font-semibold": failing(),
-                            [severityCellTint(worst() ?? "error")]: failing(),
-                            "text-fg": !failing(),
-                            "sticky left-0 z-10": col() === 0,
-                            /* The sticky column's opaque backing yields to a
+                        const worst = createMemo(() =>
+                          worstSeverity(cellFindings()),
+                        );
+                        const isPicked = createMemo(() => {
+                          const p = props.picked;
+                          return p?.row === rowIndex() && p.col === col();
+                        });
+                        const isEditing = createMemo(() => {
+                          const open = editing();
+                          return open?.row === rowIndex() && open.col === col();
+                        });
+                        return (
+                          <td
+                            class="px-3 py-1.5 text-caption whitespace-nowrap"
+                            classList={{
+                              // One region, one tint — no per-column striping.
+                              // Verdicts outrank the region colour, and rank
+                              // among themselves: a failing CELL's tint beats
+                              // the row wash, which beats the key tint (#590).
+                              "bg-(--key-tint)":
+                                heading.key && !failing() && !rowFailing(),
+                              [severityRowTint(rowWorst() ?? "error")]:
+                                rowFailing() && !failing(),
+                              [severityRowEdge(rowWorst() ?? "error")]:
+                                rowFailing() && col() === 0,
+                              "border-r-[3px] border-r-(--band)":
+                                col() === lastKey(),
+                              "font-semibold": failing(),
+                              [severityCellTint(worst() ?? "error")]: failing(),
+                              "text-fg": !failing(),
+                              "sticky left-0 z-10": col() === 0,
+                              /* The sticky column's opaque backing yields to a
                                verdict: both are backgrounds, and leaving both
                                classes on lets STYLESHEET ORDER pick — column
                                0 untinted while columns 1+ tint. The quiet
                                tokens are opaque, so nothing ghosts under the
-                               pinned cell. */
-                            "bg-surface dark:bg-surface-raised":
-                              col() === 0 && !failing(),
-                          }}
-                        >
-                          <Show
-                            when={isEditing()}
-                            fallback={
-                              <button
-                                type="button"
-                                data-cell={`${rowIndex()}-${col()}`}
-                                onClick={() => {
-                                  // Fine pointer, spreadsheet feel: the first
-                                  // click selects, the second opens in place.
-                                  // Coarse pointers pick — the carousel edits.
-                                  if (fine() && isPicked())
-                                    openEditor({
-                                      row: rowIndex(),
-                                      col: col(),
-                                      seed: null,
-                                    });
-                                  else props.onPick(rowIndex(), col());
-                                }}
-                                aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                                class="w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
-                                classList={{ "bg-accent-quiet": isPicked() }}
-                              >
-                                <Show
-                                  when={row[col()]}
-                                  fallback={<span class="text-fg-dim">–</span>}
+                               pinned cell — the row wash included, which is
+                               why the backing also stands down for it. */
+                              "bg-surface dark:bg-surface-raised":
+                                col() === 0 && !failing() && !rowFailing(),
+                            }}
+                          >
+                            <Show
+                              when={isEditing()}
+                              fallback={
+                                <button
+                                  type="button"
+                                  data-cell={`${rowIndex()}-${col()}`}
+                                  onClick={() => {
+                                    // Fine pointer, spreadsheet feel: the first
+                                    // click selects, the second opens in place.
+                                    // Coarse pointers pick — the carousel edits.
+                                    if (fine() && isPicked())
+                                      openEditor({
+                                        row: rowIndex(),
+                                        col: col(),
+                                        seed: null,
+                                      });
+                                    else props.onPick(rowIndex(), col());
+                                  }}
+                                  aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
+                                  class="w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+                                  classList={{ "bg-accent-quiet": isPicked() }}
                                 >
-                                  {row[col()]}
-                                </Show>
-                                <Show when={failing()}>
-                                  {/* The marker inherits the cell's severity
+                                  <Show
+                                    when={row[col()]}
+                                    fallback={
+                                      <span class="text-fg-dim">–</span>
+                                    }
+                                  >
+                                    {row[col()]}
+                                  </Show>
+                                  <Show when={failing()}>
+                                    {/* The marker inherits the cell's severity
                                       colour; the tooltip carries what the
                                       engine actually said (#526). */}
-                                  <Tooltip
-                                    tip={cellFindings()
-                                      .map(
-                                        (f) =>
-                                          `${f.rule}: ${f.desc}${isManualFinding(f) ? " (manual)" : ""}`,
-                                      )
-                                      .join("  ·  ")}
-                                  >
-                                    <span aria-hidden="true" class="ml-1">
-                                      ✗
-                                    </span>
-                                  </Tooltip>
-                                </Show>
-                              </button>
-                            }
-                          >
-                            <CellEditor
-                              label={`${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                              initial={
-                                editing()?.seed ?? cellValue(rowIndex(), col())
+                                    <Tooltip
+                                      tip={cellFindings()
+                                        .map(
+                                          (f) =>
+                                            `${f.rule}: ${f.desc}${isManualFinding(f) ? " (manual)" : ""}`,
+                                        )
+                                        .join("  ·  ")}
+                                    >
+                                      <span aria-hidden="true" class="ml-1">
+                                        ✗
+                                      </span>
+                                    </Tooltip>
+                                  </Show>
+                                </button>
                               }
-                              selectAll={editing()?.seed == null}
-                              onCommit={commitEdit}
-                              onCancel={cancelEdit}
-                            />
-                          </Show>
-                        </td>
-                      );
-                    }}
-                  </For>
-                  {/* Row delete (#525): without it the Rule 13 teach-loop —
+                            >
+                              <CellEditor
+                                label={`${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
+                                initial={
+                                  editing()?.seed ??
+                                  cellValue(rowIndex(), col())
+                                }
+                                selectAll={editing()?.seed == null}
+                                onCommit={commitEdit}
+                                onCancel={cancelEdit}
+                              />
+                            </Show>
+                          </td>
+                        );
+                      }}
+                    </For>
+                    {/* Row delete (#525): without it the Rule 13 teach-loop —
                       add a second PROJ row, watch it flagged — could only be
                       unwound by resetting the whole demo. */}
-                  <td class="px-1 py-1.5 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Belt over the blur's braces: the input's blur has
-                        // already committed and unfrozen by the time a click
-                        // lands in every engine we ship to, but that is
-                        // event ORDERING, not a contract — and an editor
-                        // outliving its row would leave the table frozen at
-                        // stale widths for good (#593).
-                        if (editing()) cancelEdit();
-                        props.onDeleteRow(rowIndex());
-                      }}
-                      aria-label={`Delete row ${rowIndex() + 1} of ${props.schema.code}`}
-                      class="rounded-xs px-1 text-caption text-fg-faint transition-colors hover:bg-err-quiet hover:text-err focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              )}
+                    <td class="px-1 py-1.5 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Belt over the blur's braces: the input's blur has
+                          // already committed and unfrozen by the time a click
+                          // lands in every engine we ship to, but that is
+                          // event ORDERING, not a contract — and an editor
+                          // outliving its row would leave the table frozen at
+                          // stale widths for good (#593).
+                          if (editing()) cancelEdit();
+                          props.onDeleteRow(rowIndex());
+                        }}
+                        aria-label={`Delete row ${rowIndex() + 1} of ${props.schema.code}`}
+                        class="rounded-xs px-1 text-caption text-fg-faint transition-colors hover:bg-err-quiet hover:text-err focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }}
             </For>
           </tbody>
         </table>
