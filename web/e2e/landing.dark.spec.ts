@@ -190,10 +190,18 @@ test("dark: the masthead icons take real ink and the toggle's border", async ({
   );
   expect(toggleBorder.width).toBe("1px");
   expect(toggleBorder.color).not.toBe("rgba(0, 0, 0, 0)");
+  const toggleBox = await page
+    .getByRole("button", { name: "Toggle colour theme" })
+    .boundingBox();
+  if (!toggleBox) throw new Error("the toggle must lay out");
   for (const name of ["Source on GitHub", "Jump to install"]) {
-    expect(await borderOf(page.getByRole("link", { name }))).toEqual(
-      toggleBorder,
-    );
+    const link = page.getByRole("link", { name });
+    expect(await borderOf(link)).toEqual(toggleBorder);
+    // #631's height half holds in dark too: the box wears the toggle's
+    // vertical recipe, so the two heights agree by construction.
+    const box = await link.boundingBox();
+    if (!box) throw new Error("the icon link must lay out");
+    expect(box.height, `${name} box height`).toBeCloseTo(toggleBox.height, 0);
   }
 });
 

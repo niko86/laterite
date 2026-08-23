@@ -61,13 +61,16 @@ const GithubMark: Component = () => (
   </svg>
 );
 
-/* One mobile icon link: a 44px square — the tap-target floor, border
-   included — around a 20px glyph. It wears the theme toggle's box (#621,
-   superseding #597's bare-icon ruling): same border token, same radius,
-   same hover, so the two links and the toggle read as one control family
-   and the cluster's flex gap runs between visible edges instead of
-   vanishing into the bare glyphs' whitespace. Hidden exactly where the
-   text nav appears. */
+/* One mobile icon link, wearing the theme toggle's box (#621, superseding
+   #597's bare-icon ruling; resized by #631 after the 44px square dwarfed
+   the family it joined). The box takes the TOGGLE'S OWN vertical recipe —
+   its padding around a glyph slot sized to its text line. The slot and
+   the line are two independent theme knobs that agree today; the e2e
+   height-equality assertions are the gate that holds them together if
+   either retunes. The 44px tap floor survives as the centred
+   pseudo-element hit square, probed on both axes by the same suite; the
+   cluster's gap is one step wider than #621's so adjacent hit squares
+   never overlap. Hidden exactly where the text nav appears. */
 const IconLink: Component<{
   href: string;
   label: string;
@@ -76,9 +79,11 @@ const IconLink: Component<{
   <a
     href={props.href}
     aria-label={props.label}
-    class="flex size-11 items-center justify-center rounded-sm border border-line-strong text-fg-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)] min-[52rem]:hidden"
+    class="relative flex items-center justify-center rounded-sm border border-line-strong px-2 py-1 text-fg-soft transition-colors before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] hover:border-accent hover:text-accent focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)] min-[52rem]:hidden"
   >
-    {props.children}
+    <span class="flex size-5 items-center justify-center">
+      {props.children}
+    </span>
   </a>
 );
 
@@ -125,7 +130,7 @@ export const Masthead: Component = () => (
         </For>
       </nav>
 
-      <div class="ml-auto flex items-center gap-1 min-[52rem]:ml-0 min-[52rem]:gap-2">
+      <div class="ml-auto flex items-center gap-2 min-[52rem]:ml-0">
         {/* The mobile nav is these two icons (#597): the text nav is hidden
             below 52rem, which used to leave a phone no path to the source or
             the install anchor from the top bar. Iconography over text HERE

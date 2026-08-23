@@ -2577,11 +2577,44 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
     "href",
     "https://github.com/niko86/laterite",
   );
+  // #631: the visible box is no longer the tap target. The box takes the
+  // toggle's own vertical recipe, so its height must EQUAL the toggle's —
+  // the family claim #621 started, finished — while the 44px floor
+  // survives as a centred hit area probed below, not as the border box.
+  const toggleBtn = header.getByRole("button", {
+    name: "Toggle colour theme",
+  });
+  const toggleRect = await toggleBtn.boundingBox();
+  if (!toggleRect) throw new Error("the toggle must lay out");
   for (const link of [source, install]) {
     const box = await link.boundingBox();
-    expect(box, "the icon link must lay out").not.toBeNull();
-    expect(box?.width, "tap-target width floor").toBeGreaterThanOrEqual(44);
-    expect(box?.height, "tap-target height floor").toBeGreaterThanOrEqual(44);
+    if (!box) throw new Error("the icon link must lay out");
+    expect(box.height, "the box is the toggle's height").toBeCloseTo(
+      toggleRect.height,
+      0,
+    );
+    // The floor, probed on BOTH axes: the box is under 44px tall AND
+    // wide, so each axis needs its own probe — a height-only pseudo
+    // would ship a sub-floor width through a vertical-only check. 21px
+    // sits one pixel inside the hit square's 22px half-reach (clear of
+    // rounding) and outside the drawn box on both axes.
+    for (const [dx, dy] of [
+      [0, -21],
+      [0, 21],
+      [-21, 0],
+      [21, 0],
+    ]) {
+      const at = await page.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x, y);
+          return el ? (el.getAttribute("aria-label") ?? el.tagName) : "";
+        },
+        [box.x + box.width / 2 + dx, box.y + box.height / 2 + dy] as const,
+      );
+      expect(at, `hit area ${dx},${dy} from centre`).toBe(
+        await link.getAttribute("aria-label"),
+      );
+    }
   }
   // The CTA stays words, not a glyph (#586).
   await expect(header.getByRole("link", { name: "Open webapp" })).toBeVisible();
@@ -2600,7 +2633,7 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
   // family, so a retuned token moves all three together unnoticed. Only
   // the 1px width is pinned, and that pin says the border is real, not
   // which token draws it.
-  const toggle = header.getByRole("button", { name: "Toggle colour theme" });
+  const toggle = toggleBtn;
   const boxOf = (l: Locator) =>
     l.evaluate((el) => {
       const s = getComputedStyle(el);
