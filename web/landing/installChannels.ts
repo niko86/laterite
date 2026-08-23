@@ -8,6 +8,13 @@
 //
 // Regenerate: uv run --no-project python tools/gen_install_channels.py
 
+/* eslint-disable design/no-raw-palette -- #595's recorded decision: the card
+   hues are per-surface DATA riding the generator, and this file cannot be
+   hand-edited — generation overwrites it and `--check` gates the drift. The
+   #404 gate exists to stop ad-hoc literals in hand-written surface code, and
+   stays in force everywhere else; this scoped disable is the deliberate
+   price of colours-as-generated-data, not a reading of the gate's carve-out. */
+
 export type InstallChannel = {
   readonly id: string;
   readonly label: string;
@@ -20,8 +27,10 @@ export type InstallChannel = {
   readonly command: string;
   readonly href: string;
   readonly note: string;
-  /** The one card the grid highlights. */
-  readonly primary: boolean;
+  /** The card's surface hue per theme (#595) — the border colour, and the
+   *  ingredient of the card wash. The wash percentage is the page's dial
+   *  (landing.css), not data. */
+  readonly hue: { readonly light: string; readonly dark: string };
 };
 
 export const INSTALL_CHANNELS: readonly InstallChannel[] = [
@@ -33,7 +42,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "pip install laterite",
     href: "https://pypi.org/project/laterite/",
     note: "polars + duckdb, pyarrow-free",
-    primary: true,
+    hue: { light: "#34689b", dark: "#8db9dd" },
   },
   {
     id: "node",
@@ -43,7 +52,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "npm install laterite",
     href: "https://www.npmjs.com/package/laterite",
     note: "native addon, four platforms",
-    primary: false,
+    hue: { light: "#3d7d4a", dark: "#90c69c" },
   },
   {
     id: "cli",
@@ -53,7 +62,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "",
     href: "https://github.com/niko86/laterite/releases",
     note: "lat also ships with the Python wheel and the npm package",
-    primary: false,
+    hue: { light: "#5f5761", dark: "#c5c3c2" },
   },
   {
     id: "duckdb",
@@ -63,7 +72,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "INSTALL laterite_ags4 FROM community;",
     href: "https://community-extensions.duckdb.org/extensions/laterite_ags4.html",
     note: "read AGS4 in place, as SQL table functions",
-    primary: false,
+    hue: { light: "#8f6b12", dark: "#e5cd6a" },
   },
   {
     id: "browser",
@@ -73,6 +82,6 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "npm install @laterite/ags4-wasm",
     href: "https://www.npmjs.com/package/@laterite/ags4-wasm",
     note: "the same engine as wasm, or open the webapp",
-    primary: false,
+    hue: { light: "#5c50c9", dark: "#ab9ff0" },
   },
 ];

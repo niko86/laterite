@@ -11,10 +11,10 @@
  */
 
 import { Index, Show, type Component } from "solid-js";
+import { Carousel } from "../components/Carousel";
 import { FindingCallout } from "./FindingCallout";
-import { FindingsCarousel } from "./FindingsCarousel";
 import { isManualFinding } from "./store";
-import { narrowViewport } from "./viewport";
+import { narrowViewport } from "../viewport";
 import type { Finding } from "./engine";
 
 /* The strip's callout flavour — the manual badge and nothing else — written
@@ -36,9 +36,11 @@ export const FindingsStrip: Component<{
   <Show
     when={!narrowViewport()}
     fallback={
-      <FindingsCarousel
+      <Carousel
         label={`${props.code} findings`}
-        findings={props.findings}
+        items={props.findings}
+        chrome="counter"
+        noun="finding"
         card={(f) => <StripCard finding={f()} />}
       />
     }

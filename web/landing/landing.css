@@ -60,6 +60,7 @@
 :root {
   --chip-tint-pct: 26%;
   --key-tint: color-mix(in srgb, var(--stone-300) 18%, transparent);
+  --install-wash-pct: 10%;
 }
 
 /* Dark (#400). The pairing's dark set — the one-step-lighter band ramp, the
@@ -67,10 +68,31 @@
  * in the shared colors.css since #403 made the app the second surface rendering
  * it. What stays here are the dials that are this page's own: the chip's
  * band-tint percentage and the KEY region's stone mix (#590), both dialled
- * down because a wash that reads as a tint on stone glows on near-black. */
+ * down because a wash that reads as a tint on stone glows on near-black, and
+ * the install cards' wash percentage (#595), dialled UP because dark's paler
+ * hues need more of themselves to read as a wash at all. */
 .dark {
   --chip-tint-pct: 20%;
   --key-tint: color-mix(in srgb, var(--stone-500) 14%, transparent);
+  --install-wash-pct: 12%;
+}
+
+/* The install cards' surface hues (#595): the HUE is the card's — a data
+   pair the generator emits into installChannels.ts, set inline per card —
+   and the WASH PERCENTAGE is the theme's, the same split as the chip tint
+   above. The mix lands on --surface rather than transparent, so the wash IS
+   the card's whole background and the element needs no fill of its own. */
+.install-card {
+  --install-hue: var(--hue-light);
+  border-color: var(--install-hue);
+  background: color-mix(
+    in srgb,
+    var(--install-hue) var(--install-wash-pct),
+    var(--surface)
+  );
+}
+.dark .install-card {
+  --install-hue: var(--hue-dark);
 }
 
 /* Set from the token rather than Tailwind's `leading-relaxed` utility, which

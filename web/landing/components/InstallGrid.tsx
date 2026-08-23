@@ -16,7 +16,9 @@
 
 import { createSignal, For, Show, type Component } from "solid-js";
 import { Button } from "@shared/components";
+import { Carousel } from "./Carousel";
 import { INSTALL_CHANNELS, type InstallChannel } from "../installChannels";
+import { phoneViewport } from "../viewport";
 
 const CopyButton: Component<{ command: string; label: string }> = (props) => {
   const [copied, setCopied] = createSignal(false);
@@ -46,13 +48,18 @@ const CopyButton: Component<{ command: string; label: string }> = (props) => {
 };
 
 const Card: Component<{ channel: InstallChannel }> = (props) => (
-  <li
-    class="flex flex-col rounded-lg border bg-surface p-4"
-    classList={{
-      // The highlighted card. A border and a tint, never a fill: the CTA is the
-      // only rust mass on the page and a filled card would compete with it.
-      "border-cta bg-cta-quiet": props.channel.primary,
-      "border-line": !props.channel.primary,
+  <div
+    /* Every card in its surface's own hue (#595): the border is the hue, the
+       fill is the hue washed into the surface — landing.css's .install-card
+       owns the mix and the per-theme switch, this element only carries the
+       data. The old primary highlight retired with the flag: five surfaces
+       in five dresses reads as a family, one bordered card read as
+       unexplained favouritism. The `li` belongs to the callers — the grid
+       and the phone deck each bring their own. */
+    class="install-card flex h-full flex-col rounded-lg border p-4"
+    style={{
+      "--hue-light": props.channel.hue.light,
+      "--hue-dark": props.channel.hue.dark,
     }}
   >
     <p class="flex items-baseline gap-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
@@ -94,7 +101,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
     </Show>
 
     <p class="mt-3 text-caption text-fg-muted">{props.channel.note}</p>
-  </li>
+  </div>
 );
 
 export const InstallGrid: Component = () => (
@@ -113,11 +120,32 @@ export const InstallGrid: Component = () => (
       DuckDB is the read-only surface: there is no writer to diverge.
     </p>
 
-    <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
-      <For each={INSTALL_CHANNELS}>
-        {(channel) => <Card channel={channel} />}
-      </For>
-    </ul>
+    {/* Below the grid's own first column break the five cards become the
+        one-card looping deck (#595) — same cards, paged with dots instead of
+        stacked full-height. At 38rem and up the grid is untouched. */}
+    <Show
+      when={!phoneViewport()}
+      fallback={
+        <Carousel
+          label="Install channels"
+          items={INSTALL_CHANNELS}
+          chrome="dots"
+          noun="card"
+          class="mt-6"
+          card={(c) => <Card channel={c()} />}
+        />
+      }
+    >
+      <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
+        <For each={INSTALL_CHANNELS}>
+          {(channel) => (
+            <li>
+              <Card channel={channel} />
+            </li>
+          )}
+        </For>
+      </ul>
+    </Show>
 
     <p class="mt-6 text-caption text-fg-muted">
       <a

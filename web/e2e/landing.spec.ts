@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
-import { expectErrBorder } from "./tokens";
+import { expectErrBorder, hexToRgb } from "./tokens";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -1174,15 +1174,17 @@ test("the page's hierarchy runs demo-first, and the CLI card is the binary", asy
   await expect(ctas.nth(1)).not.toHaveClass(/bg-cta/);
 
   // The CLI card: the binary is the identity, the releases download is the
-  // action, and no pip command appears anywhere on it.
+  // action, and no pip command appears anywhere on it. CSS locators, not
+  // roles: below the grid's column break the deck parks non-current cards
+  // with `hidden` (#595), and a hidden card has no accessibility tree to
+  // query — but its claims must still hold.
   const cli = page
-    .locator("li")
-    .filter({ has: page.getByRole("link", { name: "lat", exact: true }) });
+    .locator(".install-card")
+    .filter({ has: page.locator("a", { hasText: /^lat$/ }) });
   await expect(cli).toHaveCount(1);
-  await expect(cli.getByRole("link", { name: /release/i })).toHaveAttribute(
-    "href",
-    "https://github.com/niko86/laterite/releases",
-  );
+  await expect(
+    cli.locator("a").filter({ hasText: /release/i }),
+  ).toHaveAttribute("href", "https://github.com/niko86/laterite/releases");
   await expect(cli).not.toContainText("pip install");
   // The note's wording is the GENERATOR's to own — assert the card renders
   // whatever the generated module says, not a second copy of its prose.
@@ -1810,4 +1812,90 @@ test("reduced motion swaps cards instantly", async ({ page }) => {
       .first()
       .evaluate((el) => getComputedStyle(el).transitionDuration),
   ).not.toBe("0s");
+});
+
+test("every install card wears its surface hue", async ({ page }) => {
+  // #595: the border is the hue the generator emitted, the fill is that hue
+  // washed into the surface — asserted per card against installChannels.ts
+  // itself, so a card and its data cannot disagree. Computed styles resolve
+  // on hidden elements too, so this holds on the phone deck's parked cards.
+  await page.goto("/");
+  const cards = page.locator(".install-card");
+  await expect(cards).toHaveCount(INSTALL_CHANNELS.length);
+  for (const [i, channel] of INSTALL_CHANNELS.entries()) {
+    expect(
+      await cards.nth(i).evaluate((el) => getComputedStyle(el).borderTopColor),
+      `${channel.id} border`,
+    ).toBe(hexToRgb(channel.hue.light));
+  }
+  // The wash is a real fill, not transparency over the page — and per-card,
+  // so two cards never share a dress.
+  const bg = (i: number) =>
+    cards.nth(i).evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await bg(0)).not.toBe("rgba(0, 0, 0, 0)");
+  expect(await bg(0)).not.toBe(await bg(1));
+});
+
+test("the install cards become a one-card looping deck on a phone", async ({
+  page,
+}) => {
+  // #595: below the grid's own first column break (38rem) the five cards
+  // page one at a time with position dots; at 38rem and up the grid stands.
+  await page.goto("/");
+  const install = page.locator("section#install");
+  const lis = install.locator("ul li");
+  await expect(lis).toHaveCount(INSTALL_CHANNELS.length);
+
+  if (width(page) >= 608) {
+    // Desktop unchanged in structure: the grid, every card visible, no
+    // paging chrome.
+    await expect(lis.nth(4)).toBeVisible();
+    await expect(
+      install.getByRole("button", { name: "Next card" }),
+    ).toHaveCount(0);
+    await expect(
+      install.getByRole("button", { name: /Go to card/ }),
+    ).toHaveCount(0);
+    return;
+  }
+
+  // One visible card — the rest parked, not gone — plus five dots.
+  const current = install.locator("ul li:not([hidden])");
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText("Python");
+  const dots = install.getByRole("button", { name: /Go to card/ });
+  await expect(dots).toHaveCount(5);
+
+  // Infinite wrap, both directions.
+  const next = install.getByRole("button", { name: "Next card" });
+  await next.click();
+  await expect(current).toContainText("Node.js");
+  await next.click();
+  await next.click();
+  await next.click();
+  await next.click();
+  await expect(current).toContainText("Python");
+  await install.getByRole("button", { name: "Previous card" }).click();
+  await expect(current).toContainText("Browser");
+
+  // A dot is a door, and the current one says so.
+  await install.getByRole("button", { name: "Go to card 3" }).click();
+  await expect(current).toContainText("CLI");
+  await expect(
+    install.getByRole("button", { name: "Go to card 3" }),
+  ).toHaveAttribute("aria-current", "true");
+
+  // Swipe pages, like the findings carousels.
+  const deck = install.getByRole("list", { name: "Install channels" });
+  await deck.dispatchEvent("pointerdown", { clientX: 300, pointerId: 1 });
+  await deck.dispatchEvent("pointerup", { clientX: 180, pointerId: 1 });
+  await expect(current).toContainText("DuckDB");
+
+  // Reduced motion swaps instantly — no transition on the cards at all.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await current.evaluate((el) => getComputedStyle(el).transitionDuration),
+  ).toBe("0s");
+  await next.click();
+  await expect(current).toContainText("Browser");
 });

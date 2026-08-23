@@ -9,8 +9,9 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { expectViewportWide } from "./viewport";
-import { expectErrBorder } from "./tokens";
+import { expectErrBorder, hexToRgb } from "./tokens";
 
 test("dark: the canvas swaps at the token level, and a dark: class really applies", async ({
   page,
@@ -141,4 +142,19 @@ test("dark: the cell popover renders for cell and row findings", async ({
   await expect(pop).toContainText("Rule 8");
   await page.locator('section#llpl [data-cell="2-1"]').hover();
   await expect(pop).toContainText("Rule 10c");
+});
+
+test("dark: every install card wears its dark hue", async ({ page }) => {
+  // The light half lives in landing.spec.ts (#595). Dark's hue is its own
+  // tuned value, not an inversion — asserted against the generated data, so
+  // the card and installChannels.ts cannot disagree.
+  await page.goto("/");
+  const cards = page.locator(".install-card");
+  await expect(cards).toHaveCount(INSTALL_CHANNELS.length);
+  for (const [i, channel] of INSTALL_CHANNELS.entries()) {
+    expect(
+      await cards.nth(i).evaluate((el) => getComputedStyle(el).borderTopColor),
+      `${channel.id} dark border`,
+    ).toBe(hexToRgb(channel.hue.dark));
+  }
 });
