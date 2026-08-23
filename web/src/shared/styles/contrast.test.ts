@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { INSTALL_CHANNELS } from "../../../landing/installChannels";
 
 // The contrast gate over the shared token layer (#403).
 //
@@ -234,5 +235,66 @@ describe("the chrome mirrors of --canvas", () => {
 it("keeps the CTA the same colour in both themes", () => {
   for (const token of ["cta", "cta-hover", "fg-on-cta"]) {
     expect(resolveVar(dark, token)).toBe(resolveVar(light, token));
+  }
+});
+
+// The install cards' hue dress (#595). The five hues are generated DATA
+// (installChannels.ts), not tokens, so the describe.each above never sees
+// them — without this block the issue's "contrast gates green" criterion
+// would be true only vacuously. The wash is recomputed here exactly as
+// landing.css mixes it (srgb, the theme's --install-wash-pct into
+// --surface), and each text role the card sets on that wash is held to the
+// same bar the role answers to on the named surfaces.
+describe("the install cards' hue dress (#595)", () => {
+  const srgbMix = (a: string, pct: number, b: string): string => {
+    const at = (h: string, o: number) => parseInt(h.slice(o, o + 2), 16);
+    const to2 = (n: number) => Math.round(n).toString(16).padStart(2, "0");
+    const m = (o: number) => at(a, o) * pct + at(b, o) * (1 - pct);
+    return `#${to2(m(1))}${to2(m(3))}${to2(m(5))}`;
+  };
+  const against = (
+    tokens: Record<string, string>,
+    fg: string,
+    bgHex: string,
+  ): number => {
+    const l1 = luminance(resolveVar(tokens, fg));
+    const l2 = luminance(bgHex);
+    const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  const cases: [string, Record<string, string>, "light" | "dark"][] = [
+    ["landing light", themes["landing light"], "light"],
+    ["landing dark", themes["landing dark"], "dark"],
+  ];
+
+  for (const [name, tokens, side] of cases) {
+    it(`${name}: every card's text roles hold their bars on its wash`, () => {
+      const pct = parseFloat(tokens["install-wash-pct"] ?? "") / 100;
+      expect(pct, "the wash dial must parse").toBeGreaterThan(0);
+      const surface = resolveVar(tokens, "surface");
+      for (const channel of INSTALL_CHANNELS) {
+        const wash = srgbMix(channel.hue[side], pct, surface);
+        for (const fg of ["fg", "fg-muted", "accent"]) {
+          expect(
+            against(tokens, fg, wash),
+            `${fg} on the ${channel.id} wash`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+        expect(
+          against(tokens, "fg-faint", wash),
+          `fg-faint on the ${channel.id} wash`,
+        ).toBeGreaterThanOrEqual(3.0);
+        // The border IS the card's identity, so it gets the UI-component
+        // floor against the wash it outlines.
+        const border = luminance(channel.hue[side]);
+        const ground = luminance(wash);
+        const [hi, lo] = border > ground ? [border, ground] : [ground, border];
+        expect(
+          (hi + 0.05) / (lo + 0.05),
+          `the ${channel.id} border on its wash`,
+        ).toBeGreaterThanOrEqual(3.0);
+      }
+    });
   }
 });

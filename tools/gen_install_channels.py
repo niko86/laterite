@@ -77,8 +77,13 @@ class Card:
     command: str
     href: str
     note: str
-    #: True for the one card the grid highlights.
-    primary: bool = False
+    #: The card's surface hue, one value per theme (#595, the owner's recorded
+    #: Option A). Editorial like the command templates — no registry has an
+    #: opinion about a card's colour — and it retires the old `primary` flag:
+    #: five surfaces in five dresses, no unexplained favouritism. The wash
+    #: percentage is the page's dial (landing.css), not data.
+    hue_light: str = ""
+    hue_dark: str = ""
 
 
 def _text(sources: dict[str, str], rel: str) -> str:
@@ -143,7 +148,8 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             command=f"pip install {wheel}",
             href=f"https://pypi.org/project/{wheel}/",
             note="polars + duckdb, pyarrow-free",
-            primary=True,
+            hue_light="#34689b",
+            hue_dark="#8db9dd",
         ),
         Card(
             id="node",
@@ -153,6 +159,8 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             command=f"npm install {node}",
             href=f"https://www.npmjs.com/package/{node}",
             note="native addon, four platforms",
+            hue_light="#3d7d4a",
+            hue_dark="#90c69c",
         ),
         Card(
             id="cli",
@@ -171,6 +179,12 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             command="",
             href="https://github.com/niko86/laterite/releases",
             note=f"{cli} also ships with the Python wheel and the npm package",
+            # The one pair that coincides with existing tokens: the owner's
+            # table names these as steel-700/steel-300 (colors.css). Frozen
+            # here BY VALUE like the other four on purpose — a steel retune
+            # must not silently restyle a card the table pinned.
+            hue_light="#5f5761",
+            hue_dark="#c5c3c2",
         ),
         Card(
             id="duckdb",
@@ -180,6 +194,8 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             command=f"INSTALL {duckdb} FROM community;",
             href=f"https://community-extensions.duckdb.org/extensions/{duckdb}.html",
             note="read AGS4 in place, as SQL table functions",
+            hue_light="#8f6b12",
+            hue_dark="#e5cd6a",
         ),
         Card(
             id="browser",
@@ -189,6 +205,8 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             command=f"npm install {wasm}",
             href=f"https://www.npmjs.com/package/{wasm}",
             note="the same engine as wasm, or open the webapp",
+            hue_light="#5c50c9",
+            hue_dark="#ab9ff0",
         ),
     ]
 
@@ -316,7 +334,8 @@ def render(cards: list[Card]) -> str:
         + f"    command: {json.dumps(c.command)},\n"
         + f"    href: {json.dumps(c.href)},\n"
         + f"    note: {json.dumps(c.note)},\n"
-        + f"    primary: {'true' if c.primary else 'false'},\n"
+        + f"    hue: {{ light: {json.dumps(c.hue_light)}, "
+        + f"dark: {json.dumps(c.hue_dark)} }},\n"
         + "  },"
         for c in cards
     )
@@ -330,6 +349,13 @@ def render(cards: list[Card]) -> str:
 //
 // Regenerate: uv run --no-project python tools/gen_install_channels.py
 
+/* eslint-disable design/no-raw-palette -- #595's recorded decision: the card
+   hues are per-surface DATA riding the generator, and this file cannot be
+   hand-edited — generation overwrites it and `--check` gates the drift. The
+   #404 gate exists to stop ad-hoc literals in hand-written surface code, and
+   stays in force everywhere else; this scoped disable is the deliberate
+   price of colours-as-generated-data, not a reading of the gate's carve-out. */
+
 export type InstallChannel = {{
   readonly id: string;
   readonly label: string;
@@ -342,8 +368,10 @@ export type InstallChannel = {{
   readonly command: string;
   readonly href: string;
   readonly note: string;
-  /** The one card the grid highlights. */
-  readonly primary: boolean;
+  /** The card's surface hue per theme (#595) — the border colour, and the
+   *  ingredient of the card wash. The wash percentage is the page's dial
+   *  (landing.css), not data. */
+  readonly hue: {{ readonly light: string; readonly dark: string }};
 }};
 
 export const INSTALL_CHANNELS: readonly InstallChannel[] = [

@@ -19,9 +19,9 @@ import { For, Index, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
-import { FindingsCarousel } from "./FindingsCarousel";
+import { Carousel } from "../components/Carousel";
 import { severityLineTint, worstPerLine } from "./severity";
-import { narrowViewport } from "./viewport";
+import { narrowViewport } from "../viewport";
 import {
   armed,
   busy,
@@ -302,9 +302,11 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               <Show
                 when={!narrowViewport()}
                 fallback={
-                  <FindingsCarousel
+                  <Carousel
                     label="Findings"
-                    findings={findings()}
+                    items={findings()}
+                    chrome="counter"
+                    noun="finding"
                     card={(f) => <FindingRow finding={f()} />}
                   />
                 }

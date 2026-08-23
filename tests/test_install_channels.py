@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -176,3 +177,27 @@ def test_the_cli_card_is_caught_when_npm_stops_shipping_lat() -> None:
     src["rust-packages/laterite-node/package.json"] = json.dumps(manifest)
     claims = gic.unpublished_claims(src)
     assert any("npm" in c and c.startswith("cli:") for c in claims)
+
+
+# --- the surface hues (#595) ----------------------------------------------
+
+
+def test_every_card_carries_a_well_formed_hue_pair() -> None:
+    """#595: each card borders and washes in its surface's own hue, one value
+    per theme. A malformed hex would render as no border at all — CSS drops
+    the declaration silently."""
+    for card in gic.resolve(_sources()):
+        assert re.fullmatch(r"#[0-9a-f]{6}", card.hue_light), card.id
+        assert re.fullmatch(r"#[0-9a-f]{6}", card.hue_dark), card.id
+        assert card.hue_light != card.hue_dark, (
+            f"{card.id}: one hue for both themes — the dark value must be its "
+            "own tuning, not a copy"
+        )
+
+
+def test_the_five_hues_are_five_hues() -> None:
+    """The whole point of #595 is that no card reads as favoured or generic:
+    a duplicated hue would put two surfaces in one dress."""
+    cards = gic.resolve(_sources())
+    assert len({c.hue_light for c in cards}) == len(cards)
+    assert len({c.hue_dark for c in cards}) == len(cards)
