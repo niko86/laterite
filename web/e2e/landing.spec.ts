@@ -2116,14 +2116,18 @@ test("every install card opens a door to its surface's get-started page", async 
   const install = page.locator("section#install");
 
   if (width(page) >= 608) {
-    // By INDEX like the hue test above, not by label text: a hasText filter
-    // reads the card's whole subtree, and the CLI card's note names Python
-    // (and Python's note names duckdb), so label filtering resolves two
-    // cards and trips strict mode. The grid renders INSTALL_CHANNELS in
-    // order; nth is the established pin for that.
-    const cards = install.locator(".install-card");
+    // #641: desktop is the tab strip. A door is reachable by activating
+    // its surface's tab — reachability is the AC, so the walk clicks
+    // every tab and reads the VISIBLE door, by index (tabs render
+    // INSTALL_CHANNELS in order; a label filter would read the card's
+    // whole subtree and trip strict mode on cross-mentions).
+    const tabs = install.getByRole("tab");
     for (const [i, channel] of INSTALL_CHANNELS.entries()) {
-      const link = cards.nth(i).getByRole("link", { name: "Get started" });
+      await tabs.nth(i).click();
+      const link = install
+        .locator("[role='tabpanel'] .install-card")
+        .locator("visible=true")
+        .getByRole("link", { name: "Get started" });
       await expect(link, `${channel.id} card's door`).toBeVisible();
       await expect(link).toHaveAttribute("href", channel.docs);
     }
@@ -2140,28 +2144,73 @@ test("every install card opens a door to its surface's get-started page", async 
   await expect(activeDoor()).toHaveAttribute("href", INSTALL_CHANNELS[1].docs);
 });
 
-test("the install cards become a one-card looping deck on a phone", async ({
+test("tabs carry the stack on desktop, the looping deck on a phone", async ({
   page,
 }) => {
-  // #595: below the grid's own first column break (38rem) the five cards
-  // page one at a time with position dots; at 38rem and up the grid stands.
+  // #595 gave the phone its one-card deck below 38rem; #641 retires the
+  // desktop grid for the tab strip — every surface name stays visible
+  // (the #395 discoverability job), one detail card shows, and all five
+  // cards stay parked in the DOM (the #622 stack) so the absence and
+  // computed-style assertions keep their strength.
   await page.goto("/");
   const install = page.locator("section#install");
-  const lis = install.locator("ul li");
-  await expect(lis).toHaveCount(INSTALL_CHANNELS.length);
 
   if (width(page) >= 608) {
-    // Desktop unchanged in structure: the grid, every card visible, no
-    // paging chrome.
-    await expect(lis.nth(4)).toBeVisible();
+    const tabs = install.getByRole("tab");
+    await expect(tabs).toHaveCount(INSTALL_CHANNELS.length);
+    for (const [i, channel] of INSTALL_CHANNELS.entries()) {
+      await expect(tabs.nth(i), `${channel.id} tab`).toHaveText(channel.label);
+    }
+    // All five cards in the DOM, exactly one showing.
+    await expect(install.locator(".install-card")).toHaveCount(
+      INSTALL_CHANNELS.length,
+    );
+    const shown = install
+      .locator("[role='tabpanel'] .install-card")
+      .locator("visible=true");
+    await expect(shown).toHaveCount(1);
+    await expect(shown).toContainText("Python");
+
+    // A tab is a door; arrows walk the strip with a roving tabindex.
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(shown).toContainText("CLI");
+    await page.keyboard.press("ArrowRight");
+    await expect(shown).toContainText("DuckDB");
+    await page.keyboard.press("ArrowLeft");
+    await expect(shown).toContainText("CLI");
+
+    // No paging chrome at this width — the deck's grammar stays the
+    // phone's.
     await expect(
       install.getByRole("button", { name: "Next card" }),
     ).toHaveCount(0);
     await expect(
       install.getByRole("button", { name: /Go to card/ }),
     ).toHaveCount(0);
+
+    // The decided geometry: text left of the panel at the two-column
+    // breakpoint, stacked above it below.
+    const heading = await install
+      .getByRole("heading", { name: "Pick your stack" })
+      .boundingBox();
+    const strip = await install.getByRole("tablist").boundingBox();
+    if (!heading || !strip) throw new Error("heading and tablist must lay out");
+    if (width(page) >= 1024) {
+      expect(
+        strip.x,
+        "the panel sits right of the text column",
+      ).toBeGreaterThanOrEqual(heading.x + heading.width);
+    } else {
+      expect(strip.y, "stacked below the text").toBeGreaterThan(
+        heading.y + heading.height,
+      );
+    }
     return;
   }
+
+  const lis = install.locator("ul li");
+  await expect(lis).toHaveCount(INSTALL_CHANNELS.length);
 
   // One visible card — the rest parked, not gone — plus five dots.
   const current = install.locator("ul li:visible");
@@ -2342,6 +2391,33 @@ test("a page turn enters from the side of travel, even on a reversal", async ({
   });
   // Previous enters from the LEFT: a negative x nudge easing to rest.
   expect(parseFloat(pose), pose).toBeLessThan(-5);
+});
+
+test("wide: the tabs stack under the text at mid widths", async ({ page }) => {
+  test.skip(width(page) < 1088, "one lane carries the mid-width probe");
+  // The decided mid-width behaviour (#641): between the phone break and
+  // the two-column width the tabs stack under the text. No project runs
+  // in that gap, so this test resizes the wide lane's page into it and
+  // pins the stacked geometry there — otherwise the decision's e2e
+  // branch would exist without ever executing.
+  await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto("/");
+  const install = page.locator("section#install");
+  await expect(install.getByRole("tab")).toHaveCount(INSTALL_CHANNELS.length);
+  await expect(install.getByRole("button", { name: /Go to card/ })).toHaveCount(
+    0,
+  );
+  const heading = await install
+    .getByRole("heading", { name: "Pick your stack" })
+    .boundingBox();
+  const strip = await install.getByRole("tablist").boundingBox();
+  if (!heading || !strip) throw new Error("heading and tablist must lay out");
+  expect(strip.y, "stacked below the text").toBeGreaterThan(
+    heading.y + heading.height,
+  );
+  await expect(
+    install.locator("[role='tabpanel'] .install-card").locator("visible=true"),
+  ).toHaveCount(1);
 });
 
 test("the file pane wraps on a phone and side-scrolls on desktop", async ({
@@ -2696,24 +2772,57 @@ test("wide: a rail jump lands the pill exactly on its tick", async ({
   // A CSS attribute selector, not getByRole: role-name matching is
   // case-insensitive, and the masthead carries its own lowercase "Jump to
   // install" door that would straddle the rail's "Jump to Install".
+  // #641 shortened the page's tail (the tab strip is roughly half the
+  // grid's height), so the LAST landings can clamp at max scroll — the
+  // #615 model drops those knots by design. The pill therefore reads the
+  // tick only where the landing is genuinely reachable, and the floor's
+  // own depth where the browser clamps. The probe below is settled()'s
+  // formula COPIED, both clamps included — same by hand, not by shared
+  // code, so a drift between them fails this test at the seam rather
+  // than skewing it silently.
+  const reachable = (id: string) =>
+    page.evaluate((sel) => {
+      const el = document.getElementById(sel);
+      if (!el) return false;
+      const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const target = Math.max(
+        0,
+        Math.min(el.getBoundingClientRect().top + window.scrollY - offset, max),
+      );
+      return target < max;
+    }, id);
+
   const jumpAndRead = async (label: string, id: string) => {
     const door = page.locator(`a[aria-label="Jump to ${label}"]`);
     const tick = (
       await door.locator("xpath=preceding-sibling::p").innerText()
     ).replace(/ m$/, "");
+    const lands = await reachable(id);
     await door.click();
     await settled(id);
-    await expect(pill, `${label}'s landing must read its tick`).toHaveText(
-      tick,
-    );
+    await expect(
+      pill,
+      lands
+        ? `${label}'s landing must read its tick`
+        : `${label} clamps at the floor`,
+    ).toHaveText(lands ? tick : seededFinalDepthLabel());
+    return lands;
   };
 
   // Every door on the scale, in descent order, from the page's own sequence —
   // Surface included: its landing clamps at the very top, where the datum
-  // construction pins 0.00 exactly.
+  // construction pins 0.00 exactly. Clamping is only legal at the TAIL
+  // (tops are ordered), and a scale that mostly clamps is broken, not
+  // compact — both held below so the reachable branch cannot silently
+  // hollow out.
+  let clamped = 0;
   for (const section of SECTIONS) {
-    await jumpAndRead(section.label, section.id);
+    const lands = await jumpAndRead(section.label, section.id);
+    if (!lands) clamped++;
+    else expect(clamped, "a reachable landing after a clamped one").toBe(0);
   }
+  expect(clamped, "most landings stay exact").toBeLessThanOrEqual(2);
 
   // The floor: max scroll reads the seeded final depth — the stretched
   // tail's whole purpose, since the deepest landing line sits well above

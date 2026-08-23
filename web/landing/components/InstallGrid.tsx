@@ -8,13 +8,21 @@
  * the file is written. A landing page advertising a package name the registry
  * does not have is worse than no landing page.
  *
+ * The desktop presentation is the TAB STRIP (#641, retiring #395's grid by
+ * recorded decision): every surface name stays visible — the discoverability
+ * job survives — while one detail card shows, at roughly half the grid's
+ * height. At the demo sections' two-column breakpoint the section splits
+ * text-left / panel-right, keeping the page's left-right-left progression;
+ * between the phone break and that width the same tabs stack under the text.
+ * Below 38rem the #595 deck is untouched.
+ *
  * Commands wrap rather than overflow. `npm install @laterite/ags4-wasm` is
  * longer than a phone's content column, and a card that scrolls sideways to
  * reveal the end of the one string the reader came for has failed at its only
  * job.
  */
 
-import { createSignal, For, Show, type Component } from "solid-js";
+import { createSignal, Index, Show, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { Carousel } from "./Carousel";
 import { INSTALL_CHANNELS, type InstallChannel } from "../installChannels";
@@ -119,11 +127,12 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
 );
 
 export const InstallGrid: Component = () => (
-  <div>
-    <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
-      Pick your stack
-    </h2>
-    {/* The claim below is scoped to the surfaces the nightly output-value
+  <div class="min-[64rem]:grid min-[64rem]:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] min-[64rem]:items-start min-[64rem]:gap-8">
+    <div>
+      <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
+        Pick your stack
+      </h2>
+      {/* The claim below is scoped to the surfaces the nightly output-value
         gate actually walks — #536 records the leg-by-leg check. DuckDB is a
         read-only surface, so it has no AGS4 writer for the gate to compare:
         don't re-widen the sentence to all five cards.
@@ -131,34 +140,35 @@ export const InstallGrid: Component = () => (
         The intro's tail carries what two retired fixtures used to say
         (#617): the transport aside collapsed to one sentence with its docs
         link, and the install-guide line moved up from below the grid. */}
-    <p class="mt-2 max-w-[60ch] text-fg-soft">
-      One engine behind every one of these. Every surface that writes AGS4
-      (Python, Node, the CLI, the browser) emits byte-identical scriptable
-      output, gate-checked nightly, so a CI job and a notebook cannot disagree.
-      DuckDB is the read-only surface: there is no writer to diverge. The engine
-      also packs deliveries for sending, zstd compressed and optionally
-      passphrase encrypted:{" "}
-      <a
-        class="font-semibold text-cta no-underline transition-colors hover:underline"
-        href="https://docs.laterite.dev/cookbook/transport/"
-      >
-        Pack / encrypt for transport
-      </a>
-      .{" "}
-      <a
-        class="font-semibold text-cta no-underline transition-colors hover:underline"
-        href="https://docs.laterite.dev/learn/install/"
-      >
-        Full install guide
-      </a>
-      : extras, the dependency shape, and a first validate in three lines.
-      laterite is in beta: the AGS4 surface is stable and covered, and the
-      version numbers still move quickly.
-    </p>
+      <p class="mt-2 max-w-[60ch] text-fg-soft">
+        One engine behind every one of these. Every surface that writes AGS4
+        (Python, Node, the CLI, the browser) emits byte-identical scriptable
+        output, gate-checked nightly, so a CI job and a notebook cannot
+        disagree. DuckDB is the read-only surface: there is no writer to
+        diverge. The engine also packs deliveries for sending, zstd compressed
+        and optionally passphrase encrypted:{" "}
+        <a
+          class="font-semibold text-cta no-underline transition-colors hover:underline"
+          href="https://docs.laterite.dev/cookbook/transport/"
+        >
+          Pack / encrypt for transport
+        </a>
+        .{" "}
+        <a
+          class="font-semibold text-cta no-underline transition-colors hover:underline"
+          href="https://docs.laterite.dev/learn/install/"
+        >
+          Full install guide
+        </a>
+        : extras, the dependency shape, and a first validate in three lines.
+        laterite is in beta: the AGS4 surface is stable and covered, and the
+        version numbers still move quickly.
+      </p>
+    </div>
 
-    {/* Below the grid's own first column break the five cards become the
-        one-card looping deck (#595) — same cards, paged with dots instead of
-        stacked full-height. At 38rem and up the grid is untouched. */}
+    {/* Below the phone break the five cards are the one-card looping deck
+        (#595) — same cards, paged with dots. Everywhere else the tab strip
+        carries them (#641). */}
     <Show
       when={!phoneViewport()}
       fallback={
@@ -172,15 +182,83 @@ export const InstallGrid: Component = () => (
         />
       }
     >
-      <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
-        <For each={INSTALL_CHANNELS}>
-          {(channel) => (
-            <li>
-              <Card channel={channel} />
-            </li>
-          )}
-        </For>
-      </ul>
+      <StackTabs />
     </Show>
   </div>
 );
+
+/* The tab strip (#641): five always-visible surface names, one detail card.
+ * The panel is a one-cell grid stack — the #622 parking pattern — so every
+ * card stays in the DOM (countable, computed-styles readable, the e2e
+ * contract) and the panel holds the tallest card's height: switching tabs
+ * reflows nothing below. Roving tabindex + arrows, the tablist grammar. */
+const StackTabs: Component = () => {
+  const [at, setAt] = createSignal(0);
+  const tabEls: HTMLButtonElement[] = [];
+  const move = (delta: number) => {
+    const n = INSTALL_CHANNELS.length;
+    const next = (at() + delta + n) % n;
+    setAt(next);
+    tabEls[next]?.focus();
+  };
+  return (
+    <div class="mt-6 min-[64rem]:mt-0">
+      <div
+        role="tablist"
+        aria-label="Install channels"
+        class="flex flex-wrap items-center gap-2"
+      >
+        <Index each={INSTALL_CHANNELS}>
+          {(channel, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`stack-tab-${channel().id}`}
+              aria-selected={at() === i}
+              aria-controls={`stack-panel-${channel().id}`}
+              tabIndex={at() === i ? 0 : -1}
+              ref={(el) => {
+                tabEls[i] = el;
+              }}
+              class="rounded-md border px-3 py-1.5 font-mono text-caption transition-colors focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+              classList={{
+                "border-accent bg-accent-quiet text-accent": at() === i,
+                "border-line text-fg-soft hover:text-accent": at() !== i,
+              }}
+              onClick={() => setAt(i)}
+              onKeyDown={(e) => {
+                // preventDefault: a handled arrow walks the strip; letting
+                // it also nudge the page scroll reads as a glitch.
+                if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  move(1);
+                }
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  move(-1);
+                }
+              }}
+            >
+              {channel().label}
+            </button>
+          )}
+        </Index>
+      </div>
+      <div class="mt-3 grid">
+        <Index each={INSTALL_CHANNELS}>
+          {(channel, i) => (
+            <div
+              role="tabpanel"
+              id={`stack-panel-${channel().id}`}
+              aria-labelledby={`stack-tab-${channel().id}`}
+              class="col-start-1 row-start-1"
+              classList={{ invisible: at() !== i }}
+            >
+              <Card channel={channel()} />
+            </div>
+          )}
+        </Index>
+      </div>
+    </div>
+  );
+};
