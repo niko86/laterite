@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { readFileSync, readdirSync } from "node:fs";
@@ -1327,4 +1327,82 @@ test("no em dash reaches the reader", async ({ page }) => {
     .filter((f) => f.endsWith(".js") || f.endsWith(".css"))
     .filter((f) => readFileSync(path.join(assets, f), "utf8").includes("—"));
   expect(offendingChunks).toEqual([]);
+});
+
+test("the file region reads explainer, pane, reset, pill, findings — and the cover sheet joins the alternation", async ({
+  page,
+}) => {
+  // #594: the region's pieces sit where they are read. DOM order IS the
+  // contract here — below the grid breakpoint it is literally the reading
+  // order, and above it the same order splits into the file column
+  // (explainer, pane, reset) and the findings column (pill, panel), so one
+  // assertion set covers every lane. The pane's landmark is its header
+  // line, pinned by tag and exact text: the transport aside also says
+  // delivery.ags, but in code chips, and the anchor keeps any future prose
+  // that merely mentions the filename from stealing the match.
+  await page.goto("/");
+  const file = page.locator("section#file");
+  await expect(file.locator("li").first()).toBeVisible({ timeout: 15_000 });
+
+  const explainer = file.getByText("left standing on purpose").first();
+  const pane = file.locator("p", { hasText: /^delivery\.ags$/ }).first();
+  const resetBtn = file.getByRole("button", { name: "Reset the delivery" });
+  const pill = file.getByText("Nothing is uploaded").first();
+  const findingsLabel = file
+    .locator("#findings p")
+    .filter({ hasText: "Findings" })
+    .first();
+
+  const precedes = async (a: Locator, b: Locator, claim: string) => {
+    const aH = (await a.elementHandle())!;
+    const bH = (await b.elementHandle())!;
+    expect(
+      await aH.evaluate(
+        (x, y) =>
+          !!(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING),
+        bH,
+      ),
+      claim,
+    ).toBe(true);
+  };
+
+  await precedes(
+    explainer,
+    pane,
+    "the orphan explainer precedes the file pane",
+  );
+  await precedes(pane, resetBtn, "the file pane precedes the reset button");
+  await precedes(resetBtn, pill, "the reset button precedes the status pill");
+  await precedes(pill, findingsLabel, "the pill precedes the findings panel");
+
+  // The cover sheet pairs with its prose in the side-by-side grid the four
+  // descent groups set up, continuing their alternation: LLPL led with the
+  // prose, so TRAN leads with the table.
+  if (width(page) >= 1024) {
+    // Measured at the right grains: the table ELEMENT reports its full
+    // scrollable width — past its own clip — so the horizontal check reads
+    // its scroller, and the prose is read as its whole column (label plus
+    // paragraph), not the one-line label, which sits above the table's top
+    // where the toolbar row intervenes.
+    const proseCol = await file
+      .getByText("The cover sheet · TRAN")
+      .locator("xpath=..")
+      .boundingBox();
+    const scroller = await file
+      .locator("table")
+      .locator("xpath=..")
+      .boundingBox();
+    expect(proseCol).not.toBeNull();
+    expect(scroller).not.toBeNull();
+    expect(
+      scroller!.x + scroller!.width,
+      "table left, prose right",
+    ).toBeLessThanOrEqual(proseCol!.x + 1);
+    expect(
+      Math.max(scroller!.y, proseCol!.y),
+      "the two share a row",
+    ).toBeLessThan(
+      Math.min(scroller!.y + scroller!.height, proseCol!.y + proseCol!.height),
+    );
+  }
 });
