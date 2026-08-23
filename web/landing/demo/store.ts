@@ -30,6 +30,7 @@ import {
   deleteGroup as deleteGroupFrom,
   deleteRow as deleteRowFrom,
   emit,
+  parse,
   reparseGuarded,
   restoreGroup as restoreGroupTo,
   setCell as setCellIn,
@@ -280,6 +281,20 @@ export function bindUndoShortcuts(): void {
   onCleanup(() => {
     target.removeEventListener("keydown", onKey);
   });
+}
+
+/* PROTOTYPE (#635): whole-delivery replacement from pane text. A parse
+   that throws keeps the last good state; consecutive applies coalesce
+   into one undo step, so a live-typing session unwinds in one Cmd+Z. */
+export function replaceFromText(
+  raw: string,
+): "applied" | "unchanged" | "invalid" {
+  try {
+    const next = parse(raw);
+    return commit(() => next, "pane-edit") ? "applied" : "unchanged";
+  } catch {
+    return "invalid";
+  }
 }
 
 export function reset(): void {

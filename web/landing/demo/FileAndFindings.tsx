@@ -40,6 +40,7 @@ import {
   armed,
   busy,
   focusLine,
+  replaceFromText,
   reset,
   report,
   setFocusLine,
@@ -74,6 +75,35 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
      keys by the same index in both modes. Raw stays the default — the
      #396 byte-fidelity story belongs to it. */
   const [alignedView, setAlignedView] = createSignal(false);
+  /* PROTOTYPE (#635): the pane edits, desktop only. Two commit boundaries
+     to FEEL: live (debounced reparse as you type) vs an explicit Apply.
+     The tables and findings beside the pane stay wired to the store, so
+     churn is visible while typing — the question this prototype answers. */
+  const [editing, setEditing] = createSignal(false);
+  const [live, setLive] = createSignal(true);
+  const [draft, setDraft] = createSignal("");
+  const [editStatus, setEditStatus] = createSignal("");
+  let applyTimer: ReturnType<typeof setTimeout> | undefined;
+  const applyDraft = () => {
+    const r = replaceFromText(draft());
+    setEditStatus(
+      r === "invalid"
+        ? "could not parse — keeping the last good state"
+        : r === "applied"
+          ? "applied"
+          : "no change",
+    );
+  };
+  const queueApply = () => {
+    clearTimeout(applyTimer);
+    applyTimer = setTimeout(applyDraft, 500);
+  };
+  const startEditing = (on: boolean) => {
+    clearTimeout(applyTimer);
+    setEditing(on);
+    setEditStatus("");
+    if (on) setDraft(text());
+  };
   const shown = createMemo(() =>
     alignedView() ? alignLines(lines()) : lines(),
   );
@@ -142,17 +172,58 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
                 delivery.ags
               </p>
-              {/* The webapp's control, same label, same grammar (#620) —
-                  the convergence direction is shared components, website
-                  first, so the borrowed wording is deliberate. */}
-              <Checkbox
-                label="Aligned columns"
-                title="A display-only view: the engine reads the raw bytes either way"
-                checked={alignedView()}
-                onChange={(e) => setAlignedView(e.currentTarget.checked)}
-              />
+              <span class="flex items-center gap-3">
+                <Show when={!narrowViewport()}>
+                  <Checkbox
+                    label="Edit the file"
+                    title="PROTOTYPE: type into the delivery itself"
+                    checked={editing()}
+                    onChange={(e) => startEditing(e.currentTarget.checked)}
+                  />
+                  <Show when={editing()}>
+                    <Checkbox
+                      label="Live"
+                      title="Reparse as you type (debounced); off = commit with Apply"
+                      checked={live()}
+                      onChange={(e) => setLive(e.currentTarget.checked)}
+                    />
+                    <Show when={!live()}>
+                      <Button variant="action" size="sm" onClick={applyDraft}>
+                        Apply
+                      </Button>
+                    </Show>
+                    <span class="font-mono text-micro text-fg-muted">
+                      {editStatus()}
+                    </span>
+                  </Show>
+                </Show>
+                {/* The webapp's control, same label, same grammar (#620) —
+                    the convergence direction is shared components, website
+                    first, so the borrowed wording is deliberate. */}
+                <Checkbox
+                  label="Aligned columns"
+                  title="A display-only view: the engine reads the raw bytes either way"
+                  checked={alignedView()}
+                  onChange={(e) => setAlignedView(e.currentTarget.checked)}
+                />
+              </span>
             </div>
-            <div class="max-h-[26rem] overflow-auto overscroll-contain">
+            <Show when={editing()}>
+              <textarea
+                class="block h-[26rem] w-full resize-none bg-transparent p-3 font-mono text-caption text-fg outline-none"
+                spellcheck={false}
+                value={draft()}
+                onInput={(e) => {
+                  setDraft(e.currentTarget.value);
+                  setEditStatus(live() ? "…" : "uncommitted");
+                  if (live()) queueApply();
+                }}
+              />
+            </Show>
+            <div
+              class="max-h-[26rem] overflow-auto overscroll-contain"
+              style={{ display: editing() ? "none" : undefined }}
+            >
               <Show
                 when={armed()}
                 fallback={
