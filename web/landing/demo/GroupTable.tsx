@@ -20,8 +20,8 @@
  * cap. It was three until #590 retired the band-coloured KEY region — on the
  * red-brown ramp it read as a verdict anyway, the exact confusion this rule
  * exists to prevent — so the region now wears the theme's structural stone
- * tint (landing.css). Severity is carried by the error tint and the ✗ marker,
- * which are the same on every group.
+ * tint (landing.css). Severity is carried by the error tint and the corner
+ * flag (#616), which are the same on every group.
  *
  * The seven KEY columns of LLPL are tinted as ONE continuous region rather than
  * seven striped columns — same tint, no per-column edges, and a single solid
@@ -45,8 +45,8 @@ import {
   onMount,
   type Component,
 } from "solid-js";
-import { Button, Popover } from "@shared/components";
-import type { DemoGroup } from "./schema";
+import { Button, Icon, Popover } from "@shared/components";
+import type { DemoGroup, DemoHeading } from "./schema";
 import { singleLine, type Group } from "./delivery";
 import { FindingCallout } from "./FindingCallout";
 import { coarsePointer } from "./pointer";
@@ -66,6 +66,18 @@ import { findingsForCell, findingsForRow, isManualFinding } from "./store";
  *  COMMIT — a per-keystroke setCell would revalidate half-typed values the
  *  reader never asserted. (The carousel commits live by design: its card IS
  *  the editor.) */
+/** The status half of a header's tooltip (#616): the marks are decorative,
+ *  so this is where the grammar is spelled out. KEY and REQUIRED are
+ *  independent rules — 10a is identity, 10b is non-empty — which is why the
+ *  words name them separately rather than ranking one under the other. */
+function statusWords(heading: DemoHeading): string {
+  if (heading.key && heading.required)
+    return " · KEY and REQUIRED: part of the row's identity, never empty";
+  if (heading.key) return " · KEY: part of the row's identity";
+  if (heading.required) return " · REQUIRED: must not be empty";
+  return "";
+}
+
 const CellEditor: Component<{
   label: string;
   initial: string;
@@ -370,17 +382,35 @@ export const GroupTable: Component<{
                     }}
                   >
                     <span class="flex items-baseline gap-1">
+                      {/* The status marks (#616): a key glyph for KEY, the
+                          glyph boxed for KEY+REQUIRED, the form-convention
+                          `*` for REQUIRED alone, nothing for OTHER. The two
+                          axes are independent rules — KEY is 10a (identity),
+                          REQUIRED is 10b (non-empty) — and both occur
+                          separately on this page's own headings. Decorative:
+                          the words live in the header's title attribute. */}
                       <Show when={heading.key}>
-                        {/* The KEY marker. Decorative — the column's role is
-                            already in the header's title attribute. */}
+                        {/* The system's key, not a drawn one (icons.ts's
+                            rule), at the sheet's ~10px in the band ink. */}
                         <span
                           aria-hidden="true"
-                          class="text-[0.6em] text-(--band)"
+                          class="self-center text-(--band)"
+                          classList={{
+                            "rounded-xs border border-current p-px":
+                              heading.required,
+                          }}
                         >
-                          ◆
+                          <Icon name="key-round" size={10} class="block" />
                         </span>
                       </Show>
-                      <span title={`${heading.description} (${heading.type})`}>
+                      <Show when={!heading.key && heading.required}>
+                        <span aria-hidden="true" class="text-(--band)">
+                          *
+                        </span>
+                      </Show>
+                      <span
+                        title={`${heading.description} (${heading.type})${statusWords(heading)}`}
+                      >
                         {heading.name}
                       </span>
                     </span>
@@ -530,7 +560,7 @@ export const GroupTable: Component<{
                                       else props.onPick(rowIndex(), col());
                                     }}
                                     aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                                    class="w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+                                    class="relative w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
                                     classList={{
                                       "bg-accent-quiet": isPicked(),
                                     }}
@@ -544,12 +574,18 @@ export const GroupTable: Component<{
                                       {row[col()]}
                                     </Show>
                                     <Show when={failing()}>
-                                      {/* The marker inherits the cell's
-                                        severity colour; the popover above
+                                      {/* The corner flag (#616): the
+                                        spreadsheet convention for an
+                                        annotated cell, replacing the inline
+                                        ✗ that read as part of the value
+                                        ("11.8 ✗", worse at 390px). It
+                                        borrows the cell's severity ink via
+                                        currentColor; the popover above
                                         carries what the engine said. */}
-                                      <span aria-hidden="true" class="ml-1">
-                                        ✗
-                                      </span>
+                                      <span
+                                        aria-hidden="true"
+                                        class="absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-current border-l-transparent"
+                                      />
                                     </Show>
                                   </button>
                                 </Popover>

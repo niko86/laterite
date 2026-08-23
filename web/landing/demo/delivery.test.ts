@@ -10,6 +10,9 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import seededText from "./seeded-delivery.ags?raw";
 import {
   SEEDED,
@@ -294,6 +297,63 @@ describe("the model and the generated schema agree", () => {
       "SAMP_ID",
       "SPEC_REF",
       "SPEC_DPTH",
+    ]);
+  });
+});
+
+describe("the schema statuses match the dictionary (#616)", () => {
+  /* Straight from the canonical dictionary, the same file the generator
+   * slices — so a status edit there that the committed schema has not
+   * re-synced fails HERE, not as a wrong mark on the page. */
+  const dict = JSON.parse(
+    readFileSync(
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../../../rust-packages/laterite-ags4-reference/data/ags_dictionary.json",
+      ),
+      "utf8",
+    ),
+  ) as {
+    groups: Record<string, { headings: { name: string; status: string }[] }>;
+  };
+
+  it("carries the dictionary's KEY and REQUIRED for every drawn heading", () => {
+    for (const g of DEMO_GROUPS) {
+      const source = dict.groups[g.code]?.headings ?? [];
+      for (const h of g.headings) {
+        const src = source.find((e) => e.name === h.name);
+        expect(src, `${g.code}.${h.name} is in the dictionary`).toBeDefined();
+        expect(h.key, `${g.code}.${h.name} KEY`).toBe(
+          src!.status.includes("KEY"),
+        );
+        expect(h.required, `${g.code}.${h.name} REQUIRED`).toBe(
+          src!.status.includes("REQUIRED"),
+        );
+      }
+    }
+  });
+
+  it("pins the exact status sets the marks will draw", () => {
+    // The grammar's premise, as literals: the two axes really are
+    // independent on this page — five of TRAN's six are REQUIRED without
+    // being KEY, and exactly two headings are both at once. If an edition
+    // bump moves a status, this is where it surfaces as a decision rather
+    // than as a silently changed mark.
+    const tag = (h: { key: boolean; required: boolean }) =>
+      h.key && h.required ? "boxed-key" : h.key ? "key" : h.required ? "*" : "";
+    const marked = DEMO_GROUPS.flatMap((g) =>
+      g.headings
+        .filter((h) => h.required)
+        .map((h) => `${g.code}.${h.name}:${tag(h)}`),
+    );
+    expect(marked).toEqual([
+      "PROJ.PROJ_ID:boxed-key",
+      "TRAN.TRAN_ISNO:boxed-key",
+      "TRAN.TRAN_DATE:*",
+      "TRAN.TRAN_PROD:*",
+      "TRAN.TRAN_STAT:*",
+      "TRAN.TRAN_AGS:*",
+      "TRAN.TRAN_RECV:*",
     ]);
   });
 });

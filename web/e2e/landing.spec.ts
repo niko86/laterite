@@ -56,6 +56,10 @@ function seededFinalDepthLabel(): string {
 const scroller = (page: Page, section: string) =>
   page.locator(`section#${section} table`).locator("xpath=..");
 
+/** The failing cell's corner flag (#616) — the one absolutely-positioned
+ *  span inside a cell button, replacing the retired inline ✗. */
+const cornerFlag = (cell: Locator) => cell.locator("span.absolute");
+
 test("phone: the page stays viewport-wide and each group table pans in its own scroller", async ({
   page,
 }) => {
@@ -427,14 +431,14 @@ test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and mo
 
   // The seeded Rule 8 defect: LOCA_GL is 11.8 where 2DP demands 11.80. The
   // click selects the cell; the engine is already loading eagerly (#531),
-  // and the click's own arm() is just the fast path — either way the ✗
-  // arrives on this cell.
+  // and the click's own arm() is just the fast path — either way the
+  // corner flag (#616) arrives on this cell.
   const cell = page.getByRole("button", {
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
   await cell.click();
   await expect(cell).toHaveClass(/bg-accent-quiet/);
-  await expect(cell).toContainText("✗");
+  await expect(cornerFlag(cell)).toBeVisible();
 
   // Enter opens the value in place; typing replaces the selection; Enter
   // commits — and the live revalidation clears the finding.
@@ -447,7 +451,7 @@ test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and mo
   await page.keyboard.press("Enter");
   await expect(editor).toBeHidden();
   await expect(cell).toContainText("11.80");
-  await expect(cell).not.toContainText("✗");
+  await expect(cornerFlag(cell)).toHaveCount(0);
 
   // Esc restores: the draft dies with the editor.
   await page.keyboard.press("Enter");
@@ -639,7 +643,7 @@ test("fine: findings speak one vocabulary — tinted cell with popover, chipped 
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
   await cell.click();
-  await expect(cell).toContainText("✗");
+  await expect(cornerFlag(cell)).toBeVisible();
   const td = cell.locator("xpath=ancestor::td[1]");
   await expect(td).toHaveClass(/bg-err-quiet/);
   await cell.hover();
@@ -655,6 +659,66 @@ test("fine: findings speak one vocabulary — tinted cell with popover, chipped 
     .filter({ hasText: "not defined" });
   await expect(panelRows).toHaveCount(2);
   await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
+});
+
+test("the corner flag arrives with the findings, no pointer required", async ({
+  page,
+}) => {
+  // #616's fine-AND-coarse criterion, honestly: the flag renders from the
+  // FINDINGS, not from an interaction, so it must appear on every modality
+  // without a click — which is exactly what lets the touch lane (the one
+  // project every in-place-editor test skips) verify it. The inline glyph
+  // it replaced is asserted gone in the same breath.
+  await page.goto("/");
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await expect(cornerFlag(cell)).toBeVisible({ timeout: 15_000 });
+  await expect(cell).not.toContainText("\u2717");
+});
+
+test("the header marks speak the dictionary's status grammar", async ({
+  page,
+}) => {
+  // #616: bare key glyph = KEY, boxed key = KEY+REQUIRED, `*` = REQUIRED
+  // alone, nothing = OTHER — and the words live in the header's title, so
+  // the marks stay decorative. One header of each status, from the page's
+  // own headings: the axes are independent (10a identity, 10b non-empty)
+  // and TRAN is where they separate.
+  await page.goto("/");
+
+  // LOCA_ID in its own group: KEY only — the glyph, unboxed.
+  const locaId = page.locator("section#loca th").filter({ hasText: "LOCA_ID" });
+  await expect(locaId.locator("svg")).toBeVisible();
+  await expect(locaId.locator("span[class*='border-current']")).toHaveCount(0);
+  await expect(
+    locaId.locator("span[title*='KEY: part of the row']"),
+  ).toHaveCount(1);
+
+  // PROJ_ID: KEY+REQUIRED — the glyph in its box.
+  const projId = page.locator("section#proj th").filter({ hasText: "PROJ_ID" });
+  await expect(projId.locator("svg")).toBeVisible();
+  await expect(projId.locator("span[class*='border-current']")).toBeVisible();
+  await expect(projId.locator("span[title*='KEY and REQUIRED']")).toHaveCount(
+    1,
+  );
+
+  // TRAN_DATE: REQUIRED without KEY — the form-convention asterisk.
+  const tranDate = page
+    .locator("section#file th")
+    .filter({ hasText: "TRAN_DATE" });
+  await expect(tranDate.getByText("*", { exact: true })).toBeVisible();
+  await expect(tranDate.locator("svg")).toHaveCount(0);
+  await expect(
+    tranDate.locator("span[title*='REQUIRED: must not be empty']"),
+  ).toHaveCount(1);
+
+  // PROJ_NAME: OTHER — no mark at all.
+  const projName = page
+    .locator("section#proj th")
+    .filter({ hasText: "PROJ_NAME" });
+  await expect(projName.locator("svg")).toHaveCount(0);
+  await expect(projName.getByText("*", { exact: true })).toHaveCount(0);
 });
 
 test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the reader causes it", async ({
@@ -1628,13 +1692,14 @@ test("fine: the bad abbreviation lights its cell, and fixing the value clears it
   const bCell = samp.getByRole("button", {
     name: "Edit SAMP_TYPE on row 1 of SAMP",
   });
-  await expect(bCell.getByText("✗")).toBeVisible();
+  await expect(cornerFlag(bCell)).toBeVisible();
   // The LLPL copy of the same value is its own group's finding, its own mark.
   await expect(
-    page
-      .locator("section#llpl")
-      .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of LLPL" })
-      .getByText("✗"),
+    cornerFlag(
+      page
+        .locator("section#llpl")
+        .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of LLPL" }),
+    ),
   ).toBeVisible();
   // D is defined in ABBR: committing it clears SAMP's Rule 16, and the mark
   // goes with it.
@@ -1642,7 +1707,7 @@ test("fine: the bad abbreviation lights its cell, and fixing the value clears it
   await bCell.click();
   await page.keyboard.type("D");
   await page.keyboard.press("Enter");
-  await expect(bCell.getByText("✗")).not.toBeVisible();
+  await expect(cornerFlag(bCell)).toHaveCount(0);
 });
 
 test("fine: the orphaned row wears the row treatment, and restoring its parent clears it", async ({
