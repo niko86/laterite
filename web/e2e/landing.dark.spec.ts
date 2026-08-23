@@ -90,3 +90,35 @@ test("dark: the delete-group control keeps its danger border", async ({
   await page.goto("/");
   await expectErrBorder(page, "Delete the PROJ group");
 });
+
+test("dark: the KEY region tint stays structural", async ({ page }) => {
+  // The light half lives in landing.spec.ts (#590); the same two-bands-one-
+  // tint claim must hold under dark's own stone mix.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const headerBg = (section: string) =>
+    page
+      .locator(`section#${section} th`)
+      .nth(1)
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await headerBg("samp")).toBe(await headerBg("llpl"));
+
+  // And the three treatments stay pairwise distinct under dark's tokens:
+  // the orphan row's wash is not the KEY tint, and its edge marker renders.
+  const llpl = page.locator("section#llpl");
+  const td = (cell: string) =>
+    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=..");
+  const washBg = await td("2-1").evaluate(
+    (el) => getComputedStyle(el).backgroundColor,
+  );
+  const keyBg = await td("1-1").evaluate(
+    (el) => getComputedStyle(el).backgroundColor,
+  );
+  expect(washBg, "row wash is not the KEY tint in dark").not.toBe(keyBg);
+  expect(
+    await td("2-0").evaluate((el) => getComputedStyle(el).boxShadow),
+    "the row edge marker renders in dark",
+  ).not.toBe("none");
+});

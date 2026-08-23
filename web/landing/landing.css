@@ -49,24 +49,28 @@
   --canvas: var(--stone-150);
 }
 
-/* The two band tints, as percentages rather than colours (#396).
-   A tint is `color-mix(band, transparent, N%)`, so the BAND is the group's
-   and the PERCENTAGE is the theme's — which is what lets #400 dial both down
-   for dark without restating a single band colour. */
+/* The chip tint, as a percentage rather than a colour (#396): the BAND is
+   the group's and the PERCENTAGE is the theme's, which is what lets #400
+   dial it down for dark without restating a single band colour. The KEY
+   region left this mechanism at #590 (the owner's recorded choice on the
+   issue): a band-coloured region on the red-brown ramp read as "these
+   columns are all wrong", so the tint is now STRUCTURAL stone — one value
+   for every table, per theme — and band identity stays on the group chip
+   and the table's cap. */
 :root {
   --chip-tint-pct: 26%;
-  --key-tint-pct: 18%;
+  --key-tint: color-mix(in srgb, var(--stone-300) 18%, transparent);
 }
 
 /* Dark (#400). The pairing's dark set — the one-step-lighter band ramp, the
  * surfaces, the fg ramp, sand-for-maroon accent and the dimmed statuses — lives
  * in the shared colors.css since #403 made the app the second surface rendering
- * it. What stays here is the one dial that is this page's own: the band-tint
- * percentages, dialled down because a saturated wash that reads as a tint on
- * stone glows on near-black. */
+ * it. What stays here are the dials that are this page's own: the chip's
+ * band-tint percentage and the KEY region's stone mix (#590), both dialled
+ * down because a wash that reads as a tint on stone glows on near-black. */
 .dark {
   --chip-tint-pct: 20%;
-  --key-tint-pct: 14%;
+  --key-tint: color-mix(in srgb, var(--stone-500) 14%, transparent);
 }
 
 /* Set from the token rather than Tailwind's `leading-relaxed` utility, which

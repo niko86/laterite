@@ -1499,3 +1499,101 @@ test("the delete-group control reads as a button, not a caption", async ({
   await page.goto("/");
   await expectErrBorder(page, "Delete the PROJ group");
 });
+
+test("fine: the bad abbreviation lights its cell, and fixing the value clears it", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the carousel is the coarse pointer's editor (#525)");
+  // #590: Rule 16 arrives group-level — no heading, no row — so no cell used
+  // to light up; the reader saw the alert text but not the cell. The mapping
+  // lights EVERY cell carrying the named value, one mark per group that
+  // reports it.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const samp = page.locator("section#samp");
+  const bCell = samp.getByRole("button", {
+    name: "Edit SAMP_TYPE on row 1 of SAMP",
+  });
+  await expect(bCell.getByText("✗")).toBeVisible();
+  // The LLPL copy of the same value is its own group's finding, its own mark.
+  await expect(
+    page
+      .locator("section#llpl")
+      .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of LLPL" })
+      .getByText("✗"),
+  ).toBeVisible();
+  // D is defined in ABBR: committing it clears SAMP's Rule 16, and the mark
+  // goes with it.
+  await bCell.click();
+  await bCell.click();
+  await page.keyboard.type("D");
+  await page.keyboard.press("Enter");
+  await expect(bCell.getByText("✗")).not.toBeVisible();
+});
+
+test("fine: the orphaned row wears the row treatment, and restoring its parent clears it", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the carousel is the coarse pointer's editor (#525)");
+  // #590: Rule 10c arrives heading-less but row-pinned — a claim about the
+  // whole row, so it reads as one: wash across the cells plus an edge
+  // marker, distinct from the cell verdict's text-and-weight treatment.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const llpl = page.locator("section#llpl");
+  const td = (cell: string) =>
+    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=..");
+  const shadow = (cell: string) =>
+    td(cell).evaluate((el) => getComputedStyle(el).boxShadow);
+  const bg = (cell: string) =>
+    td(cell).evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  expect(await shadow("2-0"), "the orphan row's edge marker").not.toBe("none");
+  expect(await shadow("1-0"), "a healthy row has none").toBe("none");
+  expect(
+    await bg("2-1"),
+    "the wash replaces the KEY tint on the condemned row",
+  ).not.toBe(await bg("1-1"));
+
+  // Restore the SAMP parent the orphan names: BH02|4.50|S3|D|BH02-S3.
+  const samp = page.locator("section#samp");
+  const edit = async (name: string, value: string) => {
+    const cell = samp.getByRole("button", { name });
+    await cell.click();
+    await cell.click();
+    await page.keyboard.type(value);
+    await page.keyboard.press("Enter");
+    // Serialize the commits — the next edit must not race this one's close.
+    await expect(samp.getByRole("textbox")).not.toBeVisible();
+  };
+  await edit("Edit SAMP_TOP on row 3 of SAMP", "4.50");
+  await edit("Edit SAMP_REF on row 3 of SAMP", "S3");
+  await edit("Edit SAMP_ID on row 3 of SAMP", "BH02-S3");
+  await expect(async () => {
+    expect(await shadow("2-0")).toBe("none");
+  }).toPass();
+});
+
+test("the KEY region tint is structural, not a verdict", async ({ page }) => {
+  // #590, the owner's recorded choice on the issue: stone, one value across
+  // every table. The band-coloured region sat on the red-brown ramp, so on
+  // SAMP and LLPL whole columns read as failed; identity stays on the group
+  // chip and the table's cap. Two tables on different bands rendering the
+  // SAME header tint is what "structural" means.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const headerBg = (section: string) =>
+    page
+      .locator(`section#${section} th`)
+      .nth(1)
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await headerBg("samp")).toBe(await headerBg("llpl"));
+});

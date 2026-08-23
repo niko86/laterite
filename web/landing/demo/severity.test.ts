@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   severityCellTint,
   severityLineTint,
+  severityRowEdge,
+  severityRowTint,
   severityTint,
   worstPerLine,
   worstSeverity,
@@ -91,5 +93,26 @@ describe("worstSeverity", () => {
     };
     expect(worstSeverity([finding("warning"), unknown])).toBe("brand-new");
     expect(severityCellTint("brand-new")).toBe(severityCellTint("error"));
+  });
+});
+
+describe("severityRowTint", () => {
+  it("is a different dress from the cell grammar — a row fault is a different claim", () => {
+    expect(severityRowTint("error")).not.toBe(severityCellTint("error"));
+  });
+
+  it("falls to error for an unknown tier, loud like every variant", () => {
+    expect(severityRowTint("brand-new-tier")).toBe(severityRowTint("error"));
+  });
+});
+
+describe("severityRowEdge", () => {
+  it("marks with the tier's own colour", () => {
+    expect(severityRowEdge("warning")).toContain("--warn");
+    expect(severityRowEdge("fyi")).toContain("--info");
+  });
+
+  it("falls to error for an unknown tier", () => {
+    expect(severityRowEdge("brand-new-tier")).toBe(severityRowEdge("error"));
   });
 });

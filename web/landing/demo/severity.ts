@@ -64,6 +64,38 @@ const LINE: Record<string, string> = {
   fyi: "border-l-info bg-info-quiet text-info",
 };
 
+const ROW_ERROR = "bg-err-quiet";
+
+/** The condemned ROW's variant of the grammar (#590) — wash only, no text
+ *  repaint and no weight: a row-level fault ("this row has no parent") is a
+ *  different claim from a cell verdict, so it must not wear the cell's
+ *  dress. Unknown tiers fall to error, loud, like every variant here. */
+export function severityRowTint(severity: string): string {
+  return ROW[severity] ?? ROW_ERROR;
+}
+
+const ROW: Record<string, string> = {
+  error: ROW_ERROR,
+  warning: "bg-warn-quiet",
+  fyi: "bg-info-quiet",
+};
+
+const ROW_EDGE_ERROR = "[box-shadow:inset_3px_0_0_var(--err)]";
+
+/** The condemned row's left-edge marker, first cell only — an inset shadow
+ *  rather than a border, so the marked row's text stays aligned with its
+ *  column instead of shifting by the marker's width. Unknown tiers fall to
+ *  error, loud, like every variant here. */
+export function severityRowEdge(severity: string): string {
+  return ROW_EDGE[severity] ?? ROW_EDGE_ERROR;
+}
+
+const ROW_EDGE: Record<string, string> = {
+  error: ROW_EDGE_ERROR,
+  warning: "[box-shadow:inset_3px_0_0_var(--warn)]",
+  fyi: "[box-shadow:inset_3px_0_0_var(--info)]",
+};
+
 const RANK: Record<string, number> = { error: 3, warning: 2, fyi: 1 };
 
 /** One comparator for both worst-of aggregations below — an unknown tier

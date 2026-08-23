@@ -138,3 +138,40 @@ export function flatten(
       (a.line ?? Number.MAX_SAFE_INTEGER) - (b.line ?? Number.MAX_SAFE_INTEGER),
   );
 }
+
+/** Rule 16 names its target only in prose: the finding carries no heading
+ *  and no row — correctly, since it is a statement about the group's USE of
+ *  an abbreviation, not about one cell. This reads the value and the heading
+ *  back out of that prose so the tables can light the cells that carry it
+ *  (#590). Null for every other finding shape; the message text is the
+ *  contract, so the fixture test beside this pins the exact wording the
+ *  engine emits. */
+export function abbreviationTarget(
+  f: Finding,
+): { value: string; heading: string } | null {
+  if (!f.rule.endsWith("Rule 16") || f.heading !== null || f.dataRow !== null)
+    return null;
+  const m = /^Abbreviation "(.*)" under (\S+) is not defined/.exec(f.desc);
+  return m ? { value: m[1] as string, heading: m[2] as string } : null;
+}
+
+/** Every cell in one group's block that carries the abbreviation a Rule 16
+ *  finding names — the finding→cell mapping. A group finding may light
+ *  SEVERAL cells: pinning it to the first row would lie in a file where rows
+ *  1 and 3 both carry the value, which is why the finding maps to all of
+ *  them or none. */
+export function abbreviationCells(
+  f: Finding,
+  headings: readonly string[],
+  rows: readonly (readonly string[])[],
+): { row: number; col: number }[] {
+  const target = abbreviationTarget(f);
+  if (!target) return [];
+  const col = headings.indexOf(target.heading);
+  if (col === -1) return [];
+  const out: { row: number; col: number }[] = [];
+  rows.forEach((r, row) => {
+    if (r[col] === target.value) out.push({ row, col });
+  });
+  return out;
+}
