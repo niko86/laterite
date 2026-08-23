@@ -21,7 +21,13 @@ test("dark: the canvas swaps at the token level, and a dark: class really applie
   // The mechanism, not just the preference: the bootstrap must have put the
   // class on the root, because everything below hangs off it.
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
-  await expect(page.locator('aside[aria-label="Transport"]')).toBeVisible();
+  // The transport aside was this probe's raised subject until the phone
+  // declutter stopped rendering it below the breakpoint (#596) — this lane
+  // runs at 390, so the group table's wrapper carries the same
+  // dark:bg-surface-raised contract now, and the aside's absence is itself
+  // asserted.
+  await expect(page.locator('aside[aria-label="Transport"]')).toHaveCount(0);
+  await expect(page.locator("section#loca table")).toBeVisible();
 
   // Two probes, two failure shapes — and they need different instruments.
   //
@@ -52,8 +58,10 @@ test("dark: the canvas swaps at the token level, and a dark: class really applie
     return {
       darkCanvas,
       lightCanvas,
-      aside: getComputedStyle(
-        document.querySelector('aside[aria-label="Transport"]')!,
+      raisedCard: getComputedStyle(
+        document
+          .querySelector("section#loca table")!
+          .closest('[class*="dark:bg-surface-raised"]')!,
       ).backgroundColor,
       // The SOURCE tokens, not the `--color-*` theme names: `@theme inline`
       // erases those at build time (utilities compile straight to the source
@@ -66,11 +74,13 @@ test("dark: the canvas swaps at the token level, and a dark: class really applie
     probe.lightCanvas,
   );
   // Guard the probe against vacuity first: if the two tokens ever computed
-  // equal, the aside assertion below would pass while proving nothing.
+  // equal, the raised-card assertion below would pass while proving nothing.
   expect(probe.raised, "surface and raised must differ in dark").not.toBe(
     probe.surface,
   );
-  expect(probe.aside, "the aside's dark: fill must apply").toBe(probe.raised);
+  expect(probe.raisedCard, "the card's dark: fill must apply").toBe(
+    probe.raised,
+  );
 });
 
 test("dark: the page still fits the viewport", async ({ page }) => {

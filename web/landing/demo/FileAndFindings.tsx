@@ -6,9 +6,15 @@
  * handoff captions it as, and hard-coding a severity in the UI is how a demo
  * comes to disagree with the tool it is advertising.
  *
- * The output pane scrolls sideways rather than wrapping. AGS4 lines are long,
- * and wrapping them destroys the column alignment that makes the format readable
- * at all — which is the one thing this pane exists to show.
+ * The output pane scrolls sideways rather than wrapping — AGS4 lines are
+ * long, and wrapping them destroys the column alignment that makes the format
+ * readable at all — EXCEPT below the layout breakpoint (#596): findings cite
+ * line numbers, and on a phone a hidden line end is worse than a wrapped one,
+ * so there the pane soft-wraps with a hanging indent under the number and
+ * the number keeps meaning the logical line. Type size never shrinks either
+ * way. The same breakpoint drops the page's three secondary-prose pieces —
+ * the status pill, the orphan explainer, the transport aside — because at
+ * 390px they cost screens of scroll to say what the demo already shows.
  *
  * "Nothing is uploaded" sits with the findings panel (#594), not in the
  * footer: the verdict is the moment a reader wonders where their file just
@@ -113,63 +119,66 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           transmission header — drawn, never run: this page's wasm build
           ships without the transport feature on purpose, and the only way
           out of the aside is the cookbook page. */}
-      <aside
-        aria-label="Transport"
-        class="mt-8 max-w-[46rem] rounded-lg border border-line bg-surface p-4 dark:bg-surface-raised"
-      >
-        <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
-          TRAN, taken literally
-        </p>
-        <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
-          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-            delivery.ags
-          </code>
-          <span aria-hidden="true" class="text-fg-faint">
-            →
-          </span>
-          <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
-            pack
-          </span>
-          <span aria-hidden="true" class="text-fg-faint">
-            →
-          </span>
-          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-            delivery.ags.zst
-          </code>
-        </div>
-        <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
-          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-            delivery.ags
-          </code>
-          <span aria-hidden="true" class="text-fg-faint">
-            →
-          </span>
-          <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
-            lock
-          </span>
-          <span aria-hidden="true" class="text-fg-faint">
-            →
-          </span>
-          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-            delivery.ags.zst.age
-          </code>
-        </div>
-        <p class="mt-3 max-w-[60ch] text-caption text-fg-soft">
-          The delivery itself is built for the trip its cover sheet describes:{" "}
-          <code class="font-mono">pack</code> squeezes the file with zstd and{" "}
-          <code class="font-mono">unpack</code> restores it byte-for-byte (the
-          pair moves bytes, it never parses them) while{" "}
-          <code class="font-mono">lock</code> starts from the original and seals
-          its zstd pack inside a passphrase-encrypted age envelope. Shown here,
-          not run: this page's engine deliberately ships without transport.{" "}
-          <a
-            class="font-semibold text-cta no-underline transition-colors hover:underline"
-            href="https://docs.laterite.dev/cookbook/transport/"
-          >
-            Pack / encrypt for transport
-          </a>
-        </p>
-      </aside>
+      <Show when={!narrowViewport()}>
+        <aside
+          aria-label="Transport"
+          class="mt-8 max-w-[46rem] rounded-lg border border-line bg-surface p-4 dark:bg-surface-raised"
+        >
+          <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+            TRAN, taken literally
+          </p>
+          <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
+            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+              delivery.ags
+            </code>
+            <span aria-hidden="true" class="text-fg-faint">
+              →
+            </span>
+            <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
+              pack
+            </span>
+            <span aria-hidden="true" class="text-fg-faint">
+              →
+            </span>
+            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+              delivery.ags.zst
+            </code>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
+            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+              delivery.ags
+            </code>
+            <span aria-hidden="true" class="text-fg-faint">
+              →
+            </span>
+            <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
+              lock
+            </span>
+            <span aria-hidden="true" class="text-fg-faint">
+              →
+            </span>
+            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+              delivery.ags.zst.age
+            </code>
+          </div>
+          <p class="mt-3 max-w-[60ch] text-caption text-fg-soft">
+            The delivery itself is built for the trip its cover sheet describes:{" "}
+            <code class="font-mono">pack</code> squeezes the file with zstd and{" "}
+            <code class="font-mono">unpack</code> restores it byte-for-byte (the
+            pair moves bytes, it never parses them) while{" "}
+            <code class="font-mono">lock</code> starts from the original and
+            seals its zstd pack inside a passphrase-encrypted age envelope.
+            Shown here, not run: this page's engine deliberately ships without
+            transport.{" "}
+            <a
+              class="font-semibold text-cta no-underline transition-colors hover:underline"
+              href="https://docs.laterite.dev/cookbook/transport/"
+            >
+              Pack / encrypt for transport
+            </a>
+          </p>
+        </aside>
+      </Show>
 
       <div class="mt-6 grid gap-6 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[64rem]:items-start">
         <div class="min-w-0">
@@ -182,12 +191,15 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               each table now carries its own fix budget. The neutral "note"
               tone — same callout as every finding, no verdict. */}
           <Show
-            when={report()?.findings.some(
-              (f) =>
-                f.rule === "AGS Format Rule 10c" &&
-                f.group === "LLPL" &&
-                isManualFinding(f),
-            )}
+            when={
+              !narrowViewport() &&
+              report()?.findings.some(
+                (f) =>
+                  f.rule === "AGS Format Rule 10c" &&
+                  f.group === "LLPL" &&
+                  isManualFinding(f),
+              )
+            }
           >
             <div class="mb-3 max-w-[70ch]">
               <FindingCallout severity="note">
@@ -246,7 +258,16 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                         <span class="w-8 shrink-0 text-right text-fg-dim select-none">
                           {n()}
                         </span>
-                        <span>{line}</span>
+                        {/* Below the breakpoint the content wraps INSIDE its
+                            own flex item (#596) — the number column stays a
+                            fixed gutter, so continuation lines land as a
+                            hanging indent under it, and `anywhere` is what
+                            lets an unspaced AGS record break at all. Desktop
+                            keeps the row unconstrained, which is what the
+                            scroller's side-scroll rides on. */}
+                        <span class="max-[64rem]:min-w-0 max-[64rem]:flex-1 max-[64rem]:whitespace-pre-wrap max-[64rem]:[overflow-wrap:anywhere]">
+                          {line}
+                        </span>
                       </div>
                     );
                   }}
@@ -271,9 +292,15 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         {/* The findings list. The id is the scoreboard's jump target (#531):
             the chip states the verdict, this panel is its evidence. */}
         <div id="findings" class="min-w-0 scroll-mt-16">
-          <p class="rounded-md border border-ok/40 bg-ok-quiet px-3 py-1.5 text-caption font-semibold text-ok">
-            Nothing is uploaded. The engine runs in this tab.
-          </p>
+          {/* One of the three prose pieces the phone declutter drops (#596):
+              on a 390px screen the reassurance cost more scroll than it
+              bought — the webapp line below still says "it stays in your
+              browser", so the privacy claim survives on every width. */}
+          <Show when={!narrowViewport()}>
+            <p class="rounded-md border border-ok/40 bg-ok-quiet px-3 py-1.5 text-caption font-semibold text-ok">
+              Nothing is uploaded. The engine runs in this tab.
+            </p>
+          </Show>
           <p class="mt-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report()}>

@@ -700,6 +700,15 @@ test("the transport aside tells the packed story without running it", async ({
   await page.goto("/");
 
   const aside = page.getByRole("complementary", { name: "Transport" });
+
+  // Below the layout breakpoint the aside is one of the three prose pieces
+  // the phone declutter removes (#596) — not hidden, not rendered.
+  if (width(page) < 1024) {
+    await expect(page.locator("section#file table")).toBeVisible();
+    await expect(aside).toHaveCount(0);
+    return;
+  }
+
   await aside.scrollIntoViewIfNeeded();
   await expect(aside).toBeVisible();
 
@@ -914,15 +923,21 @@ test("fine: the fix budget lives on each table — scoped to its group, honest a
   // The validator-vs-fixer narrative survives where it stays true: pinned to
   // the orphan the fixer refuses to touch — and it LEAVES when the orphan
   // does. Deleting the orphaned LLPL row repairs it by hand; the note must
-  // follow its example out, and undo brings both back.
+  // follow its example out, and undo brings both back. Below the breakpoint
+  // the note is one of the three prose pieces the phone declutter never
+  // renders (#596), so the choreography is the wide lanes' to hold.
   const narrative = page.getByText(
     "difference between a validator and a fixer",
   );
-  await expect(narrative).toBeVisible();
-  await page.getByRole("button", { name: "Delete row 3 of LLPL" }).click();
-  await expect(narrative).toBeHidden();
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(narrative).toBeVisible();
+  if (width(page) < 1024) {
+    await expect(narrative).toHaveCount(0);
+  } else {
+    await expect(narrative).toBeVisible();
+    await page.getByRole("button", { name: "Delete row 3 of LLPL" }).click();
+    await expect(narrative).toBeHidden();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(narrative).toBeVisible();
+  }
 
   // A scoped fix is one commit like any other: undo returns the raw decimal.
   await page.keyboard.press("ControlOrMeta+z");
@@ -1375,6 +1390,21 @@ test("the file region reads explainer, pane, reset, pill, findings — and the c
       claim,
     ).toBe(true);
   };
+
+  if (width(page) < 1024) {
+    // The phone declutter (#596): the explainer and the pill are two of the
+    // three prose pieces that do not render below the breakpoint, so the
+    // reading order here is the survivors'.
+    await expect(file.getByText("left standing on purpose")).toHaveCount(0);
+    await expect(file.getByText("Nothing is uploaded")).toHaveCount(0);
+    await precedes(pane, resetBtn, "the file pane precedes the reset button");
+    await precedes(
+      resetBtn,
+      findingsLabel,
+      "the reset button precedes the findings panel",
+    );
+    return;
+  }
 
   await precedes(
     explainer,
@@ -1898,4 +1928,93 @@ test("the install cards become a one-card looping deck on a phone", async ({
   ).toBe("0s");
   await next.click();
   await expect(current).toContainText("Browser");
+});
+
+test("the file pane wraps on a phone and side-scrolls on desktop", async ({
+  page,
+}) => {
+  // #596: findings cite line numbers, so hidden content is worse than
+  // wrapped content — below the breakpoint every character is visible,
+  // wrapped with a hanging indent under the number; desktop keeps the
+  // side-scroll that preserves column alignment.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const scroller = page.locator("section#file .overscroll-contain");
+  const overflowsX = () =>
+    scroller.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+
+  if (width(page) >= 1024) {
+    expect(await overflowsX(), "desktop keeps the side-scroll").toBe(true);
+    return;
+  }
+
+  expect(await overflowsX(), "no sideways scroll on a phone").toBe(false);
+  // A long DATA line really wraps — its row stands taller than a single
+  // line — and the severity band spans the whole logical line: the banded
+  // row's paint is as tall as the row, wrapped or not.
+  const rows = scroller.locator("div.flex");
+  const heights = await rows.evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().height),
+  );
+  const single = Math.min(...heights.filter((h) => h > 0));
+  expect(Math.max(...heights), "some line must wrap").toBeGreaterThan(
+    single * 1.5,
+  );
+  // The hanging indent is geometry, not inference: every row's content span
+  // starts at the same x — one content column — and that column sits past
+  // the number gutter, so continuation lines can only land under content.
+  const contentX = await scroller
+    .locator("div.flex > span:nth-child(2)")
+    .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().x));
+  expect(new Set(contentX).size, "one content column").toBe(1);
+  const gutterRight = await scroller
+    .locator("div.flex > span:first-child")
+    .first()
+    .evaluate((el) => el.getBoundingClientRect().right);
+  expect(contentX[0], "content clears the number gutter").toBeGreaterThan(
+    gutterRight,
+  );
+  // AC: the severity band spans the full logical line when wrapped — the
+  // banded Rule 8 row is itself one of the wrapped ones, and its border is
+  // the row box's own left edge, so tall row = tall band.
+  const banded = scroller.locator("div.flex[class*='border-l-err']").first();
+  expect(
+    await banded.evaluate((el) => el.getBoundingClientRect().height),
+    "the banded row wraps and its band spans it",
+  ).toBeGreaterThan(single * 1.5);
+  // One row per LOGICAL line, counted from the same fixture the page bakes
+  // in (the seededFinalDepthLabel convention, #524) — editing the seed moves
+  // both sides with no code edit here.
+  const seedLines = readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../landing/demo/seeded-delivery.ags",
+    ),
+    "utf8",
+  ).split("\r\n").length;
+  expect(heights.length, "one row per logical line").toBe(seedLines);
+  // Line numbers stay one per LOGICAL line: the numbers run 1..N with no
+  // repeats, so "line 17" in a finding still means the 17th row here.
+  const numbers = await scroller
+    .locator("div.flex > span:first-child")
+    .allTextContents();
+  expect(numbers.map(Number)).toEqual(numbers.map((_, i) => i + 1));
+});
+
+test("the section rhythm steps down on a phone", async ({ page }) => {
+  // #596: the desktop rhythm at 390px ran the page ~17 screens tall. The
+  // step-down is the dial the owner reviews; what this pins is that a phone
+  // pays LESS than the old desktop rhythm and desktop pays what it did.
+  await page.goto("/");
+  const pad = await page
+    .locator("section#loca > div")
+    .evaluate((el) => parseFloat(getComputedStyle(el).paddingTop));
+  if (width(page) >= 1088) {
+    expect(pad, "the 68rem rhythm holds").toBe(64);
+  } else if (width(page) < 640) {
+    expect(pad, "a phone pays less than the old py-12").toBeLessThan(48);
+    expect(pad, "but not drastically less").toBeGreaterThanOrEqual(24);
+  }
 });
