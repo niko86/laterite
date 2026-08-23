@@ -43,7 +43,7 @@ export const Masthead: Component = () => (
       <a
         href="/"
         class="flex items-center gap-2.5 no-underline"
-        aria-label="laterite — home"
+        aria-label="laterite home"
       >
         <img
           src={mark}

@@ -19,9 +19,9 @@ import { DEMO_GROUPS } from "./schema";
  *  Editorial rather than derived: the dictionary's own descriptions ("Location
  *  Details") name the group without explaining why it exists. */
 const BLURB: Record<string, string> = {
-  PROJ: "Every delivery starts here. One row, naming the job — and every other group in the file hangs off it.",
+  PROJ: "Every delivery starts here. One row, naming the job; every other group in the file hangs off it.",
   LOCA: "The holes. One row per borehole or trial pit, with its ground level and how deep it went.",
-  SAMP: "What came out of the hole. Note that LOCA_ID reappears — that repetition IS the link back to the borehole.",
+  SAMP: "What came out of the hole. Note that LOCA_ID reappears; that repetition IS the link back to the borehole.",
   LLPL: "Atterberg limits, one row per specimen. Nine columns, seven of them KEY: five restating SAMP's key, two naming the specimen. That is what a join looks like in a format with no joins.",
 };
 

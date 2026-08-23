@@ -72,7 +72,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     package: "@laterite/ags4-wasm",
     command: "npm install @laterite/ags4-wasm",
     href: "https://www.npmjs.com/package/@laterite/ags4-wasm",
-    note: "the same engine as wasm \u2014 or open the webapp",
+    note: "the same engine as wasm, or open the webapp",
     primary: false,
   },
 ];

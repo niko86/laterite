@@ -108,9 +108,9 @@ export const InstallGrid: Component = () => (
         don't re-widen the sentence to all five cards. */}
     <p class="mt-2 max-w-[60ch] text-fg-soft">
       One engine behind every one of these. Every surface that writes AGS4
-      &mdash; Python, Node, the CLI, the browser &mdash; emits byte-identical
-      scriptable output, gate-checked nightly, so a CI job and a notebook cannot
-      disagree. DuckDB is the read-only surface: there is no writer to diverge.
+      (Python, Node, the CLI, the browser) emits byte-identical scriptable
+      output, gate-checked nightly, so a CI job and a notebook cannot disagree.
+      DuckDB is the read-only surface: there is no writer to diverge.
     </p>
 
     <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
@@ -125,8 +125,8 @@ export const InstallGrid: Component = () => (
         href="https://docs.laterite.dev/learn/install/"
       >
         Full install guide
-      </a>{" "}
-      — extras, the dependency shape, and a first validate in three lines.
+      </a>
+      : extras, the dependency shape, and a first validate in three lines.
       laterite is in beta: the AGS4 surface is stable and covered, and the
       version numbers still move quickly.
     </p>

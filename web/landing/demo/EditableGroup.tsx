@@ -168,7 +168,7 @@ export const EditableGroup: Component<{
               <span class="text-caption text-fg-faint">
                 {coarsePointer()
                   ? "Tap any cell to edit the row."
-                  : "Click a cell, then type — Enter commits, Esc cancels."}
+                  : "Click a cell, then type. Enter commits, Esc cancels."}
               </span>
             </Show>
           </div>

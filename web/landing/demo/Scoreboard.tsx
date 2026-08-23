@@ -87,7 +87,7 @@ export const Scoreboard: Component = () => {
           }}
         >
           {scoreboardLabel(t())}
-          <span class="sr-only"> — jump to the findings panel</span>
+          <span class="sr-only">, jump to the findings panel</span>
         </button>
       )}
     </Show>
