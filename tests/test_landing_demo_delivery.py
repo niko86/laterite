@@ -207,6 +207,7 @@ def _schema_ts() -> dict[str, dict]:
             continue
         heading = re.search(
             r'^\s*\{ name: "(?P<name>\w+)", key: (?P<key>true|false), '
+            r"required: (?P<required>true|false), "
             r'type: "(?P<type>[^"]*)", unit: "(?P<unit>[^"]*)"',
             line,
         )
@@ -215,6 +216,7 @@ def _schema_ts() -> dict[str, dict]:
                 {
                     "name": heading.group("name"),
                     "key": heading.group("key") == "true",
+                    "required": heading.group("required") == "true",
                     "type": heading.group("type"),
                     "unit": heading.group("unit"),
                 }
@@ -261,6 +263,14 @@ def test_the_committed_schema_agrees_with_the_dictionary() -> None:
                 f"{code}.{drawn['name']} is drawn "
                 f"{'as KEY' if drawn['key'] else 'as non-KEY'} and the "
                 f"dictionary says {real.status}"
+            )
+            # The other status axis (#616): REQUIRED drives its own header
+            # mark now, so a drift here is a wrong mark on the page, not a
+            # cosmetic field.
+            assert drawn["required"] == ("REQUIRED" in real.status), (
+                f"{code}.{drawn['name']} is drawn "
+                f"{'as REQUIRED' if drawn['required'] else 'as non-REQUIRED'} "
+                f"and the dictionary says {real.status}"
             )
             assert drawn["type"] == real.type, (
                 f"{code}.{drawn['name']} is drawn as {drawn['type']} and the "

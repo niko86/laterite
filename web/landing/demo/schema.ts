@@ -5,9 +5,14 @@
 export type DemoHeading = {
   /** The AGS4 heading, e.g. `SAMP_TOP`. */
   readonly name: string;
-  /** True when the dictionary marks it KEY — the ◆ marker and the pinned
-   *  column edge both key off this, and so does the parent-match tuple. */
+  /** True when the dictionary's status carries KEY (Rule 10a, the row's
+   *  identity tuple) — the header's key glyph and the pinned column edge
+   *  both key off this, and so does the parent-match tuple. */
   readonly key: boolean;
+  /** True when the status carries REQUIRED (Rule 10b, present and
+   *  non-empty) — an independent axis: TRAN holds REQUIRED-only headings,
+   *  and PROJ_ID/TRAN_ISNO are both at once (#616's marker grammar). */
+  readonly required: boolean;
   /** The AGS TYPE the file declares, e.g. `2DP`. */
   readonly type: string;
   /** The unit, or "" where the dictionary gives none. */
@@ -29,9 +34,9 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     parent: null,
     description: "Project Information",
     headings: [
-      { name: "PROJ_ID", key: true, type: "ID", unit: "", description: "Project identifier" },
-      { name: "PROJ_NAME", key: false, type: "X", unit: "", description: "Project title" },
-      { name: "PROJ_CLNT", key: false, type: "X", unit: "", description: "Client organisation name" },
+      { name: "PROJ_ID", key: true, required: true, type: "ID", unit: "", description: "Project identifier" },
+      { name: "PROJ_NAME", key: false, required: false, type: "X", unit: "", description: "Project title" },
+      { name: "PROJ_CLNT", key: false, required: false, type: "X", unit: "", description: "Client organisation name" },
     ],
   },
   {
@@ -39,11 +44,11 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     parent: "PROJ",
     description: "Location Details",
     headings: [
-      { name: "LOCA_ID", key: true, type: "ID", unit: "", description: "Location identifier" },
-      { name: "LOCA_TYPE", key: false, type: "PA", unit: "", description: "Type of activity" },
-      { name: "LOCA_GL", key: false, type: "2DP", unit: "m", description: "Ground level relative to datum of location or start of traverse" },
-      { name: "LOCA_REM", key: false, type: "X", unit: "", description: "General remarks" },
-      { name: "LOCA_FDEP", key: false, type: "2DP", unit: "m", description: "Final depth" },
+      { name: "LOCA_ID", key: true, required: false, type: "ID", unit: "", description: "Location identifier" },
+      { name: "LOCA_TYPE", key: false, required: false, type: "PA", unit: "", description: "Type of activity" },
+      { name: "LOCA_GL", key: false, required: false, type: "2DP", unit: "m", description: "Ground level relative to datum of location or start of traverse" },
+      { name: "LOCA_REM", key: false, required: false, type: "X", unit: "", description: "General remarks" },
+      { name: "LOCA_FDEP", key: false, required: false, type: "2DP", unit: "m", description: "Final depth" },
     ],
   },
   {
@@ -51,11 +56,11 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     parent: "LOCA",
     description: "Sample Information",
     headings: [
-      { name: "LOCA_ID", key: true, type: "ID", unit: "", description: "Location identifier" },
-      { name: "SAMP_TOP", key: true, type: "2DP", unit: "m", description: "Depth to top of sample" },
-      { name: "SAMP_REF", key: true, type: "X", unit: "", description: "Sample reference" },
-      { name: "SAMP_TYPE", key: true, type: "PA", unit: "", description: "Sample type" },
-      { name: "SAMP_ID", key: true, type: "ID", unit: "", description: "Sample unique identifier" },
+      { name: "LOCA_ID", key: true, required: false, type: "ID", unit: "", description: "Location identifier" },
+      { name: "SAMP_TOP", key: true, required: false, type: "2DP", unit: "m", description: "Depth to top of sample" },
+      { name: "SAMP_REF", key: true, required: false, type: "X", unit: "", description: "Sample reference" },
+      { name: "SAMP_TYPE", key: true, required: false, type: "PA", unit: "", description: "Sample type" },
+      { name: "SAMP_ID", key: true, required: false, type: "ID", unit: "", description: "Sample unique identifier" },
     ],
   },
   {
@@ -63,15 +68,15 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     parent: "SAMP",
     description: "Liquid and Plastic Limit Tests",
     headings: [
-      { name: "LOCA_ID", key: true, type: "ID", unit: "", description: "Location identifier" },
-      { name: "SAMP_TOP", key: true, type: "2DP", unit: "m", description: "Depth to top of sample" },
-      { name: "SAMP_REF", key: true, type: "X", unit: "", description: "Sample reference" },
-      { name: "SAMP_TYPE", key: true, type: "PA", unit: "", description: "Sample type" },
-      { name: "SAMP_ID", key: true, type: "ID", unit: "", description: "Sample unique identifier" },
-      { name: "SPEC_REF", key: true, type: "X", unit: "", description: "Specimen reference" },
-      { name: "SPEC_DPTH", key: true, type: "2DP", unit: "m", description: "Depth to top of test specimen" },
-      { name: "LLPL_LL", key: false, type: "0DP", unit: "%", description: "Liquid limit" },
-      { name: "LLPL_PL", key: false, type: "XN", unit: "%", description: "Plastic limit" },
+      { name: "LOCA_ID", key: true, required: false, type: "ID", unit: "", description: "Location identifier" },
+      { name: "SAMP_TOP", key: true, required: false, type: "2DP", unit: "m", description: "Depth to top of sample" },
+      { name: "SAMP_REF", key: true, required: false, type: "X", unit: "", description: "Sample reference" },
+      { name: "SAMP_TYPE", key: true, required: false, type: "PA", unit: "", description: "Sample type" },
+      { name: "SAMP_ID", key: true, required: false, type: "ID", unit: "", description: "Sample unique identifier" },
+      { name: "SPEC_REF", key: true, required: false, type: "X", unit: "", description: "Specimen reference" },
+      { name: "SPEC_DPTH", key: true, required: false, type: "2DP", unit: "m", description: "Depth to top of test specimen" },
+      { name: "LLPL_LL", key: false, required: false, type: "0DP", unit: "%", description: "Liquid limit" },
+      { name: "LLPL_PL", key: false, required: false, type: "XN", unit: "%", description: "Plastic limit" },
     ],
   },
   {
@@ -79,12 +84,12 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     parent: null,
     description: "Data File Transmission Information / Data Status",
     headings: [
-      { name: "TRAN_ISNO", key: true, type: "X", unit: "", description: "Issue sequence reference" },
-      { name: "TRAN_DATE", key: false, type: "DT", unit: "yyyy-mm-dd", description: "Date of production of data file" },
-      { name: "TRAN_PROD", key: false, type: "X", unit: "", description: "Data file producer" },
-      { name: "TRAN_STAT", key: false, type: "X", unit: "", description: "Status of data within submission" },
-      { name: "TRAN_AGS", key: false, type: "X", unit: "", description: "AGS Edition Reference" },
-      { name: "TRAN_RECV", key: false, type: "X", unit: "", description: "Data file recipient" },
+      { name: "TRAN_ISNO", key: true, required: true, type: "X", unit: "", description: "Issue sequence reference" },
+      { name: "TRAN_DATE", key: false, required: true, type: "DT", unit: "yyyy-mm-dd", description: "Date of production of data file" },
+      { name: "TRAN_PROD", key: false, required: true, type: "X", unit: "", description: "Data file producer" },
+      { name: "TRAN_STAT", key: false, required: true, type: "X", unit: "", description: "Status of data within submission" },
+      { name: "TRAN_AGS", key: false, required: true, type: "X", unit: "", description: "AGS Edition Reference" },
+      { name: "TRAN_RECV", key: false, required: true, type: "X", unit: "", description: "Data file recipient" },
     ],
   },
 ] as const;

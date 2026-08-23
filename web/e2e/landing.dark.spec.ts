@@ -185,3 +185,57 @@ test("dark: every install card wears its dark hue", async ({ page }) => {
     ).toBe(hexToRgb(channel.hue.dark));
   }
 });
+
+test("dark: the status marks and the corner flag take real ink", async ({
+  page,
+}) => {
+  // #616's "both themes" half. The key glyph strokes with currentColor from
+  // the band variable and the corner flag borrows the severity ink the same
+  // way, so what dark must prove is that both resolve to real colours here
+  // — the glyph to its band, the flag to the error ink — not transparent.
+  await page.goto("/");
+  const keyGlyph = page
+    .locator("section#loca th")
+    .filter({ hasText: "LOCA_ID" })
+    .locator("svg");
+  await expect(keyGlyph).toBeVisible();
+  const stroke = await keyGlyph.evaluate((el) => getComputedStyle(el).stroke);
+  expect(stroke).not.toBe("none");
+  expect(stroke).not.toBe("rgba(0, 0, 0, 0)");
+
+  // The seeded Rule 8 cell wears the flag once findings arrive; its border
+  // ink is the cell's severity colour, which must differ from the header
+  // glyph's band ink — severity is never band identity (#590).
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  const flag = cell.locator("span.absolute");
+  await expect(flag).toBeVisible({ timeout: 15_000 });
+  const flagInk = await flag.evaluate(
+    (el) => getComputedStyle(el).borderTopColor,
+  );
+  expect(flagInk).not.toBe("rgba(0, 0, 0, 0)");
+  expect(flagInk).not.toBe(
+    await keyGlyph.evaluate((el) => getComputedStyle(el).color),
+  );
+
+  // The other half of the grammar: the KEY+REQUIRED box draws with the
+  // same currentColor as its glyph, and the REQUIRED-only asterisk takes
+  // its band ink too — both must resolve here, not just the bare glyph.
+  const boxed = page
+    .locator("section#proj th")
+    .filter({ hasText: "PROJ_ID" })
+    .locator("span[class*='border-current']");
+  await expect(boxed).toBeVisible();
+  expect(
+    await boxed.evaluate((el) => getComputedStyle(el).borderTopColor),
+  ).not.toBe("rgba(0, 0, 0, 0)");
+  const star = page
+    .locator("section#file th")
+    .filter({ hasText: "TRAN_DATE" })
+    .getByText("*", { exact: true });
+  await expect(star).toBeVisible();
+  expect(await star.evaluate((el) => getComputedStyle(el).color)).not.toBe(
+    "rgba(0, 0, 0, 0)",
+  );
+});

@@ -25,6 +25,7 @@ import funnel from "./funnel.svg?raw";
 import gitCompareArrows from "./git-compare-arrows.svg?raw";
 import gripVertical from "./grip-vertical.svg?raw";
 import history from "./history.svg?raw";
+import keyRound from "./key-round.svg?raw";
 import redo2 from "./redo-2.svg?raw";
 import search from "./search.svg?raw";
 import shieldCheck from "./shield-check.svg?raw";
@@ -43,6 +44,7 @@ export const ICONS = {
   "git-compare-arrows": iconBody(gitCompareArrows),
   "grip-vertical": iconBody(gripVertical),
   history: iconBody(history),
+  "key-round": iconBody(keyRound),
   "redo-2": iconBody(redo2),
   search: iconBody(search),
   "shield-check": iconBody(shieldCheck),
