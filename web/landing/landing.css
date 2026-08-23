@@ -79,6 +79,21 @@ body {
   line-height: var(--lh-relaxed);
 }
 
+/* Anchor jumps ease (#589). One document-level declaration, so the scoreboard
+   pill's scrollIntoView, the masthead's fragment links and any future anchor
+   all resolve through it — no call site states a behavior, the same
+   keep-the-preference-out-of-call-sites contract the duration tokens hold.
+   Deliberately NOT in the shared motion.css: smooth scrolling is a per-surface
+   call, not a token — the app scrolls programmatically inside virtualized
+   panes, and smoothing those is a decision that surface has not made. Guarded
+   the positive way round: reduced-motion readers keep the browser's instant
+   default rather than having a collapse applied. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 ::selection {
   background: var(--selection);
 }
