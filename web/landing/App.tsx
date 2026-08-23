@@ -24,7 +24,13 @@ import { FileAndFindings } from "./demo/FileAndFindings";
 import { SECTIONS, bandVar } from "./sections";
 
 /** One band of the page. The hairline and the band chip are the section's
- *  only chrome; everything else is the section's own content. */
+ *  only chrome; everything else is the section's own content.
+ *
+ *  The scroll-margin is the datum token, not a static step (#615): the
+ *  retired `scroll-mt-16` disagreed with the masthead the rail measures, so
+ *  jumps landed sections just past the line the probe read. One token —
+ *  measured masthead plus the datum gap — now decides where jumps land,
+ *  where 0.00 m sits and what the probe reads. */
 const Section: Component<{
   id: string;
   index: number;
@@ -32,7 +38,7 @@ const Section: Component<{
 }> = (props) => (
   <section
     id={props.id}
-    class="border-t border-line first:border-t-0 scroll-mt-16"
+    class="border-t border-line first:border-t-0 scroll-mt-(--datum-offset)"
   >
     {/* The rhythm steps: phones pay py-8 (#596 — the desktop rhythm ran the
         390px page seventeen screens tall), the sm boundary restores py-12,

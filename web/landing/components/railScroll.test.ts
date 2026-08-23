@@ -9,33 +9,144 @@ import {
   bandBounds,
   bandFractions,
   bandStartFraction,
+  datumFraction,
   depthAt,
   depthLabel,
   railY,
-  scrollProgress,
 } from "./railScroll";
 import { SECTIONS } from "../sections";
 
-describe("scrollProgress", () => {
-  it("is 0 at the top and 1 at the bottom", () => {
-    expect(scrollProgress(0, 800, 4000)).toBe(0);
-    expect(scrollProgress(3200, 800, 4000)).toBe(1);
+/* A page shaped like the real one: seven contiguous sections stacked below a
+ * masthead, a datum one gap-step under the masthead's bottom, and a viewport
+ * short enough that the last section's landing line is reachable. Fixture
+ * numbers, not measurements — the mapping's PROPERTIES are what these pin. */
+const TOPS = [53, 472, 782, 1129, 1514, 1900, 3271];
+const HEIGHTS = [419, 310, 347, 385, 385, 1371, 707];
+const DATUM = 65;
+const MAX = 3238;
+
+/* Fixture reads are in range by construction; the helper answers the
+   compiler's noUncheckedIndexedAccess without an assertion. */
+const at = (xs: readonly number[], i: number): number => xs[i] ?? 0;
+
+describe("datumFraction — the probe keyed to the datum line (#615)", () => {
+  it("is exact at every section's landing line", () => {
+    // The whole point of the remap: a jump puts a section top ON the datum,
+    // and the probe there must read the section's own tick fraction — the
+    // retired document-fraction mapping overshot it (the incident is
+    // recorded on datumFraction itself).
+    for (let i = 0; i < TOPS.length; i++) {
+      const landing = Math.max(0, at(TOPS, i) - DATUM);
+      expect(datumFraction(landing, DATUM, TOPS, HEIGHTS, MAX)).toBeCloseTo(
+        bandStartFraction(i, HEIGHTS),
+        10,
+      );
+    }
   });
 
-  it("is linear in between", () => {
-    expect(scrollProgress(1600, 800, 4000)).toBeCloseTo(0.5);
+  it("reads 0 at the top of the page", () => {
+    // The first section starts ABOVE the datum (the masthead covers it), so
+    // its landing clamps to scroll 0 — where the fraction is 0 exactly, not
+    // the sliver of band the datum has already descended past.
+    expect(datumFraction(0, DATUM, TOPS, HEIGHTS, MAX)).toBe(0);
+  });
+
+  it("reaches 1 at max scroll — the stretched tail", () => {
+    // The deepest landing line sits well above the page bottom; from there
+    // the fraction lerps to 1 so the floor reads the full depth.
+    expect(datumFraction(MAX, DATUM, TOPS, HEIGHTS, MAX)).toBe(1);
+    const lastLanding = at(TOPS, TOPS.length - 1) - DATUM;
+    const midTail = (lastLanding + MAX) / 2;
+    const f = datumFraction(midTail, DATUM, TOPS, HEIGHTS, MAX);
+    expect(f).toBeGreaterThan(bandStartFraction(TOPS.length - 1, HEIGHTS));
+    expect(f).toBeLessThan(1);
+  });
+
+  it("reads the tick exactly from a whole pixel away — the landing snap", () => {
+    // Browsers land an anchor jump on a whole pixel; the measured geometry
+    // is fractional. A pixel of scroll can flip the depth's second decimal,
+    // so within one the probe reads the tick — the e2e's EXACT text match
+    // rides on this.
+    const landing = at(TOPS, 3) - DATUM;
+    for (const off of [-1, 1]) {
+      expect(datumFraction(landing + off, DATUM, TOPS, HEIGHTS, MAX)).toBe(
+        bandStartFraction(3, HEIGHTS),
+      );
+    }
+    // And only from a pixel: two out is a real position, not a landing.
+    expect(
+      datumFraction(landing + 2, DATUM, TOPS, HEIGHTS, MAX),
+    ).toBeGreaterThan(bandStartFraction(3, HEIGHTS));
+  });
+
+  it("is monotonic through every section and the tail", () => {
+    let prev = -1;
+    for (let y = 0; y <= MAX; y += 7) {
+      const f = datumFraction(y, DATUM, TOPS, HEIGHTS, MAX);
+      expect(f).toBeGreaterThanOrEqual(prev);
+      prev = f;
+    }
   });
 
   it("clamps rather than overshooting on elastic scroll", () => {
     // iOS rubber-banding reports a negative scrollY and one past the end.
-    expect(scrollProgress(-120, 800, 4000)).toBe(0);
-    expect(scrollProgress(9999, 800, 4000)).toBe(1);
+    expect(datumFraction(-120, DATUM, TOPS, HEIGHTS, MAX)).toBe(0);
+    expect(datumFraction(MAX + 999, DATUM, TOPS, HEIGHTS, MAX)).toBe(1);
   });
 
   it("answers 0 for a page shorter than the viewport", () => {
-    // The division by zero. NaN here would paint the veil over the whole rail.
-    expect(scrollProgress(0, 800, 800)).toBe(0);
-    expect(scrollProgress(0, 800, 400)).toBe(0);
+    // No scrollable height is a division by zero, and the honest answer is
+    // the surface — not NaN painting the veil over the whole rail.
+    expect(datumFraction(0, DATUM, TOPS, HEIGHTS, 0)).toBe(0);
+    expect(datumFraction(0, DATUM, TOPS, HEIGHTS, -400)).toBe(0);
+  });
+
+  it("degrades to the plain document fraction before first measure", () => {
+    // Unmeasured tops all clamp into the origin knot, leaving a single
+    // linear run — the first paint is the retired mapping, not NaN.
+    const zeros = SECTIONS.map(() => 0);
+    expect(datumFraction(1619, DATUM, zeros, zeros, MAX)).toBeCloseTo(
+      1619 / MAX,
+    );
+  });
+
+  it("drops an unreachable landing into the tail", () => {
+    // A landing at or past max scroll can never sit on the datum; its knot
+    // would put two fractions at one scroll position. The tail from the
+    // last landable knot absorbs it, still monotonic, still 1 at the floor.
+    const shortMax = 3100; // below the last section's landing
+    const atLast = datumFraction(
+      at(TOPS, 5) - DATUM,
+      DATUM,
+      TOPS,
+      HEIGHTS,
+      shortMax,
+    );
+    expect(atLast).toBeCloseTo(bandStartFraction(5, HEIGHTS), 10);
+    expect(datumFraction(shortMax, DATUM, TOPS, HEIGHTS, shortMax)).toBe(1);
+    let prev = -1;
+    for (let y = 0; y <= shortMax; y += 7) {
+      const f = datumFraction(y, DATUM, TOPS, HEIGHTS, shortMax);
+      expect(f).toBeGreaterThanOrEqual(prev);
+      prev = f;
+    }
+  });
+
+  it("keeps a landing on its tick when a section below the datum grows", () => {
+    // Findings arrive and the file section doubles: everything above it
+    // lands unmoved, and the probe still reads each tick exactly.
+    const grown = [...HEIGHTS.slice(0, 5), at(HEIGHTS, 5) * 2, at(HEIGHTS, 6)];
+    const grownTops = [at(TOPS, 0)];
+    for (let i = 1; i < grown.length; i++) {
+      grownTops.push(at(grownTops, i - 1) + at(grown, i - 1));
+    }
+    const grownMax = MAX + at(HEIGHTS, 5);
+    for (let i = 0; i < grownTops.length; i++) {
+      const landing = Math.max(0, at(grownTops, i) - DATUM);
+      expect(
+        datumFraction(landing, DATUM, grownTops, grown, grownMax),
+      ).toBeCloseTo(bandStartFraction(i, grown), 10);
+    }
   });
 });
 
@@ -48,12 +159,12 @@ describe("depthLabel", () => {
 
   it("reads 0.00 at the top and the seeded total at the bottom", () => {
     const total = 25;
-    expect(depthLabel(depthAt(scrollProgress(0, 800, 4000), total))).toBe(
-      "0.00",
-    );
-    expect(depthLabel(depthAt(scrollProgress(3200, 800, 4000), total))).toBe(
-      "25.00",
-    );
+    expect(
+      depthLabel(depthAt(datumFraction(0, DATUM, TOPS, HEIGHTS, MAX), total)),
+    ).toBe("0.00");
+    expect(
+      depthLabel(depthAt(datumFraction(MAX, DATUM, TOPS, HEIGHTS, MAX), total)),
+    ).toBe("25.00");
   });
 });
 

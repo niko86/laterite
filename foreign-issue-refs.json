@@ -48,8 +48,8 @@
     "and expect it to go stale harmlessly — the gate takes whichever of the two",
     "is higher, so a forgotten override is overtaken rather than obeyed."
   ],
-  "claimed_through": 581,
-  "claimed_through_note": "#581 is an issue filed in THIS repo on 2026-08-23 (setCell burning an undo step on a no-op). The satellite also owns 581 — the shared scrub engine — so this releases a number the frozen set genuinely held, on the same terms as the #519 override it supersedes: this repo's numbering reaching it is exactly when a bare #581 stops meaning the satellite. The qualified `laterite-dev#581` citations in the tree stay correct and stay unflagged; what is given up is the gate catching a FUTURE bare #581 that meant the satellite, which is the intended trade. The derived watermark was one short. Goes stale harmlessly: the gate takes whichever is higher.",
+  "claimed_through": 615,
+  "claimed_through_note": "#615 is an issue filed in THIS repo on 2026-08-23 (the rail's datum-keyed probe mapping, from the landing pass-2 review). The satellite also owns 615, so this releases a number the frozen set genuinely held, on the same terms as the #581 override it supersedes: this repo's numbering reaching it is exactly when a bare #615 stops meaning the satellite. The qualified `laterite-dev#615` citations in the tree stay correct and stay unflagged; what is given up is the gate catching a FUTURE bare #615 that meant the satellite, which is the intended trade. The batch's later numbers (#616-#622) are deliberately NOT claimed here - no bare reference to them is being flagged yet, and the derived watermark overtakes this override as their PRs merge. Goes stale harmlessly: the gate takes whichever is higher.",
   "satellite": {
     "repo": "laterite-dev",
     "note": "Same owner, private. Qualified rather than linked: a 404 is honest about being unreachable, where a bare number actively lies.",
@@ -100,7 +100,8 @@
       585,
       610,
       611,
-      615
+      615,
+      659
     ]
   },
   "foreign": {

@@ -63,6 +63,20 @@
   --install-wash-pct: 10%;
 }
 
+/* The datum line (#615): where a jump lands a section top, where the rail's
+   0.00 m tick sits, and the line the probe's mapping keys to — one derived
+   token so the three cannot drift apart, which is how the retired static
+   `scroll-mt-16` came to sit 11px off the masthead the rail measures.
+   `--surface-y` is the masthead's measured height, written onto the root by
+   the rail's ResizeObserver; the value here is only the first paint's
+   stand-in until that delivery. The gap is a spacing STEP, not a pixel
+   count (D2-01's air, sized to scale with root font size and zoom). */
+:root {
+  --surface-y: 56px;
+  --datum-gap: calc(var(--spacing) * 3);
+  --datum-offset: calc(var(--surface-y) + var(--datum-gap));
+}
+
 /* Dark (#400). The pairing's dark set — the one-step-lighter band ramp, the
  * surfaces, the fg ramp, sand-for-maroon accent and the dimmed statuses — lives
  * in the shared colors.css since #403 made the app the second surface rendering
