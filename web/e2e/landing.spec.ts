@@ -677,6 +677,41 @@ test("the corner flag arrives with the findings, no pointer required", async ({
   await expect(cell).not.toContainText("\u2717");
 });
 
+test("a picked cell wears the selection ring, and it travels with the arrows", async ({
+  page,
+  hasTouch,
+}) => {
+  // #618 (pass-2 pin D2-09): the first click PICKS (the #593 grammar), and
+  // its only sign was the button's pale wash — read in the review as a dead
+  // click. The ring is asserted on the TD's computed shadow rather than a
+  // class name, so the test reads what the reader sees, on every modality:
+  // fine and wide click, coarse taps, and the same pick either way.
+  await page.goto("/");
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_TYPE on row 1 of LOCA",
+  });
+  await cell.click();
+  const ringOf = (c: Locator) =>
+    c
+      .locator("xpath=ancestor::td[1]")
+      .evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(await ringOf(cell), "first click draws the ring").toContain("inset");
+  // The wash stays underneath: the ring joins it, not replaces it.
+  await expect(cell).toHaveClass(/bg-accent-quiet/);
+
+  if (!hasTouch) {
+    // Arrows move the pick, and the ring is the pick's — it must follow.
+    await page.keyboard.press("ArrowRight");
+    const next = page.getByRole("button", {
+      name: "Edit LOCA_GL on row 1 of LOCA",
+    });
+    expect(await ringOf(next), "the ring follows the arrow").toContain("inset");
+    expect(await ringOf(cell), "and leaves the old cell").not.toContain(
+      "inset",
+    );
+  }
+});
+
 test("the header marks speak the dictionary's status grammar", async ({
   page,
 }) => {
