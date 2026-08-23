@@ -24,32 +24,56 @@ const BASE =
   "transition-colors duration-(--dur-base) ease-(--ease-out) " +
   "focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]";
 
-const VARIANTS: Record<ButtonVariant, string> = {
+// Shape and colour are separate maps so a tone can REPLACE a variant's
+// colours rather than pile more colour utilities on top: two utilities for
+// the same property tie on specificity, stylesheet order picks the winner,
+// and that is how the danger repaint silently lost to the variant coat
+// (#593) — ghost's `.text-fg-muted` sorts after `.text-err` in the compiled
+// sheet, so a danger ghost rendered muted, and default's `.border-line`
+// beat `.border-err` the same way.
+const SHAPES: Record<ButtonVariant, string> = {
   // Toolbar text button.
-  default:
-    "border border-line bg-surface text-fg rounded-md px-[0.8rem] py-[0.3rem] hover:bg-chip",
+  default: "border rounded-md px-[0.8rem] py-[0.3rem]",
   // Filled commit.
-  primary:
-    "border border-cta bg-cta text-fg-on-cta rounded-md px-[0.8rem] py-[0.3rem] " +
-    "font-semibold hover:bg-cta-hover hover:border-cta-hover",
-  // "Runs something" — tinted wash, rust text.
-  action:
-    "border border-cta bg-cta-quiet text-cta rounded-md px-[0.9rem] py-[0.26rem] " +
-    "font-semibold hover:text-cta-hover hover:border-cta-hover",
+  primary: "border rounded-md px-[0.8rem] py-[0.3rem] font-semibold",
+  // "Runs something".
+  action: "border rounded-md px-[0.9rem] py-[0.26rem] font-semibold",
   // Dashed "+ thing" affordance.
-  add:
-    "border border-dashed border-line-strong bg-surface text-accent rounded-xs " +
-    "px-[0.5rem] py-[0.15rem] hover:text-accent-hover hover:border-accent",
-  // Quiet icon / ✕ button, muted until hover.
-  ghost:
-    "bg-transparent text-fg-muted rounded-xs px-[0.3rem] py-[0.1rem] hover:text-fg",
-  // The secondary CTA (#395): maroon outline on the canvas, beside the rust
-  // fill. Accent rather than cta on purpose — "maroon reads, rust acts", so the
-  // quieter of two adjacent calls to action takes the reading colour, and the
-  // page never shows two rust buttons competing to be pressed.
+  add: "border border-dashed rounded-xs px-[0.5rem] py-[0.15rem]",
+  // Quiet icon / ✕ button.
+  ghost: "rounded-xs px-[0.3rem] py-[0.1rem]",
+  // The secondary CTA (#395).
+  outline: "border rounded-md px-[0.8rem] py-[0.3rem] font-semibold",
+};
+
+const COLORS: Record<ButtonVariant, string> = {
+  default: "border-line bg-surface text-fg hover:bg-chip",
+  primary:
+    "border-cta bg-cta text-fg-on-cta hover:bg-cta-hover hover:border-cta-hover",
+  // Tinted wash, rust text.
+  action:
+    "border-cta bg-cta-quiet text-cta hover:text-cta-hover hover:border-cta-hover",
+  add: "border-line-strong bg-surface text-accent hover:text-accent-hover hover:border-accent",
+  // Muted until hover.
+  ghost: "bg-transparent text-fg-muted hover:text-fg",
+  // Maroon outline on the canvas, beside the rust fill. Accent rather than
+  // cta on purpose — "maroon reads, rust acts", so the quieter of two
+  // adjacent calls to action takes the reading colour, and the page never
+  // shows two rust buttons competing to be pressed.
   outline:
-    "border border-accent bg-transparent text-accent rounded-md px-[0.8rem] " +
-    "py-[0.3rem] font-semibold hover:bg-accent-quiet hover:text-accent-hover",
+    "border-accent bg-transparent text-accent hover:bg-accent-quiet hover:text-accent-hover",
+};
+
+/** Destructive repaint: the full colour coat per variant, err where the
+ *  variant's own hue was. */
+const DANGER: Record<ButtonVariant, string> = {
+  default: "border-err bg-surface text-err hover:bg-chip hover:text-err",
+  primary: "border-err bg-err text-fg-on-cta hover:bg-err hover:border-err",
+  action: "border-err bg-cta-quiet text-err hover:text-err",
+  add: "border-err bg-surface text-err hover:text-err",
+  ghost: "bg-transparent text-err hover:text-err",
+  outline:
+    "border-err bg-transparent text-err hover:bg-accent-quiet hover:text-err",
 };
 
 // `md` is the unstyled middle rung — the variant's own padding stands.
@@ -58,14 +82,6 @@ const SIZES: Record<ButtonSize, string> = {
   md: "",
   lg: "text-body px-[1rem] py-[0.4rem]",
 };
-
-/** Destructive repaint. A ghost has no border to recolour, so it loses one. */
-const danger = (variant: ButtonVariant): string =>
-  variant === "primary"
-    ? "bg-err border-err text-fg-on-cta hover:bg-err hover:border-err"
-    : variant === "ghost"
-      ? "text-err border-transparent hover:text-err"
-      : "text-err border-err hover:text-err";
 
 export const Button: Component<
   {
@@ -107,9 +123,9 @@ export const Button: Component<
       {...rest}
       class={[
         BASE,
-        VARIANTS[variant()],
+        SHAPES[variant()],
+        (own.tone === "danger" ? DANGER : COLORS)[variant()],
         SIZES[own.size ?? "md"],
-        own.tone === "danger" ? danger(variant()) : "",
         // Never a grey repaint — the control keeps its colour and loses its
         // affordance, so a disabled primary still reads as the primary action.
         props.disabled ? "opacity-45 cursor-default" : "",

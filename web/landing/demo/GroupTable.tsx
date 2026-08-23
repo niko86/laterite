@@ -134,7 +134,39 @@ export const GroupTable: Component<{
   } | null>(null);
 
   let root: HTMLDivElement | undefined;
+  let tableEl: HTMLTableElement | undefined;
   const fine = () => !coarsePointer();
+
+  /* Freeze the geometry for the life of an edit session (#593): the auto
+     layout re-solves on every keystroke into the editor — thirteen
+     characters into SAMP_TYPE moved all six columns. Measured BEFORE the
+     editor mounts, because a type-to-replace open swaps a long value for a
+     one-character input, which is itself enough to move the columns; then
+     fixed layout holds that solution until the editor closes, when auto
+     layout resumes so a committed value still earns its column the usual
+     way. */
+  const freezeColumns = () => {
+    const el = tableEl;
+    if (!el || el.style.tableLayout === "fixed") return;
+    for (const th of el.querySelectorAll("th")) {
+      th.style.width = `${th.getBoundingClientRect().width}px`;
+    }
+    el.style.tableLayout = "fixed";
+  };
+  const unfreezeColumns = () => {
+    const el = tableEl;
+    if (!el) return;
+    for (const th of el.querySelectorAll("th")) th.style.width = "";
+    el.style.tableLayout = "";
+  };
+  const openEditor = (cell: {
+    row: number;
+    col: number;
+    seed: string | null;
+  }) => {
+    freezeColumns();
+    setEditing(cell);
+  };
   const cellValue = (row: number, col: number) =>
     props.data.rows[row]?.[col] ?? "";
 
@@ -168,6 +200,7 @@ export const GroupTable: Component<{
     const open = editing();
     if (!open) return;
     setEditing(null);
+    unfreezeColumns();
     props.onCommit(open.row, open.col, value);
     if (thenMove) move(0, thenMove);
     else focusCell(open.row, open.col);
@@ -176,6 +209,7 @@ export const GroupTable: Component<{
   const cancelEdit = () => {
     const open = editing();
     setEditing(null);
+    unfreezeColumns();
     if (open) focusCell(open.row, open.col);
   };
 
@@ -233,10 +267,10 @@ export const GroupTable: Component<{
       move(step[0], step[1]);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      setEditing({ row: at.row, col: at.col, seed: null });
+      openEditor({ row: at.row, col: at.col, seed: null });
     } else if (e.key.length === 1 && !e.altKey) {
       e.preventDefault();
-      setEditing({ row: at.row, col: at.col, seed: e.key });
+      openEditor({ row: at.row, col: at.col, seed: e.key });
     }
   };
 
@@ -283,7 +317,7 @@ export const GroupTable: Component<{
       </Show>
 
       <div class="overflow-x-auto overscroll-x-contain">
-        <table class="w-full border-collapse text-left">
+        <table ref={tableEl} class="w-full border-collapse text-left">
           <caption class="sr-only">
             {props.schema.code} · {props.schema.description}
           </caption>
@@ -407,7 +441,7 @@ export const GroupTable: Component<{
                                   // click selects, the second opens in place.
                                   // Coarse pointers pick — the carousel edits.
                                   if (fine() && isPicked())
-                                    setEditing({
+                                    openEditor({
                                       row: rowIndex(),
                                       col: col(),
                                       seed: null,
@@ -465,6 +499,13 @@ export const GroupTable: Component<{
                     <button
                       type="button"
                       onClick={() => {
+                        // Belt over the blur's braces: the input's blur has
+                        // already committed and unfrozen by the time a click
+                        // lands in every engine we ship to, but that is
+                        // event ORDERING, not a contract — and an editor
+                        // outliving its row would leave the table frozen at
+                        // stale widths for good (#593).
+                        if (editing()) cancelEdit();
                         props.onDeleteRow(rowIndex());
                       }}
                       aria-label={`Delete row ${rowIndex() + 1} of ${props.schema.code}`}
