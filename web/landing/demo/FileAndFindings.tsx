@@ -36,6 +36,7 @@ import { Carousel } from "../components/Carousel";
 import { severityLineTint, verdictTint, worstPerLine } from "./severity";
 import { verdictState } from "./verdict";
 import { alignLines } from "./align";
+import { saveDelivery } from "./save";
 import { narrowViewport } from "../viewport";
 import {
   armed,
@@ -75,6 +76,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
      keys by the same index in both modes. Raw stays the default — the
      #396 byte-fidelity story belongs to it. */
   const [alignedView, setAlignedView] = createSignal(false);
+  const [saveNote, setSaveNote] = createSignal("");
   const shown = createMemo(() =>
     alignedView() ? alignLines(lines()) : lines(),
   );
@@ -239,6 +241,29 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             <Button variant="default" onClick={reset}>
               Reset the delivery
             </Button>
+            {/* The takeaway door (#639): the delivery leaves as a real .ags
+                so a reader can run it through their own validator — which
+                is why the bytes are text() itself, the emitter's output the
+                pane shows, never a re-serialization. A failure after the
+                picker gets a stated note: the reader chose a location in an
+                OS dialog, and silence there reads as saved. */}
+            <Button
+              variant="default"
+              onClick={() => {
+                void saveDelivery(text()).then((outcome) => {
+                  setSaveNote(
+                    outcome === "failed"
+                      ? "Saving failed: nothing was written."
+                      : "",
+                  );
+                });
+              }}
+            >
+              Download the delivery
+            </Button>
+            <Show when={saveNote()}>
+              <span class="text-caption text-err">{saveNote()}</span>
+            </Show>
             <Show when={busy()}>
               <span class="text-caption text-fg-faint">validating…</span>
             </Show>

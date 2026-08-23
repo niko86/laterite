@@ -188,6 +188,92 @@ test("touch: the tray opens above the strip, inside the viewport", async ({
   expect(stripFollows, "the strip follows the tray in the DOM").toBe(true);
 });
 
+const seededDeliveryText = () =>
+  readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../landing/demo/seeded-delivery.ags",
+    ),
+    "utf8",
+  );
+
+test("the download offers the emitter's own bytes to the picker", async ({
+  page,
+}) => {
+  // Chromium's save-as picker cannot be driven headlessly, so the probe
+  // stands a recording stub in its place BEFORE the page scripts run: the
+  // wiring under test is everything up to the handle — the gesture, the
+  // branch choice, and WHICH bytes get written. The bytes are the claim
+  // (#639): the emitter's own, byte-identical to the seeded fixture the
+  // round-trip test pins, never a re-serialization of the page's state.
+  await page.addInitScript(() => {
+    // One local alias: the callback is serialized into the page, so the
+    // cast cannot come from the spec's scope.
+    const w = window as unknown as Record<string, unknown>;
+    w.showSaveFilePicker = async (opts: { suggestedName: string }) => {
+      w.__pickerName = opts.suggestedName;
+      return {
+        createWritable: async () => ({
+          write: async (data: string) => {
+            w.__saved = data;
+          },
+          close: async () => {},
+        }),
+      };
+    };
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Download the delivery" }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as never)["__saved"]))
+    .toBe(seededDeliveryText());
+  expect(await page.evaluate(() => (window as never)["__pickerName"])).toBe(
+    "laterite.ags",
+  );
+});
+
+test("a failed save after the picker says so", async ({ page }) => {
+  // The reader chose a location in an OS dialog; a write that then fails
+  // must never read as saved. The stub's writable fails on write — the
+  // page's answer is a stated note, not silence.
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.showSaveFilePicker = async () => ({
+      createWritable: async () => ({
+        write: async () => {
+          throw new Error("disk full");
+        },
+        close: async () => {},
+        abort: async () => {},
+      }),
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Download the delivery" }).click();
+  await expect(
+    page.getByText("Saving failed: nothing was written."),
+  ).toBeVisible();
+});
+
+test("without a picker, the download falls back as laterite.ags", async ({
+  page,
+}) => {
+  // Safari and Firefox have no save-as picker; the decided fallback is the
+  // anchor download under the decided name. Chromium HAS the picker, so
+  // the probe removes it before the page scripts run — the fallback branch
+  // is exactly what a picker-less browser executes.
+  await page.addInitScript(() => {
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+  });
+  await page.goto("/");
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download the delivery" }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe("laterite.ags");
+  const file = await download.path();
+  expect(readFileSync(file, "utf8")).toBe(seededDeliveryText());
+});
+
 test("fine: a refused run never renders as the all-clear", async ({
   page,
   hasTouch,
