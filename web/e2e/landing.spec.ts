@@ -756,6 +756,98 @@ test("the header marks speak the dictionary's status grammar", async ({
   await expect(projName.getByText("*", { exact: true })).toHaveCount(0);
 });
 
+test("the aligned view keeps every line where it was, and jumps still land", async ({
+  page,
+}) => {
+  // #620 (pass-2 pins D2-12, M2-06): the webapp's "Aligned columns" grammar
+  // as a display-only VIEW. The load-bearing property is that alignment is
+  // intra-line only — same line count, same numbers — so a finding jump
+  // lands identically in both modes. The tag columns are the crisp probe:
+  // "HEADING" and "DATA" differ in width, so their first commas differ in
+  // raw and must coincide in aligned.
+  await page.goto("/");
+  const file = page.locator("section#file");
+  await expect(file.locator("li").first()).toBeVisible({ timeout: 15_000 });
+  const toggle = file.getByRole("checkbox", { name: "Aligned columns" });
+  await expect(toggle).not.toBeChecked();
+
+  const pane = file.locator(".overscroll-contain");
+  const rows = pane.locator("div.flex");
+  const rawCount = await rows.count();
+
+  // A third, independent copy of the in-quote comma walk ON PURPOSE: the
+  // helper under test must not be its own oracle, so the spec re-derives
+  // the split rather than importing align.ts.
+  const firstCommaAt = async (needle: string) => {
+    const text = await rows
+      .filter({ hasText: needle })
+      .first()
+      .locator("span")
+      .nth(1)
+      .innerText();
+    let inQuote = false;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '"') inQuote = !inQuote;
+      else if (text[i] === "," && !inQuote) return i;
+    }
+    return -1;
+  };
+
+  const jumpLandsOn = async () => {
+    await page
+      .locator("#findings li")
+      .filter({ hasText: "Rule 8" })
+      .first()
+      .locator("button")
+      .first()
+      .click();
+    const focused = pane.locator("div.flex[class*='--focus-ring']").first();
+    await expect(focused).toBeVisible();
+    return focused.locator("span").first().innerText();
+  };
+
+  // Needles that survive the padding: alignment inserts spaces BEFORE
+  // commas, so a needle spanning one would stop matching in aligned mode.
+  // First occurrence of "LOCA_ID" is LOCA's HEADING row; of "BH01", LOCA's
+  // first DATA row.
+  const rawComma = await firstCommaAt('"LOCA_ID"');
+  expect(rawComma).not.toBe(await firstCommaAt('"BH01"'));
+  const rawLanding = await jumpLandsOn();
+
+  await toggle.check();
+  await expect(rows).toHaveCount(rawCount);
+  expect(await firstCommaAt('"LOCA_ID"')).toBe(await firstCommaAt('"BH01"'));
+  expect(await jumpLandsOn()).toBe(rawLanding);
+
+  // And back: raw is one uncheck away, bytes exact again.
+  await toggle.uncheck();
+  expect(await firstCommaAt('"LOCA_ID"')).toBe(rawComma);
+});
+
+test("phone: aligned mode trades the wrap for a pan", async ({ page }) => {
+  test.skip(
+    width(page) >= 1024,
+    "the wrap this trades away only exists below the layout breakpoint",
+  );
+  // M2-06: columnar text cannot wrap and stay columnar, so aligned mode
+  // opts out of #596's soft wrap and rides the pane's own scroller
+  // sideways instead. Raw keeps the wrap — that half is pinned by the
+  // existing pane test, and re-checked here after a round trip.
+  await page.goto("/");
+  const file = page.locator("section#file");
+  await expect(file.locator("li").first()).toBeVisible({ timeout: 15_000 });
+  const scroller = file.locator(".overscroll-contain");
+  const overflowsX = () =>
+    scroller.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+  expect(await overflowsX(), "raw wraps, no sideways scroll").toBe(false);
+
+  await file.getByRole("checkbox", { name: "Aligned columns" }).check();
+  expect(await overflowsX(), "aligned pans sideways").toBe(true);
+
+  await file.getByRole("checkbox", { name: "Aligned columns" }).uncheck();
+  expect(await overflowsX(), "raw's wrap comes back").toBe(false);
+});
+
 test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the reader causes it", async ({
   page,
   hasTouch,

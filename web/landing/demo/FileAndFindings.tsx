@@ -21,12 +21,20 @@
  * not prose: the pane's wrap above, and the findings list's carousel (#592).
  */
 
-import { For, Index, Show, createMemo, type Component } from "solid-js";
-import { Button } from "@shared/components";
+import {
+  For,
+  Index,
+  Show,
+  createMemo,
+  createSignal,
+  type Component,
+} from "solid-js";
+import { Button, Checkbox } from "@shared/components";
 import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
 import { Carousel } from "../components/Carousel";
 import { severityLineTint, worstPerLine } from "./severity";
+import { alignLines } from "./align";
 import { narrowViewport } from "../viewport";
 import {
   armed,
@@ -60,6 +68,15 @@ const FindingRow: Component<{ finding: Finding }> = (props) => (
 
 export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
+  /* The aligned VIEW (#620, the webapp's grammar recomputed in align.ts):
+     display-only, intra-line padding only, so `shown` always has exactly
+     `lines()`'s count and every per-line signal (tints, focus, numbers)
+     keys by the same index in both modes. Raw stays the default — the
+     #396 byte-fidelity story belongs to it. */
+  const [alignedView, setAlignedView] = createSignal(false);
+  const shown = createMemo(() =>
+    alignedView() ? alignLines(lines()) : lines(),
+  );
   const findings = createMemo(() => report()?.findings ?? []);
 
   /** Worst severity per banded line, so the pane can tint without a lookup
@@ -121,9 +138,20 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               wears the manual badge in its group table and strip (the fixer
               refuses it), with no prose narrating it. */}
           <div class="overflow-hidden rounded-lg border border-line bg-surface-code">
-            <p class="border-b border-line px-3 py-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
-              delivery.ags
-            </p>
+            <div class="flex items-center justify-between border-b border-line px-3 py-2">
+              <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+                delivery.ags
+              </p>
+              {/* The webapp's control, same label, same grammar (#620) —
+                  the convergence direction is shared components, website
+                  first, so the borrowed wording is deliberate. */}
+              <Checkbox
+                label="Aligned columns"
+                title="A display-only view: the engine reads the raw bytes either way"
+                checked={alignedView()}
+                onChange={(e) => setAlignedView(e.currentTarget.checked)}
+              />
+            </div>
             <div class="max-h-[26rem] overflow-auto overscroll-contain">
               <Show
                 when={armed()}
@@ -135,7 +163,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   </p>
                 }
               >
-                <For each={lines()}>
+                <For each={shown()}>
                   {(line, i) => {
                     const n = () => i() + 1;
                     const tier = () => lineTiers().get(n());
@@ -170,7 +198,16 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                             lets an unspaced AGS record break at all. Desktop
                             keeps the row unconstrained, which is what the
                             scroller's side-scroll rides on. */}
-                        <span class="max-[64rem]:min-w-0 max-[64rem]:flex-1 max-[64rem]:whitespace-pre-wrap max-[64rem]:[overflow-wrap:anywhere]">
+                        {/* Aligned mode opts OUT of the phone wrap (M2-06):
+                            columnar text cannot wrap and stay columnar, so
+                            the pane pans horizontally instead — the
+                            scroller above is already overflow-auto. */}
+                        <span
+                          classList={{
+                            "max-[64rem]:min-w-0 max-[64rem]:flex-1 max-[64rem]:whitespace-pre-wrap max-[64rem]:[overflow-wrap:anywhere]":
+                              !alignedView(),
+                          }}
+                        >
                           {line}
                         </span>
                       </div>
