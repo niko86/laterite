@@ -25,8 +25,11 @@ import {
   For,
   Index,
   Show,
+  createEffect,
   createMemo,
   createSignal,
+  on,
+  onCleanup,
   type Component,
 } from "solid-js";
 import { Button, Checkbox } from "@shared/components";
@@ -38,10 +41,14 @@ import { verdictState } from "./verdict";
 import { alignLines } from "./align";
 import { saveDelivery } from "./save";
 import { narrowViewport } from "../viewport";
+import { coarsePointer } from "./pointer";
 import {
   armed,
   busy,
   focusLine,
+  paneDraftActive,
+  releasePaneDraft,
+  replaceFromText,
   reset,
   report,
   setFocusLine,
@@ -79,6 +86,65 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
   const [saveNote, setSaveNote] = createSignal("");
   const shown = createMemo(() =>
     alignedView() ? alignLines(lines()) : lines(),
+  );
+
+  /* The pane as an editor (#635) — desktop only; coarse pointers keep the
+     read-only pane. The draft is the textarea's text and the visual
+     layer's source at once, so the two can never disagree; commits flow
+     through the store on a debounce (LIVE was the recorded pick — the
+     tables and findings churn beside the typing), and the engine judges
+     the raw draft itself, not the parse's laundering of it. Closing
+     flushes the pending draft first, so the store holds what the reader
+     last saw — then the pane re-renders the EMITTER'S text, which is the
+     one visible re-emit moment the fidelity story allows (#396). */
+  const [editing, setEditing] = createSignal(false);
+  const [draft, setDraft] = createSignal("");
+  let paneTimer: ReturnType<typeof setTimeout> | undefined;
+  /* A textarea's value API is LF-only — the platform normalizes CRLF on
+     the way in — while AGS4 lines end CRLF and the engine rightly flags
+     every bare LF. Restoring CRLF at the commit seam undoes the CONTROL'S
+     transform, not the reader's input: nobody can type a \r into a
+     textarea, so every LF here stands for the line break they DID type. */
+  const commitDraft = () => {
+    replaceFromText(draft().replace(/\r?\n/g, "\r\n"));
+  };
+  const draftLines = createMemo(() => draft().split(/\r?\n/));
+  const paneLines = () => (editing() ? draftLines() : shown());
+  const setEditorOpen = (on: boolean) => {
+    clearTimeout(paneTimer);
+    if (on) {
+      setDraft(text());
+      setEditing(true);
+    } else {
+      commitDraft();
+      setEditing(false);
+      releasePaneDraft();
+    }
+  };
+  const onDraftInput = (value: string) => {
+    setDraft(value);
+    clearTimeout(paneTimer);
+    paneTimer = setTimeout(commitDraft, 500);
+  };
+  onCleanup(() => {
+    clearTimeout(paneTimer);
+  });
+  /* An OUTSIDE writer while the pane edits — undo, Reset, a cell edit,
+     the fix button — clears paneRaw as it commits, and the draft must
+     follow: a draft that kept itself would re-commit on the next debounce
+     and silently revert the other writer. Last writer wins in both
+     directions; a pane commit echoing back still wears paneRaw, which is
+     how it is told apart. */
+  createEffect(
+    on(
+      text,
+      () => {
+        if (!editing() || paneDraftActive()) return;
+        clearTimeout(paneTimer);
+        setDraft(text());
+      },
+      { defer: true },
+    ),
   );
   const findings = createMemo(() => report()?.findings ?? []);
   /* The refused run's surface (#638): an errored report carries an empty
@@ -158,15 +224,33 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
                 delivery.ags
               </p>
-              {/* The webapp's control, same label, same grammar (#620) —
-                  the convergence direction is shared components, website
-                  first, so the borrowed wording is deliberate. */}
-              <Checkbox
-                label="Aligned columns"
-                title="A display-only view: the engine reads the raw bytes either way"
-                checked={alignedView()}
-                onChange={(e) => setAlignedView(e.currentTarget.checked)}
-              />
+              <span class="flex items-center gap-4">
+                {/* Desktop only (#635): the coarse pointer's pane stays
+                    read-only — its editor is the row tray. */}
+                <Show when={!coarsePointer()}>
+                  <Checkbox
+                    label="Edit the file"
+                    title="Type into the delivery itself; the tables and findings follow"
+                    checked={editing()}
+                    onChange={(e) => {
+                      setEditorOpen(e.currentTarget.checked);
+                    }}
+                  />
+                </Show>
+                {/* The webapp's control, same label, same grammar (#620) —
+                    the convergence direction is shared components, website
+                    first, so the borrowed wording is deliberate. Disabled
+                    while editing (#635): alignment is display-only
+                    padding, and typing into it would leak pad spaces into
+                    values. */}
+                <Checkbox
+                  label="Aligned columns"
+                  title="A display-only view: the engine reads the raw bytes either way"
+                  checked={alignedView() && !editing()}
+                  disabled={editing()}
+                  onChange={(e) => setAlignedView(e.currentTarget.checked)}
+                />
+              </span>
             </div>
             <div class="max-h-[26rem] overflow-auto overscroll-contain">
               <Show
@@ -179,57 +263,94 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   </p>
                 }
               >
-                <For each={shown()}>
-                  {(line, i) => {
-                    const n = () => i() + 1;
-                    const tier = () => lineTiers().get(n());
-                    const band = () => {
-                      const t = tier();
-                      return t === undefined
-                        ? "border-l-transparent text-fg-soft"
-                        : severityLineTint(t);
-                    };
-                    return (
-                      <div
-                        class={`flex gap-3 whitespace-pre border-l-[3px] px-3 font-mono text-caption leading-[1.7] ${band()}`}
-                        classList={{
-                          "[box-shadow:var(--focus-ring)]": focusLine() === n(),
-                        }}
-                        ref={(el) => {
-                          // Scroll the pane, not the page, when a finding is clicked.
-                          if (focusLine() === n()) {
-                            queueMicrotask(() => {
-                              el.scrollIntoView({ block: "center" });
-                            });
-                          }
-                        }}
-                      >
-                        <span class="w-8 shrink-0 text-right text-fg-dim select-none">
-                          {n()}
-                        </span>
-                        {/* Below the breakpoint the content wraps INSIDE its
+                {/* The edit dress (#635): the SAME line renderer carries
+                    both modes — reading renders shown(), editing renders
+                    the draft — so the gutter and the severity tints
+                    survive into the editor (the recorded pick) instead of
+                    dropping to a bare textarea. The textarea overlays the
+                    layer with transparent text and a visible caret; both
+                    share one font, size and leading, so the caret walks
+                    the very glyphs the layer paints. w-fit only while
+                    editing: max-content sizing would unwrap the phone's
+                    soft-wrapped lines, and editing never runs there. */}
+                <div
+                  class="relative"
+                  classList={{ "w-fit min-w-full": editing() }}
+                >
+                  <div aria-hidden={editing() || undefined}>
+                    <For each={paneLines()}>
+                      {(line, i) => {
+                        const n = () => i() + 1;
+                        const tier = () => lineTiers().get(n());
+                        const band = () => {
+                          const t = tier();
+                          return t === undefined
+                            ? "border-l-transparent text-fg-soft"
+                            : severityLineTint(t);
+                        };
+                        return (
+                          <div
+                            class={`flex gap-3 whitespace-pre border-l-[3px] px-3 font-mono text-caption leading-[1.7] ${band()}`}
+                            classList={{
+                              "[box-shadow:var(--focus-ring)]":
+                                focusLine() === n(),
+                            }}
+                            ref={(el) => {
+                              // Scroll the pane, not the page, when a finding is clicked.
+                              if (focusLine() === n()) {
+                                queueMicrotask(() => {
+                                  el.scrollIntoView({ block: "center" });
+                                });
+                              }
+                            }}
+                          >
+                            <span class="w-8 shrink-0 text-right text-fg-dim select-none">
+                              {n()}
+                            </span>
+                            {/* Below the breakpoint the content wraps INSIDE its
                             own flex item (#596) — the number column stays a
                             fixed gutter, so continuation lines land as a
                             hanging indent under it, and `anywhere` is what
                             lets an unspaced AGS record break at all. Desktop
                             keeps the row unconstrained, which is what the
                             scroller's side-scroll rides on. */}
-                        {/* Aligned mode opts OUT of the phone wrap (M2-06):
+                            {/* Aligned mode opts OUT of the phone wrap (M2-06):
                             columnar text cannot wrap and stay columnar, so
                             the pane pans horizontally instead — the
                             scroller above is already overflow-auto. */}
-                        <span
-                          classList={{
-                            "max-[64rem]:min-w-0 max-[64rem]:flex-1 max-[64rem]:whitespace-pre-wrap max-[64rem]:[overflow-wrap:anywhere]":
-                              !alignedView(),
-                          }}
-                        >
-                          {line}
-                        </span>
-                      </div>
-                    );
-                  }}
-                </For>
+                            <span
+                              classList={{
+                                "max-[64rem]:min-w-0 max-[64rem]:flex-1 max-[64rem]:whitespace-pre-wrap max-[64rem]:[overflow-wrap:anywhere]":
+                                  !alignedView(),
+                              }}
+                            >
+                              {line}
+                            </span>
+                          </div>
+                        );
+                      }}
+                    </For>
+                  </div>
+                  <Show when={editing()}>
+                    <textarea
+                      aria-label="Edit delivery.ags"
+                      spellcheck={false}
+                      // wrap=off: a soft wrap would break the one-to-one
+                      // line pact with the layer underneath.
+                      wrap="off"
+                      // pl is the layer's text start: the line's 3px tint
+                      // border + px-3 + the w-8 gutter + gap-3. The
+                      // "editing keeps the line numbers and the tints"
+                      // e2e pins this geometrically — a drift shows as a
+                      // caret standing beside its glyph, not on it.
+                      class="absolute inset-0 resize-none overflow-hidden bg-transparent pr-3 pl-[59px] font-mono text-caption leading-[1.7] whitespace-pre text-transparent caret-(--accent) focus-visible:outline-hidden"
+                      value={draft()}
+                      onInput={(e) => {
+                        onDraftInput(e.currentTarget.value);
+                      }}
+                    />
+                  </Show>
+                </div>
               </Show>
             </div>
           </div>
@@ -243,14 +364,20 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             </Button>
             {/* The takeaway door (#639): the delivery leaves as a real .ags
                 so a reader can run it through their own validator — which
-                is why the bytes are text() itself, the emitter's output the
-                pane shows, never a re-serialization. A failure after the
-                picker gets a stated note: the reader chose a location in an
-                OS dialog, and silence there reads as saved. */}
+                is why the bytes are what the PANE SHOWS, never a
+                re-serialization: the emitted text normally, the reader's
+                own draft (CRLF restored) while the pane is an editor
+                (#635) — downloading the emitter's view of a divergent
+                draft would be a silent re-emit. A failure after the picker
+                gets a stated note: the reader chose a location in an OS
+                dialog, and silence there reads as saved. */}
             <Button
               variant="default"
               onClick={() => {
-                void saveDelivery(text()).then((outcome) => {
+                const bytes = editing()
+                  ? draft().replace(/\r?\n/g, "\r\n")
+                  : text();
+                void saveDelivery(bytes).then((outcome) => {
                   setSaveNote(
                     outcome === "failed"
                       ? "Saving failed: nothing was written."

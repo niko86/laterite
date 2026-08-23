@@ -17,6 +17,7 @@
  */
 
 import {
+  batch,
   createMemo,
   createResource,
   createRoot,
@@ -30,6 +31,7 @@ import {
   deleteGroup as deleteGroupFrom,
   deleteRow as deleteRowFrom,
   emit,
+  parse,
   reparseGuarded,
   restoreGroup as restoreGroupTo,
   setCell as setCellIn,
@@ -71,6 +73,24 @@ const [picked, setPicked] = createSignal<{
  *  the reader is looking at. */
 const text = createMemo(() => emit(delivery()));
 
+/* The pane's raw draft (#635). While the pane editor holds the delivery,
+   the engine must judge the DRAFT'S OWN BYTES: the tolerant parse launders
+   garbage into an empty delivery, and validating THAT emitted an
+   earned-looking all-clear — #638's lie through another door. Non-null only
+   between pane commits; any other writer (a structured commit, an undo
+   step, the editor closing) makes the emitted text the truth again. */
+const [paneRaw, setPaneRaw] = createSignal<string | null>(null);
+
+/** One key, two sites: commit() skips clearing paneRaw for exactly the
+ *  commits that are about to re-stamp it. A string in only one place would
+ *  fail silently as an extra engine pass per commit, not a visible break. */
+const PANE_EDIT = "pane-edit";
+
+/** Whether the pane's draft currently outranks the emitted text — the
+ *  component uses this to tell its own commit echoing back from an outside
+ *  writer reclaiming the store. */
+export const paneDraftActive = (): boolean => paneRaw() !== null;
+
 /* The validation pass, as a resource rather than a hand-rolled async effect.
  *
  * The first version of this was `createEffect(on([armed, text], async …))` with
@@ -92,7 +112,7 @@ const text = createMemo(() => emit(delivery()));
  */
 const { report, busy, counted } = createRoot(() => {
   const [res] = createResource(
-    () => (armed() ? delivery() : false),
+    () => (armed() ? { snapshot: delivery(), raw: paneRaw() } : false),
     // One fetch, all three answers: the findings, the fixes, AND the delivery
     // they were computed against. Keying the fetcher on the delivery (not its
     // text) lets the result carry that snapshot, so a fix's line is only ever
@@ -100,12 +120,15 @@ const { report, busy, counted } = createRoot(() => {
     // stale fix list with a fresh delivery could count a fix against the
     // wrong table during the revalidation window (#530). The cost is a
     // second engine pass per revalidation — accepted for coherence.
-    async (snapshot: Delivery) => {
-      const current = emit(snapshot);
+    async (src: { snapshot: Delivery; raw: string | null }) => {
+      // The raw draft outranks the emitted text while it stands (#635):
+      // the reader is looking at THOSE bytes, so the verdict must be about
+      // them — including the engine's refusal when they are not AGS4.
+      const current = src.raw ?? emit(src.snapshot);
       return {
         report: await validateText(current),
         fixes: await computeFixesText(current),
-        snapshot,
+        snapshot: src.snapshot,
       };
     },
   );
@@ -186,8 +209,17 @@ function commit(
   const changed = next(current);
   if (changed === current) return false;
   history = record(history, current, 100, coalesce);
-  setDelivery(changed);
-  dropStalePick(changed);
+  // One batch, deliberately: effects watching text() must see the pane
+  // draft's fate and the new delivery TOGETHER — written separately,
+  // Solid runs them between the writes, and the pane's follow-the-writer
+  // effect read a stale still-standing draft and skipped (#635).
+  batch(() => {
+    setDelivery(changed);
+    dropStalePick(changed);
+    // A structured writer reclaims the truth from the pane's draft — the
+    // pane commit re-stamps its own raw right after this.
+    if (coalesce !== PANE_EDIT) setPaneRaw(null);
+  });
   return true;
 }
 
@@ -250,8 +282,13 @@ function step(walk: typeof undoIn): void {
   const stepped = walk(history, delivery());
   if (!stepped) return;
   history = stepped.history;
-  setDelivery(() => stepped.present);
-  dropStalePick(stepped.present);
+  // Batched for the same reason as commit(): the pane's follow-the-writer
+  // effect must see the draft released and the stepped delivery at once.
+  batch(() => {
+    setDelivery(() => stepped.present);
+    dropStalePick(stepped.present);
+    setPaneRaw(null);
+  });
 }
 
 export function undo(): void {
@@ -280,6 +317,36 @@ export function bindUndoShortcuts(): void {
   onCleanup(() => {
     target.removeEventListener("keydown", onKey);
   });
+}
+
+/** Whole-delivery replacement from the pane's draft (#635). The tables get
+ *  the tolerant parse's view; the ENGINE gets the raw bytes (paneRaw
+ *  above), so garbage is refused rather than laundered. Never throws —
+ *  parse is tolerant by design — and consecutive pane commits coalesce
+ *  into one undo step, so a typing session unwinds in one Cmd+Z. Stale
+ *  cell picks are commit's own concern (dropStalePick). */
+export function replaceFromText(raw: string): void {
+  const next = parse(raw);
+  // Only a successful parse feeds the structured store (the recorded
+  // mechanism): a draft the parser finds no groups in — the same
+  // emptiness the engine refuses as "no GROUP rows" — leaves the tables
+  // on the last good delivery, while the verdict surfaces carry the
+  // refusal. Emptying every table under a refused banner would punish
+  // the reader twice for one typo.
+  // Batched with the raw stamp: written separately, the follow-the-writer
+  // effect runs between them, sees a not-yet-stamped draft, and re-seeds
+  // the textarea mid-typing wherever emit(parse(draft)) differs from the
+  // draft's own bytes.
+  batch(() => {
+    if (next.length > 0) commit(() => next, PANE_EDIT);
+    setPaneRaw(raw);
+  });
+}
+
+/** The pane editor closing (#635): the emitted text is the truth again,
+ *  and the verdict re-keys to it. */
+export function releasePaneDraft(): void {
+  setPaneRaw(null);
 }
 
 export function reset(): void {

@@ -274,10 +274,7 @@ test("without a picker, the download falls back as laterite.ags", async ({
   expect(readFileSync(file, "utf8")).toBe(seededDeliveryText());
 });
 
-test("fine: the pane edits the delivery, live", async ({
-  page,
-  hasTouch,
-}) => {
+test("fine: the pane edits the delivery, live", async ({ page, hasTouch }) => {
   test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
   await page.goto("/");
   const chip = page.locator('[data-scoreboard="floating"]');
@@ -319,6 +316,12 @@ test("fine: pane garbage is identified, never validated clean", async ({
   await expect(page.locator("#findings")).toContainText(
     "not a parseable AGS4 file",
   );
+  // The tables hold the LAST GOOD delivery under the refusal — only a
+  // successful parse feeds the structured store, so one typo never
+  // empties the page it sits on.
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" }),
+  ).toBeVisible();
 
   // Typing the delivery back restores the counted verdict — recovery is
   // the same door in reverse.
@@ -340,13 +343,39 @@ test("fine: editing keeps the line numbers and the tints", async ({
   // The recorded pick for #635's edit surface: the overlay keeps the
   // pane's own dress — the gutter still counts, the failing line still
   // wears its severity tint — instead of dropping to a bare textarea.
+  // The pane's line divs and nothing else: the findings panel quotes the
+  // same value in Rule 8's description, so a loose text filter drifts to
+  // it — whitespace-pre is the line renderer's own dress.
   const pane = page.locator("section#file");
   const failingLine = pane
-    .locator("div")
-    .filter({ hasText: /"11\.8"/ })
-    .last();
+    .locator("div.whitespace-pre")
+    .filter({ hasText: '"11.8"' })
+    .first();
   await expect(failingLine).toHaveClass(/border-l-err/);
   await expect(pane.getByText("17", { exact: true })).toBeVisible();
+
+  // The overlay pact, pinned by geometry: the textarea's text must start
+  // exactly where the layer's text starts (its pl equals the line's tint
+  // border + padding + gutter + gap) and step with the same leading —
+  // a drifted class shows here as a caret beside its glyph, not on it.
+  const editor = page.getByRole("textbox", { name: "Edit delivery.ags" });
+  const spanBox = await failingLine.locator("span").nth(1).boundingBox();
+  const editorBox = await editor.boundingBox();
+  if (!spanBox || !editorBox) throw new Error("overlay must measure");
+  const padLeft = await editor.evaluate(
+    (el) =>
+      parseFloat(getComputedStyle(el).paddingLeft) +
+      el.getBoundingClientRect().x,
+  );
+  expect(padLeft, "text starts under the caret's origin").toBeCloseTo(
+    spanBox.x,
+    0,
+  );
+  const [layerLead, editorLead] = await Promise.all([
+    failingLine.evaluate((el) => getComputedStyle(el).lineHeight),
+    editor.evaluate((el) => getComputedStyle(el).lineHeight),
+  ]);
+  expect(editorLead, "one leading for both layers").toBe(layerLead);
 
   // Aligned columns is a display-only re-spacing; typing into padding
   // would leak pad spaces into values, so the toggle stands down while
@@ -354,6 +383,65 @@ test("fine: editing keeps the line numbers and the tints", async ({
   await expect(
     page.getByRole("checkbox", { name: "Aligned columns" }),
   ).toBeDisabled();
+});
+
+test("fine: an outside writer reclaims the pane's draft", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+
+  // Two writers over one store, the OTHER direction: while the pane
+  // edits, Reset (or a cell edit, or undo) moves the delivery under it.
+  // The draft must follow — a draft that kept itself would re-commit on
+  // the next debounce and silently revert the other writer.
+  await page.getByRole("checkbox", { name: "Edit the file" }).check();
+  const editor = page.getByRole("textbox", { name: "Edit delivery.ags" });
+  const fixed = (await editor.inputValue()).replace('"11.8"', '"11.80"');
+  await editor.fill(fixed);
+  await expect(chip).toContainText("3 errors");
+
+  await page.getByRole("button", { name: "Reset the delivery" }).click();
+  await expect(chip).toContainText("4 errors");
+  await expect
+    .poll(async () => (await editor.inputValue()).includes('"11.80"'))
+    .toBe(false);
+});
+
+test("fine: a pane session unwinds in one undo step", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+
+  // Consecutive pane commits coalesce ("pane-edit"): however long the
+  // typing session, one Cmd+Z after closing restores the pre-session
+  // delivery — a keystroke-per-step unwind would make undo useless here.
+  await page.getByRole("checkbox", { name: "Edit the file" }).check();
+  const editor = page.getByRole("textbox", { name: "Edit delivery.ags" });
+  const fixed = (await editor.inputValue()).replace('"11.8"', '"11.80"');
+  await editor.fill(fixed);
+  await expect(chip).toContainText("3 errors");
+  await page.getByRole("checkbox", { name: "Edit the file" }).uncheck();
+
+  // Park focus off the checkbox first: the undo binding defers to any
+  // focused input (#525's native-undo guard), and unchecking leaves focus
+  // on the toggle — a reader clicks back into the page the same way.
+  await page
+    .locator("section#file")
+    .getByText("delivery.ags", { exact: true })
+    .click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(chip).toContainText("4 errors");
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" }),
+  ).toContainText("11.8");
 });
 
 test("touch: the pane keeps its read-only dress", async ({
