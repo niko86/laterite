@@ -25,8 +25,8 @@
  * <img> rather than baked into the asset.
  */
 
-import { For, type Component } from "solid-js";
-import { Button, ThemeToggle } from "@shared/components";
+import { For, type Component, type JSX } from "solid-js";
+import { Button, Icon, ThemeToggle } from "@shared/components";
 import mark from "../../../assets/laterite-icon-128.png";
 
 const NAV = [
@@ -36,6 +36,47 @@ const NAV = [
   { href: "https://docs.laterite.dev/", label: "Docs" },
   { href: "https://github.com/niko86/laterite", label: "Source" },
 ];
+
+/* The GitHub MARK, not a Lucide glyph — deliberately outside the vendored
+   icon set. The pinned lucide-static dropped its brand icons, and the icon
+   system's own rule for that case is "say so, never hand-draw a lookalike":
+   this is the saying-so. The path is GitHub's official mark, vendored
+   verbatim (their logo policy invites exactly this use — a mark that links
+   to a GitHub presence), filled with currentColor so it takes the same ink
+   as the Lucide glyph beside it in both themes.
+
+   18px where the Lucide glyph gets 20: the mark fills its 16-unit box
+   edge-to-edge while Lucide draws inside a ~2-unit gutter of its 24, so
+   equal boxes render the mark visibly heavier — the two only read as one
+   nav with the box compensating for the gutter. */
+const GithubMark: Component = () => (
+  <svg
+    viewBox="0 0 16 16"
+    width="18"
+    height="18"
+    fill="currentColor"
+    aria-hidden="true"
+  >
+    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+  </svg>
+);
+
+/* One mobile icon link (#597): a 44px square — the tap-target floor — around
+   a 20px glyph, wearing the nav links' own ink-and-hover so the two forms
+   read as one nav. Hidden exactly where the text nav appears. */
+const IconLink: Component<{
+  href: string;
+  label: string;
+  children: JSX.Element;
+}> = (props) => (
+  <a
+    href={props.href}
+    aria-label={props.label}
+    class="flex size-11 items-center justify-center rounded-md text-fg-soft transition-colors hover:text-accent focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)] min-[52rem]:hidden"
+  >
+    {props.children}
+  </a>
+);
 
 export const Masthead: Component = () => (
   <header class="sticky top-0 z-30 bg-surface">
@@ -80,7 +121,22 @@ export const Masthead: Component = () => (
         </For>
       </nav>
 
-      <div class="ml-auto flex items-center gap-2 min-[52rem]:ml-0">
+      <div class="ml-auto flex items-center gap-1 min-[52rem]:ml-0 min-[52rem]:gap-2">
+        {/* The mobile nav is these two icons (#597): the text nav is hidden
+            below 52rem, which used to leave a phone no path to the source or
+            the install anchor from the top bar. Iconography over text HERE
+            only — the CTA keeps its words (#586). The install glyph is the
+            arrow-into-tray; the jump rides the document's smooth-scroll rule
+            (#589) like every anchor. */}
+        <IconLink
+          href="https://github.com/niko86/laterite"
+          label="Source on GitHub"
+        >
+          <GithubMark />
+        </IconLink>
+        <IconLink href="#install" label="Jump to install">
+          <Icon name="download" size={20} />
+        </IconLink>
         <ThemeToggle />
         <Button variant="primary" size="sm" href="https://app.laterite.dev/">
           Open webapp

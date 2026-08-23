@@ -19,6 +19,7 @@
 // so — that is the system's rule, and an invented glyph is the one thing that
 // makes an icon set stop reading as one.
 
+import download from "./download.svg?raw";
 import fileDown from "./file-down.svg?raw";
 import funnel from "./funnel.svg?raw";
 import gitCompareArrows from "./git-compare-arrows.svg?raw";
@@ -36,6 +37,7 @@ import { iconBody } from "./iconBody";
 
 /** Icon name → the icon's inner markup, wrapper stripped (see `iconBody`). */
 export const ICONS = {
+  download: iconBody(download),
   "file-down": iconBody(fileDown),
   funnel: iconBody(funnel),
   "git-compare-arrows": iconBody(gitCompareArrows),

@@ -154,6 +154,23 @@ test("dark: the cell popover renders for cell and row findings", async ({
   await expect(pop).toContainText("Rule 10c");
 });
 
+test("dark: the masthead icons take real ink", async ({ page }) => {
+  // #597's "crisp in both themes" is a colour claim at this altitude: both
+  // glyphs draw with currentColor, so what the dark theme must prove is
+  // that the ink they inherit resolves to a real colour, not transparent —
+  // and that the two carry the SAME ink, one nav in two forms.
+  await page.goto("/");
+  const source = page.getByRole("link", { name: "Source on GitHub" });
+  await expect(source).toBeVisible();
+  const ink = (name: string) =>
+    page
+      .getByRole("link", { name })
+      .evaluate((el) => getComputedStyle(el).color);
+  const sourceInk = await ink("Source on GitHub");
+  expect(sourceInk).not.toBe("rgba(0, 0, 0, 0)");
+  expect(await ink("Jump to install")).toBe(sourceInk);
+});
+
 test("dark: every install card wears its dark hue", async ({ page }) => {
   // The light half lives in landing.spec.ts (#595). Dark's hue is its own
   // tuned value, not an inversion — asserted against the generated data, so
