@@ -188,6 +188,49 @@ test("touch: the tray opens above the strip, inside the viewport", async ({
   expect(stripFollows, "the strip follows the tray in the DOM").toBe(true);
 });
 
+test("fine: a refused run never renders as the all-clear", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#525)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+
+  // An AGS 3.x TRAN_AGS is the value the engine REFUSES (unsupported
+  // edition, O-30) rather than falls back on — the run returns an error
+  // and an empty findings list, and #638 was that emptiness rendering as
+  // "valid": the demo's all-clear and the engine's refusal are different
+  // claims. (A merely unknown 4.x-ish value — "banana" — falls back with a
+  // warning finding and never took this path.)
+  const cell = page.getByRole("button", {
+    name: "Edit TRAN_AGS on row 1 of TRAN",
+  });
+  await cell.scrollIntoViewIfNeeded();
+  await cell.click();
+  await page.keyboard.type("3.1");
+  await page.keyboard.press("Enter");
+
+  // The chip states the refusal, in the error dress, never the green tick.
+  await expect(chip).toContainText("not validatable");
+  await expect(chip).not.toContainText("valid AGS4");
+
+  // The panel carries the engine's own message — the UI neither rewords a
+  // refusal nor decides how bad — and drops the finding count: "0" under a
+  // refused run would be the same false claim in digits.
+  const panel = page.locator("#findings");
+  await expect(panel).toContainText("is not supported");
+  await expect(panel).not.toContainText("Clean: 0 findings.");
+
+  // Restoring the edition ends the refusal: the counts come back, so the
+  // all-clear stays earned — it renders only from a run that genuinely
+  // returned zero findings.
+  await cell.click();
+  await page.keyboard.type("4.1.1");
+  await page.keyboard.press("Enter");
+  await expect(chip).toContainText("4 errors");
+});
+
 test("touch: a row deletes from the carousel and the findings follow", async ({
   page,
   hasTouch,
