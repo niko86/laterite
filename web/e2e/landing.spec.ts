@@ -56,9 +56,10 @@ function seededFinalDepthLabel(): string {
 const scroller = (page: Page, section: string) =>
   page.locator(`section#${section} table`).locator("xpath=..");
 
-/** The failing cell's corner flag (#616) — the one absolutely-positioned
- *  span inside a cell button, replacing the retired inline ✗. */
-const cornerFlag = (cell: Locator) => cell.locator("span.absolute");
+/** The failing cell's corner flag (#616; re-anchored to the cell by
+ *  #632) — the one absolutely-positioned span inside the cell's td. */
+const cornerFlag = (cell: Locator) =>
+  cell.locator("xpath=ancestor::td[1]//span[contains(@class, 'absolute')]");
 
 test("phone: the page stays viewport-wide and each group table pans in its own scroller", async ({
   page,
@@ -481,7 +482,12 @@ test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and mo
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
   await cell.click();
-  await expect(cell).toHaveClass(/bg-accent-quiet/);
+  // The pick's sign on a FAILING cell is the #618 ring — the wash stands
+  // down there since #633, so the severity tint stays the only hue.
+  await expect(cell.locator("xpath=ancestor::td[1]")).toHaveCSS(
+    "box-shadow",
+    /inset/,
+  );
   await expect(cornerFlag(cell)).toBeVisible();
 
   // Enter opens the value in place; typing replaces the selection; Enter
@@ -569,7 +575,8 @@ test("fine: rows delete from the table, and undo/redo walk the model timeline", 
     .getByRole("button", { name: "Edit PROJ_ID on row 2 of PROJ" })
     .click();
   // `.bg-accent-quiet` matches the class TOKEN — a [class*=] substring match
-  // would also catch every cell's hover:bg-accent-quiet.
+  // would also catch a clean cell's hover:bg-accent-quiet (#633 removed the
+  // hover token from failing cells only).
   await expect(proj.locator("td button.bg-accent-quiet")).toHaveCount(1);
   await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
   await expect(rows).toHaveCount(3);
@@ -705,6 +712,112 @@ test("fine: findings speak one vocabulary — tinted cell with popover, chipped 
   await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
 });
 
+test("the corner flag pins the cell's corner, and a failing pick wears one wash", async ({
+  page,
+}) => {
+  // #632: the flag was anchored to the inner edit button, which sits
+  // inside the td's padding — so the triangle floated mid-cell instead of
+  // pinning the corner the way a spreadsheet annotation does. The claim
+  // is geometric: the flag's top-right IS the td's top-right.
+  await page.goto("/");
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await expect(cornerFlag(cell)).toBeVisible({ timeout: 15_000 });
+  const td = cell.locator("xpath=ancestor::td[1]");
+  const flagBox = await cornerFlag(cell).boundingBox();
+  const tdBox = await td.boundingBox();
+  if (!flagBox || !tdBox) throw new Error("flag and cell must lay out");
+  expect(flagBox.y, "flag top = cell top").toBeCloseTo(tdBox.y, 0);
+  expect(flagBox.x + flagBox.width, "flag right = cell right").toBeCloseTo(
+    tdBox.x + tdBox.width,
+    0,
+  );
+
+  // #633: picking a FAILING cell used to add the accent wash on top of
+  // the severity tint — two hues, one cell. The wash stands down there
+  // (the #618 ring and the tint carry the pick); on fine lanes the mouse
+  // is left sitting on the cell, so this also proves hover adds none.
+  //
+  // TIMING IS THE TRAP here: the button transitions its colours, so a
+  // computed background read at click time reports the transition's
+  // START value and a wash still fading in reads as absent. The clean
+  // cell's wash is asserted with a retrying matcher (also the positive
+  // control that keeps the claim falsifiable), and the failing cell is
+  // read once only AFTER the clean cell's wash has fully faded back out
+  // — a whole transition provably elapsed since the pick moved, so a
+  // pre-fix wash would have landed by then.
+  const TRANSPARENT = "rgba(0, 0, 0, 0)";
+  const clean = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of LOCA",
+  });
+  await clean.click();
+  await expect(clean, "the clean cell keeps the wash").not.toHaveCSS(
+    "background-color",
+    TRANSPARENT,
+  );
+  const failing = page.getByRole("button", {
+    name: "Edit SAMP_TYPE on row 1 of SAMP",
+  });
+  await failing.click();
+  await expect(clean, "the pick moved off the clean cell").toHaveCSS(
+    "background-color",
+    TRANSPARENT,
+  );
+  expect(
+    await failing.evaluate((el) => getComputedStyle(el).backgroundColor),
+    "no second wash on a failing cell",
+  ).toBe(TRANSPARENT);
+  expect(
+    await failing
+      .locator("xpath=ancestor::td[1]")
+      .evaluate((el) => getComputedStyle(el).boxShadow),
+    "the ring still marks the pick",
+  ).toContain("inset");
+  // …and the severity tint is what remains painting the cell: the wash
+  // stood down FOR it, so its absence would mean an untinted verdict.
+  expect(
+    await failing
+      .locator("xpath=ancestor::td[1]")
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+    "the severity tint stands",
+  ).not.toBe(TRANSPARENT);
+});
+
+test("a long finding stays inside its hover popover", async ({
+  page,
+  hasTouch,
+}) => {
+  // #636: the Rule 10c KEY-combination token is one long unbroken run,
+  // and engines differ on whether a pipe is a break opportunity — the
+  // report's engine let it burst past the popover's border. The claim
+  // is overflow-free content, whatever the engine's line breaker does.
+  test.skip(hasTouch, "the popover is the fine pointer's surface (#591)");
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.locator('section#llpl [data-cell="2-1"]').hover();
+  const pop = page.getByRole("tooltip");
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 10c");
+  expect(
+    await pop.evaluate((el) => el.scrollWidth - el.clientWidth),
+    "content escapes the popover",
+  ).toBeLessThanOrEqual(0);
+
+  // The callout's other homes keep their wrap contract: the panel's
+  // cards were never nowrap-poisoned, and this pins that the shared
+  // class change left them overflow-free too.
+  expect(
+    await page
+      .locator("#findings li")
+      .first()
+      .evaluate((el) => el.scrollWidth - el.clientWidth),
+    "the findings panel home stays overflow-free",
+  ).toBeLessThanOrEqual(0);
+});
+
 test("the corner flag arrives with the findings, no pointer required", async ({
   page,
 }) => {
@@ -740,7 +853,8 @@ test("a picked cell wears the selection ring, and it travels with the arrows", a
       .locator("xpath=ancestor::td[1]")
       .evaluate((el) => getComputedStyle(el).boxShadow);
   expect(await ringOf(cell), "first click draws the ring").toContain("inset");
-  // The wash stays underneath: the ring joins it, not replaces it.
+  // On a CLEAN cell the wash stays underneath: the ring joins it, not
+  // replaces it. (A failing cell is the wash-free case — #633.)
   await expect(cell).toHaveClass(/bg-accent-quiet/);
 
   if (!hasTouch) {
@@ -2160,14 +2274,18 @@ test("every install card opens a door to its surface's get-started page", async 
   const install = page.locator("section#install");
 
   if (width(page) >= 608) {
-    // By INDEX like the hue test above, not by label text: a hasText filter
-    // reads the card's whole subtree, and the CLI card's note names Python
-    // (and Python's note names duckdb), so label filtering resolves two
-    // cards and trips strict mode. The grid renders INSTALL_CHANNELS in
-    // order; nth is the established pin for that.
-    const cards = install.locator(".install-card");
+    // #641: desktop is the tab strip. A door is reachable by activating
+    // its surface's tab — reachability is the AC, so the walk clicks
+    // every tab and reads the VISIBLE door, by index (tabs render
+    // INSTALL_CHANNELS in order; a label filter would read the card's
+    // whole subtree and trip strict mode on cross-mentions).
+    const tabs = install.getByRole("tab");
     for (const [i, channel] of INSTALL_CHANNELS.entries()) {
-      const link = cards.nth(i).getByRole("link", { name: "Get started" });
+      await tabs.nth(i).click();
+      const link = install
+        .locator("[role='tabpanel'] .install-card")
+        .locator("visible=true")
+        .getByRole("link", { name: "Get started" });
       await expect(link, `${channel.id} card's door`).toBeVisible();
       await expect(link).toHaveAttribute("href", channel.docs);
     }
@@ -2184,28 +2302,73 @@ test("every install card opens a door to its surface's get-started page", async 
   await expect(activeDoor()).toHaveAttribute("href", INSTALL_CHANNELS[1].docs);
 });
 
-test("the install cards become a one-card looping deck on a phone", async ({
+test("tabs carry the stack on desktop, the looping deck on a phone", async ({
   page,
 }) => {
-  // #595: below the grid's own first column break (38rem) the five cards
-  // page one at a time with position dots; at 38rem and up the grid stands.
+  // #595 gave the phone its one-card deck below 38rem; #641 retires the
+  // desktop grid for the tab strip — every surface name stays visible
+  // (the #395 discoverability job), one detail card shows, and all five
+  // cards stay parked in the DOM (the #622 stack) so the absence and
+  // computed-style assertions keep their strength.
   await page.goto("/");
   const install = page.locator("section#install");
-  const lis = install.locator("ul li");
-  await expect(lis).toHaveCount(INSTALL_CHANNELS.length);
 
   if (width(page) >= 608) {
-    // Desktop unchanged in structure: the grid, every card visible, no
-    // paging chrome.
-    await expect(lis.nth(4)).toBeVisible();
+    const tabs = install.getByRole("tab");
+    await expect(tabs).toHaveCount(INSTALL_CHANNELS.length);
+    for (const [i, channel] of INSTALL_CHANNELS.entries()) {
+      await expect(tabs.nth(i), `${channel.id} tab`).toHaveText(channel.label);
+    }
+    // All five cards in the DOM, exactly one showing.
+    await expect(install.locator(".install-card")).toHaveCount(
+      INSTALL_CHANNELS.length,
+    );
+    const shown = install
+      .locator("[role='tabpanel'] .install-card")
+      .locator("visible=true");
+    await expect(shown).toHaveCount(1);
+    await expect(shown).toContainText("Python");
+
+    // A tab is a door; arrows walk the strip with a roving tabindex.
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(shown).toContainText("CLI");
+    await page.keyboard.press("ArrowRight");
+    await expect(shown).toContainText("DuckDB");
+    await page.keyboard.press("ArrowLeft");
+    await expect(shown).toContainText("CLI");
+
+    // No paging chrome at this width — the deck's grammar stays the
+    // phone's.
     await expect(
       install.getByRole("button", { name: "Next card" }),
     ).toHaveCount(0);
     await expect(
       install.getByRole("button", { name: /Go to card/ }),
     ).toHaveCount(0);
+
+    // The decided geometry: text left of the panel at the two-column
+    // breakpoint, stacked above it below.
+    const heading = await install
+      .getByRole("heading", { name: "Pick your stack" })
+      .boundingBox();
+    const strip = await install.getByRole("tablist").boundingBox();
+    if (!heading || !strip) throw new Error("heading and tablist must lay out");
+    if (width(page) >= 1024) {
+      expect(
+        strip.x,
+        "the panel sits right of the text column",
+      ).toBeGreaterThanOrEqual(heading.x + heading.width);
+    } else {
+      expect(strip.y, "stacked below the text").toBeGreaterThan(
+        heading.y + heading.height,
+      );
+    }
     return;
   }
+
+  const lis = install.locator("ul li");
+  await expect(lis).toHaveCount(INSTALL_CHANNELS.length);
 
   // One visible card — the rest parked, not gone — plus five dots.
   const current = install.locator("ul li:visible");
@@ -2388,6 +2551,33 @@ test("a page turn enters from the side of travel, even on a reversal", async ({
   expect(parseFloat(pose), pose).toBeLessThan(-5);
 });
 
+test("wide: the tabs stack under the text at mid widths", async ({ page }) => {
+  test.skip(width(page) < 1088, "one lane carries the mid-width probe");
+  // The decided mid-width behaviour (#641): between the phone break and
+  // the two-column width the tabs stack under the text. No project runs
+  // in that gap, so this test resizes the wide lane's page into it and
+  // pins the stacked geometry there — otherwise the decision's e2e
+  // branch would exist without ever executing.
+  await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto("/");
+  const install = page.locator("section#install");
+  await expect(install.getByRole("tab")).toHaveCount(INSTALL_CHANNELS.length);
+  await expect(install.getByRole("button", { name: /Go to card/ })).toHaveCount(
+    0,
+  );
+  const heading = await install
+    .getByRole("heading", { name: "Pick your stack" })
+    .boundingBox();
+  const strip = await install.getByRole("tablist").boundingBox();
+  if (!heading || !strip) throw new Error("heading and tablist must lay out");
+  expect(strip.y, "stacked below the text").toBeGreaterThan(
+    heading.y + heading.height,
+  );
+  await expect(
+    install.locator("[role='tabpanel'] .install-card").locator("visible=true"),
+  ).toHaveCount(1);
+});
+
 test("the file pane wraps on a phone and side-scrolls on desktop", async ({
   page,
 }) => {
@@ -2507,11 +2697,44 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
     "href",
     "https://github.com/niko86/laterite",
   );
+  // #631: the visible box is no longer the tap target. The box takes the
+  // toggle's own vertical recipe, so its height must EQUAL the toggle's —
+  // the family claim #621 started, finished — while the 44px floor
+  // survives as a centred hit area probed below, not as the border box.
+  const toggleBtn = header.getByRole("button", {
+    name: "Toggle colour theme",
+  });
+  const toggleRect = await toggleBtn.boundingBox();
+  if (!toggleRect) throw new Error("the toggle must lay out");
   for (const link of [source, install]) {
     const box = await link.boundingBox();
-    expect(box, "the icon link must lay out").not.toBeNull();
-    expect(box?.width, "tap-target width floor").toBeGreaterThanOrEqual(44);
-    expect(box?.height, "tap-target height floor").toBeGreaterThanOrEqual(44);
+    if (!box) throw new Error("the icon link must lay out");
+    expect(box.height, "the box is the toggle's height").toBeCloseTo(
+      toggleRect.height,
+      0,
+    );
+    // The floor, probed on BOTH axes: the box is under 44px tall AND
+    // wide, so each axis needs its own probe — a height-only pseudo
+    // would ship a sub-floor width through a vertical-only check. 21px
+    // sits one pixel inside the hit square's 22px half-reach (clear of
+    // rounding) and outside the drawn box on both axes.
+    for (const [dx, dy] of [
+      [0, -21],
+      [0, 21],
+      [-21, 0],
+      [21, 0],
+    ]) {
+      const at = await page.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x, y);
+          return el ? (el.getAttribute("aria-label") ?? el.tagName) : "";
+        },
+        [box.x + box.width / 2 + dx, box.y + box.height / 2 + dy] as const,
+      );
+      expect(at, `hit area ${dx},${dy} from centre`).toBe(
+        await link.getAttribute("aria-label"),
+      );
+    }
   }
   // The CTA stays words, not a glyph (#586).
   await expect(header.getByRole("link", { name: "Open webapp" })).toBeVisible();
@@ -2530,7 +2753,7 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
   // family, so a retuned token moves all three together unnoticed. Only
   // the 1px width is pinned, and that pin says the border is real, not
   // which token draws it.
-  const toggle = header.getByRole("button", { name: "Toggle colour theme" });
+  const toggle = toggleBtn;
   const boxOf = (l: Locator) =>
     l.evaluate((el) => {
       const s = getComputedStyle(el);
@@ -2740,24 +2963,57 @@ test("wide: a rail jump lands the pill exactly on its tick", async ({
   // A CSS attribute selector, not getByRole: role-name matching is
   // case-insensitive, and the masthead carries its own lowercase "Jump to
   // install" door that would straddle the rail's "Jump to Install".
+  // #641 shortened the page's tail (the tab strip is roughly half the
+  // grid's height), so the LAST landings can clamp at max scroll — the
+  // #615 model drops those knots by design. The pill therefore reads the
+  // tick only where the landing is genuinely reachable, and the floor's
+  // own depth where the browser clamps. The probe below is settled()'s
+  // formula COPIED, both clamps included — same by hand, not by shared
+  // code, so a drift between them fails this test at the seam rather
+  // than skewing it silently.
+  const reachable = (id: string) =>
+    page.evaluate((sel) => {
+      const el = document.getElementById(sel);
+      if (!el) return false;
+      const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const target = Math.max(
+        0,
+        Math.min(el.getBoundingClientRect().top + window.scrollY - offset, max),
+      );
+      return target < max;
+    }, id);
+
   const jumpAndRead = async (label: string, id: string) => {
     const door = page.locator(`a[aria-label="Jump to ${label}"]`);
     const tick = (
       await door.locator("xpath=preceding-sibling::p").innerText()
     ).replace(/ m$/, "");
+    const lands = await reachable(id);
     await door.click();
     await settled(id);
-    await expect(pill, `${label}'s landing must read its tick`).toHaveText(
-      tick,
-    );
+    await expect(
+      pill,
+      lands
+        ? `${label}'s landing must read its tick`
+        : `${label} clamps at the floor`,
+    ).toHaveText(lands ? tick : seededFinalDepthLabel());
+    return lands;
   };
 
   // Every door on the scale, in descent order, from the page's own sequence —
   // Surface included: its landing clamps at the very top, where the datum
-  // construction pins 0.00 exactly.
+  // construction pins 0.00 exactly. Clamping is only legal at the TAIL
+  // (tops are ordered), and a scale that mostly clamps is broken, not
+  // compact — both held below so the reachable branch cannot silently
+  // hollow out.
+  let clamped = 0;
   for (const section of SECTIONS) {
-    await jumpAndRead(section.label, section.id);
+    const lands = await jumpAndRead(section.label, section.id);
+    if (!lands) clamped++;
+    else expect(clamped, "a reachable landing after a clamped one").toBe(0);
   }
+  expect(clamped, "most landings stay exact").toBeLessThanOrEqual(2);
 
   // The floor: max scroll reads the seeded final depth — the stretched
   // tail's whole purpose, since the deepest landing line sits well above
