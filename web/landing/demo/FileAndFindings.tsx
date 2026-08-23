@@ -12,13 +12,13 @@
  * line numbers, and on a phone a hidden line end is worse than a wrapped one,
  * so there the pane soft-wraps with a hanging indent under the number and
  * the number keeps meaning the logical line. Type size never shrinks either
- * way. The same breakpoint drops the page's three secondary-prose pieces —
- * the status pill, the orphan explainer, the transport aside — because at
- * 390px they cost screens of scroll to say what the demo already shows.
- *
- * "Nothing is uploaded" sits with the findings panel (#594), not in the
- * footer: the verdict is the moment a reader wonders where their file just
- * went, so the answer stands directly above it.
+ * way. The three secondary-prose pieces #596 used to drop below the
+ * breakpoint — the status pill, the orphan explainer, the transport aside —
+ * stopped existing at ANY width in #617: the pass-2 review judged each one
+ * paid in scroll for a point the demo already makes (the privacy claim
+ * survives in the findings outro; the transport story moved to one sentence
+ * in the Pick-your-stack intro). What the breakpoint still swaps is layout,
+ * not prose: the pane's wrap above, and the findings list's carousel (#592).
  */
 
 import { For, Index, Show, createMemo, type Component } from "solid-js";
@@ -32,7 +32,6 @@ import {
   armed,
   busy,
   focusLine,
-  isManualFinding,
   reset,
   report,
   setFocusLine,
@@ -114,107 +113,13 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         </div>
       </div>
 
-      {/* The transport aside (#528): TRAN taken literally. The delivery is
-          built to travel, so the envelope gets told as a story beside the
-          transmission header — drawn, never run: this page's wasm build
-          ships without the transport feature on purpose, and the only way
-          out of the aside is the cookbook page. */}
-      <Show when={!narrowViewport()}>
-        <aside
-          aria-label="Transport"
-          class="mt-8 max-w-[46rem] rounded-lg border border-line bg-surface p-4 dark:bg-surface-raised"
-        >
-          <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
-            TRAN, taken literally
-          </p>
-          <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
-            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-              delivery.ags
-            </code>
-            <span aria-hidden="true" class="text-fg-faint">
-              →
-            </span>
-            <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
-              pack
-            </span>
-            <span aria-hidden="true" class="text-fg-faint">
-              →
-            </span>
-            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-              delivery.ags.zst
-            </code>
-          </div>
-          <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
-            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-              delivery.ags
-            </code>
-            <span aria-hidden="true" class="text-fg-faint">
-              →
-            </span>
-            <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
-              lock
-            </span>
-            <span aria-hidden="true" class="text-fg-faint">
-              →
-            </span>
-            <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
-              delivery.ags.zst.age
-            </code>
-          </div>
-          <p class="mt-3 max-w-[60ch] text-caption text-fg-soft">
-            The delivery itself is built for the trip its cover sheet describes:{" "}
-            <code class="font-mono">pack</code> squeezes the file with zstd and{" "}
-            <code class="font-mono">unpack</code> restores it byte-for-byte (the
-            pair moves bytes, it never parses them) while{" "}
-            <code class="font-mono">lock</code> starts from the original and
-            seals its zstd pack inside a passphrase-encrypted age envelope.
-            Shown here, not run: this page's engine deliberately ships without
-            transport.{" "}
-            <a
-              class="font-semibold text-cta no-underline transition-colors hover:underline"
-              href="https://docs.laterite.dev/cookbook/transport/"
-            >
-              Pack / encrypt for transport
-            </a>
-          </p>
-        </aside>
-      </Show>
-
       <div class="mt-6 grid gap-6 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[64rem]:items-start">
         <div class="min-w-0">
-          {/* The validator-vs-fixer lesson (#530), sitting directly above the
-              pane whose lines it is about (#594): shown while the orphan the
-              copy describes actually stands — pinned to Rule 10c on LLPL, the
-              orphan's own identity, so no OTHER manual LLPL finding can hold
-              the note up after the orphan is repaired. Gated on the finding,
-              not a click — the global fix button it used to follow is gone;
-              each table now carries its own fix budget. The neutral "note"
-              tone — same callout as every finding, no verdict. */}
-          <Show
-            when={
-              !narrowViewport() &&
-              report()?.findings.some(
-                (f) =>
-                  f.rule === "AGS Format Rule 10c" &&
-                  f.group === "LLPL" &&
-                  isManualFinding(f),
-              )
-            }
-          >
-            <div class="mb-3 max-w-[70ch]">
-              <FindingCallout severity="note">
-                The orphaned <code class="font-mono">LLPL</code> row is left
-                standing on purpose: no fix button will touch it, and its
-                finding wears a manual badge. The engine can tell you a lab
-                result points at a sample that does not exist, but only a human
-                knows whether the sample reference is wrong or the sample is
-                missing. That is the whole difference between a validator and a
-                fixer.
-              </FindingCallout>
-            </div>
-          </Show>
-
-          {/* The output pane. */}
+          {/* The output pane. The validator-vs-fixer explainer that stood
+              here retired in #617 (pass-2 pin D2-04): what remains of the
+              story is the mechanism itself — the orphan's Rule 10c finding
+              wears the manual badge in its group table and strip (the fixer
+              refuses it), with no prose narrating it. */}
           <div class="overflow-hidden rounded-lg border border-line bg-surface-code">
             <p class="border-b border-line px-3 py-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
               delivery.ags
@@ -292,15 +197,6 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         {/* The findings list. The id is the scoreboard's jump target (#531):
             the chip states the verdict, this panel is its evidence. */}
         <div id="findings" class="min-w-0 scroll-mt-16">
-          {/* One of the three prose pieces the phone declutter drops (#596):
-              on a 390px screen the reassurance cost more scroll than it
-              bought — the webapp line below still says "it stays in your
-              browser", so the privacy claim survives on every width. */}
-          <Show when={!narrowViewport()}>
-            <p class="rounded-md border border-ok/40 bg-ok-quiet px-3 py-1.5 text-caption font-semibold text-ok">
-              Nothing is uploaded. The engine runs in this tab.
-            </p>
-          </Show>
           <p class="mt-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report()}>
