@@ -24,6 +24,7 @@ import {
   seededFinalDepth,
   setCell,
   singleLine,
+  type Delivery,
 } from "./delivery";
 import { DEMO_GROUPS, keyHeadings } from "./schema";
 
@@ -175,6 +176,37 @@ describe("setCell", () => {
     // change the reader cannot see.
     const current = SEEDED.find((g) => g.code === "LOCA")?.rows[0]?.[0] ?? "";
     expect(setCell(SEEDED, "LOCA", 0, 0, `${current}\r\n`)).toBe(SEEDED);
+  });
+
+  it("answers the same delivery for a group, row or column that is not there", () => {
+    /* #581: the same identity contract deleteRow carries. A write that cannot
+       land writes nothing either way — `rows.map` just rebuilds an identical
+       array — so the only thing at stake is the undo step commit() charges for
+       it, and the Ctrl/Cmd+Z that then appears to do nothing. Reachable rather
+       than theoretical: the selected-cell paste commits in a `.then()` against
+       an index captured at keydown (#580). */
+    expect(setCell(SEEDED, "NOPE", 0, 0, "x")).toBe(SEEDED);
+    expect(setCell(SEEDED, "PROJ", 5, 0, "x")).toBe(SEEDED);
+    expect(setCell(SEEDED, "PROJ", -1, 0, "x")).toBe(SEEDED);
+    expect(setCell(SEEDED, "PROJ", 0, 99, "x")).toBe(SEEDED);
+    expect(setCell(SEEDED, "PROJ", 0, -1, "x")).toBe(SEEDED);
+  });
+
+  it("bounds the column on the ROW's own length, not the heading count", () => {
+    /* Hand-built because the seeded fixture is well-formed, which is the
+       point: only a row shorter than its headings can tell the two candidate
+       bounds apart, and setCell's doc comment says which one it takes. */
+    const short: Delivery = [
+      {
+        code: "PROJ",
+        headings: ["A", "B", "C"],
+        units: [],
+        types: [],
+        rows: [["1"]],
+      },
+    ];
+    expect(setCell(short, "PROJ", 0, 1, "x")).toBe(short);
+    expect(setCell(short, "PROJ", 0, 0, "x").at(0)?.rows.at(0)).toEqual(["x"]);
   });
 });
 
