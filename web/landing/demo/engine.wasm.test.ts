@@ -96,10 +96,14 @@ describe("validateText", () => {
 });
 
 describe("the fix round-trip", () => {
-  it("computeFixesText returns the engine's own fix records", async () => {
-    const fixes = [{ id: 1 }];
-    compute_fixes.mockReturnValueOnce(fixes);
-    expect(await computeFixesText("text")).toBe(fixes);
+  it("computeFixesText keeps the engine's safe fixes and drops the risky ones (#583)", async () => {
+    // The engine's list arrives whole — compute_fixes has no risk filter, and
+    // the wasm apply path never goes through fix_document_selective — so this
+    // seam is the ONE place the demo's budget matches `lat fix`'s default.
+    const safe = { rule: "AGS Format Rule 8", line: 17, risk: "safe" };
+    const risky = { rule: "AGS Format Rule 1", line: 12, risk: "risky" };
+    compute_fixes.mockReturnValueOnce([safe, risky]);
+    expect(await computeFixesText("text")).toEqual([safe]);
     expect(compute_fixes).toHaveBeenCalledWith(
       new TextEncoder().encode("text"),
     );

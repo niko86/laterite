@@ -1008,6 +1008,49 @@ test("fine: a table's budget reacts to new defects, and the tooltip badges the f
   await expect(page.getByRole("tooltip")).toContainText("manual");
 });
 
+test("fine: the budget only offers what lat fix would apply — a risky rewrite never joins it", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#530)");
+  await page.goto("/");
+
+  // An accented remark is an ordinary thing to type into a free-text cell —
+  // and the engine CAN repair it, by Rule 1's transliteration, which it
+  // classifies risky ("guesses intent") and `lat fix` withholds by default.
+  // Before #583 the budget counted it: LOCA read "Fix 2" and the click
+  // rewrote this cell to "cafe -- soft ground" — the demo repairing MORE
+  // than the CLI it sells. The budget must hold at the one safe seeded fix.
+  const rem = page.getByRole("button", {
+    name: "Edit LOCA_REM on row 1 of LOCA",
+  });
+  await rem.click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("café — soft ground");
+  await page.keyboard.press("Enter");
+  const nonAscii = page
+    .locator("section#file li")
+    .filter({ hasText: "Non-ASCII" });
+  await expect(nonAscii.first()).toBeVisible();
+  const locaFix = page.getByRole("button", {
+    name: "Fix 1 auto-fixable in LOCA",
+  });
+  await expect(locaFix).toBeEnabled();
+
+  // Spending the budget repairs the safe Rule 8 decimal and NOTHING else:
+  // the remark keeps its accent and its dash, the Rule 1 finding stands —
+  // exactly the state `lat fix` would leave the reader's own file in.
+  await locaFix.click();
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" }),
+  ).toContainText("11.80");
+  await expect(rem).toContainText("café — soft ground");
+  await expect(nonAscii.first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Fix 0 auto-fixable in LOCA" }),
+  ).toBeDisabled();
+});
+
 test("the engine arrives uninvited — after paint, without a touch", async ({
   page,
 }) => {
