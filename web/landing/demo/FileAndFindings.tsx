@@ -33,7 +33,8 @@ import { Button, Checkbox } from "@shared/components";
 import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
 import { Carousel } from "../components/Carousel";
-import { severityLineTint, worstPerLine } from "./severity";
+import { severityLineTint, verdictTint, worstPerLine } from "./severity";
+import { verdictState } from "./verdict";
 import { alignLines } from "./align";
 import { narrowViewport } from "../viewport";
 import {
@@ -78,6 +79,19 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
     alignedView() ? alignLines(lines()) : lines(),
   );
   const findings = createMemo(() => report()?.findings ?? []);
+  /* The refused run's surface (#638): an errored report carries an empty
+     findings list, and this panel's zero-state read "Clean" over it. The
+     refusal renders the engine's own message — the UI neither rewords a
+     refusal nor decides how bad — and the finding count stands down: "0"
+     under a refused run is the same false claim in digits. Derived through
+     the same verdictState the chip reads, so the two surfaces cannot
+     disagree about what kind of run this was. */
+  const refusal = () => {
+    const r = report();
+    if (!r) return null;
+    const s = verdictState(r);
+    return s.kind === "refused" ? s : null;
+  };
 
   /** Worst severity per banded line, so the pane can tint without a lookup
    *  per line — the last finding surface to route through severity.ts
@@ -236,7 +250,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         <div id="findings" class="min-w-0 scroll-mt-16">
           <p class="mt-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
-            <Show when={armed() && report()}>
+            <Show when={armed() && report() && !refusal()}>
               <span class="ml-2 text-fg-faint">{findings().length}</span>
             </Show>
           </p>
@@ -250,11 +264,24 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             }
           >
             <Show
-              when={findings().length}
+              when={!refusal() && findings().length}
               fallback={
-                <p class="mt-3 rounded-md border border-ok/40 bg-ok-quiet px-3 py-2 text-caption text-ok">
-                  Clean: 0 findings.
-                </p>
+                <Show
+                  when={refusal()}
+                  fallback={
+                    <p class="mt-3 rounded-md border border-ok/40 bg-ok-quiet px-3 py-2 text-caption text-ok">
+                      Clean: 0 findings.
+                    </p>
+                  }
+                >
+                  {(err) => (
+                    <p
+                      class={`mt-3 rounded-md border px-3 py-2 text-caption ${verdictTint(false)}`}
+                    >
+                      {err().message}
+                    </p>
+                  )}
+                </Show>
               }
             >
               {/* Below the breakpoint the list becomes the one-card carousel
@@ -288,12 +315,6 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               </Show>
             </Show>
           </Show>
-
-          <p class="mt-4 text-caption text-fg-faint">
-            Two findings for one bad cell is correct, not a duplicate: the
-            SAMP_TYPE value is part of LLPL's key tuple, so it is wrong in both
-            groups. That repetition is the format, working.
-          </p>
 
           <p class="mt-3 text-caption text-fg-muted">
             Want to run this on your own delivery?{" "}

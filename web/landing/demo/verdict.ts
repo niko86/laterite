@@ -9,7 +9,7 @@
  * the tiers a delivery gate would fail on.
  */
 
-import type { Finding } from "./engine";
+import type { Finding, Report } from "./engine";
 
 export type Tally = {
   readonly errors: number;
@@ -36,3 +36,22 @@ export function scoreboardLabel(t: Tally): string {
     parts.push(`${t.warnings} ${t.warnings === 1 ? "warning" : "warnings"}`);
   return parts.join(" · ");
 }
+
+export type VerdictState =
+  | { readonly kind: "refused"; readonly message: string }
+  | { readonly kind: "counted"; readonly tally: Tally };
+
+/** What a run's report SAYS (#638): a refusal carrying the engine's own
+ *  message, or the counted findings. An error report rides with an empty
+ *  findings list, so tallying it stated the all-clear over a run the engine
+ *  refused — the KIND is the claim, the count is only its detail. Error wins
+ *  even if findings ever ride along with one: a refused run's list is not
+ *  evidence. */
+export function verdictState(r: Report): VerdictState {
+  if (r.error) return { kind: "refused", message: r.error.message };
+  return { kind: "counted", tally: tally(r.findings) };
+}
+
+/** The refused chip's text — chip-short; the panel carries the engine's
+ *  message, unreworded. */
+export const REFUSED_LABEL = "✗ not validatable";

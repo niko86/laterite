@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { scoreboardLabel, tally } from "./verdict";
+import { REFUSED_LABEL, scoreboardLabel, tally, verdictState } from "./verdict";
 import { HERO_LINES, HERO_LINE_COUNT } from "./heroExcerpt";
 import type { Finding } from "./engine";
 
@@ -55,5 +55,48 @@ describe("the hero excerpt", () => {
       .split(/\r?\n/)
       .slice(0, HERO_LINE_COUNT);
     expect([...HERO_LINES]).toEqual(onDisk);
+  });
+});
+
+describe("verdictState", () => {
+  it("a refusal carries the engine's message, never a count", () => {
+    expect(
+      verdictState({
+        ok: false,
+        findings: [],
+        error: {
+          kind: "unsupported_edition",
+          message: 'AGS edition "3.1" is not supported',
+        },
+      }),
+    ).toEqual({
+      kind: "refused",
+      message: 'AGS edition "3.1" is not supported',
+    });
+  });
+
+  it("error outranks findings if both ever arrive", () => {
+    // The engine promises an empty list beside an error today; the priority
+    // is pinned so a future report shape cannot re-open #638.
+    const s = verdictState({
+      ok: false,
+      findings: [finding("error")],
+      error: { kind: "x", message: "m" },
+    });
+    expect(s.kind).toBe("refused");
+  });
+
+  it("counts an ordinary report", () => {
+    expect(verdictState({ ok: true, findings: [finding("warning")] })).toEqual({
+      kind: "counted",
+      tally: { errors: 0, warnings: 1 },
+    });
+  });
+
+  it("the refused label is chip-short and never the tick", () => {
+    // Properties, not a byte copy: the label must never wear the clean
+    // tick, and it has to fit the chip.
+    expect(REFUSED_LABEL).not.toContain("✓");
+    expect(REFUSED_LABEL.length).toBeLessThan(20);
   });
 });

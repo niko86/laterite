@@ -28,16 +28,27 @@ import {
 import { report } from "./store";
 import { SECTIONS } from "../sections";
 import { verdictTint } from "./severity";
-import { scoreboardLabel, tally } from "./verdict";
+import { REFUSED_LABEL, scoreboardLabel, verdictState } from "./verdict";
 
 export const Scoreboard: Component = () => {
-  const counts = createMemo(() => {
+  /* The refusal is not a zero-count (#638): an errored run carries an
+     empty findings list, and tallying that list dressed the chip as
+     "\u2713 valid AGS4" over a run the engine refused. The claim comes from
+     the state's KIND; only a counted state can ever be clean. */
+  const state = createMemo(() => {
     const r = report();
-    return r ? tally(r.findings) : null;
+    return r ? verdictState(r) : null;
   });
   const clean = () => {
-    const t = counts();
-    return t !== null && t.errors === 0 && t.warnings === 0;
+    const s = state();
+    return (
+      s?.kind === "counted" && s.tally.errors === 0 && s.tally.warnings === 0
+    );
+  };
+  const label = () => {
+    const s = state();
+    if (!s) return null;
+    return s.kind === "refused" ? REFUSED_LABEL : scoreboardLabel(s.tally);
   };
 
   const [bump, setBump] = createSignal(false);
@@ -47,14 +58,11 @@ export const Scoreboard: Component = () => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   createEffect(
     on(
-      () => {
-        const t = counts();
-        return t ? scoreboardLabel(t) : null;
-      },
-      (label, prev) => {
+      label,
+      (l, prev) => {
         // Only a CHANGE bumps — the first report arriving is not news the
         // reader caused.
-        if (prev == null || label === prev) return;
+        if (prev == null || l === prev) return;
         setBump(true);
         clearTimeout(timer);
         timer = setTimeout(() => {
@@ -69,8 +77,8 @@ export const Scoreboard: Component = () => {
   });
 
   return (
-    <Show when={counts()}>
-      {(t) => (
+    <Show when={label()}>
+      {(l) => (
         <button
           type="button"
           class={[
@@ -86,7 +94,7 @@ export const Scoreboard: Component = () => {
             });
           }}
         >
-          {scoreboardLabel(t())}
+          {l()}
           <span class="sr-only">, jump to the findings panel</span>
         </button>
       )}
