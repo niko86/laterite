@@ -45,9 +45,10 @@ import {
   onMount,
   type Component,
 } from "solid-js";
-import { Button, Tooltip } from "@shared/components";
+import { Button, Popover } from "@shared/components";
 import type { DemoGroup } from "./schema";
 import { singleLine, type Group } from "./delivery";
+import { FindingCallout } from "./FindingCallout";
 import { coarsePointer } from "./pointer";
 import {
   severityCellTint,
@@ -448,51 +449,80 @@ export const GroupTable: Component<{
                             <Show
                               when={isEditing()}
                               fallback={
-                                <button
-                                  type="button"
-                                  data-cell={`${rowIndex()}-${col()}`}
-                                  onClick={() => {
-                                    // Fine pointer, spreadsheet feel: the first
-                                    // click selects, the second opens in place.
-                                    // Coarse pointers pick — the carousel edits.
-                                    if (fine() && isPicked())
-                                      openEditor({
-                                        row: rowIndex(),
-                                        col: col(),
-                                        seed: null,
-                                      });
-                                    else props.onPick(rowIndex(), col());
-                                  }}
-                                  aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                                  class="w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
-                                  classList={{ "bg-accent-quiet": isPicked() }}
+                                /* The finding text lives ON the cell (#591):
+                                   hover, select and keyboard focus each
+                                   summon the callouts the strip used to
+                                   carry — cell findings when the cell has
+                                   its own, else the row's, so the orphan
+                                   pops from any of its cells. Content, not
+                                   the popover, carries the severity tint. */
+                                <Popover
+                                  class="w-full"
+                                  content={
+                                    failing() || rowFailing() ? (
+                                      <For
+                                        each={
+                                          failing()
+                                            ? cellFindings()
+                                            : findingsForRow(
+                                                props.schema.code,
+                                                rowIndex(),
+                                              )
+                                        }
+                                      >
+                                        {(f) => (
+                                          <FindingCallout
+                                            severity={f.severity}
+                                            rule={f.rule}
+                                            manual={isManualFinding(f)}
+                                          >
+                                            {f.desc}
+                                          </FindingCallout>
+                                        )}
+                                      </For>
+                                    ) : undefined
+                                  }
                                 >
-                                  <Show
-                                    when={row[col()]}
-                                    fallback={
-                                      <span class="text-fg-dim">–</span>
-                                    }
+                                  <button
+                                    type="button"
+                                    data-cell={`${rowIndex()}-${col()}`}
+                                    onClick={() => {
+                                      // Fine pointer, spreadsheet feel: the
+                                      // first click selects, the second opens
+                                      // in place. Coarse pointers pick — the
+                                      // carousel edits.
+                                      if (fine() && isPicked())
+                                        openEditor({
+                                          row: rowIndex(),
+                                          col: col(),
+                                          seed: null,
+                                        });
+                                      else props.onPick(rowIndex(), col());
+                                    }}
+                                    aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
+                                    class="w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+                                    classList={{
+                                      "bg-accent-quiet": isPicked(),
+                                    }}
                                   >
-                                    {row[col()]}
-                                  </Show>
-                                  <Show when={failing()}>
-                                    {/* The marker inherits the cell's severity
-                                      colour; the tooltip carries what the
-                                      engine actually said (#526). */}
-                                    <Tooltip
-                                      tip={cellFindings()
-                                        .map(
-                                          (f) =>
-                                            `${f.rule}: ${f.desc}${isManualFinding(f) ? " (manual)" : ""}`,
-                                        )
-                                        .join("  ·  ")}
+                                    <Show
+                                      when={row[col()]}
+                                      fallback={
+                                        <span class="text-fg-dim">–</span>
+                                      }
                                     >
+                                      {row[col()]}
+                                    </Show>
+                                    <Show when={failing()}>
+                                      {/* The marker inherits the cell's
+                                        severity colour; the popover above
+                                        carries what the engine said. */}
                                       <span aria-hidden="true" class="ml-1">
                                         ✗
                                       </span>
-                                    </Tooltip>
-                                  </Show>
-                                </button>
+                                    </Show>
+                                  </button>
+                                </Popover>
                               }
                             >
                               <CellEditor

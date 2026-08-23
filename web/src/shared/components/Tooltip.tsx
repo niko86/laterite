@@ -1,19 +1,14 @@
-import {
-  createSignal,
-  onCleanup,
-  Show,
-  type Component,
-  type JSX,
-} from "solid-js";
-import { onTooltipTrigger } from "./tooltipDelay";
+import { Show, type Component, type JSX } from "solid-js";
+import { createTooltipMachine } from "./tooltipMachine";
 
 // The icon-control tooltip: a maroon pill after a uniform delay. Native `title`
 // delays are browser-controlled and feel inconsistent between them, which is
 // the whole reason this exists — long-form field help stays on `title`, where
 // the inconsistency does not matter.
 //
-// When the timing decisions live: tooltipDelay.ts. This owns the timer and the
-// DOM; that owns what should happen and after how long.
+// Where the pieces live: tooltipDelay.ts owns what should happen and after
+// how long; tooltipMachine.ts owns the signal and the timer (shared with
+// Popover, #591); this owns the pill.
 
 export const Tooltip: Component<{
   /** The label. Nothing renders when absent, so a conditional tip is safe. */
@@ -22,30 +17,7 @@ export const Tooltip: Component<{
   class?: string;
   children: JSX.Element;
 }> = (props) => {
-  const [shown, setShown] = createSignal(false);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  const clear = () => {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      timer = undefined;
-    }
-  };
-  // A trigger fired, then the control unmounted — without this the timer still
-  // fires and sets a signal on a disposed component.
-  onCleanup(clear);
-
-  const trigger = (kind: Parameters<typeof onTooltipTrigger>[0]) => {
-    const action = onTooltipTrigger(kind);
-    clear();
-    if (action.kind === "delay") {
-      timer = setTimeout(() => {
-        setShown(true);
-      }, action.ms);
-    } else {
-      setShown(action.kind === "show");
-    }
-  };
+  const { shown, trigger } = createTooltipMachine();
 
   return (
     <span

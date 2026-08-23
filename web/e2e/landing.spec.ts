@@ -489,10 +489,13 @@ test("fine: rows delete from the table, and undo/redo walk the model timeline", 
   const rows = proj.locator("tbody tr");
   await proj.getByRole("button", { name: "+ row" }).click();
   await expect(rows).toHaveCount(2);
-  await expect(proj.locator("li").first()).toBeVisible();
+  // The blank row's findings land in the panel — the strip is the coarse
+  // pointer's surface since #591, and this lane's pointer is fine.
+  const projFindings = page.locator("#findings li").filter({ hasText: "PROJ" });
+  await expect(projFindings.first()).toBeVisible();
   await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
   await expect(rows).toHaveCount(1);
-  await expect(proj.locator("li")).toHaveCount(0);
+  await expect(projFindings).toHaveCount(0);
 
   // Undo resurrects the deleted row; again, the add; redo replays it.
   await page.keyboard.press("ControlOrMeta+z");
@@ -600,17 +603,20 @@ test("wide: the depth scale clears the masthead and labels the hole's floor", as
   await expectViewportWide(page);
 });
 
-test("fine: findings speak one vocabulary — tinted cell with tooltip, table strip, chipped panel", async ({
+test("fine: findings speak one vocabulary — tinted cell with popover, chipped panel", async ({
   page,
   hasTouch,
 }) => {
-  test.skip(hasTouch, "the tooltip needs a pointer that can hover (#526)");
+  test.skip(
+    hasTouch,
+    "the popover needs a pointer that can hover (#526, #591)",
+  );
   await page.goto("/");
 
   // Select the seeded Rule 8 cell (arming is eager since #531 — the click
-  // is only the fast path); the findings arrive
-  // and the cell wears the ERROR grammar: tint + marker + tooltip carrying
-  // what the engine actually said.
+  // is only the fast path); the findings arrive and the cell wears the
+  // ERROR grammar: tint + marker + the popover carrying what the engine
+  // actually said (#591 — the strip is the coarse pointer's surface now).
   const cell = page.getByRole("button", {
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
@@ -618,19 +624,10 @@ test("fine: findings speak one vocabulary — tinted cell with tooltip, table st
   await expect(cell).toContainText("✗");
   const td = cell.locator("xpath=ancestor::td[1]");
   await expect(td).toHaveClass(/bg-err-quiet/);
-  await cell.getByText("✗").hover();
+  await cell.hover();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toContainText("Rule 8");
-
-  // Group-level findings live in a strip attached to the TABLE, not in the
-  // prose column: the strip's parent is the table's own column.
-  const strip = page.getByRole("list", { name: "SAMP findings" });
-  await expect(strip.getByText(/Rule/).first()).toBeVisible();
-  expect(
-    await strip.evaluate((el) => !!el.parentElement?.querySelector("table")),
-    "the strip must share a column with the table it judges",
-  ).toBe(true);
 
   // The two Rule 16 findings carry byte-identical text against SAMP and LLPL;
   // the panel's GROUP chip is what tells them apart. Without the chip no
@@ -667,23 +664,25 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
     0,
   );
 
-  // Blanking a REQUIRED value raises a finding live, in the cover sheet's
-  // own strip (the engine answers Rule 10b, against the group)...
+  // Blanking a REQUIRED value raises a finding live, read from the panel
+  // (the engine answers Rule 10b, against the group; the strip is the
+  // coarse pointer's surface since #591)...
   await page.keyboard.press("Enter");
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Enter");
-  const strip = page.getByRole("list", { name: "TRAN findings" });
-  await expect(strip.getByText("Rule 10b")).toBeVisible();
+  const rule10b = page.locator("#findings li").filter({ hasText: "Rule 10b" });
+  await expect(rule10b.first()).toBeVisible();
 
   // ...and undo clears it — cause, read, unwind.
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(strip).toBeHidden();
+  await expect(rule10b).toHaveCount(0);
 
   // Deleting the cover sheet's one row is what Rule 14 exists to catch.
   await file.getByRole("button", { name: "Delete row 1 of TRAN" }).click();
-  await expect(strip.getByText("Rule 14")).toBeVisible();
+  const rule14 = page.locator("#findings li").filter({ hasText: "Rule 14" });
+  await expect(rule14.first()).toBeVisible();
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(strip).toBeHidden();
+  await expect(rule14).toHaveCount(0);
 });
 
 test("the transport aside tells the packed story without running it", async ({
@@ -753,15 +752,17 @@ test("fine: a deleted group leaves a restore stub — restore means the seed, un
     .press("Enter");
   await expect(file.getByText("TRAN deleted")).toBeVisible();
   await expect(file.locator("table")).toHaveCount(0);
-  const strip = page.getByRole("list", { name: "TRAN findings" });
-  await expect(strip.getByText("Rule 14")).toBeVisible();
+  // Rule 14 reads from the panel — the strip belongs to coarse pointers
+  // since #591, and a deleted group has no cells to pop from.
+  const rule14 = page.locator("#findings li").filter({ hasText: "Rule 14" });
+  await expect(rule14.first()).toBeVisible();
   // The stub must hold the page's width discipline while it stands in.
   await expectViewportWide(page);
 
   // Restore, also from the keyboard: the finding clears and the SEEDED value
   // returns — restore is the seed's rows, not the reader's edits.
   await file.getByRole("button", { name: "Restore TRAN" }).press("Enter");
-  await expect(strip).toBeHidden();
+  await expect(rule14).toHaveCount(0);
   await expect(
     file.getByRole("button", { name: "Edit TRAN_STAT on row 1 of TRAN" }),
   ).toContainText("Final");
@@ -863,16 +864,18 @@ test("fine: the fix budget lives on each table — scoped to its group, honest a
     page.getByRole("button", { name: "Fix what is safe to fix" }),
   ).toHaveCount(0);
 
-  // The badge grammar: the fixable finding's tooltip says nothing about
-  // "manual"; the fixer-proof Rule 16 on SAMP's strip wears the chip.
-  await cell.getByText("✗").hover();
+  // The badge grammar, read from the cell popovers (#591): the fixable
+  // finding's popover says nothing about "manual"; the fixer-proof Rule 16
+  // on SAMP's b cell wears the badge.
+  await cell.hover();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toContainText("Rule 8");
   await expect(tooltip).not.toContainText("manual");
+  await page
+    .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of SAMP" })
+    .hover();
   await expect(
-    page
-      .getByRole("list", { name: "SAMP findings" })
-      .getByText("manual", { exact: true }),
+    page.getByRole("tooltip").getByText("manual", { exact: true }),
   ).toBeVisible();
 
   // Apply LOCA's budget: the decimal is repaired, the count hits a disabled
@@ -979,7 +982,7 @@ test("fine: a table's budget reacts to new defects, and the tooltip badges the f
   await expect(
     page.getByRole("button", { name: "Fix 0 auto-fixable in SAMP" }),
   ).toBeDisabled();
-  await top.getByText("✗").hover();
+  await top.hover();
   await expect(page.getByRole("tooltip")).toContainText("manual");
 });
 
@@ -1469,6 +1472,7 @@ test("fine: column widths hold still while a cell is edited", async ({
 
 test("the cover sheet carries the full toolbar, and a second TRAN row is a teachable state", async ({
   page,
+  hasTouch,
 }) => {
   // #593, superseding #527's recorded "+ row is meaningless on a one-row
   // header": the owner's review chose the opposite — the affordance grammar
@@ -1484,9 +1488,22 @@ test("the cover sheet carries the full toolbar, and a second TRAN row is a teach
   await expect(file.getByText(/Click a cell|Tap any cell/)).toBeVisible();
 
   await file.getByRole("button", { name: "+ row" }).click();
-  const strip = page.getByRole("list", { name: "TRAN findings" });
-  await expect(strip).toBeVisible();
-  await expect(strip.locator("li").first()).toBeVisible();
+  // The verdict lands in the panel on every pointer; the strip is the
+  // coarse pointer's surface (#591).
+  await expect(
+    file.locator("#findings li").filter({ hasText: "TRAN" }).first(),
+  ).toBeVisible();
+  if (hasTouch) {
+    const strip = page.getByRole("list", { name: "TRAN findings" });
+    await expect(strip.locator("li").first()).toBeVisible();
+    // The strip stays ATTACHED to the table it judges — the relationship
+    // the fine-pointer vocabulary test used to pin before #591 moved the
+    // strips to this pointer.
+    expect(
+      await strip.evaluate((el) => !!el.parentElement?.querySelector("table")),
+      "the strip must share a column with the table it judges",
+    ).toBe(true);
+  }
 });
 
 test("the delete-group control reads as a button, not a caption", async ({
@@ -1548,7 +1565,7 @@ test("fine: the orphaned row wears the row treatment, and restoring its parent c
   });
   const llpl = page.locator("section#llpl");
   const td = (cell: string) =>
-    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=..");
+    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=ancestor::td[1]");
   const shadow = (cell: string) =>
     td(cell).evaluate((el) => getComputedStyle(el).boxShadow);
   const bg = (cell: string) =>
@@ -1596,4 +1613,60 @@ test("the KEY region tint is structural, not a verdict", async ({ page }) => {
       .nth(1)
       .evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(await headerBg("samp")).toBe(await headerBg("llpl"));
+});
+
+test("fine: finding text surfaces at the cell — popover on hover and focus, Escape dismisses, strips gone", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the popover is fine-pointer vocabulary (#591)");
+  // #591: the rule text lives ON the failing cell, not in callout strips
+  // under the table. Hover, select and keyboard focus each summon it;
+  // Escape and leaving dismiss it; the panel stays the one complete list.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await cell.hover();
+  const pop = page.getByRole("tooltip");
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 8");
+  await page.locator("section#loca h2").hover();
+  await expect(pop).not.toBeVisible();
+
+  await cell.click();
+  await expect(pop).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(pop).not.toBeVisible();
+
+  // KEYBOARD arrival is its own path, not click's twin: select the left
+  // neighbour, then ArrowRight moves selection AND focus onto the failing
+  // cell — the popover follows focus. Arrowing on again is the blur, and
+  // the popover leaves with it.
+  await page
+    .getByRole("button", { name: "Edit LOCA_TYPE on row 1 of LOCA" })
+    .click();
+  await page.keyboard.press("ArrowRight");
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 8");
+  await page.keyboard.press("ArrowRight");
+  await expect(pop).not.toBeVisible();
+
+  // A row-level finding pops from any cell of the condemned row — this cell
+  // carries no cell finding of its own.
+  await page.locator('section#llpl [data-cell="2-1"]').hover();
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 10c");
+
+  // The strips are gone at this pointer; the panel remains complete.
+  await expect(
+    page.getByRole("list", { name: /(PROJ|LOCA|SAMP|LLPL|TRAN) findings/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator("#findings li").filter({ hasText: "not defined" }),
+  ).toHaveCount(2);
 });

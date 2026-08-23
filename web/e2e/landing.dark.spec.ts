@@ -109,7 +109,7 @@ test("dark: the KEY region tint stays structural", async ({ page }) => {
   // the orphan row's wash is not the KEY tint, and its edge marker renders.
   const llpl = page.locator("section#llpl");
   const td = (cell: string) =>
-    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=..");
+    llpl.locator(`[data-cell="${cell}"]`).locator("xpath=ancestor::td[1]");
   const washBg = await td("2-1").evaluate(
     (el) => getComputedStyle(el).backgroundColor,
   );
@@ -121,4 +121,24 @@ test("dark: the KEY region tint stays structural", async ({ page }) => {
     await td("2-0").evaluate((el) => getComputedStyle(el).boxShadow),
     "the row edge marker renders in dark",
   ).not.toBe("none");
+});
+
+test("dark: the cell popover renders for cell and row findings", async ({
+  page,
+}) => {
+  // The light journeys live in landing.spec.ts (#591); dark asserts the
+  // same two surfaces exist under its token set — the callout inside is
+  // severity.ts's tint, which the tint tests already hold per theme.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await page
+    .getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" })
+    .hover();
+  const pop = page.getByRole("tooltip");
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 8");
+  await page.locator('section#llpl [data-cell="2-1"]').hover();
+  await expect(pop).toContainText("Rule 10c");
 });

@@ -20,6 +20,16 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    // The one wasm module id a unit test may RESOLVE (never run): mocking
+    // `src/wasm/ags4_wasm` requires the id to resolve, and the build output
+    // is absent on this lane's runner by design — see test-stubs/ags4_wasm.ts.
+    alias: [
+      {
+        find: /\/src\/wasm\/ags4_wasm$/,
+        replacement: new URL("./test-stubs/ags4_wasm.ts", import.meta.url)
+          .pathname,
+      },
+    ],
     // `landing/**` is the apex's own build (#394): its dependency firewall is
     // pure logic that must be tested, and it lives beside the config it guards
     // rather than in the app's source tree.
