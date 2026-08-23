@@ -2158,3 +2158,86 @@ test("wide: the rail weighs its bands and its labels are doors", async ({
     "true",
   );
 });
+
+test("fine: a paste whose target moved is abandoned, not re-aimed", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the selected-cell clipboard is fine-pointer (#551)");
+  // #580: the pick is captured at keydown but the clipboard resolves later,
+  // and between the two the reader can delete the row the pick names. The
+  // recorded decision: such a paste is ABANDONED — dropStalePick's grounds,
+  // never silently edit data the reader did not choose. The race is made
+  // deterministic by holding the clipboard promise open until the row is
+  // gone.
+  await page.addInitScript(() => {
+    let pending: ((v: string) => void) | null = null;
+    (window as unknown as Record<string, unknown>).__resolvePaste = (
+      v: string,
+    ) => {
+      pending?.(v);
+      pending = null;
+    };
+    navigator.clipboard.readText = () =>
+      new Promise<string>((resolve) => {
+        pending = resolve;
+      });
+  });
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // Resolving flushes a macrotask turn too, so the handler's .then has run
+  // by the time this returns — the SNEAK assertions below are about a
+  // completed paste path, not a race against it.
+  const resolvePaste = (v: string) =>
+    page.evaluate(async (value) => {
+      (
+        window as unknown as { __resolvePaste: (v: string) => void }
+      ).__resolvePaste(value);
+      await new Promise((r) => setTimeout(r, 0));
+    }, v);
+
+  // The surviving-pick window, where the defect actually bites: edit a cell,
+  // select it, start a paste, then RESET while the clipboard is pending. The
+  // pick survives (same position, still in range) but the row under it is
+  // the seed's again — data the reader never chose to paste into.
+  const proj = page.locator("section#proj");
+  const cell = proj.getByRole("button", {
+    name: "Edit PROJ_ID on row 1 of PROJ",
+  });
+  await cell.click();
+  await page.keyboard.type("XYZ");
+  await page.keyboard.press("Enter");
+  await expect(cell).toContainText("XYZ");
+  // Enter commits AND keeps the selection (#593's spreadsheet grammar), so
+  // the cell is already picked — a second click would OPEN the editor and
+  // hand the paste to the input's native clipboard instead.
+  await page.keyboard.press("ControlOrMeta+v");
+  await page.getByRole("button", { name: "Reset the delivery" }).click();
+  await expect(cell).not.toContainText("XYZ");
+  await resolvePaste("SNEAK");
+  await expect(page.locator("main")).not.toContainText("SNEAK");
+  // No phantom commit either: one undo returns the pre-reset edit.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(cell).toContainText("XYZ");
+
+  // And the closed-pick window: the row the pick named is deleted outright
+  // while the clipboard hangs. Benign-looking today, but the decision says
+  // abandoned, and this holds it so.
+  const rows = proj.locator("tbody tr");
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await expect(rows).toHaveCount(2);
+  await proj
+    .getByRole("button", { name: "Edit PROJ_ID on row 2 of PROJ" })
+    .click();
+  await page.keyboard.press("ControlOrMeta+v");
+  await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
+  await expect(rows).toHaveCount(1);
+  await resolvePaste("SNEAK");
+  await expect(page.locator("main")).not.toContainText("SNEAK");
+  // One undo brings the deleted row back — no phantom step in between.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(rows).toHaveCount(2);
+});

@@ -253,9 +253,23 @@ export const GroupTable: Component<{
           .catch(() => undefined);
       } else if (key === "v") {
         const commitTo = props.onCommit;
+        /* #580: the clipboard resolves LATER, and between the keypress and
+           the read the reader can delete the row, undo, apply fixes or
+           reset — after which these indices name data they never chose. The
+           recorded decision is dropStalePick's: ABANDON, never re-aim. The
+           value is the target's identity as far as one exists (rows carry no
+           ids): a pick still on the same position over the same value is the
+           same target; anything else is a moved one and the paste dies
+           silently. A swapped-in row with a byte-identical cell value is the
+           one residual this cannot see. */
+        const before = cellValue(at.row, at.col);
         void navigator.clipboard
           .readText()
+          // eslint-disable-next-line solid/reactivity -- event-handler continuation: reading the pick and cell AT RESOLVE TIME is the #580 fix, not a missed tracking scope
           .then((value) => {
+            const now = props.picked;
+            if (!now || now.row !== at.row || now.col !== at.col) return;
+            if (cellValue(at.row, at.col) !== before) return;
             commitTo(at.row, at.col, singleLine(value));
           })
           .catch(() => undefined);
