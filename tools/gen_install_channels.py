@@ -188,7 +188,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             package=wasm,
             command=f"npm install {wasm}",
             href=f"https://www.npmjs.com/package/{wasm}",
-            note="the same engine as wasm — or open the webapp",
+            note="the same engine as wasm, or open the webapp",
         ),
     ]
 

@@ -285,7 +285,7 @@ export const GroupTable: Component<{
       <div class="overflow-x-auto overscroll-x-contain">
         <table class="w-full border-collapse text-left">
           <caption class="sr-only">
-            {props.schema.code} — {props.schema.description}
+            {props.schema.code} · {props.schema.description}
           </caption>
           <thead>
             <tr class="border-b border-line">
@@ -420,7 +420,7 @@ export const GroupTable: Component<{
                               >
                                 <Show
                                   when={row[col()]}
-                                  fallback={<span class="text-fg-dim">—</span>}
+                                  fallback={<span class="text-fg-dim">–</span>}
                                 >
                                   {row[col()]}
                                 </Show>
@@ -432,7 +432,7 @@ export const GroupTable: Component<{
                                     tip={cellFindings()
                                       .map(
                                         (f) =>
-                                          `${f.rule} — ${f.desc}${isManualFinding(f) ? " — manual" : ""}`,
+                                          `${f.rule}: ${f.desc}${isManualFinding(f) ? " (manual)" : ""}`,
                                       )
                                       .join("  ·  ")}
                                   >

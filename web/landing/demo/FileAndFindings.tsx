@@ -71,8 +71,8 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           </h2>
           <p class="mt-2 max-w-[60ch] text-fg-soft">
             This is the delivery the tables above emit, and these are the
-            findings the shipped validator returns for it — the same engine the
-            CLI and the Python library run.
+            findings the shipped validator returns for it. The CLI and the
+            Python library run the same engine.
           </p>
         </div>
         <p class="rounded-md border border-ok/40 bg-ok-quiet px-3 py-1.5 text-caption font-semibold text-ok">
@@ -107,7 +107,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         <div class="mt-3 max-w-[70ch]">
           <FindingCallout severity="note">
             The orphaned <code class="font-mono">LLPL</code> row is left
-            standing on purpose — no fix button will touch it, and its finding
+            standing on purpose: no fix button will touch it, and its finding
             wears a manual badge. The engine can tell you a lab result points at
             a sample that does not exist, but only a human knows whether the
             sample reference is wrong or the sample is missing. That is the
@@ -126,12 +126,12 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           deletes its one row — a finding they can cause, read, and undo. */}
       <div class="mt-8 max-w-[46rem]">
         <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
-          The cover sheet — TRAN
+          The cover sheet · TRAN
         </p>
         <p class="mt-1 max-w-[60ch] text-caption text-fg-soft">
           Every delivery opens with its transmission header: who produced the
-          file, for whom, and against which AGS edition. Delete its row — or the
-          whole group — and Rule 14 has something to say.
+          file, for whom, and against which AGS edition. Delete its row, or the
+          whole group, and Rule 14 has something to say.
         </p>
         {/* The cover sheet's own wrapper, not the harness's: `mt-3` is what
             separates the table from the prose HERE, where a descent section
@@ -190,8 +190,8 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         <p class="mt-3 max-w-[60ch] text-caption text-fg-soft">
           The delivery itself is built for the trip its cover sheet describes:{" "}
           <code class="font-mono">pack</code> squeezes the file with zstd and{" "}
-          <code class="font-mono">unpack</code> restores it byte-for-byte — the
-          pair moves bytes, it never parses them — while{" "}
+          <code class="font-mono">unpack</code> restores it byte-for-byte (the
+          pair moves bytes, it never parses them) while{" "}
           <code class="font-mono">lock</code> starts from the original and seals
           its zstd pack inside a passphrase-encrypted age envelope. Shown here,
           not run: this page's engine deliberately ships without transport.{" "}
@@ -215,7 +215,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               when={armed()}
               fallback={
                 <p class="p-4 text-caption text-fg-muted">
-                  The engine is on its way — it loads itself shortly after the
+                  The engine is on its way: it loads itself shortly after the
                   page paints, and this pane fills with the file and its
                   findings, live.
                 </p>
@@ -280,7 +280,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               when={findings().length}
               fallback={
                 <p class="mt-3 rounded-md border border-ok/40 bg-ok-quiet px-3 py-2 text-caption text-ok">
-                  Clean — 0 findings.
+                  Clean: 0 findings.
                 </p>
               }
             >
@@ -310,8 +310,8 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               href="https://app.laterite.dev/"
             >
               Open the webapp
-            </a>{" "}
-            — it stays in your browser too.
+            </a>
+            ; it stays in your browser too.
           </p>
         </div>
       </div>

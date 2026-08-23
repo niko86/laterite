@@ -40,13 +40,13 @@ import { findingsForCell, groupFindingsNaming, setCell } from "./store";
  *  dictionary gives. Unknown types fall through to the engine's own wording,
  *  which is always present above it. */
 const TYPE_IN_WORDS: Record<string, string> = {
-  ID: "a unique identifier — free text, but it has to be unique in its group",
+  ID: "a unique identifier: free text, but it has to be unique in its group",
   X: "free text",
   PA: "one of the abbreviations the ABBR group defines for this heading",
   XN: "text or a number",
   "0DP": "a whole number, no decimal point",
   "1DP": "a number written to one decimal place",
-  "2DP": "a number written to exactly two decimal places — 11.80, not 11.8",
+  "2DP": "a number written to exactly two decimal places: 11.80, not 11.8",
   "3DP": "a number written to three decimal places",
   DT: "a date or timestamp in the format the UNIT row declares",
 };

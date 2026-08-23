@@ -22,7 +22,7 @@ export const Footer: Component = () => (
       </p>
       <p class="mt-2 max-w-[70ch]">
         laterite implements the published AGS4 rules independently of
-        python-ags4, so results can differ between the two —{" "}
+        python-ags4, so results can differ between the two;{" "}
         <a
           class="text-accent no-underline transition-colors hover:underline"
           href="https://github.com/niko86/laterite/blob/main/COMPAT.md"

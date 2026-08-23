@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -1260,4 +1260,71 @@ test("anchor jumps ease under normal motion, and stay instant under reduced", as
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(await behavior()).toBe("auto");
+});
+
+test("no em dash reaches the reader", async ({ page }) => {
+  // The em dash is banned from reader-facing landing copy (#587) — every
+  // sentence that carried one was rewritten, and this scan is what stops the
+  // character creeping back with the next copy edit. Scope, said out loud:
+  // the default render on this lane's viewport and pointer — its title and
+  // meta description, every visible text node (the engine's own finding text
+  // deliberately included), and the strings assistive tech reads from
+  // aria-label and title attributes — plus the deleted-group stub, the one
+  // conditional surface a single click reaches. Copy that only renders
+  // mid-journey (the carousel's type glossary, the all-clear findings
+  // state, the engine-loading placeholder) is beyond the DOM's reach here,
+  // so the built chunks are scanned as text below — esbuild strips
+  // comments, which makes every surviving string literal reader-bound.
+  await page.goto("/");
+  await expect(page.locator("section#file li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const offenders = () =>
+    page.evaluate(() => {
+      const hits: string[] = [];
+      if (document.title.includes("—")) {
+        hits.push(`<title>: ${document.title}`);
+      }
+      const desc =
+        document
+          .querySelector('meta[name="description"]')
+          ?.getAttribute("content") ?? "";
+      if (desc.includes("—")) hits.push(`meta description: ${desc}`);
+      for (const el of document.querySelectorAll("[aria-label], [title]")) {
+        for (const attr of ["aria-label", "title"]) {
+          const v = el.getAttribute(attr);
+          if (v?.includes("—")) hits.push(`${attr}: ${v}`);
+        }
+      }
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+      );
+      while (walker.nextNode()) {
+        const t = walker.currentNode.textContent ?? "";
+        if (t.includes("—")) hits.push(t.trim());
+      }
+      return hits;
+    });
+
+  expect(await offenders()).toEqual([]);
+
+  await page.locator("section#llpl").scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Delete the LLPL group" }).click();
+  await expect(page.getByText("LLPL deleted")).toBeVisible();
+  expect(await offenders()).toEqual([]);
+
+  // The bundle half: every string literal in the built chunks, comment-free,
+  // so the states the DOM half cannot reach are still pinned. dist/index.html
+  // sits this out — HTML comments survive the build, and that file's rendered
+  // surface is already the DOM half's title/meta scan.
+  const assets = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../landing/dist/assets",
+  );
+  const offendingChunks = readdirSync(assets)
+    .filter((f) => f.endsWith(".js") || f.endsWith(".css"))
+    .filter((f) => readFileSync(path.join(assets, f), "utf8").includes("—"));
+  expect(offendingChunks).toEqual([]);
 });

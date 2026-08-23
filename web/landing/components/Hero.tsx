@@ -39,7 +39,7 @@ export const Hero: Component = () => (
       </h1>
 
       <p class="mt-5 max-w-[54ch] text-lead text-fg-soft">
-        One Rust engine for AGS4 geotechnical transfer files — validate, fix,
+        One Rust engine for AGS4 geotechnical transfer files: validate, fix,
         explore and write them, from Python, Node, the command line, DuckDB or a
         browser tab. Scroll down and put a real delivery through the validator;
         it runs here, in this page.

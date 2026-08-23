@@ -25,7 +25,7 @@ export const GroupStub: Component<{
       {props.code} deleted
     </p>
     <p class="mt-1 max-w-[52ch] text-caption text-fg-soft">
-      The delivery just lost its {props.code} block — if a rule needs it, the
+      The delivery just lost its {props.code} block: if a rule needs it, the
       findings now say so. Restore brings back the seeded rows, not your edits;
       undo walks the timeline and does.
     </p>
