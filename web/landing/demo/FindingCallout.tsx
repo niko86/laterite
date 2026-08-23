@@ -41,7 +41,15 @@ export const FindingCallout: Component<{
     disabled={props.onClick ? props.disabled : undefined}
     onClick={props.onClick}
     class={[
-      "w-full rounded-md border px-3 py-2 text-left text-caption",
+      /* whitespace-normal (#636): the hover popover mounts INSIDE the
+         cell's td, and the td's nowrap — which keeps table cells
+         one-line — inherits into the panel, so the finding could not
+         wrap at all and walked out of the box. The callout declares its
+         own wrapping context instead of trusting whatever home it is
+         mounted in. break-words is the second guard: a KEY-combination
+         token is one unbroken run, and a long enough one must break
+         mid-token rather than escape. */
+      "w-full rounded-md border px-3 py-2 text-left text-caption whitespace-normal break-words",
       // The callout FADES IN on insertion (#534): findings appearing is the
       // page's most frequent motion, and it rides the fast opacity tier.
       "transition-opacity duration-(--dur-fast) starting:opacity-0",
