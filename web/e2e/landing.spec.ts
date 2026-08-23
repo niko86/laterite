@@ -274,6 +274,102 @@ test("without a picker, the download falls back as laterite.ags", async ({
   expect(readFileSync(file, "utf8")).toBe(seededDeliveryText());
 });
 
+test("fine: the pane edits the delivery, live", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+
+  // The pane becomes the editor: typing a corrected LOCA_GL into the TEXT
+  // clears the Rule 8 finding everywhere — tables, chip, panel — because
+  // the pane writes through the same store the cell editors do.
+  await page.getByRole("checkbox", { name: "Edit the file" }).check();
+  const editor = page.getByRole("textbox", { name: "Edit delivery.ags" });
+  await expect(editor).toBeVisible();
+  const fixed = (await editor.inputValue()).replace('"11.8"', '"11.80"');
+  await editor.fill(fixed);
+  await expect(chip).toContainText("3 errors");
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" }),
+  ).toContainText("11.80");
+});
+
+test("fine: pane garbage is identified, never validated clean", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+
+  await page.getByRole("checkbox", { name: "Edit the file" }).check();
+  const editor = page.getByRole("textbox", { name: "Edit delivery.ags" });
+  const original = await editor.inputValue();
+
+  // The engine judges the DRAFT'S OWN BYTES (#635): the tolerant table
+  // parse would launder garbage into an empty delivery and an earned-
+  // looking all-clear — the decided behaviour is the engine's refusal,
+  // rendered by #638's refused state.
+  await editor.fill("total garbage");
+  await expect(chip).toContainText("not validatable");
+  await expect(page.locator("#findings")).toContainText(
+    "not a parseable AGS4 file",
+  );
+
+  // Typing the delivery back restores the counted verdict — recovery is
+  // the same door in reverse.
+  await editor.fill(original);
+  await expect(chip).toContainText("4 errors");
+});
+
+test("fine: editing keeps the line numbers and the tints", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the pane edits on a fine pointer only (#635)");
+  await page.goto("/");
+  await page.getByRole("checkbox", { name: "Edit the file" }).check();
+  await expect(
+    page.getByRole("textbox", { name: "Edit delivery.ags" }),
+  ).toBeVisible();
+
+  // The recorded pick for #635's edit surface: the overlay keeps the
+  // pane's own dress — the gutter still counts, the failing line still
+  // wears its severity tint — instead of dropping to a bare textarea.
+  const pane = page.locator("section#file");
+  const failingLine = pane
+    .locator("div")
+    .filter({ hasText: /"11\.8"/ })
+    .last();
+  await expect(failingLine).toHaveClass(/border-l-err/);
+  await expect(pane.getByText("17", { exact: true })).toBeVisible();
+
+  // Aligned columns is a display-only re-spacing; typing into padding
+  // would leak pad spaces into values, so the toggle stands down while
+  // the pane is an editor.
+  await expect(
+    page.getByRole("checkbox", { name: "Aligned columns" }),
+  ).toBeDisabled();
+});
+
+test("touch: the pane keeps its read-only dress", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the fine pointer's editor is not offered here (#635)");
+  await page.goto("/");
+  await expect(
+    page.locator("section#file").getByText("delivery.ags", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Edit the file" }),
+  ).toHaveCount(0);
+});
+
 test("fine: a refused run never renders as the all-clear", async ({
   page,
   hasTouch,
