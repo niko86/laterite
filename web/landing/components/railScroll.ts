@@ -37,8 +37,10 @@ export function depthLabel(depth: number): string {
   return depth.toFixed(2);
 }
 
-/** The inset the whole rail runs inside, in percentage points at each end, so
- *  the depth pill is never clipped against the top or bottom edge. */
+/** The inset at the BOTTOM of the run, in percentage points, so the terminal
+ *  pill is never clipped against the viewport floor. The top inset retired
+ *  with #585: the datum anchors to the masthead bar now, and an inset above
+ *  it would move 0.00 m off the very line that defines it. */
 export const RAIL_INSET_PCT = 4;
 
 /** The rail's ONE vertical mapping: a 0–1 fraction of the hole to a percentage
@@ -49,18 +51,53 @@ export const RAIL_INSET_PCT = 4;
  * The inset applies to POSITION only while depth still runs a true 0–total.
  * The two are deliberately decoupled: clamping the DEPTH to keep the pill on
  * screen would make the rail lie about how deep the reader is. */
-export function railY(fraction: number, inset = RAIL_INSET_PCT): number {
-  return inset + fraction * (100 - inset * 2);
+export function railY(fraction: number): number {
+  return fraction * (100 - RAIL_INSET_PCT);
 }
 
-/** The band a section occupies, top and height, as percentages of the strip —
- *  on the shared run, so a band top IS its tick's position. Equal bands: the
- *  rail marks the sequence of sections, not their pixel heights, so a long
- *  section does not get a fatter stratum. */
+/** Each section's share of the hole, from its MEASURED height (#585,
+ *  superseding #524's recorded equal-bands choice): depth now maps onto
+ *  scroll distance, so a long section gets the fat stratum it costs to
+ *  scroll. Zero-total heights — the first paint, before the ResizeObserver
+ *  delivers — fall back to equal shares rather than NaN. */
+export function bandFractions(heights: readonly number[]): number[] {
+  const total = heights.reduce((a, b) => a + b, 0);
+  if (total <= 0) return heights.map(() => 1 / Math.max(1, heights.length));
+  return heights.map((h) => h / total);
+}
+
+/* The one walker over the shares, so bandStartFraction and bandBounds
+   cannot disagree about where a band starts. */
+function startFrom(fractions: readonly number[], index: number): number {
+  let before = 0;
+  for (let i = 0; i < index; i++) before += fractions[i] ?? 0;
+  return before;
+}
+
+/** Where section `index`'s band starts, as a 0–1 fraction of the hole — the
+ *  fraction its depth tick labels, so tick depth and pill depth read off the
+ *  same run. */
+export function bandStartFraction(
+  index: number,
+  heights: readonly number[],
+): number {
+  return startFrom(bandFractions(heights), index);
+}
+
+/** The band a section occupies — its start fraction, and top and height as
+ *  percentages of the strip — on the shared run, so a band top IS its tick's
+ *  position, weighted by the heights the sections really rendered (#585).
+ *  `start` rides along so a caller labelling the tick's depth does not walk
+ *  the shares a second time. */
 export function bandBounds(
   index: number,
-  count: number,
-): { top: number; height: number } {
-  const height = (100 - RAIL_INSET_PCT * 2) / count;
-  return { top: railY(index / count), height };
+  heights: readonly number[],
+): { start: number; top: number; height: number } {
+  const fractions = bandFractions(heights);
+  const start = startFrom(fractions, index);
+  return {
+    start,
+    top: railY(start),
+    height: (fractions[index] ?? 0) * (100 - RAIL_INSET_PCT),
+  };
 }

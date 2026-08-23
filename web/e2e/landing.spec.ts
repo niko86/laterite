@@ -563,10 +563,13 @@ test("wide: the depth scale clears the masthead and labels the hole's floor", as
     .boundingBox();
   if (!masthead || !surfaceTick)
     throw new Error("masthead or 0.00 m tick did not render");
+  // #585's datum ruling, superseding #524's "clear the masthead" inset: the
+  // masthead's gradient bar IS the surface, so 0.00 m sits level WITH it —
+  // not merely below it — at scroll 0.
   expect(
-    surfaceTick.y,
-    "the 0.00 tick must clear the masthead",
-  ).toBeGreaterThan(masthead.y + masthead.height);
+    Math.abs(surfaceTick.y - (masthead.y + masthead.height)),
+    "the 0.00 tick must sit level with the masthead bar",
+  ).toBeLessThanOrEqual(2);
 
   // The hole has a floor and the scale says so: a terminal tick labels the
   // seeded final depth, below every section tick. Section ticks mark section
@@ -2081,4 +2084,77 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
   // in view, riding the document's own anchor behaviour (#589).
   await install.click();
   await expect(page.locator("section#install")).toBeInViewport();
+});
+
+test("wide: the rail weighs its bands and its labels are doors", async ({
+  page,
+}) => {
+  test.skip(
+    width(page) < 1088,
+    "the depth scale only renders above the rail's 68rem collapse breakpoint",
+  );
+  // #585, reversing #524's recorded equal-bands choice: each band's height
+  // is its section's measured share of the page, and the depth-scale labels
+  // are real links.
+  await page.goto("/");
+  // The fullest layout first — the bands weigh RENDERED heights, and the
+  // findings are the demo's tallest content.
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // The strip's bands are nowhere near equal on the real page — equality is
+  // the regression this pins. The strip is the veil's parent; the veil is
+  // the one child that is not a band.
+  const strip = page.locator("div.border-t-steel-500").locator("xpath=..");
+  const bandHeights = await strip.evaluate((el) =>
+    Array.from(el.children)
+      .filter((c) => !c.className.includes("border-t-steel-500"))
+      .map((c) => c.getBoundingClientRect().height),
+  );
+  expect(bandHeights).toHaveLength(7);
+  expect(
+    new Set(bandHeights.map((h) => Math.round(h))).size,
+    "weighted bands cannot all round to one height",
+  ).toBeGreaterThan(1);
+
+  // The keyboard door first, from the top of a fresh document: the rail
+  // renders first, so its links are the page's first tab stops — four Tabs
+  // land on SAMP with real keyboard provenance, which is what lets
+  // :focus-visible paint the ring (a scripted focus() would not). This half
+  // runs before any click because a fragment navigation moves the
+  // sequential-focus starting point to its target, and Tab would continue
+  // from inside the landed section.
+  const samp = page.getByRole("link", { name: "Jump to SAMP" });
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Tab");
+  await expect(samp).toBeFocused();
+  expect(
+    await samp.evaluate((el) => getComputedStyle(el).boxShadow),
+    "keyboard focus paints the ring",
+  ).not.toBe("none");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("section#samp")).toBeInViewport();
+
+  // And the pointer door.
+  await page.getByRole("link", { name: "Jump to LOCA" }).click();
+  await expect(page.locator("section#loca")).toBeInViewport();
+
+  // The reduced-motion half of the AC, on a rail label specifically: the
+  // jump rides the document's one scroll-behavior rule (#589), so under
+  // reduce it resolves instant — and still arrives.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).scrollBehavior,
+    ),
+  ).toBe("auto");
+  await page.getByRole("link", { name: "Jump to LLPL" }).click();
+  await expect(page.locator("section#llpl")).toBeInViewport();
+
+  // The ornaments stay ornaments: the pill is aria-hidden, the labels are
+  // the rail's only citizens of the accessibility tree.
+  await expect(page.locator(".rounded-pill")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
 });
