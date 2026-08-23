@@ -61,9 +61,13 @@ const GithubMark: Component = () => (
   </svg>
 );
 
-/* One mobile icon link (#597): a 44px square — the tap-target floor — around
-   a 20px glyph, wearing the nav links' own ink-and-hover so the two forms
-   read as one nav. Hidden exactly where the text nav appears. */
+/* One mobile icon link: a 44px square — the tap-target floor, border
+   included — around a 20px glyph. It wears the theme toggle's box (#621,
+   superseding #597's bare-icon ruling): same border token, same radius,
+   same hover, so the two links and the toggle read as one control family
+   and the cluster's flex gap runs between visible edges instead of
+   vanishing into the bare glyphs' whitespace. Hidden exactly where the
+   text nav appears. */
 const IconLink: Component<{
   href: string;
   label: string;
@@ -72,7 +76,7 @@ const IconLink: Component<{
   <a
     href={props.href}
     aria-label={props.label}
-    class="flex size-11 items-center justify-center rounded-md text-fg-soft transition-colors hover:text-accent focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)] min-[52rem]:hidden"
+    class="flex size-11 items-center justify-center rounded-sm border border-line-strong text-fg-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)] min-[52rem]:hidden"
   >
     {props.children}
   </a>

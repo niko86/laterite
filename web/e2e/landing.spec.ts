@@ -2342,6 +2342,43 @@ test("the mobile masthead carries source and install icons; the desktop nav stan
   expect(await ink(source)).not.toBe("rgba(0, 0, 0, 0)");
   expect(await ink(install)).toBe(await ink(source));
 
+  // #621 (superseding #597's bare-icon ruling): both links wear the theme
+  // toggle's box. Matching the toggle's own computed border and radius —
+  // never a pinned colour or radius value — IS the claim: one control
+  // family, so a retuned token moves all three together unnoticed. Only
+  // the 1px width is pinned, and that pin says the border is real, not
+  // which token draws it.
+  const toggle = header.getByRole("button", { name: "Toggle colour theme" });
+  const boxOf = (l: Locator) =>
+    l.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        width: s.borderTopWidth,
+        color: s.borderTopColor,
+        radius: s.borderRadius,
+      };
+    });
+  const toggleBox = await boxOf(toggle);
+  expect(toggleBox.width, "the family's border is real").toBe("1px");
+  for (const link of [source, install]) {
+    expect(await boxOf(link)).toEqual(toggleBox);
+  }
+
+  // #621's other half: the cluster's two gaps are equal edge-to-edge. The
+  // boxes make the flex gap the VISIBLE gap — between borders, not glyph
+  // whitespace — so measuring bounding-box edges now measures what a
+  // reader sees.
+  const sBox = await source.boundingBox();
+  const iBox = await install.boundingBox();
+  const tBox = await toggle.boundingBox();
+  if (!sBox || !iBox || !tBox)
+    throw new Error("masthead controls must lay out");
+  const gapOne = iBox.x - (sBox.x + sBox.width);
+  const gapTwo = tBox.x - (iBox.x + iBox.width);
+  expect(Math.abs(gapOne - gapTwo), "one consistent gap").toBeLessThanOrEqual(
+    0.5,
+  );
+
   // The focus state is visible, not just declared: keyboard focus must
   // paint the ring. Tab from the top of the document — logo first, then
   // the source icon.

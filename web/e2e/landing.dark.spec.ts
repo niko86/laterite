@@ -8,7 +8,7 @@
  * unnecessary for what this lane exists to catch.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { expectViewportWide } from "./viewport";
 import { expectErrBorder, hexToRgb } from "./tokens";
@@ -154,7 +154,9 @@ test("dark: the cell popover renders for cell and row findings", async ({
   await expect(pop).toContainText("Rule 10c");
 });
 
-test("dark: the masthead icons take real ink", async ({ page }) => {
+test("dark: the masthead icons take real ink and the toggle's border", async ({
+  page,
+}) => {
   // #597's "crisp in both themes" is a colour claim at this altitude: both
   // glyphs draw with currentColor, so what the dark theme must prove is
   // that the ink they inherit resolves to a real colour, not transparent —
@@ -169,6 +171,30 @@ test("dark: the masthead icons take real ink", async ({ page }) => {
   const sourceInk = await ink("Source on GitHub");
   expect(sourceInk).not.toBe("rgba(0, 0, 0, 0)");
   expect(await ink("Jump to install")).toBe(sourceInk);
+
+  // #621: the box joins the claim. Both links wear the theme toggle's
+  // border and radius under the dark palette — matched against the
+  // toggle's own computed values, so the family holds whatever the
+  // tokens resolve to.
+  const borderOf = (l: Locator) =>
+    l.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        width: s.borderTopWidth,
+        color: s.borderTopColor,
+        radius: s.borderRadius,
+      };
+    });
+  const toggleBorder = await borderOf(
+    page.getByRole("button", { name: "Toggle colour theme" }),
+  );
+  expect(toggleBorder.width).toBe("1px");
+  expect(toggleBorder.color).not.toBe("rgba(0, 0, 0, 0)");
+  for (const name of ["Source on GitHub", "Jump to install"]) {
+    expect(await borderOf(page.getByRole("link", { name }))).toEqual(
+      toggleBorder,
+    );
+  }
 });
 
 test("dark: every install card wears its dark hue", async ({ page }) => {
