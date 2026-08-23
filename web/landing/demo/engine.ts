@@ -75,11 +75,19 @@ export async function validateText(text: string): Promise<Report> {
  *  scoping helpers (fixes.ts) speak the wasm surface's type, never a copy. */
 export type Fix = import("../../src/wasm/ags4_wasm").Fix;
 
-/** The safe fixes the engine offers for this text (#530). The demo never
- *  repairs more than `lat fix` would: this list IS the repair budget. */
+/** The engine's fixes for this text, filtered to `risk === "safe"` — which is
+ *  the filter `lat fix` applies by default, so the demo never repairs more
+ *  than the CLI would (#530). The filter has to live HERE (#583): the engine
+ *  hands over its whole list — `compute_fixes` does not read risk, and the
+ *  wasm apply path never goes through `fix_document_selective`'s opt-in — and
+ *  every consumer (the budget count, the fix button, the manual badge) reads
+ *  this one seam, so filtering here is what keeps the three telling one
+ *  story: a risky fix does not exist as far as this page is concerned, and
+ *  its finding reads as manual. */
 export async function computeFixesText(text: string): Promise<Fix[]> {
   const m = await engine();
-  return m.compute_fixes(encoder.encode(text));
+  const all: Fix[] = m.compute_fixes(encoder.encode(text));
+  return all.filter((f) => f.risk === "safe");
 }
 
 /** Apply a subset of the engine's fixes to the text, returning the new text.
