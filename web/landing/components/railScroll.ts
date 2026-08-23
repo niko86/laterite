@@ -1,29 +1,94 @@
 /* The rail's arithmetic (#399), extracted from the component.
  *
- * Scroll progress and depth are the only parts of the borehole rail that can be
- * WRONG rather than merely ugly, and neither is testable through a component in
- * the node lane — jsdom reports every scroll dimension as 0. So they live here
- * as pure functions of numbers, and the component does nothing but read the
- * viewport and pass them on.
+ * The probe's mapping and depth are the only parts of the borehole rail that
+ * can be WRONG rather than merely ugly, and neither is testable through a
+ * component in the node lane — jsdom reports every scroll dimension as 0. So
+ * they live here as pure functions of numbers, and the component does nothing
+ * but read the viewport and pass them on.
  *
  * The wink in `depthLabel` is that 2DP is a real AGS TYPE, and the total is the
  * `LOCA_FDEP` the seeded delivery gives BH01 — read from the fixture, not
  * written here, so changing the seeded depth moves the rail with it.
  */
 
-/** Scroll position over scrollable height, clamped to 0–1.
+/** The probe's fraction of the hole, keyed to the DATUM line (#615).
  *
- * A page shorter than its viewport has no scrollable height; that is a division
- * by zero, and the honest answer is 0 (the probe sits at the surface) rather
- * than NaN painting the veil over the whole rail. */
-export function scrollProgress(
+ * The retired mapping rode the document's scroll fraction while the ticks
+ * rode section-height shares — two domains that agreed only at the surface
+ * and the floor, so a jump could land the pill 1.37 m past its own tick.
+ * This one reads whichever section sits under the datum (the masthead's
+ * measured bottom plus the datum-gap token, `datumOffset` in viewport px):
+ * each section's LANDING scroll position — where a jump puts its top on the
+ * datum — becomes a knot at that section's tick fraction, and the probe
+ * interpolates between knots. A landing therefore reads its tick exactly,
+ * by construction rather than by coincidence.
+ *
+ * Two recorded, accepted trades from the #615 trial: the probe changes speed
+ * where sections change height, and the run from the last landable knot to
+ * `maxScroll` lerps to 1 — the stretched tail that lets the floor read the
+ * full depth at page bottom while the deepest landing line sits well above
+ * it, compressing the final section into the tail.
+ *
+ * Degenerates stay honest: an unscrollable page answers 0, unmeasured
+ * sections (tops all zero, before the ResizeObserver's first delivery)
+ * collapse every knot and leave the plain document fraction, and elastic
+ * overscroll clamps rather than painting the veil past the rail. */
+export function datumFraction(
   scrollY: number,
-  viewportHeight: number,
-  documentHeight: number,
+  datumOffset: number,
+  tops: readonly number[],
+  heights: readonly number[],
+  maxScroll: number,
 ): number {
-  const scrollable = documentHeight - viewportHeight;
-  if (scrollable <= 0) return 0;
-  return Math.min(1, Math.max(0, scrollY / scrollable));
+  if (maxScroll <= 0) return 0;
+  const fractions = bandFractions(heights);
+  /* Knots must strictly increase in BOTH coordinates or the lerp divides by
+     zero: a landing clamped into its predecessor (the first section starts
+     above the datum; unmeasured tops collapse to 0) folds into the knot
+     already there, and a landing at or past maxScroll is unreachable — the
+     tail from the last landable knot covers that scroll instead. */
+  const knots: [number, number][] = [[0, 0]];
+  let lastScroll = 0;
+  let lastFraction = 0;
+  for (let i = 0; i < tops.length; i++) {
+    const landing = (tops[i] ?? 0) - datumOffset;
+    /* startFrom, not a parallel accumulation: the knot's fraction and the
+       tick's (bandStartFraction) must come from the one walker, or the
+       exactness this mapping exists for is two computations agreeing by
+       luck. */
+    const start = startFrom(fractions, i);
+    if (landing > lastScroll && landing < maxScroll && start > lastFraction) {
+      knots.push([landing, start]);
+      lastScroll = landing;
+      lastFraction = start;
+    }
+  }
+  knots.push([maxScroll, 1]);
+  const y = Math.min(maxScroll, Math.max(0, scrollY));
+  /* The landing snap: browsers land an anchor jump on a whole pixel while
+     the measured geometry is fractional, and one pixel of scroll is enough
+     to flip the depth's second decimal. Within a pixel of a landing line
+     the probe cannot resolve the difference, so it reads the tick exactly —
+     which is the landing's DEFINITION, not a fudge. Monotonicity survives:
+     the unsnapped fraction a pixel out is within a pixel's slope of the
+     knot's. */
+  for (const [s, f] of knots) {
+    if (Math.abs(y - s) <= 1) return f;
+  }
+  let prevScroll = 0;
+  let prevFraction = 0;
+  for (const [s, f] of knots) {
+    if (y <= s) {
+      if (s === prevScroll) return f;
+      return (
+        prevFraction +
+        ((y - prevScroll) / (s - prevScroll)) * (f - prevFraction)
+      );
+    }
+    prevScroll = s;
+    prevFraction = f;
+  }
+  return 1;
 }
 
 /** Depth in metres at `progress` down a hole of `total` metres. */

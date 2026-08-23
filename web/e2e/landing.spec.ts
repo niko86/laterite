@@ -2,6 +2,8 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 import { expectViewportWide } from "./viewport";
 import { expectErrBorder, hexToRgb } from "./tokens";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
+import { SECTIONS } from "../landing/sections";
+import { RAIL_INSET_PCT } from "../landing/components/railScroll";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -563,12 +565,22 @@ test("wide: the depth scale clears the masthead and labels the hole's floor", as
     .boundingBox();
   if (!masthead || !surfaceTick)
     throw new Error("masthead or 0.00 m tick did not render");
-  // #585's datum ruling, superseding #524's "clear the masthead" inset: the
-  // masthead's gradient bar IS the surface, so 0.00 m sits level WITH it —
-  // not merely below it — at scroll 0.
+  // #615's datum, revising a sliver of #585's flush ruling (pass-2 pin
+  // D2-01): 0.00 m sits one spacing-token step BELOW the gradient bar, and
+  // the expected line is read from a section's own scroll-margin — the one
+  // token the ticks, the probe and the jumps all consume — so this test
+  // cannot agree with the rail while disagreeing with where a jump lands.
+  const datumOffset = await page.evaluate(() => {
+    const section = document.querySelector("section");
+    return section ? parseFloat(getComputedStyle(section).scrollMarginTop) : 0;
+  });
   expect(
-    Math.abs(surfaceTick.y - (masthead.y + masthead.height)),
-    "the 0.00 tick must sit level with the masthead bar",
+    datumOffset - masthead.height,
+    "the datum keeps real air below the bar",
+  ).toBeGreaterThan(4);
+  expect(
+    Math.abs(surfaceTick.y - (masthead.y + datumOffset)),
+    "the 0.00 tick must sit on the datum line",
   ).toBeLessThanOrEqual(2);
 
   // The hole has a floor and the scale says so: a terminal tick labels the
@@ -2200,6 +2212,133 @@ test("wide: the rail weighs its bands and its labels are doors", async ({
     "aria-hidden",
     "true",
   );
+});
+
+test("phone: the narrow strip inherits the datum mapping", async ({ page }) => {
+  test.skip(
+    width(page) >= 1088,
+    "the narrow strip is the rail's below-68rem form",
+  );
+  // #615's one narrow-width AC: the 8px strip inherits the mapping and
+  // nothing else. There are no doors down here (the depth scale never
+  // renders), so the pin is the veil: scrolled to SAMP's landing line, its
+  // top must sit at railY of SAMP's tick fraction — the datum-keyed value,
+  // re-derived here from the sections' own rendered heights. The retired
+  // document-fraction mapping puts a visibly different number at the same
+  // scroll, so this goes red on the old wiring, narrow or not.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const ids = SECTIONS.map((s) => s.id);
+  await page.evaluate(() => {
+    const el = document.getElementById("samp");
+    if (!el) return;
+    const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+    window.scrollTo(
+      0,
+      el.getBoundingClientRect().top + window.scrollY - offset,
+    );
+  });
+  await page.waitForFunction(() => {
+    const el = document.getElementById("samp");
+    if (!el) return false;
+    const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+    const target = el.getBoundingClientRect().top + window.scrollY - offset;
+    return Math.abs(window.scrollY - target) <= 1;
+  });
+  const expected = await page.evaluate(
+    ([sectionIds, insetPct]) => {
+      const heights = (sectionIds as string[]).map(
+        (id) => document.getElementById(id)?.offsetHeight ?? 0,
+      );
+      const total = heights.reduce((a, b) => a + b, 0);
+      const before = heights
+        .slice(0, (sectionIds as string[]).indexOf("samp"))
+        .reduce((a, b) => a + b, 0);
+      return (before / total) * (100 - (insetPct as number));
+    },
+    [ids, RAIL_INSET_PCT] as const,
+  );
+  const veil = page.locator("div.border-t-steel-500");
+  const probeTop = parseFloat(await veil.evaluate((el) => el.style.top));
+  expect(
+    probeTop,
+    "the strip's veil must sit at SAMP's tick fraction",
+  ).toBeCloseTo(expected, 1);
+});
+
+test("wide: a rail jump lands the pill exactly on its tick", async ({
+  page,
+}) => {
+  test.skip(
+    width(page) < 1088,
+    "the depth scale only renders above the rail's 68rem collapse breakpoint",
+  );
+  // #615, retiring the document-fraction probe: the probe now reads the
+  // section under the DATUM line, so a jump's landing IS the tick's own
+  // fraction. Measured on prod before the fix, "Jump to SAMP" read 8.23 m
+  // against a 6.86 m tick. Assertions run only once the scroll has SETTLED
+  // on the landing line: the old mapping glides THROUGH the correct number
+  // on its way past it, and a mid-glide read would go green on the defect.
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const pill = page.locator(".rounded-pill");
+
+  const settled = (id: string) =>
+    page.waitForFunction((sel) => {
+      const el = document.getElementById(sel);
+      if (!el) return false;
+      const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const target = Math.max(
+        0,
+        Math.min(el.getBoundingClientRect().top + window.scrollY - offset, max),
+      );
+      return Math.abs(window.scrollY - target) <= 1;
+    }, id);
+
+  // A CSS attribute selector, not getByRole: role-name matching is
+  // case-insensitive, and the masthead carries its own lowercase "Jump to
+  // install" door that would straddle the rail's "Jump to Install".
+  const jumpAndRead = async (label: string, id: string) => {
+    const door = page.locator(`a[aria-label="Jump to ${label}"]`);
+    const tick = (
+      await door.locator("xpath=preceding-sibling::p").innerText()
+    ).replace(/ m$/, "");
+    await door.click();
+    await settled(id);
+    await expect(pill, `${label}'s landing must read its tick`).toHaveText(
+      tick,
+    );
+  };
+
+  // Every door on the scale, in descent order, from the page's own sequence —
+  // Surface included: its landing clamps at the very top, where the datum
+  // construction pins 0.00 exactly.
+  for (const section of SECTIONS) {
+    await jumpAndRead(section.label, section.id);
+  }
+
+  // The floor: max scroll reads the seeded final depth — the stretched
+  // tail's whole purpose, since the deepest landing line sits well above
+  // the page bottom.
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  // scrollTo rides the document's smooth behavior too, so wait for the
+  // glide to reach the floor before reading.
+  await page.waitForFunction(() => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    return Math.abs(window.scrollY - max) <= 1;
+  });
+  await expect(pill).toHaveText(seededFinalDepthLabel());
+
+  // Reduced motion: the jump resolves instant (#589) and lands identically.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await jumpAndRead("SAMP", "samp");
 });
 
 test("fine: a paste whose target moved is abandoned, not re-aimed", async ({
