@@ -1443,8 +1443,8 @@ test("the page's hierarchy runs demo-first, and the CLI card is the binary", asy
   // The CLI card: the binary is the identity, the releases download is the
   // action, and no pip command appears anywhere on it. CSS locators, not
   // roles: below the grid's column break the deck parks non-current cards
-  // with `hidden` (#595), and a hidden card has no accessibility tree to
-  // query — but its claims must still hold.
+  // invisible (#595, #622), and a parked card has no accessibility tree
+  // to query — but its claims must still hold.
   const cli = page
     .locator(".install-card")
     .filter({ has: page.locator("a", { hasText: /^lat$/ }) });
@@ -1996,10 +1996,7 @@ test("the findings panel is one card below the breakpoint, a stack at desktop", 
   const ringed = page.locator(
     "section#file .overscroll-contain [class*='--focus-ring']",
   );
-  const box = await panel
-    .locator("ul li:not([hidden]) button")
-    .first()
-    .boundingBox();
+  const box = await panel.locator("ul li:visible button").first().boundingBox();
   if (!box) throw new Error("the visible card has no button to drag");
   const y = box.y + box.height / 2;
   await page.mouse.move(box.x + box.width - 10, y);
@@ -2011,7 +2008,7 @@ test("the findings panel is one card below the breakpoint, a stack at desktop", 
 
   // The click verb itself still works at this width — the positive control
   // that makes the no-focus assertion above falsifiable.
-  await panel.locator("ul li:not([hidden]) button").first().click();
+  await panel.locator("ul li:visible button").first().click();
   await expect(ringed).toHaveCount(1);
 
   // RowCarousel's keyboard idiom answers here too: Alt+Arrow pages.
@@ -2064,10 +2061,12 @@ test("reduced motion swaps cards instantly", async ({ page }) => {
   await page.goto("/");
   const panel = page.locator("#findings");
   await expect(panel.locator("li").first()).toBeVisible({ timeout: 15_000 });
+  // The ACTIVE card carries the transition (#622 moved it off the parked
+  // cards, whose pose must snap), so the card being swapped is the one
+  // the claim reads.
   expect(
     await panel
-      .locator("li")
-      .first()
+      .locator("li:visible")
       .evaluate((el) => getComputedStyle(el).transitionDuration),
   ).toBe("0s");
   await panel.getByRole("button", { name: "Next finding" }).click();
@@ -2076,8 +2075,7 @@ test("reduced motion swaps cards instantly", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   expect(
     await panel
-      .locator("li")
-      .first()
+      .locator("li:visible")
       .evaluate((el) => getComputedStyle(el).transitionDuration),
   ).not.toBe("0s");
 });
@@ -2111,7 +2109,7 @@ test("every install card opens a door to its surface's get-started page", async 
   // I start with THIS surface". The hrefs come from the generated data the
   // page itself renders, so the five decided targets are pinned on the
   // Python side (test_install_channels.py) and the DOM side here cannot
-  // disagree with them. On a phone the deck parks four cards `hidden`, so
+  // disagree with them. On a phone the deck parks four cards invisible, so
   // the visible-and-tappable half reads the ACTIVE card, then pages once —
   // reachability on the deck is the AC, not mere presence in the DOM.
   await page.goto("/");
@@ -2134,7 +2132,7 @@ test("every install card opens a door to its surface's get-started page", async 
 
   const activeDoor = () =>
     install
-      .locator("ul li:not([hidden]) .install-card")
+      .locator("ul li:visible .install-card")
       .getByRole("link", { name: "Get started" });
   await expect(activeDoor()).toBeVisible();
   await expect(activeDoor()).toHaveAttribute("href", INSTALL_CHANNELS[0].docs);
@@ -2166,7 +2164,7 @@ test("the install cards become a one-card looping deck on a phone", async ({
   }
 
   // One visible card — the rest parked, not gone — plus five dots.
-  const current = install.locator("ul li:not([hidden])");
+  const current = install.locator("ul li:visible");
   await expect(current).toHaveCount(1);
   await expect(current).toContainText("Python");
   const dots = install.getByRole("button", { name: /Go to card/ });
@@ -2204,6 +2202,146 @@ test("the install cards become a one-card looping deck on a phone", async ({
   ).toBe("0s");
   await next.click();
   await expect(current).toContainText("Browser");
+});
+
+test("a deck holds one height while paging, and its chrome sits centred", async ({
+  page,
+  hasTouch,
+}) => {
+  // #622 (M2-03..M2-05): display parking sized each deck to whichever card
+  // was showing, so paging pumped the page below it — and the chrome row
+  // hugged the left edge under a centred card. Grid-stack parking reserves
+  // the tallest card's height (the ONE thing paging may change is which
+  // card shows), and both chromes centre under their cards.
+  test.skip(width(page) >= 608, "both decks are grids at this width");
+  await page.goto("/");
+
+  const heightOf = (l: Locator) =>
+    l.evaluate((el) => el.getBoundingClientRect().height);
+  // The chrome row spans the column even unfixed, so the falsifiable claim
+  // is the content's symmetry INSIDE it: the paging buttons' two insets.
+  const insetSkew = async (prev: Locator, next: Locator) => {
+    const r = await prev.locator("..").boundingBox();
+    const p = await prev.boundingBox();
+    const n = await next.boundingBox();
+    if (!r || !p || !n) throw new Error("the chrome must lay out");
+    return Math.abs(p.x - r.x - (r.x + r.width - (n.x + n.width)));
+  };
+
+  const install = page.locator("section#install");
+  const deck = install.getByRole("list", { name: "Install channels" });
+  await expect(deck.locator("li:visible")).toHaveCount(1);
+  const deckHeight = await heightOf(deck);
+  const nextCard = install.getByRole("button", { name: "Next card" });
+  for (const channel of INSTALL_CHANNELS.slice(1)) {
+    await nextCard.click();
+    await expect(deck.locator("li:visible")).toContainText(channel.label);
+    expect(await heightOf(deck), `the deck on ${channel.id}`).toBeCloseTo(
+      deckHeight,
+      0,
+    );
+  }
+  expect(
+    await insetSkew(
+      install.getByRole("button", { name: "Previous card" }),
+      nextCard,
+    ),
+    "the dots chrome sits centred",
+  ).toBeLessThanOrEqual(1);
+
+  // Visibility parking must hold BOTH halves display parking held: a
+  // parked card sits outside the accessibility tree and cannot take
+  // focus. The active card is the positive control that keeps the focus
+  // probe falsifiable.
+  const listitems = (await deck.ariaSnapshot()).match(/- listitem/g);
+  expect(listitems, "one card in the accessibility tree").toHaveLength(1);
+  const takesFocus = (l: Locator) =>
+    l.evaluate((el) => {
+      el.focus();
+      return document.activeElement === el;
+    });
+  expect(await takesFocus(deck.locator("li:visible a").first())).toBe(true);
+  expect(
+    await takesFocus(deck.locator("li").first().locator("a").first()),
+  ).toBe(false);
+
+  const panel = page.locator("#findings");
+  await expect(panel.locator("li").first()).toBeVisible({ timeout: 15_000 });
+  const findings = panel.getByRole("list", { name: "Findings" });
+  const findingsHeight = await heightOf(findings);
+  const nextFinding = panel.getByRole("button", { name: "Next finding" });
+  for (const n of [2, 3, 4]) {
+    await nextFinding.click();
+    await expect(panel.getByText(`${n} / 4`)).toBeVisible();
+    expect(await heightOf(findings), `the findings deck on ${n}`).toBeCloseTo(
+      findingsHeight,
+      0,
+    );
+  }
+  expect(
+    await insetSkew(
+      panel.getByRole("button", { name: "Previous finding" }),
+      nextFinding,
+    ),
+    "the counter chrome sits centred",
+  ).toBeLessThanOrEqual(1);
+
+  if (hasTouch) {
+    // The bare-deck half: a single card reserves nothing extra — SAMP's
+    // one finding IS its deck's whole height.
+    const samp = page.getByRole("list", { name: "SAMP findings" });
+    expect(await heightOf(samp)).toBeCloseTo(
+      await heightOf(samp.locator("li")),
+      0,
+    );
+  }
+});
+
+test("a page turn enters from the side of travel, even on a reversal", async ({
+  page,
+}) => {
+  // #622's parking rewrite almost lost #534's slide grammar: the parked
+  // nudge is rendered state and a transition starts from the last
+  // COMPUTED style, so a direction flip landing in the same recalc as the
+  // turn would slide the entering card in from the PREVIOUS turn's side.
+  // The component turns a reversal in two renders instead; this pins it.
+  // The probe stretches the transition so the read lands at its start,
+  // then reads the entering card's translate in flight — the SIGN is the
+  // claim, not the magnitude.
+  test.skip(width(page) >= 608, "the deck is a grid at this width");
+  await page.goto("/");
+  const install = page.locator("section#install");
+  const next = install.getByRole("button", { name: "Next card" });
+  await next.click();
+  await next.click();
+  const deck = install.getByRole("list", { name: "Install channels" });
+  await expect(deck.locator("li:visible")).toContainText("CLI");
+  const pose = await install.evaluate(async (section) => {
+    const style = document.createElement("style");
+    style.textContent = "section#install ul li { --dur-fast: 60s; }";
+    document.head.append(style);
+    const prev = [...section.querySelectorAll("button")].find(
+      (b) => b.getAttribute("aria-label") === "Previous card",
+    );
+    if (!prev) throw new Error("no Previous button to reverse with");
+    prev.click();
+    // A reversal turns one frame after the pose renders — wait past it,
+    // then catch the stretched transition just after it starts.
+    await new Promise((r) =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      ),
+    );
+    const li = [...section.querySelectorAll("ul li")].find(
+      (el) => getComputedStyle(el).visibility === "visible",
+    );
+    if (!li) throw new Error("no visible card mid-turn");
+    const translate = getComputedStyle(li).translate;
+    style.remove();
+    return translate;
+  });
+  // Previous enters from the LEFT: a negative x nudge easing to rest.
+  expect(parseFloat(pose), pose).toBeLessThan(-5);
 });
 
 test("the file pane wraps on a phone and side-scrolls on desktop", async ({
