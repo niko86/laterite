@@ -56,9 +56,10 @@ function seededFinalDepthLabel(): string {
 const scroller = (page: Page, section: string) =>
   page.locator(`section#${section} table`).locator("xpath=..");
 
-/** The failing cell's corner flag (#616) — the one absolutely-positioned
- *  span inside a cell button, replacing the retired inline ✗. */
-const cornerFlag = (cell: Locator) => cell.locator("span.absolute");
+/** The failing cell's corner flag (#616; re-anchored to the cell by
+ *  #632) — the one absolutely-positioned span inside the cell's td. */
+const cornerFlag = (cell: Locator) =>
+  cell.locator("xpath=ancestor::td[1]//span[contains(@class, 'absolute')]");
 
 test("phone: the page stays viewport-wide and each group table pans in its own scroller", async ({
   page,
@@ -437,7 +438,12 @@ test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and mo
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
   await cell.click();
-  await expect(cell).toHaveClass(/bg-accent-quiet/);
+  // The pick's sign on a FAILING cell is the #618 ring — the wash stands
+  // down there since #633, so the severity tint stays the only hue.
+  await expect(cell.locator("xpath=ancestor::td[1]")).toHaveCSS(
+    "box-shadow",
+    /inset/,
+  );
   await expect(cornerFlag(cell)).toBeVisible();
 
   // Enter opens the value in place; typing replaces the selection; Enter
@@ -525,7 +531,8 @@ test("fine: rows delete from the table, and undo/redo walk the model timeline", 
     .getByRole("button", { name: "Edit PROJ_ID on row 2 of PROJ" })
     .click();
   // `.bg-accent-quiet` matches the class TOKEN — a [class*=] substring match
-  // would also catch every cell's hover:bg-accent-quiet.
+  // would also catch a clean cell's hover:bg-accent-quiet (#633 removed the
+  // hover token from failing cells only).
   await expect(proj.locator("td button.bg-accent-quiet")).toHaveCount(1);
   await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
   await expect(rows).toHaveCount(3);
@@ -661,6 +668,112 @@ test("fine: findings speak one vocabulary — tinted cell with popover, chipped 
   await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
 });
 
+test("the corner flag pins the cell's corner, and a failing pick wears one wash", async ({
+  page,
+}) => {
+  // #632: the flag was anchored to the inner edit button, which sits
+  // inside the td's padding — so the triangle floated mid-cell instead of
+  // pinning the corner the way a spreadsheet annotation does. The claim
+  // is geometric: the flag's top-right IS the td's top-right.
+  await page.goto("/");
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await expect(cornerFlag(cell)).toBeVisible({ timeout: 15_000 });
+  const td = cell.locator("xpath=ancestor::td[1]");
+  const flagBox = await cornerFlag(cell).boundingBox();
+  const tdBox = await td.boundingBox();
+  if (!flagBox || !tdBox) throw new Error("flag and cell must lay out");
+  expect(flagBox.y, "flag top = cell top").toBeCloseTo(tdBox.y, 0);
+  expect(flagBox.x + flagBox.width, "flag right = cell right").toBeCloseTo(
+    tdBox.x + tdBox.width,
+    0,
+  );
+
+  // #633: picking a FAILING cell used to add the accent wash on top of
+  // the severity tint — two hues, one cell. The wash stands down there
+  // (the #618 ring and the tint carry the pick); on fine lanes the mouse
+  // is left sitting on the cell, so this also proves hover adds none.
+  //
+  // TIMING IS THE TRAP here: the button transitions its colours, so a
+  // computed background read at click time reports the transition's
+  // START value and a wash still fading in reads as absent. The clean
+  // cell's wash is asserted with a retrying matcher (also the positive
+  // control that keeps the claim falsifiable), and the failing cell is
+  // read once only AFTER the clean cell's wash has fully faded back out
+  // — a whole transition provably elapsed since the pick moved, so a
+  // pre-fix wash would have landed by then.
+  const TRANSPARENT = "rgba(0, 0, 0, 0)";
+  const clean = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of LOCA",
+  });
+  await clean.click();
+  await expect(clean, "the clean cell keeps the wash").not.toHaveCSS(
+    "background-color",
+    TRANSPARENT,
+  );
+  const failing = page.getByRole("button", {
+    name: "Edit SAMP_TYPE on row 1 of SAMP",
+  });
+  await failing.click();
+  await expect(clean, "the pick moved off the clean cell").toHaveCSS(
+    "background-color",
+    TRANSPARENT,
+  );
+  expect(
+    await failing.evaluate((el) => getComputedStyle(el).backgroundColor),
+    "no second wash on a failing cell",
+  ).toBe(TRANSPARENT);
+  expect(
+    await failing
+      .locator("xpath=ancestor::td[1]")
+      .evaluate((el) => getComputedStyle(el).boxShadow),
+    "the ring still marks the pick",
+  ).toContain("inset");
+  // …and the severity tint is what remains painting the cell: the wash
+  // stood down FOR it, so its absence would mean an untinted verdict.
+  expect(
+    await failing
+      .locator("xpath=ancestor::td[1]")
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+    "the severity tint stands",
+  ).not.toBe(TRANSPARENT);
+});
+
+test("a long finding stays inside its hover popover", async ({
+  page,
+  hasTouch,
+}) => {
+  // #636: the Rule 10c KEY-combination token is one long unbroken run,
+  // and engines differ on whether a pipe is a break opportunity — the
+  // report's engine let it burst past the popover's border. The claim
+  // is overflow-free content, whatever the engine's line breaker does.
+  test.skip(hasTouch, "the popover is the fine pointer's surface (#591)");
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.locator('section#llpl [data-cell="2-1"]').hover();
+  const pop = page.getByRole("tooltip");
+  await expect(pop).toBeVisible();
+  await expect(pop).toContainText("Rule 10c");
+  expect(
+    await pop.evaluate((el) => el.scrollWidth - el.clientWidth),
+    "content escapes the popover",
+  ).toBeLessThanOrEqual(0);
+
+  // The callout's other homes keep their wrap contract: the panel's
+  // cards were never nowrap-poisoned, and this pins that the shared
+  // class change left them overflow-free too.
+  expect(
+    await page
+      .locator("#findings li")
+      .first()
+      .evaluate((el) => el.scrollWidth - el.clientWidth),
+    "the findings panel home stays overflow-free",
+  ).toBeLessThanOrEqual(0);
+});
+
 test("the corner flag arrives with the findings, no pointer required", async ({
   page,
 }) => {
@@ -696,7 +809,8 @@ test("a picked cell wears the selection ring, and it travels with the arrows", a
       .locator("xpath=ancestor::td[1]")
       .evaluate((el) => getComputedStyle(el).boxShadow);
   expect(await ringOf(cell), "first click draws the ring").toContain("inset");
-  // The wash stays underneath: the ring joins it, not replaces it.
+  // On a CLEAN cell the wash stays underneath: the ring joins it, not
+  // replaces it. (A failing cell is the wash-free case — #633.)
   await expect(cell).toHaveClass(/bg-accent-quiet/);
 
   if (!hasTouch) {

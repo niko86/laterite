@@ -244,7 +244,10 @@ test("dark: the status marks and the corner flag take real ink", async ({
   const cell = page.getByRole("button", {
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
-  const flag = cell.locator("span.absolute");
+  const flag = cell.locator(
+    // In the td since #632 (was the button); descendant search reads both.
+    "xpath=ancestor::td[1]//span[contains(@class, 'absolute')]",
+  );
   await expect(flag).toBeVisible({ timeout: 15_000 });
   const flagInk = await flag.evaluate(
     (el) => getComputedStyle(el).borderTopColor,
