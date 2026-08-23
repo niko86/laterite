@@ -27,7 +27,14 @@
  * is a landing page that does not land.
  */
 
-import { For, Show, createMemo, type Component } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  on,
+  type Component,
+} from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
 import type { DemoGroup } from "./schema";
@@ -92,8 +99,27 @@ export const RowCarousel: Component<{
     if (next >= 0 && next < props.schema.headings.length) props.onMove(next);
   };
 
+  /* The open nudge (#634): a tap on a bottom row of a tall table mounts the
+     tray below the fold, and a tray the tap does not reveal reads as a tap
+     that did nothing. Keyed on the pick, not the mount: Presence holds the
+     tray through a re-pick, so a second cell tapped while it is open never
+     remounts it — the nudge has to follow the pick. `nearest` scrolls only
+     what it must — an already visible tray does not move, so paging fields
+     inside it never yanks the page — and Presence's enter is an opacity
+     fade at full size, so the box this measures is the settled one. */
+  let root: HTMLDivElement | undefined;
+  createEffect(
+    on(
+      () => [props.row, props.col],
+      () => {
+        root?.scrollIntoView({ block: "nearest" });
+      },
+    ),
+  );
+
   return (
     <div
+      ref={root}
       /* The raised step was the landing's canvas EXACTLY — this page retunes
          `--canvas` onto `--surface-raised`'s own value — so the tray had no
          fill of its own and read as bare page inside a border (#452).

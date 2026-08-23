@@ -14,8 +14,8 @@
  * it, so every caller now gets the full toolbar and the props went with the
  * distinction they encoded.
  *
- * LAYOUT STAYS WITH THE CALLERS. This emits the table, the strip, the actions
- * row and the carousel; the grid column GroupSection places them in and the
+ * LAYOUT STAYS WITH THE CALLERS. This emits the table, the carousel, the
+ * strip and the actions row; the grid column GroupSection places them in and the
  * `mt-3` block the cover sheet places them in belong to those callers, and
  * normalising the difference would be a visual change the extraction has no
  * business making.
@@ -144,6 +144,34 @@ export const EditableGroup: Component<{
             }}
           />
 
+          {/* The carousel is the COARSE pointer's editor (#525); on a fine
+              pointer the pick is a spreadsheet selection and opening a tray
+              under the table would double the editing surface. It mounts
+              directly under the table, ABOVE the strip (#634): the tray
+              appears where the tap happened, and the findings it may
+              generate stay below it — last in the column, it opened off
+              screen. */}
+          <Presence when={coarsePointer() ? open() : null}>
+            {(cell) => (
+              <RowCarousel
+                schema={b().schema}
+                data={b().data}
+                band={props.band}
+                row={cell().row}
+                col={cell().col}
+                onMove={(col) => {
+                  setPicked({ group: props.code, row: cell().row, col });
+                }}
+                onClose={() => {
+                  setPicked(null);
+                }}
+                onDelete={() => {
+                  deleteRow(props.code, cell().row);
+                }}
+              />
+            )}
+          </Presence>
+
           {/* The strip is the COARSE pointer's surface now (#591): fine
               pointers read the same callouts on the failing cell itself,
               and the panel beside the file stays the one complete list.
@@ -188,30 +216,6 @@ export const EditableGroup: Component<{
                 : "Click a cell, then type. Enter commits, Esc cancels."}
             </span>
           </div>
-
-          {/* The carousel is the COARSE pointer's editor (#525); on a fine
-              pointer the pick is a spreadsheet selection and opening a tray
-              under the table would double the editing surface. */}
-          <Presence when={coarsePointer() ? open() : null}>
-            {(cell) => (
-              <RowCarousel
-                schema={b().schema}
-                data={b().data}
-                band={props.band}
-                row={cell().row}
-                col={cell().col}
-                onMove={(col) => {
-                  setPicked({ group: props.code, row: cell().row, col });
-                }}
-                onClose={() => {
-                  setPicked(null);
-                }}
-                onDelete={() => {
-                  deleteRow(props.code, cell().row);
-                }}
-              />
-            )}
-          </Presence>
         </>
       )}
     </Show>

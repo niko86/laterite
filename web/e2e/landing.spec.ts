@@ -144,6 +144,50 @@ test("touch: the carousel opens, pages, closes — and never widens the page", a
   await expectViewportWide(page);
 });
 
+test("touch: the tray opens above the strip, inside the viewport", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the carousel is the coarse pointer's editor (#525)");
+  await page.goto("/");
+  // The on-device defect (#634): the tray rendered LAST in the group's
+  // column, below the findings strip and the actions row, so on a phone a
+  // tap opened it below the fold and looked like it did nothing.
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of LLPL",
+  });
+  await cell.scrollIntoViewIfNeeded();
+  await cell.click();
+  const editor = page.getByRole("group", { name: "Editing row 1 of LLPL" });
+  await expect(editor).toBeVisible();
+
+  // The whole box on screen with no manual scroll — the mount's own nudge
+  // (block: "nearest") is what earns this, and Presence's enter is an
+  // opacity fade at full size, so the nudge measured the true box.
+  const box = await editor.boundingBox();
+  const viewport = page.viewportSize();
+  if (!box || !viewport) throw new Error("editor and viewport must measure");
+  expect(box.y, "top edge on screen").toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height, "bottom edge on screen").toBeLessThanOrEqual(
+    viewport.height,
+  );
+
+  // DOM order: the tray sits directly under the table, ABOVE the strip —
+  // the tray appears where the tap happened, and the findings a commit may
+  // generate stay below it.
+  const stripFollows = await editor.evaluate((el) => {
+    const strip = el
+      .closest("section")
+      ?.querySelector('[aria-label="LLPL findings"]');
+    return strip
+      ? Boolean(
+          el.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING,
+        )
+      : null;
+  });
+  expect(stripFollows, "the strip follows the tray in the DOM").toBe(true);
+});
+
 test("touch: a row deletes from the carousel and the findings follow", async ({
   page,
   hasTouch,
