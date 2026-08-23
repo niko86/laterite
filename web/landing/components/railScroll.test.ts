@@ -1,11 +1,14 @@
-/* The rail's arithmetic (#399). jsdom reports every scroll dimension as 0, so
- * a component test here would assert nothing; these are the numbers instead.
+/* The rail's arithmetic (#399; remapped by #585). jsdom reports every scroll
+ * dimension as 0, so a component test here would assert nothing; these are
+ * the numbers instead.
  */
 
 import { describe, expect, it } from "vitest";
 import {
   RAIL_INSET_PCT,
   bandBounds,
+  bandFractions,
+  bandStartFraction,
   depthAt,
   depthLabel,
   railY,
@@ -55,14 +58,16 @@ describe("depthLabel", () => {
 });
 
 describe("railY — the one vertical mapping", () => {
-  it("keeps the pill on screen at both extremes", () => {
-    // The failure this prevents: a pill clipped in half against the top edge.
-    expect(railY(0)).toBe(RAIL_INSET_PCT);
+  it("puts the datum at the top edge and keeps the floor off the bottom", () => {
+    // #585's ruling, superseding #524's symmetric inset: fraction 0 IS the
+    // surface — the wrapper anchors to the masthead bar, so an inset above
+    // the datum would move 0.00 m off the very line that defines it. The
+    // BOTTOM inset survives for the terminal pill's sake.
+    expect(railY(0)).toBe(0);
     expect(railY(1)).toBe(100 - RAIL_INSET_PCT);
   });
 
   it("still travels monotonically between them", () => {
-    expect(railY(0.5)).toBeCloseTo(50);
     expect(railY(0.25)).toBeLessThan(railY(0.75));
   });
 
@@ -72,43 +77,73 @@ describe("railY — the one vertical mapping", () => {
     expect(depthLabel(depthAt(1, 25))).toBe("25.00");
     expect(railY(1)).toBeLessThan(100);
   });
+});
 
-  it("positions a tick and the pill identically at the same depth (#524)", () => {
-    // The defect this pins, stated CROSS-function because that is where it
-    // lived: the component places section ticks at band TOPS (bandBounds) and
-    // the pill at railY(progress), and pre-#524 those were two different runs
-    // — bandBounds on a plain 0-100%, the pill inset — so the pill's number
-    // never matched the label beside it. Against that arithmetic this fails
-    // on every band but the first; two identical calls to one function would
-    // prove nothing.
-    const n = SECTIONS.length;
-    for (let i = 0; i < n; i++) {
-      const tickY = bandBounds(i, n).top;
-      const pillYAtTickDepth = railY(i / n);
-      expect(tickY).toBeCloseTo(pillYAtTickDepth);
-    }
-    // And the terminal tick: the pill's journey ends where the last band does.
-    const last = bandBounds(n - 1, n);
-    expect(railY(1)).toBeCloseTo(last.top + last.height);
+describe("bandFractions — measured heights become shares of the hole", () => {
+  it("is each section's share of the summed heights", () => {
+    expect(bandFractions([100, 200, 100])).toEqual([0.25, 0.5, 0.25]);
+  });
+
+  it("doubling one section's height doubles its band and shifts what follows", () => {
+    // The #585 criterion verbatim — "double one section's height, its band
+    // doubles, ticks move" — pinned as the RATIO between bands: a share of
+    // a grown total cannot literally double, but the doubled section's band
+    // now stands twice as tall as an unchanged peer's, and every later tick
+    // sits lower.
+    const before = [100, 100, 100, 100];
+    const after = [100, 200, 100, 100];
+    expect(bandBounds(1, after).height).toBeCloseTo(
+      2 * bandBounds(0, after).height,
+    );
+    expect(bandStartFraction(2, after)).toBeGreaterThan(
+      bandStartFraction(2, before),
+    );
+  });
+
+  it("falls back to equal shares when nothing has measured yet", () => {
+    // First paint runs before the ResizeObserver's first delivery; equal
+    // bands are the honest placeholder, not NaN.
+    expect(bandFractions([0, 0, 0])).toEqual([1 / 3, 1 / 3, 1 / 3]);
   });
 });
 
-describe("bandBounds", () => {
+describe("bandBounds — weighted, contiguous, on the one run", () => {
+  const HEIGHTS = [900, 1400, 1100, 1300, 1700, 2600, 800];
+
   it("tiles contiguously, with no gap and no overlap", () => {
-    const bands = SECTIONS.map((_, i) => bandBounds(i, SECTIONS.length));
-    for (let i = 1; i < bands.length; i++) {
-      const prev = bands[i - 1];
-      const here = bands[i];
-      if (!prev || !here) throw new Error("bandBounds returned a hole");
+    for (let i = 1; i < HEIGHTS.length; i++) {
+      const prev = bandBounds(i - 1, HEIGHTS);
+      const here = bandBounds(i, HEIGHTS);
       expect(here.top).toBeCloseTo(prev.top + prev.height);
     }
   });
 
-  it("gives every section an equal band, whatever its pixel height", () => {
+  it("gives a taller section a taller band, in proportion", () => {
+    const short = bandBounds(6, HEIGHTS); // 800
+    const tall = bandBounds(5, HEIGHTS); // 2600
+    expect(tall.height / short.height).toBeCloseTo(2600 / 800);
+  });
+
+  it("reproduces equal bands for equal heights", () => {
+    const equal = SECTIONS.map(() => 1000);
     const heights = new Set(
-      SECTIONS.map((_, i) => bandBounds(i, SECTIONS.length).height),
+      SECTIONS.map((_, i) => bandBounds(i, equal).height.toFixed(6)),
     );
     expect(heights.size).toBe(1);
+  });
+
+  it("positions a tick and the pill identically at the same depth (#524)", () => {
+    // The invariant #585's remap must not break: the component places
+    // section ticks at band TOPS and the pill at railY(progress) — one run,
+    // so a tick's label IS what the pill reads when centred on it.
+    for (let i = 0; i < HEIGHTS.length; i++) {
+      expect(bandBounds(i, HEIGHTS).top).toBeCloseTo(
+        railY(bandStartFraction(i, HEIGHTS)),
+      );
+    }
+    // And the terminal tick: the pill's journey ends where the last band does.
+    const last = bandBounds(HEIGHTS.length - 1, HEIGHTS);
+    expect(railY(1)).toBeCloseTo(last.top + last.height);
   });
 });
 
