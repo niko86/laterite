@@ -5,10 +5,15 @@
  * recorded choice: the findings surfaces read a "2 / 4" counter (#592), the
  * install deck reads position dots (#595).
  *
- * EVERY card stays in the DOM, parked with `hidden`, and only the current one
- * shows. That is a testing contract as much as a rendering one: the e2e
- * suite's absence assertions ("Rule 14 is gone") count `li`s, and a carousel
- * that mounted only the current card would let a card hide from them on an
+ * EVERY card stays in the DOM, parked invisible in a one-cell grid stack
+ * (#622), and only the current one shows. The stack is the height story:
+ * all cards occupy the same cell, so the ul stands as tall as its tallest
+ * card and paging never reflows the page below it — display parking sized
+ * the deck to whichever card was showing. Visibility parking keeps parked
+ * cards out of the accessibility tree and the tab order exactly as display
+ * parking did, and the testing contract survives too: the e2e suite's
+ * absence assertions ("Rule 14 is gone") count `li`s, and a carousel that
+ * mounted only the current card would let a card hide from them on an
  * unshown page. Presence stays countable; visibility is the presentation.
  *
  * The ul keeps a stack's list role and takes the caller's aria-label, so an
@@ -21,7 +26,7 @@
  * down, so a lone card constrains no gesture it cannot answer.
  */
 
-import { Index, Show, createSignal, type JSX } from "solid-js";
+import { Index, Show, createSignal, untrack, type JSX } from "solid-js";
 import { Button } from "@shared/components";
 import { clampIndex, stepIndex, swipeStep } from "../carousel";
 
@@ -47,14 +52,36 @@ export function Carousel<T>(props: {
   /* Clamped on read, not by an effect: the list can shrink under a live
      position any time, and a derived position is never stale. */
   const at = () => clampIndex(raw(), count());
+  /* A reversal is TWO renders, not one. The parked nudge is rendered
+     state, and a CSS transition starts from the last COMPUTED style — so
+     flipping direction and position in the same recalc would slide the
+     entering card in from the PREVIOUS turn's side. Frame one renders the
+     new pose, frame two turns (two rAFs: the first runs before the recalc
+     it needs to get past). The target is computed when it fires, so every
+     call still lands exactly one turn and rapid input settles where a
+     synchronous turn would have. */
+  const turn = (d: 1 | -1, target: () => number) => {
+    const flipped = d !== dir();
+    setDir(d);
+    if (!flipped) {
+      setRaw(target());
+      return;
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setRaw(target()));
+    });
+  };
   const go = (delta: number) => {
-    setDir(delta > 0 ? 1 : -1);
-    setRaw(stepIndex(at(), delta, count()));
+    /* untrack: the target reads position state at FIRE time by design —
+       a deferred turn must step from wherever the deck stands when it
+       lands, never subscribe to it. */
+    turn(delta > 0 ? 1 : -1, () =>
+      untrack(() => stepIndex(at(), delta, count())),
+    );
   };
   const jumpTo = (i: number) => {
     if (i === at()) return;
-    setDir(i > at() ? 1 : -1);
-    setRaw(clampIndex(i, count()));
+    turn(i > at() ? 1 : -1, () => untrack(() => clampIndex(i, count())));
   };
 
   /* The swipe is a straight read of two pointer events — down records where
@@ -81,7 +108,7 @@ export function Carousel<T>(props: {
     <Show when={count()}>
       <ul
         aria-label={props.label}
-        class={`list-none p-0 ${props.class ?? "mt-3"}`}
+        class={`grid list-none p-0 ${props.class ?? "mt-3"}`}
         classList={{ "touch-pan-y": count() > 1 }}
         onKeyDown={onKeys}
         /* Capture phase, so the swallow runs BEFORE the card's own click
@@ -117,18 +144,30 @@ export function Carousel<T>(props: {
           }
         }}
       >
-        {/* Index (#534): re-renders mint fresh items, and only a genuine page
-            turn should re-fire the entrance. The slide-and-fade rides
-            motion-safe, so reduced motion gets the swap with no transition
+        {/* Index (#534): re-renders mint fresh items, so only a genuine
+            page turn re-fires the entrance. The entrance is the parked
+            pose released: a parked card waits transparent, nudged toward
+            the side it would enter from (`turn` re-renders the nudge
+            before a reversal, so the side is this turn's, not the last's),
+            and unparking transitions it into place — while visibility,
+            deliberately NOT in the transition list, flips at once,
+            vanishing the outgoing card the way display parking did. Rides
+            motion-safe; reduced motion gets the swap with no transition
             at all. */}
         <Index each={props.items}>
           {(item, i) => (
             <li
-              hidden={i !== at()}
-              class="motion-safe:transition-[opacity,translate] motion-safe:duration-(--dur-fast) motion-safe:starting:opacity-0"
+              class="col-start-1 row-start-1"
               classList={{
-                "motion-safe:starting:translate-x-4": dir() === 1,
-                "motion-safe:starting:-translate-x-4": dir() === -1,
+                /* The transition rides the ACTIVE card only: a parked
+                   card's pose must SNAP — on a reversal the nudge flips
+                   sides, and a parked card that eased between them would
+                   still be mid-flip when the turn released it. */
+                "motion-safe:transition-[opacity,translate] motion-safe:duration-(--dur-fast)":
+                  i === at(),
+                "invisible opacity-0": i !== at(),
+                "translate-x-4": i !== at() && dir() === 1,
+                "-translate-x-4": i !== at() && dir() === -1,
               }}
             >
               {props.card(item)}
@@ -137,7 +176,12 @@ export function Carousel<T>(props: {
         </Index>
       </ul>
       <Show when={count() > 1}>
-        <div class="mt-2 flex items-center gap-2" onKeyDown={onKeys}>
+        {/* Centred under the card (#622): the row spans the column, so
+            without it the chrome hugged the left edge under centred cards. */}
+        <div
+          class="mt-2 flex items-center justify-center gap-2"
+          onKeyDown={onKeys}
+        >
           <Button
             variant="default"
             size="sm"
