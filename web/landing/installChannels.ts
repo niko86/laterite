@@ -27,6 +27,10 @@ export type InstallChannel = {
   readonly command: string;
   readonly href: string;
   readonly note: string;
+  /** The surface's get-started page on the docs site (#619) — derived by
+   *  the generator from the page's own repo path, held by a refusal, so a
+   *  card cannot point at a page that is not there. */
+  readonly docs: string;
   /** The card's surface hue per theme (#595) — the border colour, and the
    *  ingredient of the card wash. The wash percentage is the page's dial
    *  (landing.css), not data. */
@@ -42,6 +46,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "pip install laterite",
     href: "https://pypi.org/project/laterite/",
     note: "polars + duckdb, pyarrow-free",
+    docs: "https://docs.laterite.dev/surfaces/python/",
     hue: { light: "#34689b", dark: "#8db9dd" },
   },
   {
@@ -52,6 +57,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "npm install laterite",
     href: "https://www.npmjs.com/package/laterite",
     note: "native addon, four platforms",
+    docs: "https://docs.laterite.dev/node/",
     hue: { light: "#3d7d4a", dark: "#90c69c" },
   },
   {
@@ -62,6 +68,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "",
     href: "https://github.com/niko86/laterite/releases",
     note: "lat also ships with the Python wheel and the npm package",
+    docs: "https://docs.laterite.dev/surfaces/cli/",
     hue: { light: "#5f5761", dark: "#c5c3c2" },
   },
   {
@@ -72,6 +79,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "INSTALL laterite_ags4 FROM community;",
     href: "https://community-extensions.duckdb.org/extensions/laterite_ags4.html",
     note: "read AGS4 in place, as SQL table functions",
+    docs: "https://docs.laterite.dev/duckdb/",
     hue: { light: "#8f6b12", dark: "#e5cd6a" },
   },
   {
@@ -82,6 +90,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     command: "npm install @laterite/ags4-wasm",
     href: "https://www.npmjs.com/package/@laterite/ags4-wasm",
     note: "the same engine as wasm, or open the webapp",
+    docs: "https://docs.laterite.dev/surfaces/browser/",
     hue: { light: "#5c50c9", dark: "#ab9ff0" },
   },
 ];

@@ -201,3 +201,46 @@ def test_the_five_hues_are_five_hues() -> None:
     cards = gic.resolve(_sources())
     assert len({c.hue_light for c in cards}) == len(cards)
     assert len({c.hue_dark for c in cards}) == len(cards)
+
+
+def test_every_card_lands_on_its_decided_get_started_page() -> None:
+    """#619's mapping, pinned as the five URLs the owner checked against the
+    docs site. The generator DERIVES each from its page's repo path, so this
+    is the one place the published URL is written out — moving a docs page
+    moves the link, and this test is where that surfaces as a decision."""
+    by_id = {c.id: c.docs for c in gic.resolve(_sources())}
+    assert by_id == {
+        "python": "https://docs.laterite.dev/surfaces/python/",
+        "node": "https://docs.laterite.dev/node/",
+        "cli": "https://docs.laterite.dev/surfaces/cli/",
+        "duckdb": "https://docs.laterite.dev/duckdb/",
+        "browser": "https://docs.laterite.dev/surfaces/browser/",
+    }
+
+
+def test_a_card_whose_get_started_page_is_gutted_is_caught() -> None:
+    """The #619 refusal, falsified: a card may not send readers to a page
+    that no longer says anything. Emptying the node page's text must produce
+    a claim naming the card and the page."""
+    src = _sources()
+    src["web/docs-site/docs/node/index.md"] = "  \n"
+    claims = gic.unpublished_claims(src)
+    assert any("node" in c and "get-started" in c for c in claims), claims
+
+
+def test_a_card_with_no_get_started_page_wired_is_caught() -> None:
+    """The refusal's other half, falsified: the page-text check reads
+    DOCS_PAGES by card id, so a card constructed without `docs=` would sail
+    past it and ship an empty href. The blank-field claim is what catches
+    that — the same shape as the blank-package refusal."""
+    doorless = gic.Card(
+        id="python",
+        label="Python",
+        registry="PyPI",
+        package="laterite",
+        command="pip install laterite",
+        href="https://pypi.org/project/laterite/",
+        note="",
+    )
+    claims = gic.unpublished_claims(_sources(), cards=[doorless])
+    assert any("door to nowhere" in c for c in claims), claims
