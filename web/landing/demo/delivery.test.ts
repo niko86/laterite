@@ -193,11 +193,9 @@ describe("setCell", () => {
   });
 
   it("bounds the column on the ROW's own length, not the heading count", () => {
-    /* A DATA row shorter than its HEADING row is a real AGS4 shape, and the
-       demo's cell write has never extended one — so the last column of a short
-       row is the last column it can write, and a heading-count bound would
-       let the write through to change nothing. Built by hand: the seeded
-       fixture is well-formed, which is the point. */
+    /* Hand-built because the seeded fixture is well-formed, which is the
+       point: only a row shorter than its headings can tell the two candidate
+       bounds apart, and setCell's doc comment says which one it takes. */
     const short: Delivery = [
       {
         code: "PROJ",
