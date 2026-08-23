@@ -511,6 +511,12 @@ export const GroupTable: Component<{
                               "[box-shadow:inset_0_0_0_2px_var(--accent)]":
                                 isPicked(),
                               "sticky left-0 z-10": col() === 0,
+                              /* The corner flag's containing block (#632):
+                                 the flag pins the CELL's corner, so the td
+                                 must position. Column 0 already does — it
+                                 is sticky, and a second position value
+                                 here would fight it. */
+                              relative: col() !== 0,
                               /* The sticky column's opaque backing yields to a
                                verdict: both are backgrounds, and leaving both
                                classes on lets STYLESHEET ORDER pick — column
@@ -576,9 +582,18 @@ export const GroupTable: Component<{
                                       else props.onPick(rowIndex(), col());
                                     }}
                                     aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                                    class="relative w-full rounded-xs px-1 text-left font-mono transition-colors hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
+                                    class="w-full rounded-xs px-1 text-left font-mono transition-colors focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
                                     classList={{
-                                      "bg-accent-quiet": isPicked(),
+                                      /* The wash stands down in a failing
+                                         cell (#633): the accent quiet over
+                                         the severity tint painted a second
+                                         hue inset by the td's padding, and
+                                         the #618 ring plus the tint carry
+                                         the pick there. Clean cells keep
+                                         it — hover included. */
+                                      "bg-accent-quiet":
+                                        isPicked() && !failing(),
+                                      "hover:bg-accent-quiet": !failing(),
                                     }}
                                   >
                                     <Show
@@ -588,20 +603,6 @@ export const GroupTable: Component<{
                                       }
                                     >
                                       {row[col()]}
-                                    </Show>
-                                    <Show when={failing()}>
-                                      {/* The corner flag (#616): the
-                                        spreadsheet convention for an
-                                        annotated cell, replacing the inline
-                                        ✗ that read as part of the value
-                                        ("11.8 ✗", worse at 390px). It
-                                        borrows the cell's severity ink via
-                                        currentColor; the popover above
-                                        carries what the engine said. */}
-                                      <span
-                                        aria-hidden="true"
-                                        class="absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-current border-l-transparent"
-                                      />
                                     </Show>
                                   </button>
                                 </Popover>
@@ -616,6 +617,20 @@ export const GroupTable: Component<{
                                 selectAll={editing()?.seed == null}
                                 onCommit={commitEdit}
                                 onCancel={cancelEdit}
+                              />
+                            </Show>
+                            <Show when={failing() && !isEditing()}>
+                              {/* The corner flag (#616; re-anchored by
+                                  #632): the spreadsheet convention for an
+                                  annotated cell, pinned to the CELL's own
+                                  corner — on the button it sat inset by
+                                  the td's padding, floating mid-cell. It
+                                  borrows the severity ink via
+                                  currentColor, which resolves on the td,
+                                  where the tint classes live. */}
+                              <span
+                                aria-hidden="true"
+                                class="absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-current border-l-transparent"
                               />
                             </Show>
                           </td>
