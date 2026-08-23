@@ -34,32 +34,22 @@ const heroLines = (): readonly string[] =>
 export const Hero: Component = () => (
   <div class="grid items-center gap-10 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
     <div>
-      <p class="flex items-center gap-2 font-mono text-micro uppercase text-fg-muted">
-        {/* The sand tick — 4px of the ramp's head, the smallest the band
-            vocabulary appears anywhere on the page. */}
-        <span
-          aria-hidden="true"
-          class="inline-block h-[4px] w-6 rounded-full bg-laterite-300"
-        />
-        AGS4 tooling · beta
-      </p>
-
-      <h1 class="mt-4 max-w-[22ch] font-display text-h1 font-extrabold text-balance text-accent min-[30rem]:text-display min-[64rem]:text-hero">
+      <h1 class="max-w-[22ch] font-display text-h1 font-extrabold text-balance text-accent min-[30rem]:text-display min-[64rem]:text-hero">
         AGS4, shown rather than explained.
       </h1>
 
       <p class="mt-5 max-w-[54ch] text-lead text-fg-soft">
         One Rust engine for AGS4 geotechnical transfer files — validate, fix,
         explore and write them, from Python, Node, the command line, DuckDB or a
-        browser tab. Scroll down and break a real delivery; the validator runs
-        here, in this page.
+        browser tab. Scroll down and put a real delivery through the validator;
+        it runs here, in this page.
       </p>
 
       {/* Demo first (#533): the page's thesis is the demo, so the filled
           primary sends the reader there; install is the outline second. */}
       <div class="mt-7 flex flex-wrap items-center gap-3">
         <Button variant="primary" size="lg" href="#file">
-          See it break
+          See it catch faults
         </Button>
         <Button variant="outline" size="lg" href="#install">
           Pick your stack

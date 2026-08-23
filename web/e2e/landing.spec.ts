@@ -1155,9 +1155,9 @@ test("the page's hierarchy runs demo-first, and the CLI card is the binary", asy
 
   // The hero's filled primary is the demo; install is the outline second.
   const ctas = page.locator("section#top").getByRole("link", {
-    name: /See it break|Pick your stack/,
+    name: /See it catch faults|Pick your stack/,
   });
-  await expect(ctas.first()).toHaveText("See it break");
+  await expect(ctas.first()).toHaveText("See it catch faults");
   await expect(ctas.first()).toHaveAttribute("href", "#file");
   // Primacy is the FILL, not just the order: the demo CTA wears the rust
   // primary (bg-cta), the install CTA does not.
@@ -1203,7 +1203,7 @@ test("fine: motion rides the tokens — the probed elements transition like the 
   // every bespoke interactive element must compute the same duration it
   // does, and that duration must be a real one.
   const reference = await page
-    .getByRole("link", { name: "Open the app" })
+    .getByRole("link", { name: "Open webapp" })
     .evaluate((el) => getComputedStyle(el).transitionDuration);
   expect(reference).not.toBe("0s");
 

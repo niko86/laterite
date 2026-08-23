@@ -309,7 +309,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               class="font-semibold text-cta no-underline transition-colors hover:underline"
               href="https://app.laterite.dev/"
             >
-              Open the web app
+              Open the webapp
             </a>{" "}
             — it stays in your browser too.
           </p>
