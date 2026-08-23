@@ -83,7 +83,7 @@ export const Masthead: Component = () => (
       <div class="ml-auto flex items-center gap-2 min-[52rem]:ml-0">
         <ThemeToggle />
         <Button variant="primary" size="sm" href="https://app.laterite.dev/">
-          Open the app
+          Open webapp
         </Button>
       </div>
     </div>
