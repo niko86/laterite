@@ -101,6 +101,20 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
     </Show>
 
     <p class="mt-3 text-caption text-fg-muted">{props.channel.note}</p>
+
+    {/* The way onward (#619): a reader sold by a card gets a path to "how
+        do I start with THIS surface" — the generator derives the target
+        from the docs page's own repo path and refuses a page that is not
+        there. `mt-auto` pins the link to the card's floor, so five cards
+        with five note lengths still read as one row of doors. */}
+    <p class="mt-auto pt-3 text-caption">
+      <a
+        class="font-semibold text-cta no-underline transition-colors hover:underline"
+        href={props.channel.docs}
+      >
+        Get started
+      </a>
+    </p>
   </div>
 );
 

@@ -61,7 +61,33 @@ SOURCES = (
     "tools/release/prepare-wasm-package.sh",
     "web/docs-site/docs/duckdb/index.md",
     ".github/workflows/release.yml",
+    "web/docs-site/docs/surfaces/python.md",
+    "web/docs-site/docs/node/index.md",
+    "web/docs-site/docs/surfaces/cli.md",
+    "web/docs-site/docs/surfaces/browser.md",
 )
+
+#: Each card's get-started page (#619, pass-2 pin D2-11), as the DOCS PAGE'S
+#: OWN REPO PATH rather than a URL: the published URL is derived from the
+#: path below (mkdocs pretty URLs), so the link and the page cannot part ways
+#: — renaming the page moves the link, and deleting it is a refusal, not a
+#: 404 on laterite.dev.
+DOCS_PAGES = {
+    "python": "web/docs-site/docs/surfaces/python.md",
+    "node": "web/docs-site/docs/node/index.md",
+    "cli": "web/docs-site/docs/surfaces/cli.md",
+    "duckdb": "web/docs-site/docs/duckdb/index.md",
+    "browser": "web/docs-site/docs/surfaces/browser.md",
+}
+
+
+def _docs_url(rel: str) -> str:
+    """The docs site's pretty URL for a page path: `.../docs/a/b.md` and
+    `.../docs/a/b/index.md` both publish at `https://docs.laterite.dev/a/b/`."""
+    path = rel.removeprefix("web/docs-site/docs/")
+    path = path.removesuffix("/index.md").removesuffix(".md")
+    return f"https://docs.laterite.dev/{path}/"
+
 
 OUT = "web/landing/installChannels.ts"
 
@@ -84,6 +110,9 @@ class Card:
     #: percentage is the page's dial (landing.css), not data.
     hue_light: str = ""
     hue_dark: str = ""
+    #: The surface's get-started page on the docs site (#619) — derived from
+    #: DOCS_PAGES, never written as a URL literal.
+    docs: str = ""
 
 
 def _text(sources: dict[str, str], rel: str) -> str:
@@ -142,6 +171,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
     return [
         Card(
             id="python",
+            docs=_docs_url(DOCS_PAGES["python"]),
             label="Python",
             registry="PyPI",
             package=wheel,
@@ -153,6 +183,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
         ),
         Card(
             id="node",
+            docs=_docs_url(DOCS_PAGES["node"]),
             label="Node.js",
             registry="npm",
             package=node,
@@ -164,6 +195,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
         ),
         Card(
             id="cli",
+            docs=_docs_url(DOCS_PAGES["cli"]),
             label="CLI",
             # Deliberately blank. The crate is `publish = false`; the binary
             # rides the wheel and the GitHub release, and a card that named a
@@ -188,6 +220,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
         ),
         Card(
             id="duckdb",
+            docs=_docs_url(DOCS_PAGES["duckdb"]),
             label="DuckDB",
             registry="community extension",
             package=duckdb,
@@ -199,6 +232,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
         ),
         Card(
             id="browser",
+            docs=_docs_url(DOCS_PAGES["browser"]),
             label="Browser",
             registry="npm",
             package=wasm,
@@ -273,6 +307,22 @@ def unpublished_claims(
                 "name it — the two records of what this project publishes disagree"
             )
 
+    for card in cards:
+        rel = DOCS_PAGES.get(card.id, "")
+        if rel and not _text(sources, rel).strip():
+            claims.append(
+                f"{card.id}: its get-started page ({rel}) is empty — the card "
+                "would land readers on nothing"
+            )
+        # The other blindness: a card whose `docs` was never wired ships a
+        # door with an empty href, and the page check above cannot see it —
+        # same shape as the blank-package refusal.
+        if not card.docs:
+            claims.append(
+                f"{card.id}: no get-started page is wired — the card would "
+                "render a door to nowhere"
+            )
+
     by_id = {c.id: c for c in cards}
 
     if "cli" in by_id:
@@ -334,6 +384,7 @@ def render(cards: list[Card]) -> str:
         + f"    command: {json.dumps(c.command)},\n"
         + f"    href: {json.dumps(c.href)},\n"
         + f"    note: {json.dumps(c.note)},\n"
+        + f"    docs: {json.dumps(c.docs)},\n"
         + f"    hue: {{ light: {json.dumps(c.hue_light)}, "
         + f"dark: {json.dumps(c.hue_dark)} }},\n"
         + "  },"
@@ -368,6 +419,10 @@ export type InstallChannel = {{
   readonly command: string;
   readonly href: string;
   readonly note: string;
+  /** The surface's get-started page on the docs site (#619) — derived by
+   *  the generator from the page's own repo path, held by a refusal, so a
+   *  card cannot point at a page that is not there. */
+  readonly docs: string;
   /** The card's surface hue per theme (#595) — the border colour, and the
    *  ingredient of the card wash. The wash percentage is the page's dial
    *  (landing.css), not data. */

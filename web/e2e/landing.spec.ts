@@ -2012,6 +2012,44 @@ test("every install card wears its surface hue", async ({ page }) => {
   expect(await bg(0)).not.toBe(await bg(1));
 });
 
+test("every install card opens a door to its surface's get-started page", async ({
+  page,
+}) => {
+  // #619 (pass-2 pin D2-11): a reader sold by a card gets a path to "how do
+  // I start with THIS surface". The hrefs come from the generated data the
+  // page itself renders, so the five decided targets are pinned on the
+  // Python side (test_install_channels.py) and the DOM side here cannot
+  // disagree with them. On a phone the deck parks four cards `hidden`, so
+  // the visible-and-tappable half reads the ACTIVE card, then pages once —
+  // reachability on the deck is the AC, not mere presence in the DOM.
+  await page.goto("/");
+  const install = page.locator("section#install");
+
+  if (width(page) >= 608) {
+    // By INDEX like the hue test above, not by label text: a hasText filter
+    // reads the card's whole subtree, and the CLI card's note names Python
+    // (and Python's note names duckdb), so label filtering resolves two
+    // cards and trips strict mode. The grid renders INSTALL_CHANNELS in
+    // order; nth is the established pin for that.
+    const cards = install.locator(".install-card");
+    for (const [i, channel] of INSTALL_CHANNELS.entries()) {
+      const link = cards.nth(i).getByRole("link", { name: "Get started" });
+      await expect(link, `${channel.id} card's door`).toBeVisible();
+      await expect(link).toHaveAttribute("href", channel.docs);
+    }
+    return;
+  }
+
+  const activeDoor = () =>
+    install
+      .locator("ul li:not([hidden]) .install-card")
+      .getByRole("link", { name: "Get started" });
+  await expect(activeDoor()).toBeVisible();
+  await expect(activeDoor()).toHaveAttribute("href", INSTALL_CHANNELS[0].docs);
+  await install.getByRole("button", { name: "Go to card 2" }).click();
+  await expect(activeDoor()).toHaveAttribute("href", INSTALL_CHANNELS[1].docs);
+});
+
 test("the install cards become a one-card looping deck on a phone", async ({
   page,
 }) => {

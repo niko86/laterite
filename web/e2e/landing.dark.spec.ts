@@ -184,6 +184,15 @@ test("dark: every install card wears its dark hue", async ({ page }) => {
       `${channel.id} dark border`,
     ).toBe(hexToRgb(channel.hue.dark));
   }
+
+  // #619: the get-started door reads in dark too — its CTA ink resolves on
+  // the deck's active card, not transparent. This lane runs at 390, so the
+  // first card is the visible one.
+  const door = cards.first().getByRole("link", { name: "Get started" });
+  await expect(door).toBeVisible();
+  expect(await door.evaluate((el) => getComputedStyle(el).color)).not.toBe(
+    "rgba(0, 0, 0, 0)",
+  );
 });
 
 test("dark: the status marks and the corner flag take real ink", async ({
