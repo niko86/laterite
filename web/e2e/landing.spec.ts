@@ -492,7 +492,10 @@ test("fine: rows delete from the table, and undo/redo walk the model timeline", 
   // The blank row's findings land in the panel — the strip is the coarse
   // pointer's surface since #591, and this lane's pointer is fine.
   const projFindings = page.locator("#findings li").filter({ hasText: "PROJ" });
-  await expect(projFindings.first()).toBeVisible();
+  // Attached, not visible: below the breakpoint the panel is a one-card
+  // carousel (#592) and this card need not be the one showing — the claim
+  // here is that the finding REACHED the panel.
+  await expect(projFindings.first()).toBeAttached();
   await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
   await expect(rows).toHaveCount(1);
   await expect(projFindings).toHaveCount(0);
@@ -671,7 +674,8 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Enter");
   const rule10b = page.locator("#findings li").filter({ hasText: "Rule 10b" });
-  await expect(rule10b.first()).toBeVisible();
+  // Attached: the narrow panel pages one card at a time (#592).
+  await expect(rule10b.first()).toBeAttached();
 
   // ...and undo clears it — cause, read, unwind.
   await page.keyboard.press("ControlOrMeta+z");
@@ -680,7 +684,7 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
   // Deleting the cover sheet's one row is what Rule 14 exists to catch.
   await file.getByRole("button", { name: "Delete row 1 of TRAN" }).click();
   const rule14 = page.locator("#findings li").filter({ hasText: "Rule 14" });
-  await expect(rule14.first()).toBeVisible();
+  await expect(rule14.first()).toBeAttached();
   await page.keyboard.press("ControlOrMeta+z");
   await expect(rule14).toHaveCount(0);
 });
@@ -755,7 +759,7 @@ test("fine: a deleted group leaves a restore stub — restore means the seed, un
   // Rule 14 reads from the panel — the strip belongs to coarse pointers
   // since #591, and a deleted group has no cells to pop from.
   const rule14 = page.locator("#findings li").filter({ hasText: "Rule 14" });
-  await expect(rule14.first()).toBeVisible();
+  await expect(rule14.first()).toBeAttached();
   // The stub must hold the page's width discipline while it stands in.
   await expectViewportWide(page);
 
@@ -1492,7 +1496,7 @@ test("the cover sheet carries the full toolbar, and a second TRAN row is a teach
   // coarse pointer's surface (#591).
   await expect(
     file.locator("#findings li").filter({ hasText: "TRAN" }).first(),
-  ).toBeVisible();
+  ).toBeAttached();
   if (hasTouch) {
     const strip = page.getByRole("list", { name: "TRAN findings" });
     await expect(strip.locator("li").first()).toBeVisible();
@@ -1669,4 +1673,141 @@ test("fine: finding text surfaces at the cell — popover on hover and focus, Es
   await expect(
     page.locator("#findings li").filter({ hasText: "not defined" }),
   ).toHaveCount(2);
+});
+
+test("the findings panel is one card below the breakpoint, a stack at desktop", async ({
+  page,
+}) => {
+  // #592: at 390px the four stacked callouts cost most of a screen; the
+  // panel becomes a single card paged with wrap. Width, not pointer — the
+  // stack's cost is vertical space, which a fine-pointered narrow window
+  // pays too.
+  await page.goto("/");
+  const panel = page.locator("#findings");
+  const cards = panel.locator("ul li");
+  await expect(cards.first()).toBeVisible({ timeout: 15_000 });
+  await expect(cards).toHaveCount(4);
+
+  if (width(page) >= 1024) {
+    // Desktop unchanged: every card visible, no paging chrome.
+    await expect(cards.nth(3)).toBeVisible();
+    await expect(
+      panel.getByRole("button", { name: "Next finding" }),
+    ).toHaveCount(0);
+    return;
+  }
+
+  // One visible card; the rest are parked in the DOM, not gone — absence
+  // assertions elsewhere keep their strength.
+  await expect(cards.nth(1)).toBeHidden();
+  await expect(panel.getByText("1 / 4")).toBeVisible();
+
+  // Infinite wrap, both directions: four nexts come home, and prev from
+  // the first card lands on the last.
+  const next = panel.getByRole("button", { name: "Next finding" });
+  await next.click();
+  await expect(panel.getByText("2 / 4")).toBeVisible();
+  await next.click();
+  await next.click();
+  await next.click();
+  await expect(panel.getByText("1 / 4")).toBeVisible();
+  await panel.getByRole("button", { name: "Previous finding" }).click();
+  await expect(panel.getByText("4 / 4")).toBeVisible();
+
+  // A leftward drag is the same verb as Next — the swipe the issue names.
+  const list = panel.getByRole("list", { name: "Findings" });
+  await list.dispatchEvent("pointerdown", { clientX: 300, pointerId: 1 });
+  await list.dispatchEvent("pointerup", { clientX: 180, pointerId: 1 });
+  await expect(panel.getByText("1 / 4")).toBeVisible();
+
+  // A REAL mouse drag that starts on the card's own button must page — and
+  // ONLY page: a mouse fires `click` after any down/up pair, so without the
+  // swallow the swipe would also focus the card's file line.
+  const ringed = page.locator(
+    "section#file .overscroll-contain [class*='--focus-ring']",
+  );
+  const box = await panel
+    .locator("ul li:not([hidden]) button")
+    .first()
+    .boundingBox();
+  if (!box) throw new Error("the visible card has no button to drag");
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width - 10, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 10, y, { steps: 5 });
+  await page.mouse.up();
+  await expect(panel.getByText("2 / 4")).toBeVisible();
+  await expect(ringed).toHaveCount(0);
+
+  // The click verb itself still works at this width — the positive control
+  // that makes the no-focus assertion above falsifiable.
+  await panel.locator("ul li:not([hidden]) button").first().click();
+  await expect(ringed).toHaveCount(1);
+
+  // RowCarousel's keyboard idiom answers here too: Alt+Arrow pages.
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(panel.getByText("3 / 4")).toBeVisible();
+});
+
+test("touch: under-table findings page one at a time, and one finding gets no affordance", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the strip is the coarse pointer's surface (#591)");
+  await page.goto("/");
+  await expect(page.locator("#findings li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // LLPL carries two group-level findings (Rule 16 + the 10c orphan): a
+  // carousel, one card at a time, wrapping.
+  const llpl = page.locator("section#llpl");
+  const strip = llpl.getByRole("list", { name: "LLPL findings" });
+  await expect(strip.locator("li")).toHaveCount(2);
+  await expect(strip.locator("li").nth(1)).toBeHidden();
+  await expect(llpl.getByText("1 / 2")).toBeVisible();
+  await llpl.getByRole("button", { name: "Next finding" }).click();
+  await expect(llpl.getByText("2 / 2")).toBeVisible();
+  await llpl.getByRole("button", { name: "Next finding" }).click();
+  await expect(llpl.getByText("1 / 2")).toBeVisible();
+
+  // SAMP has exactly one: the card stands alone, no counter, no buttons —
+  // paging chrome on a single card is an affordance with nothing to afford.
+  const samp = page.locator("section#samp");
+  await expect(
+    samp.getByRole("list", { name: "SAMP findings" }).locator("li"),
+  ).toHaveCount(1);
+  await expect(samp.getByRole("button", { name: "Next finding" })).toHaveCount(
+    0,
+  );
+});
+
+test("reduced motion swaps cards instantly", async ({ page }) => {
+  test.skip(
+    width(page) >= 1024,
+    "the carousel is the narrow presentation (#592)",
+  );
+  // #592: the fade rides motion-safe, so a reduced-motion reader gets the
+  // swap with no transition at all — asserted from the computed style, and
+  // falsifiable: the no-preference half must show a real duration.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const panel = page.locator("#findings");
+  await expect(panel.locator("li").first()).toBeVisible({ timeout: 15_000 });
+  expect(
+    await panel
+      .locator("li")
+      .first()
+      .evaluate((el) => getComputedStyle(el).transitionDuration),
+  ).toBe("0s");
+  await panel.getByRole("button", { name: "Next finding" }).click();
+  await expect(panel.getByText("2 / 4")).toBeVisible();
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  expect(
+    await panel
+      .locator("li")
+      .first()
+      .evaluate((el) => getComputedStyle(el).transitionDuration),
+  ).not.toBe("0s");
 });

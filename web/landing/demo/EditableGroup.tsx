@@ -116,7 +116,8 @@ export const EditableGroup: Component<{
           {/* The strip is the COARSE pointer's surface now (#591): fine
               pointers read the same callouts on the failing cell itself,
               and the panel beside the file stays the one complete list.
-              Coarse keeps the strip until the carousel replaces it. */}
+              Below the layout breakpoint the strip pages as a one-card
+              carousel (#592) — a dress the strip picks itself. */}
           <Show when={coarsePointer()}>
             <FindingsStrip code={props.code} findings={groupFindings()} />
           </Show>

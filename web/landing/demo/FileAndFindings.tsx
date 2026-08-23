@@ -19,7 +19,9 @@ import { For, Index, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
+import { FindingsCarousel } from "./FindingsCarousel";
 import { severityLineTint, worstPerLine } from "./severity";
+import { narrowViewport } from "./viewport";
 import {
   armed,
   busy,
@@ -36,20 +38,19 @@ import type { Finding } from "./engine";
    click-to-focus wiring, and the GROUP chip. The chip is what tells the two
    Rule 16 findings apart: the engine correctly reports the same abbreviation
    against SAMP and against LLPL, with byte-identical text — a duplicate to
-   the eye until something names the group (#526). */
+   the eye until something names the group (#526). The `li` belongs to the
+   callers since #592: the stack and the carousel each bring their own. */
 const FindingRow: Component<{ finding: Finding }> = (props) => (
-  <li>
-    <FindingCallout
-      severity={props.finding.severity}
-      rule={props.finding.rule}
-      group={props.finding.group || undefined}
-      line={props.finding.line}
-      disabled={props.finding.line === null}
-      onClick={() => setFocusLine(props.finding.line)}
-    >
-      {props.finding.desc}
-    </FindingCallout>
-  </li>
+  <FindingCallout
+    severity={props.finding.severity}
+    rule={props.finding.rule}
+    group={props.finding.group || undefined}
+    line={props.finding.line}
+    disabled={props.finding.line === null}
+    onClick={() => setFocusLine(props.finding.line)}
+  >
+    {props.finding.desc}
+  </FindingCallout>
 );
 
 export const FileAndFindings: Component<{ band: string }> = (props) => {
@@ -296,16 +297,33 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                 </p>
               }
             >
-              {/* Index, not For (#534): every revalidation mints fresh
-                  finding objects, so a reference-keyed For would recreate
-                  every row per keystroke and re-fire the entrance fade
-                  across the whole panel. Index updates rows in place; only
-                  a row that genuinely appears fades in. */}
-              <ul class="mt-3 list-none space-y-2 p-0">
-                <Index each={findings()}>
-                  {(finding) => <FindingRow finding={finding()} />}
-                </Index>
-              </ul>
+              {/* Below the breakpoint the list becomes the one-card carousel
+                  (#592) — same rows, same order, paged instead of stacked. */}
+              <Show
+                when={!narrowViewport()}
+                fallback={
+                  <FindingsCarousel
+                    label="Findings"
+                    findings={findings()}
+                    card={(f) => <FindingRow finding={f()} />}
+                  />
+                }
+              >
+                {/* Index, not For (#534): every revalidation mints fresh
+                    finding objects, so a reference-keyed For would recreate
+                    every row per keystroke and re-fire the entrance fade
+                    across the whole panel. Index updates rows in place; only
+                    a row that genuinely appears fades in. */}
+                <ul class="mt-3 list-none space-y-2 p-0">
+                  <Index each={findings()}>
+                    {(finding) => (
+                      <li>
+                        <FindingRow finding={finding()} />
+                      </li>
+                    )}
+                  </Index>
+                </ul>
+              </Show>
             </Show>
           </Show>
 
