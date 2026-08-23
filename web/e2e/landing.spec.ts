@@ -2018,3 +2018,67 @@ test("the section rhythm steps down on a phone", async ({ page }) => {
     expect(pad, "but not drastically less").toBeGreaterThanOrEqual(24);
   }
 });
+
+test("the mobile masthead carries source and install icons; the desktop nav stands", async ({
+  page,
+}) => {
+  // #597: the text nav hides below 52rem, which left a phone no path to the
+  // source or the install anchor from the top bar. Two icon links fill it —
+  // tap-target floor 44px, labelled — while the CTA keeps its words (#586).
+  await page.goto("/");
+  const header = page.locator("header");
+  const source = header.getByRole("link", { name: "Source on GitHub" });
+  const install = header.getByRole("link", { name: "Jump to install" });
+
+  if (width(page) >= 832) {
+    // Desktop unchanged: the text nav carries these destinations; the icon
+    // forms are not in the way.
+    await expect(source).toBeHidden();
+    await expect(install).toBeHidden();
+    await expect(header.locator("nav a")).toHaveText([
+      "Demo",
+      "Install",
+      "Docs",
+      "Source",
+    ]);
+    return;
+  }
+
+  await expect(source).toBeVisible();
+  await expect(source).toHaveAttribute(
+    "href",
+    "https://github.com/niko86/laterite",
+  );
+  for (const link of [source, install]) {
+    const box = await link.boundingBox();
+    expect(box, "the icon link must lay out").not.toBeNull();
+    expect(box?.width, "tap-target width floor").toBeGreaterThanOrEqual(44);
+    expect(box?.height, "tap-target height floor").toBeGreaterThanOrEqual(44);
+  }
+  // The CTA stays words, not a glyph (#586).
+  await expect(header.getByRole("link", { name: "Open webapp" })).toBeVisible();
+  // The masthead still fits the phone with both icons added.
+  await expectViewportWide(page);
+
+  // Light ink resolves and the two glyphs share it — the dark spec holds
+  // the same claim under its token set.
+  const ink = (l: Locator) => l.evaluate((el) => getComputedStyle(el).color);
+  expect(await ink(source)).not.toBe("rgba(0, 0, 0, 0)");
+  expect(await ink(install)).toBe(await ink(source));
+
+  // The focus state is visible, not just declared: keyboard focus must
+  // paint the ring. Tab from the top of the document — logo first, then
+  // the source icon.
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(source).toBeFocused();
+  expect(
+    await source.evaluate((el) => getComputedStyle(el).boxShadow),
+    "keyboard focus paints the ring",
+  ).not.toBe("none");
+
+  // The install glyph is a working door: the jump lands the install section
+  // in view, riding the document's own anchor behaviour (#589).
+  await install.click();
+  await expect(page.locator("section#install")).toBeInViewport();
+});
