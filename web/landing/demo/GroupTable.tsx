@@ -494,6 +494,22 @@ export const GroupTable: Component<{
                               "font-semibold": failing(),
                               [severityCellTint(worst() ?? "error")]: failing(),
                               "text-fg": !failing(),
+                              /* The selection ring (#618): the first click
+                                 PICKS, and before this the only sign was the
+                                 button's pale wash — read as "click did
+                                 nothing" in the pass-2 review, though the
+                                 #593 grammar was working underneath. An
+                                 inset shadow rather than a border so the
+                                 cell's geometry never shifts, on the TD so
+                                 the ring wraps the whole cell the way a
+                                 spreadsheet's does, in `--accent` so both
+                                 themes read it against their own surfaces.
+                                 The button's focus-visible halo nests inside
+                                 this ring on arrow moves; different
+                                 elements, so neither shadow overrides the
+                                 other. */
+                              "[box-shadow:inset_0_0_0_2px_var(--accent)]":
+                                isPicked(),
                               "sticky left-0 z-10": col() === 0,
                               /* The sticky column's opaque backing yields to a
                                verdict: both are backgrounds, and leaving both

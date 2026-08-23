@@ -239,3 +239,23 @@ test("dark: the status marks and the corner flag take real ink", async ({
     "rgba(0, 0, 0, 0)",
   );
 });
+
+test("dark: the selection ring resolves the dark accent", async ({ page }) => {
+  // #618's both-themes half: the ring is one token, var(--accent), which
+  // dark retunes to sand. Proving the computed shadow carries THAT value —
+  // not light's maroon, not transparent — is what "reads against the
+  // raised surface" means at this altitude.
+  await page.goto("/");
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_TYPE on row 1 of LOCA",
+  });
+  await cell.click();
+  const { shadow, accent } = await cell
+    .locator("xpath=ancestor::td[1]")
+    .evaluate((el) => ({
+      shadow: getComputedStyle(el).boxShadow,
+      accent: getComputedStyle(el).getPropertyValue("--accent").trim(),
+    }));
+  expect(shadow).toContain("inset");
+  expect(shadow).toContain(hexToRgb(accent));
+});
