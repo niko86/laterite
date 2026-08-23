@@ -768,43 +768,57 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
   await expect(rule14).toHaveCount(0);
 });
 
-test("the transport aside tells the packed story without running it", async ({
+test("the stack intro carries transport and the guide, and the aside is gone", async ({
   page,
 }) => {
-  // #528: a story, not a demo. The engine now loads eagerly (#531), so a
-  // wasm request is the PAGE's normal behaviour and proves nothing about the
-  // aside; what keeps the aside honest is that it stays static markup — one
-  // link out, no handlers — and that the shipped wasm build carries no
-  // transport functions at all (its feature set, gated at release).
+  // #617 (pass-2 pins D2-08, D2-06), superseding #528's aside and a sliver
+  // of #596: the pack/lock diagram no longer exists at ANY width — its
+  // story is one sentence at the end of the Pick-your-stack intro, carrying
+  // the same cookbook link — and the install-guide line moved up from below
+  // the grid into the same tail, so the intro ends guide-in-hand.
   await page.goto("/");
+  await expect(
+    page.getByRole("complementary", { name: "Transport" }),
+  ).toHaveCount(0);
 
-  const aside = page.getByRole("complementary", { name: "Transport" });
-
-  // Below the layout breakpoint the aside is one of the three prose pieces
-  // the phone declutter removes (#596) — not hidden, not rendered.
-  if (width(page) < 1024) {
-    await expect(page.locator("section#file table")).toBeVisible();
-    await expect(aside).toHaveCount(0);
-    return;
-  }
-
-  await aside.scrollIntoViewIfNeeded();
-  await expect(aside).toBeVisible();
-
-  // The chain is the file's own name growing suffixes — pack then lock —
-  // asserted on the chain's step labels (spans), not the prose's own
-  // mentions of the verbs.
-  await expect(aside).toContainText("delivery.ags.zst.age");
-  await expect(aside.locator("span").filter({ hasText: "pack" })).toBeVisible();
-  await expect(aside.locator("span").filter({ hasText: "lock" })).toBeVisible();
-
-  // The one way out is the cookbook page, not a live demo.
-  await expect(aside.getByRole("link")).toHaveAttribute(
+  // One paragraph, both links, in the intro — not below the grid: the
+  // sentence order pins the tail (transport, then guide), and link COUNTS
+  // pin that the old below-grid line did not survive as a duplicate.
+  const intro = page
+    .locator("section#install p")
+    .filter({ hasText: "One engine behind every one of these" });
+  await expect(intro).toContainText("packs deliveries");
+  const transport = intro.getByRole("link", {
+    name: "Pack / encrypt for transport",
+  });
+  await expect(transport).toHaveAttribute(
     "href",
     "https://docs.laterite.dev/cookbook/transport/",
   );
+  const guide = intro.getByRole("link", { name: "Full install guide" });
+  await expect(guide).toHaveAttribute(
+    "href",
+    "https://docs.laterite.dev/learn/install/",
+  );
+  await expect(
+    page.getByRole("link", { name: "Full install guide" }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("link", { name: "Pack / encrypt for transport" }),
+  ).toHaveCount(1);
 
-  // The page still fits the viewport with the aside in the layout.
+  // The tail's ORDER is the decided design, not an accident of today's
+  // markup: transport sentence first, then the guide, and the guide's beta
+  // note is the paragraph's last word — "ends with", pinned as ends-with.
+  expect(
+    await intro.evaluate((el) => {
+      const links = el.querySelectorAll("a");
+      return Array.from(links).map((a) => a.textContent?.trim());
+    }),
+  ).toEqual(["Pack / encrypt for transport", "Full install guide"]);
+  await expect(intro).toContainText(/version numbers still move quickly\.$/);
+
+  // The page still fits the viewport with the longer intro in the layout.
   await expectViewportWide(page);
 });
 
@@ -999,24 +1013,13 @@ test("fine: the fix budget lives on each table — scoped to its group, honest a
     page.locator("section#file li").filter({ hasText: "not defined" }),
   ).toHaveCount(2);
 
-  // The validator-vs-fixer narrative survives where it stays true: pinned to
-  // the orphan the fixer refuses to touch — and it LEAVES when the orphan
-  // does. Deleting the orphaned LLPL row repairs it by hand; the note must
-  // follow its example out, and undo brings both back. Below the breakpoint
-  // the note is one of the three prose pieces the phone declutter never
-  // renders (#596), so the choreography is the wide lanes' to hold.
-  const narrative = page.getByText(
-    "difference between a validator and a fixer",
-  );
-  if (width(page) < 1024) {
-    await expect(narrative).toHaveCount(0);
-  } else {
-    await expect(narrative).toBeVisible();
-    await page.getByRole("button", { name: "Delete row 3 of LLPL" }).click();
-    await expect(narrative).toBeHidden();
-    await page.keyboard.press("ControlOrMeta+z");
-    await expect(narrative).toBeVisible();
-  }
+  // The validator-vs-fixer explainer retired at every width in #617
+  // (pass-2 pin D2-04) — the orphan's finding wears the manual badge that
+  // tells the same story in the panel. Absence asserted in the wide lanes
+  // too: they are the ones that used to render it.
+  await expect(
+    page.getByText("difference between a validator and a fixer"),
+  ).toHaveCount(0);
 
   // A scoped fix is one commit like any other: undo returns the raw decimal.
   await page.keyboard.press("ControlOrMeta+z");
@@ -1476,25 +1479,27 @@ test("no em dash reaches the reader", async ({ page }) => {
   expect(offendingChunks).toEqual([]);
 });
 
-test("the file region reads explainer, pane, reset, pill, findings — and the cover sheet joins the alternation", async ({
+test("the file region reads pane, reset, findings — and the cover sheet joins the alternation", async ({
   page,
 }) => {
-  // #594: the region's pieces sit where they are read. DOM order IS the
-  // contract here — below the grid breakpoint it is literally the reading
-  // order, and above it the same order splits into the file column
-  // (explainer, pane, reset) and the findings column (pill, panel), so one
-  // assertion set covers every lane. The pane's landmark is its header
-  // line, pinned by tag and exact text: the transport aside also says
-  // delivery.ags, but in code chips, and the anchor keeps any future prose
-  // that merely mentions the filename from stealing the match.
+  // #594: the region's pieces sit where they are read; #617 shortened the
+  // read — the explainer and the pill retired at every width, so their old
+  // wide-lane slots are asserted EMPTY here, in the lanes that rendered
+  // them. DOM order IS the contract for what remains: below the grid
+  // breakpoint it is literally the reading order, and above it the same
+  // order splits into the file column (pane, reset) and the findings
+  // column, so one assertion set covers every lane. The pane's landmark is
+  // its header line, pinned by tag and exact text so future prose that
+  // merely mentions the filename cannot steal the match.
   await page.goto("/");
   const file = page.locator("section#file");
   await expect(file.locator("li").first()).toBeVisible({ timeout: 15_000 });
 
-  const explainer = file.getByText("left standing on purpose").first();
+  await expect(file.getByText("left standing on purpose")).toHaveCount(0);
+  await expect(file.getByText("Nothing is uploaded")).toHaveCount(0);
+
   const pane = file.locator("p", { hasText: /^delivery\.ags$/ }).first();
   const resetBtn = file.getByRole("button", { name: "Reset the delivery" });
-  const pill = file.getByText("Nothing is uploaded").first();
   const findingsLabel = file
     .locator("#findings p")
     .filter({ hasText: "Findings" })
@@ -1513,29 +1518,12 @@ test("the file region reads explainer, pane, reset, pill, findings — and the c
     ).toBe(true);
   };
 
-  if (width(page) < 1024) {
-    // The phone declutter (#596): the explainer and the pill are two of the
-    // three prose pieces that do not render below the breakpoint, so the
-    // reading order here is the survivors'.
-    await expect(file.getByText("left standing on purpose")).toHaveCount(0);
-    await expect(file.getByText("Nothing is uploaded")).toHaveCount(0);
-    await precedes(pane, resetBtn, "the file pane precedes the reset button");
-    await precedes(
-      resetBtn,
-      findingsLabel,
-      "the reset button precedes the findings panel",
-    );
-    return;
-  }
-
-  await precedes(
-    explainer,
-    pane,
-    "the orphan explainer precedes the file pane",
-  );
   await precedes(pane, resetBtn, "the file pane precedes the reset button");
-  await precedes(resetBtn, pill, "the reset button precedes the status pill");
-  await precedes(pill, findingsLabel, "the pill precedes the findings panel");
+  await precedes(
+    resetBtn,
+    findingsLabel,
+    "the reset button precedes the findings panel",
+  );
 
   // The cover sheet pairs with its prose in the side-by-side grid the four
   // descent groups set up, continuing their alternation: LLPL led with the

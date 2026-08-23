@@ -112,12 +112,34 @@ export const InstallGrid: Component = () => (
     {/* The claim below is scoped to the surfaces the nightly output-value
         gate actually walks — #536 records the leg-by-leg check. DuckDB is a
         read-only surface, so it has no AGS4 writer for the gate to compare:
-        don't re-widen the sentence to all five cards. */}
+        don't re-widen the sentence to all five cards.
+
+        The intro's tail carries what two retired fixtures used to say
+        (#617): the transport aside collapsed to one sentence with its docs
+        link, and the install-guide line moved up from below the grid. */}
     <p class="mt-2 max-w-[60ch] text-fg-soft">
       One engine behind every one of these. Every surface that writes AGS4
       (Python, Node, the CLI, the browser) emits byte-identical scriptable
       output, gate-checked nightly, so a CI job and a notebook cannot disagree.
-      DuckDB is the read-only surface: there is no writer to diverge.
+      DuckDB is the read-only surface: there is no writer to diverge. The engine
+      also packs deliveries for sending, zstd compressed and optionally
+      passphrase encrypted:{" "}
+      <a
+        class="font-semibold text-cta no-underline transition-colors hover:underline"
+        href="https://docs.laterite.dev/cookbook/transport/"
+      >
+        Pack / encrypt for transport
+      </a>
+      .{" "}
+      <a
+        class="font-semibold text-cta no-underline transition-colors hover:underline"
+        href="https://docs.laterite.dev/learn/install/"
+      >
+        Full install guide
+      </a>
+      : extras, the dependency shape, and a first validate in three lines.
+      laterite is in beta: the AGS4 surface is stable and covered, and the
+      version numbers still move quickly.
     </p>
 
     {/* Below the grid's own first column break the five cards become the
@@ -146,17 +168,5 @@ export const InstallGrid: Component = () => (
         </For>
       </ul>
     </Show>
-
-    <p class="mt-6 text-caption text-fg-muted">
-      <a
-        class="font-semibold text-cta no-underline transition-colors hover:underline"
-        href="https://docs.laterite.dev/learn/install/"
-      >
-        Full install guide
-      </a>
-      : extras, the dependency shape, and a first validate in three lines.
-      laterite is in beta: the AGS4 surface is stable and covered, and the
-      version numbers still move quickly.
-    </p>
   </div>
 );

@@ -22,10 +22,10 @@ test("dark: the canvas swaps at the token level, and a dark: class really applie
   // class on the root, because everything below hangs off it.
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
   // The transport aside was this probe's raised subject until the phone
-  // declutter stopped rendering it below the breakpoint (#596) — this lane
-  // runs at 390, so the group table's wrapper carries the same
-  // dark:bg-surface-raised contract now, and the aside's absence is itself
-  // asserted.
+  // declutter unmounted it at 390 (#596), and #617 then retired it at
+  // every width — the group table's wrapper carries the same
+  // dark:bg-surface-raised contract, and the aside's absence is asserted
+  // as a page fact now, not a lane fact.
   await expect(page.locator('aside[aria-label="Transport"]')).toHaveCount(0);
   await expect(page.locator("section#loca table")).toBeVisible();
 
