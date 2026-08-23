@@ -294,6 +294,54 @@ export function restoreGroup(delivery: Delivery, code: string): Delivery {
   return [...delivery.slice(0, head), group, ...delivery.slice(head)];
 }
 
+/** Did `next` lose data relative to `prev` (#582)? True when a group
+ *  vanished, kept fewer rows, or kept a row with fewer cells.
+ *
+ * Directional on purpose. `parse` above is narrow and SILENT about what it
+ * drops — a line before any GROUP, or one whose first cell is not a
+ * descriptor, simply falls away, which is the mechanism that hid #574 (the
+ * row count survived while the columns vanished). The engine's fixes, read
+ * from the validator's own fixes.rs: every kind rewrites in place or adds —
+ * `pad_short_row` appends cells to a row, the TRAN inserts fill a cell —
+ * and none removes a row or a cell. So growth is legitimate and shrinkage
+ * is the one honest signal that this parser threw away something the
+ * engine emitted; an equality check would refuse exactly the outputs that
+ * work. Rows pair by POSITION, which those kinds cannot disturb; the
+ * acknowledged residual is a diverged engine that drops one row and gains
+ * another of the same width in one pass, which pairs shifted rows and
+ * slips through. */
+export function losesData(prev: Delivery, next: Delivery): boolean {
+  return prev.some((was) => {
+    const now = next.find((g) => g.code === was.code);
+    if (!now) return true;
+    if (now.rows.length < was.rows.length) return true;
+    return was.rows.some((row, i) => {
+      const kept = now.rows[i];
+      return kept !== undefined && kept.length < row.length;
+    });
+  });
+}
+
+/** Reparse `text` — the engine's fixed output — refusing the result when it
+ *  lost data relative to `prev` (#582). This is the WHOLE guard, composed
+ *  here in the pure layer so it is testable without the store or an engine:
+ *  the store's applyGroupFixes only routes the answer (commit a Delivery,
+ *  surface a "refused"). No end-to-end route can drive this today — #574
+ *  closed the one way a real page could make `parse` drop a line — so this
+ *  function and its tests are the coverage, stated plainly rather than
+ *  padded with an e2e that could not fail. The store's routing line and
+ *  the callout that renders the refusal sit outside every testable
+ *  altitude for the same reason: the unit lane is plain node and cannot
+ *  import the Solid store, and no e2e can reach a refusal. Stated, not
+ *  covered. */
+export function reparseGuarded(
+  prev: Delivery,
+  text: string,
+): Delivery | "refused" {
+  const next = parse(text);
+  return losesData(prev, next) ? "refused" : next;
+}
+
 /** The seeded delivery, parsed once. The fixture is committed and gated by
  *  tests/test_landing_demo_delivery.py, which asserts the exact seeded-finding
  *  set this page narrates. */

@@ -20,6 +20,8 @@ import {
   groupOfLine,
   lineOfRow,
   parse,
+  reparseGuarded,
+  losesData,
   restoreGroup,
   seededFinalDepth,
   setCell,
@@ -423,5 +425,114 @@ describe("restoreGroup", () => {
   it("answers the same delivery when the group is present or unknown", () => {
     expect(restoreGroup(SEEDED, "TRAN")).toBe(SEEDED);
     expect(restoreGroup(SEEDED, "NOPE")).toBe(SEEDED);
+  });
+});
+
+describe("losesData — the lossy-reparse signal (#582)", () => {
+  // Hand-built pairs rather than driving parse into dropping lines: #574
+  // closed the one reachable route, so the pure comparison is where the
+  // contract is stated and tested — and it is the ONLY place it can be:
+  // the unit lane is plain node and cannot import the Solid store, and no
+  // e2e can reach a refusal, so the store's routing of this answer is
+  // stated in its comment rather than covered by a test.
+  const base: Delivery = [
+    {
+      code: "LOCA",
+      headings: ["LOCA_ID", "LOCA_GL"],
+      units: ["", "m"],
+      types: ["ID", "2DP"],
+      rows: [
+        ["BH01", "11.8"],
+        ["BH02", "12.1"],
+      ],
+    },
+    {
+      code: "SAMP",
+      headings: ["SAMP_ID"],
+      units: [""],
+      types: ["ID"],
+      rows: [["S1"]],
+    },
+  ];
+
+  it("is quiet on the identical delivery", () => {
+    expect(losesData(base, base)).toBe(false);
+  });
+
+  it("growth is legitimate — added rows and padded cells pass", () => {
+    // The directional half, pinned so an equality check cannot sneak in.
+    // No current fix kind adds a ROW (fixes.rs: the TRAN inserts fill a
+    // cell, pad_short_row appends cells to a row), so the rule is pinned
+    // wider than today's engine on purpose: shrinkage, not difference, is
+    // the signal, and this test fails any implementation that refuses
+    // growth.
+    const grown: Delivery = [
+      { ...base[0]!, rows: [...base[0]!.rows, ["BH03", "9.0"]] },
+      { ...base[1]!, rows: [["S1", "extra-cell"]] },
+    ];
+    expect(losesData(base, grown)).toBe(false);
+  });
+
+  it("a lost row is loss", () => {
+    const shrunk: Delivery = [
+      { ...base[0]!, rows: [base[0]!.rows[0]!] },
+      base[1]!,
+    ];
+    expect(losesData(base, shrunk)).toBe(true);
+  });
+
+  it("a vanished group is loss", () => {
+    expect(losesData(base, [base[0]!])).toBe(true);
+  });
+
+  it("the #574 shape — row count survives while the columns vanish — is loss", () => {
+    // The exact silhouette that hid #574: same number of rows, cells gone
+    // from one of them. The shape most likely to pass every assertion
+    // anyone would think to write, so it gets its own name here.
+    const gutted: Delivery = [
+      { ...base[0]!, rows: [["BH01", "11.8"], ["BH02"]] },
+      base[1]!,
+    ];
+    expect(losesData(base, gutted)).toBe(true);
+  });
+});
+
+describe("reparseGuarded — the whole guard, at the pure layer (#582)", () => {
+  // These texts are what a DIVERGED engine would hand applyGroupFixes: the
+  // emitted seed with one line the narrow parser cannot attribute. No
+  // end-to-end route can produce one today — #574 closed the only way — so
+  // this is the coverage, and the store only routes the answer.
+  it("refuses a text whose reparse drops a row (the #574 mechanism)", () => {
+    const lines = emit(SEEDED).split("\r\n");
+    const at = lineOfRow(SEEDED, "LOCA", 0) - 1;
+    lines[at] = (lines[at] ?? "").replace('"DATA"', '"DAT_"');
+    expect(reparseGuarded(SEEDED, lines.join("\r\n"))).toBe("refused");
+  });
+
+  it("passes a text that legitimately grows a group", () => {
+    // An equality-shaped guard would refuse this text. No current fix
+    // kind produces it (none adds a row), so this pins the RULE rather
+    // than a reachable engine output — the guard must never widen into
+    // refusing growth.
+    const lines = emit(SEEDED).split("\r\n");
+    const tran = SEEDED.find((g) => g.code === "TRAN");
+    const width = (tran?.headings.length ?? 0) + 1;
+    const row = Array.from({ length: width }, (_, i) =>
+      i === 0 ? '"DATA"' : '"X"',
+    ).join(",");
+    lines.splice(lineOfRow(SEEDED, "TRAN", 0), 0, row);
+    const next = reparseGuarded(SEEDED, lines.join("\r\n"));
+    expect(next).not.toBe("refused");
+    if (next === "refused") return;
+    expect(next.find((g) => g.code === "TRAN")?.rows).toHaveLength(
+      (tran?.rows.length ?? 0) + 1,
+    );
+  });
+
+  it("hands back the reparse untouched when nothing was lost", () => {
+    const next = reparseGuarded(SEEDED, emit(SEEDED));
+    expect(next).not.toBe("refused");
+    if (next === "refused") return;
+    expect(emit(next)).toBe(emit(SEEDED));
   });
 });

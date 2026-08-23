@@ -30,7 +30,7 @@ import {
   deleteGroup as deleteGroupFrom,
   deleteRow as deleteRowFrom,
   emit,
-  parse,
+  reparseGuarded,
   restoreGroup as restoreGroupTo,
   setCell as setCellIn,
   type Delivery,
@@ -296,15 +296,38 @@ export function reset(): void {
  *
  * Recomputed fresh against the current text rather than read from the
  * resource, so a click can never apply a list computed for an older
- * revision. */
-export async function applyGroupFixes(group: string): Promise<number> {
+ * revision.
+ *
+ * "refused" is the third outcome (#582), distinct from both a count and a
+ * zero: parse is narrow and silently drops what it does not recognise —
+ * the mechanism that hid #574 — so a reparse of the engine's fixed text
+ * that LOSES data is never committed. The guard itself (reparseGuarded,
+ * with losesData's directional rule) lives in the pure model where it is
+ * tested; this function only routes its answer — and the routing has no
+ * test at any altitude, stated per #582's brief rather than papered over:
+ * the unit lane is plain node and cannot import this Solid store, and no
+ * e2e can reach a refusal since #574 closed the one route that made parse
+ * drop a line. On refusal the delivery is
+ * left exactly as it was and no undo step is recorded, because commit is
+ * simply not called. The refusal deliberately does not enter the findings
+ * list — held by shape, not by assertion: the outcome is a return value
+ * the type system keeps out of Finding, and the report resource is keyed
+ * on the delivery, which a refusal never moves. The scoreboard tallies
+ * the engine's report and the UI never decides how bad — the caller
+ * renders the refusal as a note beside the button that was clicked. */
+export async function applyGroupFixes(
+  group: string,
+): Promise<number | "refused"> {
   arm();
-  const current = text();
+  const base = delivery();
+  const current = emit(base);
   const all = await computeFixesText(current);
-  const mine = fixesForGroup(all, delivery(), group);
+  const mine = fixesForGroup(all, base, group);
   if (!mine.length) return 0;
   const fixed = await applyFixesText(current, mine);
-  commit(() => parse(fixed));
+  const next = reparseGuarded(base, fixed);
+  if (next === "refused") return "refused";
+  commit(() => next);
   return mine.length;
 }
 

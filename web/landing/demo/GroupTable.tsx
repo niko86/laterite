@@ -125,6 +125,11 @@ export const GroupTable: Component<{
    *  rule). Count and action both come from the store's scoping of the
    *  engine's own list — this component only renders them. */
   fixCount: number | null;
+  /** #582: the last fix click was refused because reparsing the engine's
+   *  fixed text would have LOST data. Rendered as a note beside the button —
+   *  never as a finding, because the scoreboard tallies the engine's report
+   *  and this verdict is the page's own. */
+  fixRefused: boolean;
   onFix: () => void;
 }> = (props) => {
   const lastKey = () =>
@@ -331,6 +336,17 @@ export const GroupTable: Component<{
             Fix {props.fixCount} auto-fixable
           </Button>
         </div>
+        {/* The refusal note (#582): the neutral tier, no rule and no engine
+            severity — this is the page refusing its own commit, not the
+            engine finding anything. It sits under the button it answers. */}
+        <Show when={props.fixRefused}>
+          <div class="border-b border-laterite-200 px-2 py-1.5">
+            <FindingCallout severity="note">
+              These repairs came back missing part of the table, so nothing was
+              changed. The file is exactly as you left it.
+            </FindingCallout>
+          </div>
+        </Show>
       </Show>
 
       <div class="overflow-x-auto overscroll-x-contain">

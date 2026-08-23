@@ -26,7 +26,14 @@
  * to hold, not this comment's to restate.
  */
 
-import { Show, createMemo, type Component } from "solid-js";
+import {
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  type Component,
+} from "solid-js";
 import { Button } from "@shared/components";
 import { FindingsStrip } from "./FindingsStrip";
 import { GroupStub } from "./GroupStub";
@@ -72,6 +79,26 @@ export const EditableGroup: Component<{
      this once for each branch of its narrowing. */
   const groupFindings = createMemo(() => findingsForGroup(props.code));
 
+  /* The lossy-reparse refusal (#582), held HERE because it is not a finding:
+     the scoreboard tallies the engine's report and the UI never decides how
+     bad, so the refusal lives beside the button that was clicked and nowhere
+     near the findings list. Any change to the delivery clears it — a note
+     about a commit that did not happen has nothing to say about one that
+     did. This wiring has no test at any altitude, and the honest statement
+     is the coverage (#582's brief): a refusal cannot be driven end to end
+     since #574, and the unit lane cannot import the store this reads. The
+     tested half is the guard itself, in the pure model. */
+  const [fixRefused, setFixRefused] = createSignal(false);
+  createEffect(
+    on(
+      delivery,
+      () => {
+        setFixRefused(false);
+      },
+      { defer: true },
+    ),
+  );
+
   return (
     <Show
       when={bits()}
@@ -108,8 +135,12 @@ export const EditableGroup: Component<{
               deleteRow(props.code, row);
             }}
             fixCount={groupFixCount(props.code)}
+            fixRefused={fixRefused()}
             onFix={() => {
-              void applyGroupFixes(props.code);
+              setFixRefused(false);
+              void applyGroupFixes(props.code).then((outcome) => {
+                if (outcome === "refused") setFixRefused(true);
+              });
             }}
           />
 
