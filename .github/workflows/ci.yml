@@ -418,11 +418,12 @@ jobs:
       # runs `--built` over what mkdocs just produced, and is the authority:
       # three of this site's page families have no Markdown for this step to
       # open, so a source scan alone reported clean while several hundred sat in
-      # the built site. What this step sees is a strict SUBSET of what the built
-      # half sees, and that is written down rather than dressed up: it is kept
-      # for feedback speed and for naming a file and a line to edit, not because
-      # it covers anything the `docs` job misses. If it ever costs more than it
-      # saves, delete this step and keep the other one.
+      # the built site. The two are COMPLEMENTARY and neither subsumes the
+      # other: the built half excludes reference/api/ and reference/modules/ by
+      # path, and both of those pages are a MIX — hand-written intro and section
+      # prose around the generated API reference — so this step is the only gate
+      # those paragraphs have. It is also the faster of the two, and it names a
+      # file and a line rather than a rendered artefact nobody edits.
       - name: no em dash in docs-site prose (source pre-check)
         run: uv run --no-project python tools/check_docs_em_dash.py
 

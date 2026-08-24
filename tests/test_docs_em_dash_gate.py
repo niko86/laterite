@@ -316,3 +316,38 @@ def test_every_exclusion_carries_a_reason_and_a_blind_spot_is_named(gate):
     }
     assert all(len(r) > 40 for r in gate.BUILT_SKIP.values())
     assert any("gen_cli.py" in s for s in gate.BUILT_BLIND_SPOTS)
+
+
+def test_the_meta_description_is_found_when_the_theme_leaves_it_unquoted(gate):
+    """Attribute quoting is the template author's business too, not this gate's.
+    A pattern requiring quotes reads clean on a theme that omits them, which is
+    the same silent miss the source-only scan had for this exact string."""
+    excerpts, _ = gate.scan_html("<meta name=description content='AGS4 — fast'>")
+    assert len(excerpts) == 1
+
+
+def test_the_cli_exclusion_does_not_claim_the_issue_granted_it(gate):
+    """#588 enumerates its carve-outs exhaustively (stylesheets, scripts, and the
+    shipped package's docstrings) and never mentions the CLI guide, so excluding
+    it is a call made in this tool. Citing the issue for it would be a false
+    claim about the issue, and it would read as "criterion met" when what is
+    true is "criterion knowingly unmet on one page"."""
+    reason = gate.BUILT_SKIP["reference/cli/"]
+    assert "NOT BY #588" in reason
+    assert "own ticket" in reason, "an unmet criterion must point somewhere"
+
+
+def test_the_two_halves_are_not_described_as_one_subsuming_the_other(gate):
+    """The claim a review caught: the source half was documented as a strict
+    subset of the built half, kept only for speed. It is not. `reference/api/`
+    and `reference/modules/` are excluded from the built scan BY PATH, and both
+    pages carry hand-written prose around their generated parts, so the source
+    half is the only gate those paragraphs have."""
+    doc = gate.__doc__ or ""
+    assert "strict SUBSET" not in doc
+    assert "COMPLEMENTARY" in doc
+    for prefix in ("reference/api/", "reference/modules/"):
+        assert "hand-written" in gate.BUILT_SKIP[prefix], (
+            f"{prefix} is excluded wholesale but is a MIX; the reason must say "
+            "so, or the printed count reads as 'all generated'"
+        )

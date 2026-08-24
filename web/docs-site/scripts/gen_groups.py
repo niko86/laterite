@@ -129,7 +129,10 @@ for code in sorted(GROUPS):
     prov = cd.group_provenance(code)
     edlabel = cd.edition_label(prov)
     index_rows.append(
-        (code, g["contents"], fam, g["parent"] or "–", len(g["headings"]), edlabel)
+        # A word, not a dash: this cell is read aloud in the Parent column, and a
+        # dash of any width is read as nothing at all. "none" also cannot be
+        # mistaken for a group code the way a stray glyph can.
+        (code, g["contents"], fam, g["parent"] or "none", len(g["headings"]), edlabel)
     )
 
     crumb = " → ".join(f"[{c}]({c}.md)" for c in reversed(g["ancestors"]))

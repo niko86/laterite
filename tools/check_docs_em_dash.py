@@ -21,12 +21,14 @@ The default (no argument) walks the SOURCE instead: `docs/**.md` plus the
 build, answers in under a second, and points at the file and line to edit rather
 than at a rendered artefact nobody hand-edits.
 
-What it sees is a strict SUBSET of what `--built` sees, and that is worth saying
-plainly rather than dressing up: it is kept for feedback speed and for naming a
-line, not because it covers anything the built scan misses. Two gates over one
-policy is the shape this repo keeps getting burned by, so the division is stated
-here rather than inferred — and if the pre-check ever costs more than it saves,
-it is the half to delete.
+The two halves are COMPLEMENTARY, and neither subsumes the other. The built half
+misses what `BUILT_SKIP` excludes by path — and `reference/api.md` and
+`reference/modules.md` are not wholly generated: each opens with a hand-written
+intro and carries hand-written blurbs between its `:::` directives, so the source
+half is the only gate those paragraphs have. The source half misses the three
+generated families entirely. Two gates over one policy is the shape this repo
+keeps getting burned by, so the division is written down rather than inferred,
+and it is a real division rather than a fast copy of one scan by another.
 
 ## What it does not look at, and why that is written down
 
@@ -102,23 +104,44 @@ HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 #: and printed on every run rather than passed over in silence, because a
 #: declared exclusion nobody can see is the blind spot with a green tick on it.
 #:
-#: Both entries are the same judgement: the text belongs to something the docs
-#: site only displays. #588 draws that line explicitly, and it is the line that
-#: keeps this gate from turning a docs task into an API or a shipped-binary
-#: change.
+#: All three are the same judgement: the excluded text belongs to something the
+#: docs site only DISPLAYS — the wheel's docstrings, or a guide that ships inside
+#: two binaries. #588 draws that line explicitly, and it is the line that keeps
+#: this gate from turning a docs task into an API or a shipped-binary change.
+#:
+#: Note what a path prefix cannot express: two of these pages are a MIX, part
+#: generated and part hand-written, and excluding the path excludes both halves
+#: here. The hand-written halves are gated all the same, by the source scan
+#: reading their `.md` — which is why these two halves are complementary rather
+#: than one being a faster copy of the other.
 BUILT_SKIP = {
     "reference/api/": (
-        "mkdocstrings rendering the shipped wheel's own docstrings; #588 puts "
-        "them out of scope, and the fix would be an API-surface edit"
+        "MOSTLY mkdocstrings rendering the shipped wheel's own docstrings, which "
+        "#588 puts out of scope because the fix would be an API-surface edit. "
+        "The page's own hand-written intro and section prose are NOT excluded: "
+        "they live in docs/reference/api.md, which the source half reads"
     ),
     "reference/modules/": (
-        "mkdocstrings rendering the shipped wheel's own docstrings; #588 puts "
-        "them out of scope, and the fix would be an API-surface edit"
+        "MOSTLY mkdocstrings rendering the shipped wheel's own docstrings, which "
+        "#588 puts out of scope because the fix would be an API-surface edit. "
+        "The page's own hand-written intro and per-module blurbs are NOT "
+        "excluded: they live in docs/reference/modules.md, which the source "
+        "half reads"
     ),
+    # NOT granted by #588, and saying so is the point. That issue enumerates its
+    # carve-outs exhaustively (the stylesheets, the scripts, and the shipped
+    # package's own docstrings) and never mentions the CLI guide; its in-scope
+    # measurement counted `docs/**.md` only, which this page is not. So this
+    # exclusion is a scope call made HERE, and it leaves an acceptance criterion
+    # ("no U+2014 in rendered docs prose") unmet on one page rather than met.
+    # #588's own rule for a case like this is that it is worth its own ticket.
     "reference/cli/": (
-        "the shipped `lat --readme` guide, mirrored byte-identical into four "
-        "packages and gated there by tools/gen_cli_readme.py; rewriting it "
-        "changes what two binaries print, not what this site says"
+        "EXCLUDED BY A CALL MADE HERE, NOT BY #588. The page is the shipped "
+        "`lat --readme` guide, mirrored byte-identical into four packages and "
+        "held there by tools/gen_cli_readme.py, so rewriting it changes what two "
+        "binaries print rather than what this site says. That is a "
+        "shipped-content change and wants its own ticket; until then these are "
+        "known-unfixed, not known-absent"
     ),
 }
 
@@ -131,6 +154,8 @@ BUILT_BLIND_SPOTS = (
     "unread by this half, and it has no `.md` for the other half to read",
     "attribute text other than the meta description — an `alt` or a `title` is "
     "read aloud or shown on hover, but tag-stripping drops both",
+    "search/search_index.json, which feeds the search dropdown's snippets: it is "
+    "not an HTML page, so this walk never opens it",
 )
 
 #: Everything between these tags is what a tool printed, not what an author
@@ -139,13 +164,12 @@ BUILT_BLIND_SPOTS = (
 HTML_CODE_RE = re.compile(r"<(script|style|pre|code)\b[^>]*>.*?</\1\s*>", re.S | re.I)
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 #: `site_description` reaches a reader as an ATTRIBUTE, never as a text node, so
-#: stripping tags would drop the single string that renders on every page. Read
-#: in two steps rather than one pattern so it does not depend on the theme
-#: emitting `name` before `content`, which is a detail of whoever wrote the
-#: template and not something this gate should be pinned to.
+#: stripping tags would drop the single string that renders on every page. The
+#: tag is parsed into attributes rather than matched by one pattern, so this is
+#: pinned to neither the order the theme writes them in nor whether it quotes
+#: them — both are details of whoever wrote the template.
 META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.I)
-META_IS_DESC_RE = re.compile(r"""\bname=["']description["']""", re.I)
-META_CONTENT_RE = re.compile(r"""\bcontent=["']([^"']*)""", re.I)
+ATTR_RE = re.compile(r"""\b([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
 
 #: Pages no hand-edit can fix, mapped to what to edit instead. A gate that says
 #: "line 12 has an em dash" about a rendered file sends someone to edit a file
@@ -233,6 +257,14 @@ def scan_config(text: str) -> list[tuple[int, str, str]]:
     return out
 
 
+def _attrs(tag: str) -> dict[str, str]:
+    """One HTML tag's attributes, lowercased names, quoted or not."""
+    return {
+        m.group(1).lower(): next(g for g in m.group(2, 3, 4) if g is not None)
+        for m in ATTR_RE.finditer(tag)
+    }
+
+
 def scan_html(text: str) -> tuple[list[str], int]:
     """Reader-visible em dashes in one BUILT page, and how many were skipped.
 
@@ -264,9 +296,9 @@ def scan_html(text: str) -> tuple[list[str], int]:
     # search snippet and the link preview, so it is read far more often than the
     # page, and stripping tags would silently drop it.
     meta = " ".join(
-        html.unescape(c.group(1))
+        html.unescape(attrs["content"])
         for tag in META_TAG_RE.findall(body)
-        if META_IS_DESC_RE.search(tag) and (c := META_CONTENT_RE.search(tag))
+        if (attrs := _attrs(tag)).get("name") == "description" and "content" in attrs
     )
     prose = f"{html.unescape(HTML_TAG_RE.sub(' ', body))} {meta}"
 
@@ -275,6 +307,21 @@ def scan_html(text: str) -> tuple[list[str], int]:
         window = prose[max(0, m.start() - 45) : m.start() + 45]
         excerpts.append(" ".join(window.split()))
     return excerpts, skipped
+
+
+#: How many failures to print before summarising the rest. Shared by both halves
+#: so one truncation policy cannot become two that disagree about what was hidden.
+FAILURE_CAP = 40
+
+
+def report_failures(failures: list[str], headline: str) -> int:
+    """Print a capped failure list, and say how many the cap hid. Always 1."""
+    print(f"\n{headline}", file=sys.stderr)
+    for line in failures[:FAILURE_CAP]:
+        print(line, file=sys.stderr)
+    if len(failures) > FAILURE_CAP:
+        print(f"  … and {len(failures) - FAILURE_CAP} more", file=sys.stderr)
+    return 1
 
 
 def check_built(site: Path, show_skipped: bool) -> int:
@@ -325,17 +372,12 @@ def check_built(site: Path, show_skipped: bool) -> int:
             print(f"  {line}")
 
     if failures:
-        print(
-            f"\ncheck_docs_em_dash --built: {len(failures)} em dash(es) reached a "
+        return report_failures(
+            failures,
+            f"check_docs_em_dash --built: {len(failures)} em dash(es) reached a "
             f"reader. Fix the SOURCE, which for a page with no `.md` is the "
             f"generator that emits it (web/docs-site/scripts/), then rebuild:",
-            file=sys.stderr,
         )
-        for line in failures[:40]:
-            print(line, file=sys.stderr)
-        if len(failures) > 40:
-            print(f"  … and {len(failures) - 40} more", file=sys.stderr)
-        return 1
 
     print("check_docs_em_dash --built: OK, no em dash reached a docs-site reader")
     return 0
@@ -429,19 +471,14 @@ def main() -> int:
             print(f"  {line}")
 
     if failures:
-        print(
-            f"\ncheck_docs_em_dash: {len(failures)} em dash(es) in reader-facing "
+        return report_failures(
+            failures,
+            f"check_docs_em_dash: {len(failures)} em dash(es) in reader-facing "
             f"prose across {files_with_prose} page(s). Rewrite the sentence "
             f"rather than swapping the character — a comma, a colon, a full "
             f"stop or a pair of brackets each say something the dash was "
             f"standing in for:",
-            file=sys.stderr,
         )
-        for line in failures[:40]:
-            print(line, file=sys.stderr)
-        if len(failures) > 40:
-            print(f"  … and {len(failures) - 40} more", file=sys.stderr)
-        return 1
 
     print("check_docs_em_dash: OK — no em dash in reader-facing docs prose")
     return 0

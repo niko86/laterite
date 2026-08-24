@@ -1,7 +1,9 @@
 # laterite docs site (#201). Built with MkDocs + Material; published at
 # /laterite/docs/ on the same GitHub Pages artifact as the validator web app
-# (the deploy builds into ../dist/docs, which lives under web/dist that the
-# Pages workflow uploads). `strict: true` turns any broken internal link or
+# (the build lands in `site_dir` below, its OWN directory beside the app's
+# rather than inside it, and the deploy carries it from there — this line said
+# ../dist/docs until #588, long after that stopped being true). `strict: true`
+# turns any broken internal link or
 # missing-nav page into a build failure — the docs can't silently rot.
 #
 # Example-first: every code snippet is single-sourced from

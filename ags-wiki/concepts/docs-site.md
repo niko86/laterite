@@ -457,9 +457,12 @@ Key facts:
   `glossary` and its sibling, so all of their prose lives in f-strings a
   `docs/**.md` walk never opens. The first draft scanned source only, reported
   clean, and left several hundred in the built site; that is the whole reason the
-  built half exists. The buildless source half stays in `repo-gates` as a
-  sub-second pre-check that names a file and a line, and what it sees is a strict
-  *subset* of the built half rather than a complement.
+  built half exists. The buildless source half stays in `repo-gates`, and the two
+  are **complementary — neither subsumes the other**. The built half excludes
+  `reference/api/` and `reference/modules/` by path, and both of those pages are a
+  *mix*: a hand-written intro and section prose wrapped around the generated API
+  reference. So the source half is the only gate those paragraphs have, while the
+  built half is the only gate the three generated families have.
 
 > [!note] Deferred (the Phase-2 tail)
 > Done: the **Python** API reference (mkdocstrings), the **group catalogue** +
@@ -515,7 +518,10 @@ None of the below is a known defect. Each is a place nobody has looked.
   rendering the wheel's own docstrings, and `reference/cli/` is the shipped
   `lat --readme` guide mirrored into four packages: rewriting either would be an
   API or a shipped-binary change, not a docs edit, so the gate counts them and
-  prints the counts rather than reading them. Two narrower spots go with them —
+  prints the counts rather than reading them. The first two are a *mix*, and a
+  path prefix cannot say so: their hand-written halves are gated by the source
+  scan reading `docs/reference/api.md` and `docs/reference/modules.md`. Two
+  narrower spots go with them —
   the short note `gen_groups.py`'s sibling `gen_cli.py` writes *above* that
   guide is ours but sits inside an excluded page, and attribute text other than
   the meta description (an `alt`, a `title`) is dropped with the tags.
