@@ -68,6 +68,23 @@ function typedValue(type) {
   return "NO-SUCH-VALUE";
 }
 
+/** Where a heading's declared TYPE constrains what text is legal in it, which
+ *  is the Rule 8 surface. `ID` and `X`/`XN` accept anything a reader can type;
+ *  `PA` is constrained by the file's own ABBR group rather than by its type,
+ *  so it is named separately wherever it matters. One predicate because two
+ *  classes below turn on the same fact and a second copy would drift. */
+const typeConstrainsText = (type) => !["ID", "X", "XN", "PA"].includes(type);
+
+/** Where arbitrary well-formed text — the thing a reader actually types — can
+ *  change either engine's answer. Four surfaces, all of them knowable from the
+ *  demo's own schema, and everything else is inert: a project name, a location
+ *  remark or a non-KEY ID can be anything at all and both engines answer the
+ *  same. Rule 1 is the fourth surface and is NOT here, because non-ASCII text
+ *  is its own class already and pushing it into a numeric column would trip
+ *  Rule 8 on the way rather than reach Rule 1. */
+const textCanMatter = (h) =>
+  h.key || h.type === "PA" || typeConstrainsText(h.type);
+
 /** The value classes, each named for the rule it exists to reach. The control
  *  is the seed itself, which is emitted and validated like any other state. */
 const CLASSES = [
@@ -80,7 +97,15 @@ const CLASSES = [
   {
     id: "non-ascii",
     rule: "1 (the file must be ASCII)",
-    applies: (h) => h.type === "X" || h.type === "XN",
+    // Rule 1 is about the FILE, so it is reachable from any column at all —
+    // bounded here only by where a non-ASCII value would trip Rule 8 on its
+    // way and confound the state. That is exactly the types that constrain
+    // nothing, which is why this reads as the inverse of `typeConstrainsText`
+    // rather than as a list. It matters: `textCanMatter` below deliberately
+    // leaves Rule 1 out on the grounds that this class covers it, and a class
+    // narrower than "every column that can hold arbitrary text" would make
+    // that reasoning false for the columns it missed.
+    applies: (h) => !typeConstrainsText(h.type),
     value: () => "Ceci n’est pas ASCII",
   },
   {
@@ -88,7 +113,7 @@ const CLASSES = [
     rule: "8 (the value must match its declared TYPE)",
     // Only where the TYPE actually constrains the text. ID and X accept
     // anything, so there is no "wrong" value to write into them.
-    applies: (h) => !["ID", "X", "XN", "PA"].includes(h.type),
+    applies: (h) => typeConstrainsText(h.type),
     value: () => "not-a-number",
   },
   {
@@ -102,6 +127,19 @@ const CLASSES = [
     rule: "16 (a PA value must be listed in ABBR)",
     applies: (h) => h.type === "PA",
     value: () => "ZZZ",
+  },
+  {
+    id: "arbitrary-text",
+    rule:
+      "none on its own — this class exists because the five above are each " +
+      "engineered to reach a named rule, and none of them is the thing a " +
+      "reader actually does, which is type a phrase into a cell",
+    applies: textCanMatter,
+    // Ordinary prose: ASCII, no delimiter, nothing a tokenizer treats
+    // specially. It has to be inert BY ITS CONTENT so that any answer it
+    // moves is attributable to the COLUMN it was typed into, which is the
+    // claim this class is here to test.
+    value: () => "Riverside Depot Phase 2",
   },
 ];
 
@@ -294,6 +332,13 @@ async function main() {
     }
   }
 
+  // The columns the `arbitrary-text` class deliberately does NOT enumerate,
+  // recorded per column rather than per cell because it is a claim about the
+  // COLUMN. Not enumerating them is the ticket's call and rests on a prior
+  // byte-exact measurement, not on this run — which is exactly why it is
+  // written down: an unstated exclusion reads as a surface that was swept.
+  const inertColumns = [];
+  const inertSeen = new Set();
   for (const g of SEEDED) {
     const meta = groupOf(g.code);
     if (!meta) continue;
@@ -302,6 +347,21 @@ async function main() {
       for (let c = 0; c < g.headings.length; c += 1) {
         const h = meta.headings.find((x) => x.name === g.headings[c]);
         if (!h) continue;
+        if (!textCanMatter(h) && !inertSeen.has(`${g.code}.${h.name}`)) {
+          inertSeen.add(`${g.code}.${h.name}`);
+          inertColumns.push({
+            group: g.code,
+            heading: h.name,
+            type: h.type,
+            why:
+              "not a KEY, not PA, and its declared type constrains nothing a " +
+              "reader can type, so arbitrary ASCII text here reaches no rule. " +
+              "Non-ASCII text does, through Rule 1, and the `non-ascii` class " +
+              "covers this column for exactly that. Measured byte-exact " +
+              "before this class was written: free-text and non-KEY ID " +
+              "columns leave BOTH engines' findings unchanged",
+          });
+        }
         const ctx = {
           parentCarries: Boolean(
             parentMeta?.headings.some((x) => x.name === h.name),
@@ -418,6 +478,7 @@ async function main() {
       groups_not_enumerated: EXCLUDED_GROUPS,
     },
     classes: CLASSES.map((c) => ({ id: c.id, rule: c.rule })),
+    inert_columns: inertColumns,
     counts: {
       states: states.length,
       by_lever: states.reduce((acc, s) => {
@@ -438,7 +499,8 @@ async function main() {
     `sweep-demo-states: ${states.length} state(s) emitted to ${outDir}; ` +
       `${skipped.length} lever(s) skipped as no-ops; ` +
       `${EXCLUDED_GROUPS.length} group(s) excluded as not reader-editable; ` +
-      "exhaustive to depth 1 only",
+      `${inertColumns.length} column(s) where arbitrary text is inert and was ` +
+      "not enumerated; exhaustive to depth 1 only",
   );
 }
 

@@ -52,6 +52,7 @@ import {
   PYTHON_AGS4_VERSION,
   divergenceForRule,
   divergencesTheyRaise,
+  pythonFindingCount,
   type DivergenceNote,
 } from "./divergence";
 import type { Finding } from "./engine";
@@ -162,6 +163,15 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
      report: these are things the OTHER engine says, and our report cannot
      carry them (#660). */
   const theyRaise = createMemo(() => divergencesTheyRaise(delivery()));
+  /* What the OTHER engine counted for this state (#673). Read from the same
+     committed sweep, keyed on our own findings — python-ags4 is a dev-only
+     dependency and never runs in a browser. `null` means the sweep never
+     measured this state, which the header says out loud: a missing number
+     reads exactly like agreement, and agreement is the one thing it must not
+     be mistaken for. */
+  const theirCount = createMemo(() =>
+    pythonFindingCount(findings(), delivery()),
+  );
 
   return (
     <div style={{ "--band": `var(${props.band})` }}>
@@ -334,10 +344,31 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         {/* The findings list. The id is the scoreboard's jump target (#531):
             the chip states the verdict, this panel is its evidence. */}
         <div id="findings" class="min-w-0 scroll-mt-16">
-          <p class="mt-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+          {/* Two lines held open, always. The other engine's total shares
+              this line, and its longest form ("not measured for this state")
+              wraps where a digit does not — so without a reserved box the
+              header grows and shrinks under an edit, which is the whole thing
+              #657 capped the list below to stop. Reserved in LINE-HEIGHTS
+              rather than pixels: the box is then a fact about this element's
+              own type, and no wording change can outgrow a number written
+              somewhere else. */}
+          <p class="mt-3 flex min-h-[2lh] flex-wrap items-start gap-x-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report() && !refusal()}>
-              <span class="ml-2 text-fg-faint">{findings().length}</span>
+              <span class="text-fg-faint">{findings().length}</span>
+              {/* The other engine's total, beside ours rather than instead of
+                  it. Named with its version because the number is a claim
+                  about one release, and the version comes from the map rather
+                  than from prose so it cannot be right here and stale there. */}
+              <span
+                class="ml-1 flex gap-x-2 text-fg-faint"
+                data-testid="python-count"
+              >
+                python-ags4 {PYTHON_AGS4_VERSION}
+                <span data-testid="python-count-value">
+                  {theirCount() ?? "not measured for this state"}
+                </span>
+              </span>
             </Show>
           </p>
 

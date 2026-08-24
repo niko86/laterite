@@ -3398,3 +3398,155 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
   // returned; a panel about the OTHER engine's report must not move it.
   await expect(chip).not.toContainText("5 errors");
 });
+
+/** The committed sweep, read the way the page reads it — so a regenerated map
+ *  moves this expectation and the page together, with no edit on either side.
+ *  #673's acceptance criterion is explicit that the coverage be pinned by
+ *  identity rather than by count, and a literal `4` here is exactly the
+ *  assertion that keeps passing while the sweep moves under it. */
+function sweptPythonCounts() {
+  const at = (name: string) =>
+    JSON.parse(
+      readFileSync(
+        path.join(
+          path.dirname(fileURLToPath(import.meta.url)),
+          `../landing/demo/${name}`,
+        ),
+        "utf8",
+      ),
+    );
+  const map = at("state-map.json") as {
+    states: { id: string; python_rule_counts: Record<string, number> }[];
+  };
+  const counts = at("python-counts.json") as {
+    python_ags4_version: string;
+    signatures: {
+      signature: string;
+      python: number;
+      when_cell_is?: { heading: string; python: number }[];
+    }[];
+  };
+  const seed = map.states.find((s) => s.id === "seed")!;
+  const collision = counts.signatures.find((e) => e.when_cell_is)!;
+  return {
+    version: counts.python_ags4_version,
+    seed: Object.values(seed.python_rule_counts).reduce((a, b) => a + b, 0),
+    /** The two answers the ONE swept collision has: several different cells
+     *  leave laterite saying the same thing, and only a blank
+     *  `TRAN_AGS` earns python-ags4's extra FYI (O-53). */
+    withoutAgs: collision.python,
+    withAgs: collision.when_cell_is!.find((c) => c.heading === "TRAN_AGS")!
+      .python,
+  };
+}
+
+/** Blank one cell of the seeded TRAN row through the in-place editor (#525):
+ *  a click SELECTS, Enter opens, and the editor focuses in onMount — so
+ *  waiting on that focus is what stops the keystrokes landing on the cell
+ *  button and clearing nothing, which would be a green test over an unmade
+ *  edit. */
+async function clearTranCell(page: Page, heading: string) {
+  const cell = page.getByRole("button", {
+    name: `Edit ${heading} on row 1 of TRAN`,
+  });
+  await cell.scrollIntoViewIfNeeded();
+  await cell.click();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("textbox", { name: `${heading} on row 1 of TRAN` }),
+  ).toBeFocused();
+  await page.keyboard.press("Delete");
+  await page.keyboard.press("Enter");
+}
+
+test("fine: the demo shows what python-ags4 said, not just that it differs (#673)", async ({
+  page,
+  hasTouch,
+}) => {
+  const swept = sweptPythonCounts();
+  await page.goto("/");
+  const count = page.getByTestId("python-count");
+  // The NUMBER has its own hook and is asserted exactly. A substring match
+  // against the whole line would pass on the version string: "1.2.0" contains
+  // a 1, a 2 and a 0, so three of the counts this can take would be waved
+  // through by text that says nothing about the other engine at all.
+  const value = page.getByTestId("python-count-value");
+
+  // The number is a claim about ONE release, so the release is named — and
+  // named from the map rather than from prose, which is why this reads it from
+  // the same file the page imports.
+  await expect(count).toContainText(`python-ags4 ${swept.version}`);
+  await expect(value).toHaveText(String(swept.seed));
+  // Beside ours, not instead of it: the two totals are only worth showing
+  // together.
+  await expect(page.locator("#findings")).toContainText("Findings");
+
+  test.skip(hasTouch, "drives the in-place editor (#525)");
+
+  // The collision, which is the half a lookup keyed on our own findings can
+  // get wrong silently. Clearing TRAN_STAT and clearing TRAN_AGS leave
+  // laterite saying EXACTLY the same thing; only the second earns python-ags4
+  // its extra FYI (O-53). If the override ever stops firing, both edits show
+  // the same number and nothing else on the page notices.
+  await clearTranCell(page, "TRAN_STAT");
+  await expect(value).toHaveText(String(swept.withoutAgs));
+
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(value).toHaveText(String(swept.seed));
+
+  await clearTranCell(page, "TRAN_AGS");
+  await expect(value).toHaveText(String(swept.withAgs));
+  expect(swept.withAgs).not.toBe(swept.withoutAgs);
+});
+
+test("fine: the demo says so where the sweep never looked (#673)", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#525)");
+  const swept = sweptPythonCounts();
+  await page.goto("/");
+  const value = page.getByTestId("python-count-value");
+  const header = page.locator("#findings p").first();
+  await expect(value).toHaveText(String(swept.seed));
+  const seedHeight = await header.boundingBox().then((b) => b?.height);
+
+  // A state the sweep never measured must SAY it was never measured. Silence
+  // is indistinguishable from the two engines agreeing, which is the confusion
+  // this whole surface exists to remove.
+  //
+  // Two edits, because every single-cell edit IS in the map by construction —
+  // that is what "exhaustive to depth 1" means, so no one edit can reach this.
+  // Not any two, either: blanking both TRAN_STAT and TRAN_AGS lands back on a
+  // swept signature, because Rule 10b is raised once per GROUP however many of
+  // its required cells are empty. This pair crosses two groups, and was
+  // confirmed unmeasured against forge rather than assumed.
+  const key = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of SAMP",
+  });
+  await key.scrollIntoViewIfNeeded();
+  await key.click();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("textbox", { name: "LOCA_ID on row 1 of SAMP" }),
+  ).toBeFocused();
+  await page.keyboard.press("Delete");
+  await page.keyboard.press("Enter");
+  await clearTranCell(page, "TRAN_AGS");
+
+  await expect(value).toHaveText("not measured for this state");
+  // And it still names the release, so the line does not read as though the
+  // other engine had gone away.
+  await expect(page.getByTestId("python-count")).toContainText(
+    `python-ags4 ${swept.version}`,
+  );
+
+  // The header holds its box across that change. "not measured for this state"
+  // wraps where a digit does not, and the header sits INSIDE #findings — so
+  // without a reserved box, showing this message would grow the panel under a
+  // reader mid-edit, which is exactly what #657 capped the list to stop.
+  expect(
+    await header.boundingBox().then((b) => b?.height),
+    "the findings header must not grow when the number becomes a sentence",
+  ).toBe(seedHeight);
+});

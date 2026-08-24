@@ -62,7 +62,15 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 MAP = ROOT / "web" / "landing" / "demo" / "state-map.json"
 NOTES = ROOT / "web" / "landing" / "demo" / "divergence-notes.json"
+COUNTS = ROOT / "web" / "landing" / "demo" / "python-counts.json"
 FORGE = "laterite-ags4-forge"
+
+#: The prefix a rule key wears when the finding is FYI-tier. It is the tier
+#: marker in this key space — `Warning (Related to Rule 10c)` and
+#: `FYI (Related to Rule 16)` are how forge names the two non-error tiers — and
+#: it is the one thing separating what this map measures from what the demo
+#: shows. See `visible_signature`.
+FYI_PREFIX = "FYI"
 
 
 class Reader(TypedDict):
@@ -335,6 +343,10 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
                 "covered by equivalence class, not enumerated; a value outside "
                 "every class below is outside this map"
             ),
+            # The `arbitrary-text` class covers the four surfaces where free
+            # text can change an answer; these are the columns where it cannot,
+            # named rather than left as an unexplained gap in the sweep.
+            "inert_columns": manifest["inert_columns"],
         },
         "difference_shapes": [
             {
@@ -464,6 +476,191 @@ def build_notes(doc: dict) -> tuple[dict, list[str]]:
     }, missing
 
 
+def visible_signature(rust_rule_counts: dict[str, int]) -> tuple[str, list[str]]:
+    """A state's laterite finding signature AS THE DEMO SEES IT, and what that
+    cost.
+
+    The two engines are compared here with every tier on, which is what makes a
+    difference mean anything (see `dual_validate`). The demo's `validate` call
+    takes the wasm defaults: warnings on, **FYI off**. So the signature the
+    browser can compute for itself is over the visible tiers only, and building
+    it from the same subset here is what makes the lookup a function of
+    something the page actually holds rather than of something forge measured.
+
+    The dropped keys come back rather than vanishing, because they are not a
+    detail: the map's laterite total and the demo's displayed total are the
+    same number only while this list is empty.
+    """
+    dropped = sorted(k for k in rust_rule_counts if k.startswith(FYI_PREFIX))
+    visible = {k: v for k, v in rust_rule_counts.items() if k not in dropped}
+    return "|".join(f"{k}={visible[k]}" for k in sorted(visible)), dropped
+
+
+def _cell(state: dict) -> dict | None:
+    """The single cell edit a state was reached by, or None if it was reached
+    some other way. This is the only trigger a browser can evaluate exactly —
+    one cell against one string — which is why a collision resolvable any other
+    way is not resolved at all."""
+    by = state["reached_by"]
+    if state["lever"] != "setCell" or "value" not in by:
+        return None
+    return {
+        "group": by["group"],
+        "row": by["row"],
+        "heading": by["heading"],
+        "value": by["value"],
+    }
+
+
+def build_python_counts(doc: dict) -> tuple[dict, list[str]]:
+    """python-ags4's finding TOTAL for each laterite signature the demo can
+    reach, small enough to ship to a browser (#673).
+
+    python-ags4 is a dev-only dependency and is not in the page, so the number
+    beside laterite's is read, never computed. The key is laterite's own
+    finding signature because that is what the demo already has from its own
+    run — and it is a legitimate key only because the sweep measured it to be
+    one: the swept states collapse to far fewer signatures than states, and
+    python's answer is constant across all but one of them.
+
+    The exception is handled rather than hidden. A signature with two python
+    answers is not a function, and a page cannot show a number it has two of,
+    so this resolves it from the states themselves: if every state on the
+    minority answer was reached by a single cell edit that no state on the
+    majority answer shares, those cells become overrides the browser can test
+    exactly. Anything else FAILS, which is the point — the collision that
+    exists today (only a blank `TRAN_AGS` earns python's extra FYI, O-53)
+    resolves that way, and a second one landing on the page unnoticed is the
+    failure this whole sweep exists to prevent.
+    """
+    problems: list[str] = []
+    by_signature: dict[str, dict[int, list[dict]]] = {}
+    fyi_states: list[str] = []
+
+    for state in doc["states"]:
+        signature, dropped = visible_signature(state["rust_rule_counts"])
+        if dropped:
+            fyi_states.append(f"{state['id']} ({', '.join(dropped)})")
+        total = sum(state["python_rule_counts"].values())
+        by_signature.setdefault(signature, {}).setdefault(total, []).append(state)
+
+    # The trap this gate exists for, which had no gate at all: the map measures
+    # laterite with FYI ON and the demo displays it OFF. They are the same
+    # number only while nothing raises one — true today, and true by accident
+    # rather than by design.
+    if fyi_states:
+        problems.append(
+            f"{len(fyi_states)} state(s) raise a laterite FYI the demo does not "
+            f"display ({', '.join(fyi_states[:5])}"
+            f"{' …' if len(fyi_states) > 5 else ''}), so the page would put "
+            "python-ags4's total beside a laterite total it is not showing. "
+            "Either turn the demo's `fyi` option on, or stop counting the tier "
+            "here — not a call this generator may make on its own."
+        )
+
+    entries: list[dict] = []
+    for signature, by_total in sorted(by_signature.items()):
+        states = [st for group in by_total.values() for st in group]
+        if len(by_total) == 1:
+            entries.append(
+                {
+                    "signature": signature,
+                    "python": next(iter(by_total)),
+                    "states": len(states),
+                }
+            )
+            continue
+
+        # Ties broken on the total, not on dict order: this file is compared
+        # byte for byte by --check, so "whichever the sweep happened to reach
+        # first" would be a diff nobody could explain.
+        majority = max(by_total, key=lambda total: (len(by_total[total]), -total))
+        majority_cells = {
+            tuple(cell.values())
+            for st in by_total[majority]
+            if (cell := _cell(st)) is not None
+        }
+        overrides, unresolved = [], []
+        for total, group in sorted(by_total.items()):
+            if total == majority:
+                continue
+            for st in group:
+                cell = _cell(st)
+                if cell is None or tuple(cell.values()) in majority_cells:
+                    unresolved.append(st["id"])
+                else:
+                    overrides.append({**cell, "python": total})
+        # The browser matches an override against what the delivery CURRENTLY
+        # holds; this matched against the cell a state was REACHED BY. The two
+        # agree only because the enumerator refuses a class value equal to what
+        # the cell already holds, so no override can carry a seed value and
+        # fire on every delivery at once. Stated rather than asserted because
+        # the seed's cell values are not in this map to check against.
+        #
+        # What IS checkable here is the way a RESOLVED collision still goes
+        # wrong. The browser takes the first override that matches, and two
+        # overrides name two different cells — so a delivery holding both is a
+        # state where the page shows whichever happened to be written first,
+        # silently. That delivery is reachable the moment there are two: the
+        # sweep is exhaustive to depth 1 and both cells are one edit each.
+        # One override has no such state, which is why the collision that
+        # exists today is safe and a second one would not be.
+        if len(overrides) > 1:
+            unresolved.append(
+                "the resolution needs "
+                + " and ".join(
+                    f"{o['group']}.{o['heading']} row {o['row']}" for o in overrides
+                )
+                + ", and a delivery can hold both at once — the page would "
+                "show whichever was written first"
+            )
+        if unresolved:
+            problems.append(
+                f"laterite signature {signature!r} has python-ags4 answers "
+                f"{sorted(by_total)} and {len(unresolved)} of them "
+                f"({', '.join(sorted(unresolved)[:5])}) cannot be told apart by "
+                "a single cell the browser can test. The demo would show one of "
+                "the two numbers and be wrong about the other."
+            )
+            continue
+        entries.append(
+            {
+                "signature": signature,
+                "python": majority,
+                "states": len(states),
+                "when_cell_is": overrides,
+            }
+        )
+
+    return {
+        "schema": 1,
+        "generator": "tools/gen_demo_state_map.py",
+        "source": str(MAP.relative_to(ROOT)),
+        "python_ags4_version": doc["python_ags4_version"],
+        "measured": {
+            "states": len(doc["states"]),
+            "signatures": len(entries),
+            "laterite_tiers": (
+                "errors and warnings, which are the tiers the demo's own "
+                "validate call surfaces. The map itself measures FYI too, and "
+                "a state that raised one would fail this generator rather "
+                "than reach here"
+            ),
+            "python_total": (
+                "every finding python-ags4 reports at any tier, which is what "
+                "its own report shows a reader"
+            ),
+        },
+        "not_measured": (
+            "a signature absent from this table is a state the sweep never "
+            "validated, and the page must say so rather than go quiet. "
+            "Silence is indistinguishable from the two engines agreeing, "
+            "which is the confusion this whole line of work exists to remove"
+        ),
+        "signatures": entries,
+    }, problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="fail on drift, write nothing")
@@ -476,6 +673,8 @@ def main() -> int:
         doc, unknown = build_map(manifest, report, python_ags4_version())
     notes, note_gaps = build_notes(doc)
     unknown.extend(note_gaps)
+    counts, count_gaps = build_python_counts(doc)
+    unknown.extend(count_gaps)
 
     # The scope statement, printed pass or fail. A sweep that says only "199
     # states, no surprises" reads as "the demo has been swept".
@@ -518,13 +717,26 @@ def main() -> int:
         f"gen_demo_state_map: {len(notes['notes'])} reader note(s) for the "
         f"demo ({', '.join(n['observation'] for n in notes['notes']) or 'none'})"
     )
+    resolved = sum(1 for e in counts["signatures"] if "when_cell_is" in e)
+    inert = doc["not_covered"]["inert_columns"]
+    print(
+        f"gen_demo_state_map: {len(counts['signatures'])} laterite signature(s) "
+        f"carry a python-ags4 total, {resolved} of them resolving a collision "
+        f"by cell; {len(inert)} column(s) where arbitrary ASCII text is inert "
+        "and was not enumerated (they are still swept for Rule 1)"
+    )
 
     rendered = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
     rendered_notes = json.dumps(notes, indent=2, ensure_ascii=False) + "\n"
+    rendered_counts = json.dumps(counts, indent=2, ensure_ascii=False) + "\n"
     if args.check:
         stale = [
             path
-            for path, want in ((MAP, rendered), (NOTES, rendered_notes))
+            for path, want in (
+                (MAP, rendered),
+                (NOTES, rendered_notes),
+                (COUNTS, rendered_counts),
+            )
             if (path.read_text(encoding="utf-8") if path.exists() else "") != want
         ]
         if stale:
@@ -535,23 +747,27 @@ def main() -> int:
                 "it says which of the four this is: a state whose answer moved "
                 "(the states block changes), the OTHER engine moving under us "
                 "(`python_ags4_version` changes), the reachable set itself "
-                "changing (`counts` and `scope` change), or a difference "
+                "changing (`counts` and `scope` change), a difference "
                 "gaining/losing the note the demo shows for it (only "
-                "divergence-notes.json changes).",
+                "divergence-notes.json changes), or python-ags4's total moving "
+                "for a signature the page already shows (only "
+                "python-counts.json changes).",
                 file=sys.stderr,
             )
             return 1
         print(
-            f"gen_demo_state_map: {MAP.relative_to(ROOT)} and "
-            f"{NOTES.relative_to(ROOT)} are up to date"
+            "gen_demo_state_map: "
+            + ", ".join(str(x.relative_to(ROOT)) for x in (MAP, NOTES, COUNTS))
+            + " are up to date"
         )
         return 0
 
     MAP.write_text(rendered, encoding="utf-8")
     NOTES.write_text(rendered_notes, encoding="utf-8")
+    COUNTS.write_text(rendered_counts, encoding="utf-8")
     print(
-        f"gen_demo_state_map: wrote {MAP.relative_to(ROOT)} and "
-        f"{NOTES.relative_to(ROOT)}"
+        "gen_demo_state_map: wrote "
+        + ", ".join(str(x.relative_to(ROOT)) for x in (MAP, NOTES, COUNTS))
     )
     return 0
 

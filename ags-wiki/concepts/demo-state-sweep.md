@@ -11,7 +11,10 @@ repo_refs:
   generator: "repo:tools/gen_demo_state_map.py"
   model: "repo:web/landing/demo/delivery.ts"
   map: "repo:web/landing/demo/state-map.json"
-related: [parity-model, laterite-ags4-forge, validator-site]
+  notes: "repo:web/landing/demo/divergence-notes.json"
+  counts: "repo:web/landing/demo/python-counts.json"
+  lookup: "repo:web/landing/demo/divergence.ts"
+related: [parity-model, laterite-ags4-forge, validator-site, O-53]
 sources: []
 ---
 # demo state sweep: what both engines say about every state the demo can reach
@@ -91,6 +94,20 @@ REQUIRED, the declared TYPE) rather than hardcoded per cell.
 
 A value outside every class is outside the map, and the run says so.
 
+Five of the classes are each **engineered** to reach a named rule, and none of
+them is the thing a reader actually does, which is type a phrase into a cell.
+The sixth is: ordinary ASCII prose, inert by its content, so that any answer it
+moves is attributable to the COLUMN it was typed into. That surface is four
+things, all knowable from the demo's own schema — **KEY** columns (the
+relational cascade), **typed** columns (Rule 8), **PA** columns (Rule 16), and
+any column at all if the text is non-ASCII (Rule 1, which stays its own class
+because pushing non-ASCII into a numeric column trips Rule 8 on the way).
+
+Everywhere else arbitrary text is inert, and the sweep **names those columns**
+rather than enumerating them — the exclusion rests on a prior byte-exact
+measurement, not on the run, which is exactly why it is written down. An
+unstated exclusion reads as a surface that was swept.
+
 ## Why a difference must be triaged, not merely recorded
 
 A map that lists differences without saying what they ARE is a list of things
@@ -169,6 +186,46 @@ The two cases are not matched the same way, and the asymmetry is the point:
   comparison. The alternative is deciding *is this value non-ASCII for its
   declared type* in the browser, which would put a second validator on the page
   to disagree with the first.
+
+## The third output: what the other engine COUNTED
+
+A note says the two engines differ. It does not say what python-ags4 actually
+reported, and the demo showing its own findings beside no number at all leaves
+a reader to guess. The same run writes
+`repo:web/landing/demo/python-counts.json`, and the page reads its total from
+there — python-ags4 is a dev-only dependency and never runs in a browser
+(#673).
+
+It is keyed on **laterite's own finding signature**: the rule-key-to-count map
+the demo already has from its own run. That is a legitimate key only because
+the sweep measured it to be one — the swept states collapse to far fewer
+signatures than states, and python's answer is constant across all but one of
+them.
+
+Three things make it honest rather than merely convenient:
+
+- **The one collision is resolved, not smoothed over.** Clearing `PROJ_ID` or
+  any of several `TRAN` cells leaves laterite saying exactly the same thing, and
+  only a blank `TRAN_AGS` earns python's extra FYI ([[O-53]]). It resolves on
+  the same cell match the `they report it, we do not` notes use. A *second*
+  collision that no single cell can tell apart **fails the run**, because a
+  page cannot show a number it has two of.
+- **A signature the sweep never measured says so.** Silence is
+  indistinguishable from the two engines agreeing, which is the confusion this
+  whole line of work exists to remove.
+- **The signature is keyed on the tiers the DEMO shows, not the tiers the sweep
+  measured.** The sweep runs both engines with every tier on, because that is
+  what makes a difference mean anything; the demo's own `validate` call takes
+  the wasm default of FYI off. A swept state that raised a laterite FYI would
+  put python's total beside a laterite total the page is not showing, so it
+  **fails the run** rather than being written. Nothing checked that before, and
+  it was true only by accident.
+
+Two designs were measured and rejected, so they do not get retried. **Hashing
+the delivery text** is exact but over-strict: typing a project name changes the
+bytes while changing neither engine's findings. **Per-lever addition** is simply
+wrong — levers do not compose, and orphaning a `SAMP` row then deleting the
+`LOCA` group predicts one more finding than the measured answer.
 
 ## Running it
 
