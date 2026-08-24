@@ -67,6 +67,9 @@
     "removed": [],
     "fixed": [
       {
+        "text": "**The demo's UNIT, TYPE and ABBR groups now carry the standard descriptions.** Eleven were the demo's own wording rather than the AGS4 dictionary's: `m` as \"metres\" not \"metre\", `PA` as \"Abbreviation list\" not \"Text listed in ABBR Group\", `CP` as \"Cable percussion borehole\" not \"Cable percussion (shell and auger)\", and so on. Teaching material a reader may copy should be the real thing. Only the ABBR drift was checked — that is the O-43 FYI — so UNIT and TYPE had no gate at all and nothing would have caught them. The reader sees no change: the demo validates with the FYI tier off, so the two flagged ABBR descriptions were never shown, and the seed's four visible findings are the same four. What changes is the divergence map, and substantially: that FYI was the ONLY difference in 145 of the 150 swept states, so the demo's claim to differ from python-ags4 almost everywhere was an artifact of two typos in our own fixture. It now differs in 5 states, which are the real ones (#659)."
+      },
+      {
         "text": "**Dropping two columns from one group with `forge edit` now removes both.** Each removal shortened the line the other was indexing into, so the second one took the wrong field or ran off the end — which surfaced as a spurious \"row too short\" refusal or, for a row the same patch had appended, a silently ragged row. Which of the two happened depended on the order the flags were written in. Columns are now resolved against the original headings and removed right-to-left, so the pair means the same thing either way. Found by a `cargo mutants` sweep: the surviving mutant was on the bounds guard that was absorbing the fault (#655)."
       },
       {

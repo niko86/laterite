@@ -100,9 +100,19 @@ against a known one carrying its O-N. An unrecognised shape **fails the run**
 rather than being written down: it is either a new record to write or a defect
 in one of the two engines, and both need a person.
 
-The generator earned that guard on its first real run. It rejected a shape that
-turned out to be the declined-parentage warning added hours earlier — a
-validator change had moved four demo states, and the sweep is what noticed.
+The generator earned that guard twice on the day it was written. First it
+rejected a shape that turned out to be the declined-parentage warning added
+hours earlier: a validator change had moved four demo states, and the sweep is
+what noticed.
+
+Then it did the more useful thing. Asked why one FYI was firing on nearly every
+state, the answer was that the seeded delivery carried its own wording for
+eleven UNIT, TYPE and ABBR descriptions rather than the dictionary's — and two
+of the ABBR ones were what raised that FYI. So the demo's claim to differ from
+python-ags4 almost everywhere was an artifact of two typos in our own fixture.
+Correcting them moved the map from one difference in nearly every state to five
+in total. A sweep is worth having partly because it makes a claim like that
+checkable at all; the number was never wrong, but what it MEANT was.
 
 ## Reading the map
 
