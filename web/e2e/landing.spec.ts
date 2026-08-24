@@ -3300,3 +3300,101 @@ test("fine: a paste whose target moved is abandoned, not re-aimed", async ({
   await page.keyboard.press("ControlOrMeta+z");
   await expect(rows).toHaveCount(2);
 });
+
+test("fine: the demo explains a divergence where the reader meets it (#660)", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#525)");
+  await page.goto("/");
+  const chip = page.locator('[data-scoreboard="floating"]');
+  await expect(chip).toContainText("4 errors");
+  const panel = page.locator("#findings");
+
+  // Pinned by O-N IDENTITY throughout, never by count. A count assertion passes
+  // while pointing at the wrong record, and this whole surface exists because
+  // the map's first revision did exactly that across most of its states (#671).
+  //
+  // Both edits below go the same way: a click SELECTS the cell, Enter opens the
+  // editor (#525), and the editor focuses in onMount — so waiting on that focus
+  // is what stops the keystrokes landing on the cell button and clearing
+  // nothing, which would be a green test over an unmade edit.
+
+  // Nothing to explain on the delivery as seeded: the seed's four findings are
+  // ones both engines raise, so a note here would be noise on every load.
+  await expect(panel).not.toContainText("O-52");
+  await expect(panel).not.toContainText("O-53");
+  await expect(panel).not.toContainText("vs python-ags4");
+
+  // CASE 1 — we raise it, they do not. Blanking a child's parent key strands
+  // the row: laterite says the parentage check was DECLINED, python-ags4 is
+  // silent for a reason that is an accident of its merge (O-52).
+  const key = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of SAMP",
+  });
+  await key.scrollIntoViewIfNeeded();
+  await key.click();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("textbox", { name: "LOCA_ID on row 1 of SAMP" }),
+  ).toBeFocused();
+  await page.keyboard.press("Delete");
+  await page.keyboard.press("Enter");
+
+  // On the FINDING it belongs to, not merely somewhere in the panel: the note
+  // is the sibling immediately after the callout carrying the rule it explains.
+  // "somewhere in #findings" would pass with the note attached to the wrong
+  // finding, which is the failure worth catching.
+  const declined = panel
+    .locator("li")
+    .filter({ hasText: "Warning (Related to Rule 10c)" })
+    .first();
+  await expect(declined).toContainText("vs python-ags4");
+  await expect(declined).toContainText("O-52");
+
+  // And nowhere else: every other finding in this state is one both engines
+  // raise, so exactly one note is on screen.
+  await expect(panel.getByText("vs python-ags4")).toHaveCount(1);
+
+  // The note explains a finding of OURS, so it rides with one. It is not the
+  // standalone panel, which names the other tool in its own heading.
+  await expect(panel).not.toContainText("reports this. We do not.");
+
+  // CASE 2 — they raise it, we do not. A blank TRAN_AGS earns our Rule 10b
+  // error and nothing more; python-ags4 stacks an unrecognised-edition FYI on
+  // the same cell (O-53). There is no finding of ours to hang that off, so it
+  // renders as its own panel.
+  const edition = page.getByRole("button", {
+    name: "Edit TRAN_AGS on row 1 of TRAN",
+  });
+  await edition.scrollIntoViewIfNeeded();
+  await edition.click();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("textbox", { name: "TRAN_AGS on row 1 of TRAN" }),
+  ).toBeFocused();
+  await page.keyboard.press("Delete");
+  await page.keyboard.press("Enter");
+
+  const theirs = panel.getByText("reports this. We do not.");
+  await expect(theirs).toBeVisible();
+  await expect(panel).toContainText("O-53");
+
+  // It must never be mistaken for a finding. Three carriers, none of them
+  // colour: it is not a button (every finding is one — clicking a finding
+  // jumps the file pane to its line, and this has no line to jump to), its
+  // border is dashed where a callout's is solid, and it names the other tool
+  // rather than a rule.
+  const block = panel
+    .locator("div")
+    .filter({ hasText: "reports this. We do not." })
+    .last();
+  await expect(block).toHaveCSS("border-style", "dashed");
+  expect(await block.evaluate((el) => el.closest("button") !== null)).toBe(
+    false,
+  );
+
+  // And it is not counted as one. The scoreboard counts findings the engine
+  // returned; a panel about the OTHER engine's report must not move it.
+  await expect(chip).not.toContainText("5 errors");
+});

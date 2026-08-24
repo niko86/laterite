@@ -41,12 +41,19 @@ import { narrowViewport } from "../viewport";
 import {
   armed,
   busy,
+  delivery,
   focusLine,
   reset,
   report,
   setFocusLine,
   text,
 } from "./store";
+import {
+  PYTHON_AGS4_VERSION,
+  divergenceForRule,
+  divergencesTheyRaise,
+  type DivergenceNote,
+} from "./divergence";
 import type { Finding } from "./engine";
 
 /* One row of the panel — the shared callout with the panel's two extras: the
@@ -66,18 +73,57 @@ import type { Finding } from "./engine";
    fold and the browser scrolls it into view. */
 const PANE_HEIGHT = "max-h-[26rem] overflow-auto overscroll-contain";
 
-const FindingRow: Component<{ finding: Finding }> = (props) => (
-  <FindingCallout
-    severity={props.finding.severity}
-    rule={props.finding.rule}
-    group={props.finding.group || undefined}
-    line={props.finding.line}
-    disabled={props.finding.line === null}
-    onClick={() => setFocusLine(props.finding.line)}
-  >
-    {props.finding.desc}
-  </FindingCallout>
+/* The explanation for a difference, subordinate to the finding it is about
+   (#660). Indented under its finding and set in the micro size, because it is
+   commentary on a verdict and not a second verdict — the reader should be able
+   to skip every one of these and still have read the findings. The rule on the
+   left and the O-N are the non-colour carriers: this block is drawn
+   differently from a callout whether or not colour arrives. */
+const DivergenceNoteBlock: Component<{ note: DivergenceNote }> = (props) => (
+  <div class="mt-1 ml-3 border-l-2 border-line-strong pl-3 text-micro text-fg-muted">
+    <p class="font-mono uppercase tracking-(--track-micro)">
+      vs python-ags4 {PYTHON_AGS4_VERSION}
+      <span class="ml-2 text-fg-faint">{props.note.observation}</span>
+    </p>
+    <p class="mt-1 normal-case">{props.note.text}</p>
+  </div>
 );
+
+/* The other direction, which has no finding to hang off — python-ags4 reported
+   something and we did not, so there is nothing of ours on the page to
+   annotate (#660). Four things keep it from reading as a finding, only one of
+   which is colour: the border is DASHED where every callout's is solid, it
+   names the other tool in its own heading, it carries no line number, and it
+   is not a button (a finding jumps the pane to its line; this has no line to
+   jump to). */
+const TheyRaiseBlock: Component<{ note: DivergenceNote }> = (props) => (
+  <div class="rounded-md border border-dashed border-info/60 bg-info-quiet px-3 py-2 text-caption text-fg-soft">
+    <p class="font-mono text-micro uppercase tracking-(--track-micro) text-info">
+      python-ags4 {PYTHON_AGS4_VERSION} reports this. We do not.
+      <span class="ml-2 text-fg-faint">{props.note.observation}</span>
+    </p>
+    <p class="mt-1">{props.note.text}</p>
+  </div>
+);
+
+const FindingRow: Component<{ finding: Finding }> = (props) => {
+  const note = createMemo(() => divergenceForRule(props.finding.rule));
+  return (
+    <>
+      <FindingCallout
+        severity={props.finding.severity}
+        rule={props.finding.rule}
+        group={props.finding.group || undefined}
+        line={props.finding.line}
+        disabled={props.finding.line === null}
+        onClick={() => setFocusLine(props.finding.line)}
+      >
+        {props.finding.desc}
+      </FindingCallout>
+      <Show when={note()}>{(n) => <DivergenceNoteBlock note={n()} />}</Show>
+    </>
+  );
+};
 
 export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
@@ -112,6 +158,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
    *  tier. The absence-rule story (no line, no band) lives with the map's
    *  own docstring. */
   const lineTiers = createMemo(() => worstPerLine(findings()));
+  /* Read from the committed map against the delivery on screen, not from the
+     report: these are things the OTHER engine says, and our report cannot
+     carry them (#660). */
+  const theyRaise = createMemo(() => divergencesTheyRaise(delivery()));
 
   return (
     <div style={{ "--band": `var(${props.band})` }}>
@@ -322,6 +372,26 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             >
               {/* Below the breakpoint the list becomes the one-card carousel
                   (#592) — same rows, same order, paged instead of stacked. */}
+              {/* The other engine's own findings, above the list in both
+                  dresses (#660). Above rather than interleaved because it is
+                  not one of ours and must not be paged through as though it
+                  were — the carousel counts findings, and a card that is not a
+                  finding would make its "3 of 7" a lie.
+
+                  It sits INSIDE the scroller on the desktop side below, so it
+                  costs the panel no height (#657); on the carousel side there
+                  is no scroller to sit in, and it is a fixed block above a
+                  fixed-height carousel (#622). */}
+              <Show when={narrowViewport()}>
+                <For each={theyRaise()}>
+                  {(note) => (
+                    <div class="mt-3">
+                      <TheyRaiseBlock note={note} />
+                    </div>
+                  )}
+                </For>
+              </Show>
+
               <Show
                 when={!narrowViewport()}
                 fallback={
@@ -350,6 +420,13 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   aria-label="Findings"
                   class={`mt-3 list-none space-y-2 p-0 pr-1 ${PANE_HEIGHT}`}
                 >
+                  <For each={theyRaise()}>
+                    {(note) => (
+                      <li>
+                        <TheyRaiseBlock note={note} />
+                      </li>
+                    )}
+                  </For>
                   <Index each={findings()}>
                     {(finding) => (
                       <li>

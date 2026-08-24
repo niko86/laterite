@@ -144,6 +144,32 @@ often is a louder signal than a tier difference, and no O-N explains one.
 `python_ags4_version` is in the map because the map is a claim about a specific
 version of the other engine, not a timeless one.
 
+## The second output: what the reader is told
+
+The map is evidence, and it is about two orders of magnitude too large to ship
+to a landing page. So the same run writes a second, small file beside it —
+`web/landing/demo/divergence-notes.json` — carrying one reader-facing note per
+difference shape, which the demo renders at the moment someone reaches that
+state (#660).
+
+A shape with no note **fails the run**, on the same reasoning as an untriaged
+shape: a difference the demo shows nothing about is indistinguishable, on the
+page, from a state that has nothing to explain.
+
+The two cases are not matched the same way, and the asymmetry is the point:
+
+- **We report it, they do not** (and **both, at different tiers**) match on the
+  RULE KEY. The finding is already on the page carrying that key, so the note
+  hangs off it — and it generalises past the swept states for free, because any
+  state raising the key gets the explanation.
+- **They report it, we do not** has no finding of ours to hang off; that is
+  precisely the case. It matches instead on the CELL the state was reached by,
+  against the literal value the enumerator wrote — which is why the enumerator
+  records the value and not only its equivalence class. One cell, one string
+  comparison. The alternative is deciding *is this value non-ASCII for its
+  declared type* in the browser, which would put a second validator on the page
+  to disagree with the first.
+
 ## Running it
 
 ```bash
