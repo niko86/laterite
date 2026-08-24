@@ -5,7 +5,7 @@ status: reviewed
 tags: [concept]
 ags_editions: []
 repo_refs: {parity: "rust-packages/laterite-ags4-parity/src/verdict.rs"}
-related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, laterite-ags4-forge, laterite-ags4-parity, surface-census]
+related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, laterite-ags4-forge, laterite-ags4-parity, surface-census, demo-state-sweep]
 sources: []
 ---
 # parity model
@@ -90,4 +90,4 @@ gaps we have a position on but haven't actioned) are parked in
 [[compat-decisions-held]].
 
 ## Related
-[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]]
+[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]] · [[demo-state-sweep]]

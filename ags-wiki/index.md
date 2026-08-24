@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-08-24
-counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 34}
+counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 34}
 ---
 # AGS Wiki — Content Catalog
 
@@ -16,17 +16,17 @@ counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concept
 | Types | 17 |
 | Observations | 52 |
 | Tools | 30 |
-| Concepts | 30 |
+| Concepts | 31 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 34 |
-| **Total (live)** | **416** |
+| **Total (live)** | **417** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 33 · `confirmed` 18 · `drafted` 334 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 33 · `confirmed` 18 · `drafted` 335 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -369,6 +369,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concept
 | [[coverage-campaign]] | drafted |
 | [[crate-dependency-graph]] | reviewed |
 | [[crate-map]] | drafted |
+| [[demo-state-sweep]] | drafted |
 | [[denormalised-child-rows]] | drafted |
 | [[docs-site]] | drafted |
 | [[edition-resolution]] | drafted |

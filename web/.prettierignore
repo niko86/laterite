@@ -34,3 +34,9 @@ docs-site/docs/
 # version bump gets reviewed is by diffing ours against theirs. A reformatted
 # fork diffs against upstream on every line.
 docs-site/overrides/
+# Same rule again: the demo state map is rendered by tools/gen_demo_state_map.py,
+# whose --check gate compares it byte for byte against what python writes.
+# Prettier collapses short arrays onto one line and python's json.dumps never
+# does, so letting both format it would make the two gates contradict each other
+# — one of them red whichever way the file is written.
+landing/demo/state-map.json

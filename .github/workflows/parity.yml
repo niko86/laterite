@@ -61,6 +61,7 @@ jobs:
       pull-requests: read
     outputs:
       compat: ${{ steps.filter.outputs.compat }}
+      demo: ${{ steps.filter.outputs.demo }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -69,6 +70,24 @@ jobs:
           # Anything that can move the compat verdict. The GitLab clone is the
           # cost this avoids on a doc-only PR.
           filters: |
+            # Anything that can move a DEMO state's answer: the demo's own
+            # model and emitter, the states the sweep enumerates, and the two
+            # halves of the generator. Deliberately NOT the `compat` filter —
+            # a demo-only change must not spin up the GitLab clone, and a
+            # validator change must run BOTH.
+            demo:
+              - 'web/landing/demo/**'
+              - 'web/scripts/sweep-demo-states.mjs'
+              - 'tools/gen_demo_state_map.py'
+              - 'rust-packages/laterite-ags4-validator/**'
+              - 'rust-packages/laterite-ags4-parse/**'
+              # The dictionary and rules catalogue the validator PROJECTS from.
+              # An edition or dictionary edit moves a demo answer without
+              # touching a rule module, so leaving this out is a filter that
+              # switches the gate off exactly when it is needed.
+              - 'rust-packages/laterite-ags4-reference/**'
+              - 'rust-packages/laterite-ags4-forge/**'
+              - '.github/workflows/parity.yml'
             compat:
               - 'rust-packages/laterite-ags4-validator/**'
               - 'rust-packages/laterite-ags4-parse/**'
@@ -154,6 +173,60 @@ jobs:
 
       - name: Does laterite.compat still cover python-ags4's public API?
         run: uv run --no-sync python tools/check_dropin_surface.py
+
+  # The demo tells a reader that the two engines answer differently in places.
+  # This holds that claim to every state the demo can reach rather than to the
+  # handful anyone checked by hand — a handful is not evidence about a few
+  # hundred, which is the correction that produced this job (#659).
+  #
+  # Its own job, not a step in `parity`, for the reason the header already gives
+  # about `upstream-pin`: "we regressed" and "a demo state moved" are different
+  # signals and sharing a job collapses them into one red X. It is also much
+  # lighter — it needs the `python_ags4` PACKAGE, not the GitLab clone of
+  # upstream's test suite.
+  demo-state-map:
+    needs: changes
+    # `!cancelled()` is load-bearing here for the same reason it is on `parity`:
+    # without it GitHub applies an implicit success() and skips the job before
+    # ever reading the condition.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.demo == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Sync the dev group (python-ags4 is a declared dev dep)
+        run: uv sync --group dev --no-install-workspace
+
+      # Vite resolves the demo's `?raw` seed import, which is why the sweep
+      # loads the real `delivery.ts` instead of reimplementing it.
+      - name: web — install
+        working-directory: web
+        run: npm ci
+
+      # forge is what runs BOTH engines and reports per-rule counts.
+      - name: Build forge (the dual-validator)
+        run: cargo build --release -p laterite-ags4-forge
+        working-directory: rust-packages
+
+      - name: Every demo state answers the way the map says
+        run: uv run --no-sync python tools/gen_demo_state_map.py --check
 
   parity:
     needs: changes

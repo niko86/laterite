@@ -9,7 +9,7 @@ artifact: laterite-ags4-forge
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-forge"
-related: [parity-model, laterite-ags4-corpus-qa, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model, strat-forge-rule10a-relational, bs5930-soil-descriptions]
+related: [parity-model, laterite-ags4-corpus-qa, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model, strat-forge-rule10a-relational, bs5930-soil-descriptions, demo-state-sweep]
 sources: []
 ---
 # laterite-ags4-forge
@@ -147,4 +147,4 @@ See [[evolutionary-dogfooding]] for the loop and
 [[parity-confidence-model]] for the adaptive oracle gating.
 
 ## Related
-[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-parity]] · laterite-ags4-compliance · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[dec-ags4-forge-evolutionary-dogfood]] · [[strat-forge-rule10a-relational]] · [[bs5930-soil-descriptions]] · [[crate-map]]
+[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-parity]] · laterite-ags4-compliance · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[dec-ags4-forge-evolutionary-dogfood]] · [[strat-forge-rule10a-relational]] · [[bs5930-soil-descriptions]] · [[crate-map]] · [[demo-state-sweep]]
