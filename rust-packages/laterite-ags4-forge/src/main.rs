@@ -27,6 +27,7 @@ mod artifacts;
 mod cli;
 mod cmd;
 mod confidence;
+mod edit;
 mod evolve;
 mod mine;
 mod minimize;
@@ -78,6 +79,7 @@ fn main() {
         Commands::Describe(a) => cmd::describe(a, ctx),
         Commands::Scale(a) => cmd::scale(a, ctx),
         Commands::Minimize(a) => cmd::minimize(a, ctx),
+        Commands::Edit(a) => cmd::edit(a, ctx),
         Commands::Strategy(a) => cmd::strategy_cmd(a, ctx),
         Commands::Confidence(a) => cmd::confidence_cmd(a, ctx),
         Commands::SeedVendor(a) => cmd::vendor(a, ctx),

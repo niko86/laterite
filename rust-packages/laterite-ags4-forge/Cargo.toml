@@ -29,6 +29,10 @@ path = "src/main.rs"
 [dependencies]
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 laterite-ags4-parity = { path = "../laterite-ags4-parity" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# The canonical field quoter (`quote_field`) — `edit` must write fields the
+# way everything else in the repo writes them, not by a local copy.
+laterite-ags4-types = { path = "../laterite-ags4-types" }
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 serde = { version = "1", features = ["derive"] }

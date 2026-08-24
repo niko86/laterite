@@ -76,6 +76,33 @@ sources: []
 > size-scaled *densely-dirty* twin of a clean rung prices the validator's
 > error-emission path at scale (T5) — e.g. `--inject rule16 --density 1.0`
 > is ~314k Rule-16 findings on a 25 MB file.
+> `edit` is the one command that does not synthesize: it applies **structured
+> edits to a file that already exists** — set/blank a cell, add or delete a
+> row, drop a column or a whole group, several at once from a `--patch` file.
+> It exists because the investigation behind the Rule 10c parentage warning
+> produced three wrong results in a row from hand-manipulating AGS text (a
+> value containing a comma torn in half, line endings converted by a text
+> reader, a ragged row that made one validator bail and read as a divergence),
+> and none of those were interesting. Untouched lines are written back
+> **byte-verbatim** — the difference between input and output IS the edit —
+> which is a property of the line-oriented splice, not of re-emitting: a
+> parse→[[laterite-ags4-emit|emit]] round-trip is a *construction* API and
+> normalises what it did not change. A line an operation names is rebuilt
+> canonically, because splicing a comma-bearing value into a field that was
+> not quoted is one of the three failures above. Operations resolve against the
+> file **as it arrived** — a row number always counts the original data rows —
+> and then apply in a canonical order rather than the order they were listed,
+> so a patch cannot mean two things: asking to delete a group and also to edit
+> a row in it can only mean the delete. Three shapes are refused by name rather
+> than edited into something worse: a group, row or heading that is not there;
+> a file declaring one GROUP code **twice** (every locator would mean two
+> things, and the parse leaf resolves the halves inconsistently — rows
+> first-seen-wins, headings last-seen-wins); and a row too short to carry a
+> column being dropped. The **minimizer's field pass
+> runs on this layer too**: it used to split a DATA line on `,` with no quote
+> awareness, so shrinking a value like `"north, then east"` cut it in half and
+> left the quote open — at the same field count, so no arity rule noticed, and
+> a reproducer came out that was not a smaller version of its input.
 
 ## Inputs / outputs
 > [!quote] In: a declarative `strategy.toml` (the executable twin of a
@@ -98,7 +125,9 @@ Planned `repo:rust-packages/laterite-ags4-forge` (sibling of
 `repo:rust-packages/laterite-ags4-corpus-qa`). Reuses the validator library
 `repo:rust-packages/laterite-ags4-validator/src/lib.rs`, the shared
 [[laterite-ags4-parity]] (extracted from
-`repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`), the python bridge
+`repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`), the shared parse
+leaf [[laterite-ags4-parse]] (`edit`'s line model + the one tokenizer, see
+`repo:rust-packages/laterite-ags4-forge/src/edit.rs`), the python bridge
 `tools/py_ags4_check_json.py`, and [[laterite-cliutil]] per the
 [[agent-first-cli-contract]].
 
