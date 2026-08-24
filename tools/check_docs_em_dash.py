@@ -140,11 +140,15 @@ BUILT_SKIP = {
     # rewritten to say so. Until one of those, the count below is not a zero.
     "reference/cli/": (
         "EXCLUDED BY A CALL MADE HERE, NOT BY #588. The page is the shipped "
-        "`lat --readme` guide, mirrored byte-identical into four packages and "
-        "held there by tools/gen_cli_readme.py, so rewriting it changes what two "
-        "binaries print rather than what this site says. That is a "
-        "shipped-content change, and #681 is where it gets decided; until then "
-        "these are known-unfixed, not known-absent"
+        "`lat --readme` guide: one authority (rust-packages/laterite-cli/"
+        "README-cli.md) `include_str!`d into the binary, plus two mirrors held "
+        "byte-identical to it by tools/gen_cli_readme.py, so rewriting it "
+        "changes what a shipped program prints rather than what this site says. "
+        "That is a shipped-content change, and #681 is where it gets decided; "
+        "until then these are known-unfixed, not known-absent. The count is "
+        "PROSE only, and smaller than it looks: the guide's `lat --help` blocks "
+        "are skipped as code like anywhere else, and one offending heading is "
+        "counted once per place the theme renders it"
     ),
 }
 
