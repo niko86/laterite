@@ -76,6 +76,10 @@ pub enum Commands {
     /// ddmin-shrink a divergence-producing .ags to a minimal,
     /// signature-preserving reproducer (e.g. a corpus-qa ACTION file).
     Minimize(MinimizeArgs),
+    /// Apply structured edits to a real .ags file — set/blank a cell, add
+    /// or delete a row, drop a column or a whole group — leaving every
+    /// line no operation names byte-for-byte alone.
+    Edit(EditArgs),
     /// Author / schema-check / explain a declarative strategy file
     /// (the author↔CLI contract). `validate` runs nothing (read-only).
     Strategy(StrategyArgs),
@@ -282,6 +286,50 @@ pub struct ScaleArgs {
     /// or ./forge-runs).
     #[arg(long)]
     pub out_dir: Option<PathBuf>,
+}
+
+#[derive(Args)]
+pub struct EditArgs {
+    /// The .ags file to edit.
+    pub file: PathBuf,
+    /// `GROUP:ROW:HEADING=VALUE`. ROW counts the file's ORIGINAL data rows,
+    /// 1-indexed, so a patch reads the way it was written however much it
+    /// changes. Repeatable.
+    #[arg(long, value_name = "GROUP:ROW:HEADING=VALUE")]
+    pub set: Vec<String>,
+    /// `GROUP:ROW:HEADING` — empty the cell, keeping the field. Repeatable.
+    #[arg(long, value_name = "GROUP:ROW:HEADING")]
+    pub blank: Vec<String>,
+    /// `GROUP:ROW`. Repeatable.
+    #[arg(long, value_name = "GROUP:ROW")]
+    pub delete_row: Vec<String>,
+    /// `GROUP:HEADING` — drop the heading and its cell from every row,
+    /// descriptor rows included. Repeatable.
+    #[arg(long, value_name = "GROUP:HEADING")]
+    pub delete_column: Vec<String>,
+    /// `GROUP` — the GROUP/HEADING/UNIT/TYPE rows, the data rows, and the
+    /// blank separator that followed. Repeatable.
+    #[arg(long, value_name = "GROUP")]
+    pub delete_group: Vec<String>,
+    /// `GROUP` — append one empty data row, padded to the group's heading
+    /// count. Repeatable. Use `--patch` to append a row WITH values.
+    #[arg(long, value_name = "GROUP")]
+    pub add_row: Vec<String>,
+    /// A patch file (`.toml` or `.json`) of operations — the form that
+    /// carries values, survives review, and can be re-run. Combines with
+    /// the flags above; `--patch-template` prints a worked example.
+    #[arg(long, value_name = "FILE")]
+    pub patch: Option<PathBuf>,
+    /// Print a commented patch-file template and exit.
+    #[arg(long)]
+    pub patch_template: bool,
+    /// Write the edited file here. Without it (and without `--in-place`)
+    /// nothing is written: the report says what WOULD change.
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+    /// Overwrite the input file.
+    #[arg(long, conflicts_with = "out")]
+    pub in_place: bool,
 }
 
 #[derive(Args)]

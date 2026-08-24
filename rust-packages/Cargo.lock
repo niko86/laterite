@@ -2219,6 +2219,8 @@ dependencies = [
  "chrono",
  "clap",
  "laterite-ags4-parity",
+ "laterite-ags4-parse",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-cliutil",
  "serde",

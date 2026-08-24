@@ -98,6 +98,8 @@ flowchart TD
   laterite_ags4_excel --> laterite_ags4_core
   laterite_ags4_excel --> laterite_ags4_emit
   laterite_ags4_forge --> laterite_ags4_parity
+  laterite_ags4_forge --> laterite_ags4_parse
+  laterite_ags4_forge --> laterite_ags4_types
   laterite_ags4_forge --> laterite_ags4_validator
   laterite_ags4_forge --> laterite_cliutil
   laterite_ags4_merge --> laterite_ags4_emit
@@ -169,8 +171,8 @@ flowchart TD
 
 | crate | layer | ship-deps (out) | dependents (in) | transitive |
 |---|---|--:|--:|--:|
-| `laterite-ags4-parse` | L0 | 0 | 15 | 0 |
-| `laterite-ags4-types` | L0 | 0 | 12 | 0 |
+| `laterite-ags4-parse` | L0 | 0 | 16 | 0 |
+| `laterite-ags4-types` | L0 | 0 | 13 | 0 |
 | `laterite-ags4-reference` | L0 | 2 | 7 | 2 |
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
@@ -185,7 +187,7 @@ flowchart TD
 | `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
 | `laterite-ags4-corpus-qa` | L3 | 4 | 0 | 7 |
-| `laterite-ags4-forge` | L3 | 3 | 0 | 6 |
+| `laterite-ags4-forge` | L3 | 5 | 0 | 6 |
 | `laterite-ags4-perf` | L3 | 3 | 0 | 4 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
@@ -200,9 +202,9 @@ flowchart TD
 - **Layering inversions (ship edge to a higher layer):** none — the graph respects its layering.
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
-  - `laterite-ags4-parse` (in-degree 15)
+  - `laterite-ags4-parse` (in-degree 16)
+  - `laterite-ags4-types` (in-degree 13)
   - `laterite-ags4-validator` (in-degree 13)
-  - `laterite-ags4-types` (in-degree 12)
   - `laterite-ags4-core` (in-degree 9)
   - `laterite-ags4-emit` (in-degree 7)
   - `laterite-ags4-reference` (in-degree 7)

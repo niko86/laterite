@@ -1,0 +1,258 @@
+//! `forge edit` end to end, through the real binary (#655).
+//!
+//! The in-module tests cover `apply`. Nothing covered the path a contributor
+//! actually uses: flags parsed by clap, turned into operations, applied, and
+//! written to disk. That path has its own failure modes — a value swallowed by
+//! shell-adjacent splitting, a preview run that writes anyway, an exit code
+//! that says success on a refusal — and none of them are visible from `apply`.
+
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+const FILE: &str = concat!(
+    "\"GROUP\",\"LOCA\"\r\n",
+    "\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_REM\"\r\n",
+    "\"UNIT\",\"\",\"m\",\"\"\r\n",
+    "\"TYPE\",\"ID\",\"2DP\",\"X\"\r\n",
+    "\"DATA\",\"BH1\",\"100.00\",\"first\"\r\n",
+    "\"DATA\",\"BH2\",\"200.00\",\"second\"\r\n",
+);
+
+fn write_fixture(dir: &Path) -> PathBuf {
+    let path = dir.join("delivery.ags");
+    std::fs::write(&path, FILE).expect("fixture written");
+    path
+}
+
+fn forge(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_laterite-ags4-forge"))
+        .args(args)
+        .output()
+        .expect("the binary runs")
+}
+
+/// stdout is the result document; `--json` pins the mode so the assertion does
+/// not depend on whether the test harness happens to be a TTY.
+fn json(out: &Output) -> serde_json::Value {
+    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout is not JSON ({e}): {}\nstderr: {}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        )
+    })
+}
+
+#[test]
+fn a_cell_is_set_through_the_flags_and_written_to_out() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let dst = dir.path().join("edited.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        // The value carries a comma AND an `=`, the two characters the
+        // locator grammar also uses.
+        "--set",
+        "LOCA:1:LOCA_REM=north, then east = far",
+        "--out",
+        dst.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(out.status.success(), "{:?}", out.status);
+    let doc = json(&out);
+    assert_eq!(doc["unchanged"], false);
+    assert_eq!(doc["written"], true);
+    assert_eq!(doc["lines_changed"], 1);
+
+    let edited = std::fs::read_to_string(&dst).expect("output written");
+    assert!(
+        edited.contains("\"north, then east = far\""),
+        "the value must arrive quoted and whole: {edited}"
+    );
+    // Every other line byte-for-byte, terminators included.
+    let before: Vec<&str> = FILE.split_inclusive("\r\n").collect();
+    let after: Vec<&str> = edited.split_inclusive("\r\n").collect();
+    assert_eq!(before.len(), after.len());
+    for (i, (b, a)) in before.iter().zip(&after).enumerate() {
+        if i != 4 {
+            assert_eq!(b, a, "line {} must be untouched", i + 1);
+        }
+    }
+    // The input is not touched when `--out` names somewhere else.
+    assert_eq!(std::fs::read_to_string(&src).unwrap(), FILE);
+}
+
+/// The default run is the preview. A tool that writes when you did not ask it
+/// to is one you cannot use to answer "what would this do".
+#[test]
+fn without_out_or_in_place_nothing_is_written() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--delete-group",
+        "LOCA",
+        "--json",
+    ]);
+    assert!(out.status.success());
+    let doc = json(&out);
+    assert_eq!(doc["written"], false);
+    assert_eq!(doc["out"], serde_json::Value::Null);
+    assert_eq!(std::fs::read_to_string(&src).unwrap(), FILE);
+}
+
+#[test]
+fn in_place_rewrites_the_input() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--blank",
+        "LOCA:2:LOCA_REM",
+        "--in-place",
+        "--json",
+    ]);
+    assert!(out.status.success());
+    assert_eq!(json(&out)["written"], true);
+    let edited = std::fs::read_to_string(&src).unwrap();
+    assert!(
+        edited.contains("\"DATA\",\"BH2\",\"200.00\",\"\""),
+        "{edited}"
+    );
+    assert!(edited.contains("\"first\""), "row 1 untouched: {edited}");
+}
+
+/// A patch file carries what the flags cannot: a row WITH values.
+#[test]
+fn a_patch_file_composes_several_operations() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let dst = dir.path().join("out.ags");
+    let patch = dir.path().join("p.toml");
+    std::fs::write(
+        &patch,
+        r#"
+[[op]]
+kind = "add-row"
+group = "LOCA"
+cells = { LOCA_ID = "BH3", LOCA_REM = "a value, with a comma" }
+
+[[op]]
+kind = "delete-row"
+group = "LOCA"
+row = 1
+
+[[op]]
+kind = "delete-column"
+group = "LOCA"
+heading = "LOCA_NATE"
+"#,
+    )
+    .expect("patch written");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--patch",
+        patch.to_str().unwrap(),
+        "--out",
+        dst.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(json(&out)["operations"].as_array().unwrap().len(), 3);
+
+    let edited = std::fs::read_to_string(&dst).unwrap();
+    assert!(edited.contains("\"a value, with a comma\""), "{edited}");
+    assert!(!edited.contains("LOCA_NATE"), "{edited}");
+    assert!(!edited.contains("\"BH1\""), "{edited}");
+    // Both surviving data rows at the surviving arity — counted by the
+    // tokenizer, not by commas. Counting commas is the very mistake this
+    // whole layer exists to stop: the added value contains one.
+    let parsed = laterite_ags4_parse::parse_str(&edited).expect("output re-parses");
+    let g = &parsed.groups["LOCA"];
+    assert_eq!(g.headings, ["LOCA_ID", "LOCA_REM"]);
+    assert_eq!(g.rows.len(), 2);
+    assert!(
+        g.rows.iter().all(|r| r.values.len() == 2),
+        "ragged: {:?}",
+        g.rows
+    );
+}
+
+/// The template is only useful if it loads. Running the two commands back to
+/// back is the check a reader would make.
+#[test]
+fn the_printed_patch_template_is_a_patch_the_tool_accepts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let template = forge(&["edit", "x.ags", "--patch-template"]);
+    assert!(template.status.success());
+    let patch = dir.path().join("t.toml");
+    std::fs::write(&patch, &template.stdout).expect("template written");
+
+    // The template edits LOCA, so give it a LOCA to edit.
+    let src = write_fixture(dir.path());
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--patch",
+        patch.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "the printed template must apply: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// A refusal has to be visible to a script: a non-zero exit, the reason on
+/// stderr, and nothing written.
+#[test]
+fn naming_something_that_is_not_there_fails_without_writing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let dst = dir.path().join("never.ags");
+    for (args, expect) in [
+        (["--set", "NOPE:1:X=1"], "NOPE"),
+        (["--set", "LOCA:9:LOCA_ID=1"], "1-indexed"),
+        (["--set", "LOCA:1:LOCA_NOPE=1"], "LOCA_NOPE"),
+        (["--delete-row", "LOCA:0"], "1-indexed"),
+    ] {
+        let out = forge(&[
+            "edit",
+            src.to_str().unwrap(),
+            args[0],
+            args[1],
+            "--out",
+            dst.to_str().unwrap(),
+            "--json",
+        ]);
+        assert!(!out.status.success(), "{args:?} must fail");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains(expect), "{args:?} said: {stderr}");
+        assert!(!dst.exists(), "{args:?} wrote a file anyway");
+        assert_eq!(std::fs::read_to_string(&src).unwrap(), FILE);
+    }
+}
+
+/// A run with no operations is a mistake, not a no-op — the caller asked for
+/// something and spelled it wrong.
+#[test]
+fn a_run_with_no_operations_says_so() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let out = forge(&["edit", src.to_str().unwrap(), "--json"]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("no operations"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}

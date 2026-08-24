@@ -12,7 +12,8 @@ use laterite_cliutil::report::{Ctx, Plan, emit, note};
 
 use crate::artifacts::{forge_dir, guard_out_dir, new_run_id, run_dir, set_latest_run};
 use crate::cli::{
-    CheckArgs, ConfidenceArgs, GenArgs, MineArgs, MinimizeArgs, RunArgs, StrategyArgs, VendorArgs,
+    CheckArgs, ConfidenceArgs, EditArgs, GenArgs, MineArgs, MinimizeArgs, RunArgs, StrategyArgs,
+    VendorArgs,
 };
 use crate::evolve::evolve;
 use crate::mine::{MineCfg, run_mine};
@@ -875,6 +876,114 @@ pub fn minimize(args: &MinimizeArgs, ctx: Ctx) -> Result<i32> {
         "verdict": sig.0, "rust_rules": sig.1, "python_rules": sig.2,
         "original_bytes": text.len(), "minimal_bytes": minimal.len(),
         "out": args.out.as_ref().map(|p| p.display().to_string()),
+    });
+    emit_value(&doc, ctx)?;
+    Ok(0)
+}
+
+/// `forge edit` — structured edits to a real AGS4 file (#655).
+///
+/// Nothing is written without `--out` or `--in-place`: the default run is the
+/// preview, because "what would this change?" is the question worth answering
+/// before a file the investigation depends on is overwritten. The report
+/// carries `unchanged`, which is the no-op property made observable — an edit
+/// that reports `unchanged: true` did nothing, whatever it claimed to do.
+pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
+    if args.patch_template {
+        print!("{}", crate::edit::Patch::template());
+        return Ok(0);
+    }
+    if !args.file.exists() {
+        eprintln!("error: file not found: {}", args.file.display());
+        return Ok(3);
+    }
+
+    // Flags apply in a fixed order, which is safe precisely because every
+    // operation resolves against the file as it arrived: no order of these
+    // can give a different answer, so there is nothing for a caller to get
+    // wrong. `--patch` runs first, so its ops read as authored.
+    let mut ops = match &args.patch {
+        Some(p) => match crate::edit::Patch::load(p) {
+            Ok(ops) => ops,
+            Err(e) => {
+                eprintln!("error: patch {}: {e:#}", p.display());
+                return Ok(5);
+            }
+        },
+        None => Vec::new(),
+    };
+    for (kind, specs) in [
+        ("set", &args.set),
+        ("blank", &args.blank),
+        ("add-row", &args.add_row),
+        ("delete-row", &args.delete_row),
+        ("delete-column", &args.delete_column),
+        ("delete-group", &args.delete_group),
+    ] {
+        for spec in specs {
+            match crate::edit::parse_flag(kind, spec) {
+                Ok(op) => ops.push(op),
+                Err(e) => {
+                    eprintln!("error: {e:#}");
+                    return Ok(5);
+                }
+            }
+        }
+    }
+    if ops.is_empty() {
+        eprintln!(
+            "error: no operations — pass --set/--blank/--add-row/--delete-row/\
+             --delete-column/--delete-group or --patch (--patch-template shows one)"
+        );
+        return Ok(5);
+    }
+
+    let text = std::fs::read_to_string(&args.file)?;
+    let edited = match crate::edit::apply(&text, &ops) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return Ok(5);
+        }
+    };
+
+    let target = if args.in_place {
+        Some(args.file.clone())
+    } else {
+        args.out.clone()
+    };
+    let written = match &target {
+        Some(p) if !ctx.dry_run => {
+            if !args.in_place {
+                crate::artifacts::guard_out_dir(p)?;
+            }
+            std::fs::write(p, edited.as_bytes())?;
+            note(format!("edited → {}", p.display()));
+            true
+        }
+        _ => false,
+    };
+
+    // Lines that differ POSITIONALLY, which is what a reader sees in a diff
+    // rather than what the editor touched: a one-cell edit reports 1, but a
+    // deleted or added row shifts everything after it, so a single delete near
+    // the top of a file reports most of the file. That is the honest number —
+    // the diff really does show that — and it is why the field is named for
+    // lines rather than for operations.
+    let before: Vec<&str> = text.lines().collect();
+    let after: Vec<&str> = edited.lines().collect();
+    let changed = before.iter().zip(&after).filter(|(b, a)| b != a).count()
+        + before.len().abs_diff(after.len());
+    let doc = serde_json::json!({
+        "schema": 1,
+        "file": args.file.display().to_string(),
+        "operations": ops,
+        "unchanged": edited == text,
+        "bytes_in": text.len(), "bytes_out": edited.len(),
+        "lines_in": before.len(), "lines_out": after.len(),
+        "lines_changed": changed,
+        "out": target.as_ref().map(|p| p.display().to_string()),
+        "written": written,
     });
     emit_value(&doc, ctx)?;
     Ok(0)

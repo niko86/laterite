@@ -84,18 +84,25 @@ fn ddmin_lines(lines: Vec<String>, target: &Sig, oracle: Option<&PyOracle>) -> V
 
 /// Field pass: for each surviving DATA line, try blanking each value
 /// (right-to-left) while the signature holds.
+///
+/// Fields come from the tokenizer, not from `split(',')`. A comma inside a
+/// quoted value is a comma in the DATA the file is about — splitting on it
+/// counted one value as two, and dropping "the last field" then cut a value
+/// in half and left the quote unterminated. The reproducer that came out was
+/// not a smaller version of the input; it was a differently-broken file, and
+/// the signature it preserved was the signature of the tear.
 fn shrink_fields(mut lines: Vec<String>, target: &Sig, oracle: Option<&PyOracle>) -> Vec<String> {
     for li in 0..lines.len() {
         if !lines[li].starts_with("\"DATA\"") {
             continue;
         }
         loop {
-            let parts: Vec<&str> = lines[li].split(',').collect();
-            if parts.len() <= 2 {
+            let fields = laterite_ags4_parse::split_ags_line(&lines[li]);
+            if fields.len() <= 2 {
                 break;
             }
             // Try dropping the last field.
-            let trimmed = parts[..parts.len() - 1].join(",");
+            let trimmed = crate::edit::rebuild(&fields[..fields.len() - 1]);
             let mut probe = lines.clone();
             probe[li].clone_from(&trimmed);
             if eval(&join(&probe), oracle) == *target {
@@ -192,5 +199,53 @@ mod tests {
         );
         // The minimal repro still reproduces the exact signature.
         assert_eq!(eval(&m1, None), before);
+    }
+
+    /// A quoted comma is a comma in the DATA, not a field separator. The old
+    /// field pass split on `,`, so "the last field" of a value like
+    /// `"north, then east"` was ` then east"` — dropping it cut the value in
+    /// half and left the quote open, at the SAME field count, so the arity
+    /// rules never noticed.
+    ///
+    /// The fixture below is what made that reachable rather than theoretical:
+    /// a file already violating Rule 5. A tear introduces another Rule 5
+    /// finding, and a rule already in the signature cannot change it — so the
+    /// shrink was accepted and the reproducer that came out was not a smaller
+    /// version of the input, it was a differently-broken file. Minimizing a
+    /// Rule 5 divergence is exactly when you would reach for this.
+    #[test]
+    fn shrinking_never_tears_a_value_that_contains_a_comma() {
+        let dirty = concat!(
+            "\"GROUP\",\"PROJ\"\r\n",
+            "\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\"\r\n",
+            "\"UNIT\",\"\",\"\",\"\"\r\n",
+            "\"TYPE\",\"ID\",\"X\",\"X\"\r\n",
+            "\"DATA\",\"P1\",\"a site\",\"north, then east\"\r\n",
+            "\"DATA\",\"P2\",bare,\"x\"\r\n",
+        );
+        let target = eval(dirty, None);
+        assert!(
+            target.1.iter().any(|r| r == "AGS Format Rule 5"),
+            "precondition: the fixture must already violate Rule 5, got {:?}",
+            target.1
+        );
+        let lines: Vec<String> = dirty
+            .split("\r\n")
+            .map(std::string::ToString::to_string)
+            .collect();
+        let out = shrink_fields(lines, &target, None);
+        let text = out.join("\r\n");
+        for line in &out {
+            assert_eq!(
+                line.matches('"').count() % 2,
+                0,
+                "a torn field leaves an unterminated quote: {line:?}\nin:\n{text}"
+            );
+        }
+        // The value is intact or gone — never a prefix of itself.
+        assert!(
+            !text.contains("\"north\r") && !text.contains("\"north\""),
+            "the value was cut in half:\n{text}"
+        );
     }
 }
