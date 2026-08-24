@@ -1,7 +1,7 @@
 # Chaining
 
 laterite reads like a sentence. You `read` a file, then keep `.validate()`-ing
-and `.query()`-ing and `.at()`-ing off the same handle — and nothing executes
+and `.query()`-ing and `.at()`-ing off the same handle, and nothing executes
 until you ask for a frame. The handle stays the handle; the lazy parts stay lazy.
 
 ```text
@@ -23,7 +23,7 @@ AgsQuery ── fan-out branch (from .at) ────────────�
    .groups ──► list[str]            .frames() ──► dict[code, polars frame]
 ```
 
-Every builder call returns a **new** `AgsQuery` — the handles are immutable, so
+Every builder call returns a **new** `AgsQuery`: the handles are immutable, so
 you can fork a chain without one branch mutating another.
 
 ## The power ladder
@@ -72,8 +72,8 @@ keyed by group code.
 
 ### 4 · The lazy builder and its four terminals
 
-`.query(sql)` opens a single-result `AgsQuery`. Stack `.filter` / `.select` —
-nothing runs — then pick a terminal to materialise the plan.
+`.query(sql)` opens a single-result `AgsQuery`. Stack `.filter` / `.select`
+(nothing runs yet), then pick a terminal to materialise the plan.
 
 ```python
 --8<-- "python/ex05_query_builder.py:code"
@@ -89,7 +89,7 @@ one, and `.relation()` hands back the still-lazy `DuckDBPyRelation`.
 ### 5 · Raw SQL mid-chain
 
 When the builder is too narrow, drop to `.sql(sql)` for a full join across
-groups. It returns a `DuckDBPyRelation` — a terminal you materialise with `.pl()`,
+groups. It returns a `DuckDBPyRelation`, a terminal you materialise with `.pl()`,
 `.df()`, or `.arrow()`.
 
 ```python
@@ -103,7 +103,7 @@ groups. It returns a `DuckDBPyRelation` — a terminal you materialise with `.pl
 ### 6 · Splice in your own step with `.pipe`
 
 `.pipe(fn, *args)` passes the handle as `fn`'s first argument and returns
-whatever `fn` returns — so an escape hatch never breaks the chain. It works on
+whatever `fn` returns, so an escape hatch never breaks the chain. It works on
 both `Ags4File` and `AgsQuery`.
 
 ```python
@@ -118,7 +118,7 @@ both `Ags4File` and `AgsQuery`.
 
 A clean `.validate()` can mint a `.ags.idx` certificate via `.certify()`.
 Re-read with that fresh cert and `.validate()` resolves without ever running the
-rule engine — `resolution` reads `certified`, not `exact`.
+rule engine; `resolution` reads `certified`, not `exact`.
 
 ```python
 --8<-- "python/ex08_certify.py:code"
@@ -131,8 +131,8 @@ rule engine — `resolution` reads `certified`, not `exact`.
 !!! warning "Single-result and fan-out don't mix on one `AgsQuery`"
     The single-result terminals (`.filter` / `.select` → `.frame()` /
     `.to_polars()` / `.to_pandas()` / `.relation()`) and the fan-out terminals
-    (`.frames()` / `.groups`) belong to different `AgsQuery` shapes — a
-    `.query(sql)` builder versus an `.at(...)` fan-out — and are mutually
+    (`.frames()` / `.groups`) belong to different `AgsQuery` shapes, a
+    `.query(sql)` builder versus an `.at(...)` fan-out, and are mutually
     exclusive on a given handle. And because every builder call returns a **new**
     immutable `AgsQuery`, reassign (`q = q.filter(...)`) rather than expecting
     in-place mutation.
@@ -140,6 +140,6 @@ rule engine — `resolution` reads `certified`, not `exact`.
 ## Where next
 
 - The [Cookbook](../cookbook/index.md) chains these rungs into end-to-end
-  recipes — join, filter, certify, and write back out.
+  recipes: join, filter, certify, and write back out.
 - The [Reference cheatsheet](../reference/cheatsheet.md) is the one-screen map of
   every method on the chain and what it returns.

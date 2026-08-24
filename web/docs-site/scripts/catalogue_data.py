@@ -127,7 +127,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "id",
         "codes": ["ID"],
-        "title": "ID — Unique identifier",
+        "title": "ID: Unique identifier",
         "canonical": "string",
         "ags": "Unique Identifier",
         "detail": "A KEY-style text code that names a record (a borehole, a "
@@ -138,17 +138,17 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "x",
         "codes": ["X"],
-        "title": "X — Text",
+        "title": "X: Text",
         "canonical": "string",
         "ags": "Text",
-        "detail": "Free-form alphanumeric text — the catch-all type. Read "
+        "detail": "Free-form alphanumeric text, the catch-all type. Read "
         "verbatim (whitespace trimmed).",
         "example": "`Made Ground`, `Light brown sandy CLAY`",
     },
     {
         "key": "xn",
         "codes": ["XN"],
-        "title": "XN — Text or numeric",
+        "title": "XN: Text or numeric",
         "canonical": "string",
         "ags": "Text/numeric",
         "detail": "Usually a number but may carry non-numeric tokens (`<0.05`, "
@@ -160,7 +160,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "pa",
         "codes": ["PA"],
-        "title": "PA — Abbreviation pick-list",
+        "title": "PA: Abbreviation pick-list",
         "canonical": "string",
         "ags": "Text listed in ABBR Group",
         "detail": "A controlled value that must appear in the file's `ABBR` "
@@ -170,17 +170,17 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "pt",
         "codes": ["PT"],
-        "title": "PT — Type pick-list",
+        "title": "PT: Type pick-list",
         "canonical": "string",
         "ags": "Text listed in TYPE Group",
-        "detail": "A controlled value drawn from the `TYPE` group — i.e. one of "
+        "detail": "A controlled value drawn from the `TYPE` group, i.e. one of "
         "the data-type codes on this page. Read as a string.",
         "example": "`2DP`, `DT`",
     },
     {
         "key": "pu",
         "codes": ["PU"],
-        "title": "PU — Unit pick-list",
+        "title": "PU: Unit pick-list",
         "canonical": "string",
         "ags": "Text listed in UNIT Group",
         "detail": "A controlled value drawn from the file's `UNIT` group. Read "
@@ -190,18 +190,18 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "u",
         "codes": ["U"],
-        "title": "U — Unit",
+        "title": "U: Unit",
         "canonical": "string",
         "ags": "Unit (text)",
         "detail": "A unit string. Read as text. Note: `U` is used by headings in "
         "the dictionary but is not itself defined in the standard "
-        "`TYPE` group — treat it as a free unit label.",
+        "`TYPE` group; treat it as a free unit label.",
         "example": "`mm`, `%`",
     },
     {
         "key": "t",
         "codes": ["T"],
-        "title": "T — Elapsed time",
+        "title": "T: Elapsed time",
         "canonical": "string",
         "ags": "Elapsed Time",
         "detail": "A duration / elapsed time written in a colon-separated form "
@@ -211,7 +211,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "mc",
         "codes": ["MC"],
-        "title": "MC — Moisture content",
+        "title": "MC: Moisture content",
         "canonical": "string",
         "ags": "BS1377 reported moisture content",
         "detail": "A moisture content reported per BS 1377 : Part 2 conventions. "
@@ -221,7 +221,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "dms",
         "codes": ["DMS"],
-        "title": "DMS — Degrees:minutes:seconds",
+        "title": "DMS: Degrees:minutes:seconds",
         "canonical": "string",
         "ags": "Degrees:Minutes:Seconds",
         "detail": "A sexagesimal angle / geographic coordinate. Read as a string "
@@ -231,7 +231,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "yn",
         "codes": ["YN"],
-        "title": "YN — Yes / No",
+        "title": "YN: Yes / No",
         "canonical": "bool",
         "ags": "Yes or No",
         "detail": "A boolean. Read as `True`/`False`; the parser accepts "
@@ -241,7 +241,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "dt",
         "codes": ["DT"],
-        "title": "DT — Date / date-time",
+        "title": "DT: Date / date-time",
         "canonical": "datetime",
         "ags": "Date time in international format",
         "detail": "An ISO-8601-style date or date-time. Read as a `datetime`; a "
@@ -253,7 +253,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "rl",
         "codes": ["RL"],
-        "title": "RL — Record link",
+        "title": "RL: Record link",
         "canonical": "string",
         "ags": "Record Link",
         "detail": "A typed cross-reference to another group's KEY record "
@@ -263,7 +263,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "0dp",
         "codes": ["0DP"],
-        "title": "0DP — Whole number",
+        "title": "0DP: Whole number",
         "canonical": "integer",
         "ags": "Value; required number of decimal places, 0",
         "detail": "An integer (zero decimal places). Read as an `int`; values "
@@ -273,7 +273,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "ndp",
         "codes": ["1DP", "2DP", "3DP", "4DP"],
-        "title": "nDP — Fixed decimal places",
+        "title": "nDP: Fixed decimal places",
         "canonical": "decimal",
         "ags": "Value; required number of decimal places, n",
         "detail": "A fixed-point number carrying exactly **n** decimal places "
@@ -284,7 +284,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "nsf",
         "codes": ["1SF", "2SF", "3SF"],
-        "title": "nSF — Significant figures",
+        "title": "nSF: Significant figures",
         "canonical": "decimal",
         "ags": "Value; required number of significant figures, n",
         "detail": "A number expressed to exactly **n** significant figures "
@@ -294,7 +294,7 @@ TYPE_GLOSSARY: list[dict] = [
     {
         "key": "nsci",
         "codes": ["1SCI", "2SCI", "3SCI", "4SCI"],
-        "title": "nSCI — Scientific notation",
+        "title": "nSCI: Scientific notation",
         "canonical": "decimal",
         "ags": "Scientific Notation; required number of decimal places, n",
         "detail": "A number in scientific notation with **n** decimal places in "

@@ -129,14 +129,17 @@ for code in sorted(GROUPS):
     prov = cd.group_provenance(code)
     edlabel = cd.edition_label(prov)
     index_rows.append(
-        (code, g["contents"], fam, g["parent"] or "—", len(g["headings"]), edlabel)
+        # A word, not a dash: this cell is read aloud in the Parent column, and a
+        # dash of any width is read as nothing at all. "none" also cannot be
+        # mistaken for a group code the way a stray glyph can.
+        (code, g["contents"], fam, g["parent"] or "none", len(g["headings"]), edlabel)
     )
 
     crumb = " → ".join(f"[{c}]({c}.md)" for c in reversed(g["ancestors"]))
     own = g["key_headings"]
     inh = g["inherited"]
 
-    out = [f"# {code} — {g['contents']}", ""]
+    out = [f"# {code}: {g['contents']}", ""]
     out.append(f"**Path:** {crumb}  ·  **Family:** {fam}")
     out.append("")
     out.append(f"**Editions:** {edlabel}")
@@ -161,8 +164,8 @@ for code in sorted(GROUPS):
         )
     else:
         out.append(
-            f"    Identified by `{own_s}`. Root-level under the project "
-            f"— inherits no parent key."
+            f"    Identified by `{own_s}`. Root-level under the project, "
+            f"so it inherits no parent key."
         )
     out.append("")
     out.append(_heading_rows(code, g))
@@ -174,7 +177,7 @@ for code in sorted(GROUPS):
         out.append("")
         out.append('<div class="grid cards" markdown>')
         out.append("")
-        out.extend(f"- [`{k['code']}`]({k['code']}.md) — {k['contents']}" for k in kids)
+        out.extend(f"- [`{k['code']}`]({k['code']}.md): {k['contents']}" for k in kids)
         out.append("")
         out.append("</div>")
         out.append("")
@@ -190,10 +193,10 @@ for code in sorted(GROUPS):
 land = [
     "# Group catalogue",
     "",
-    f"All **{len(GROUPS)} AGS4 groups** — every group is one searchable, "
+    f"All **{len(GROUPS)} AGS4 groups**, every one a searchable, "
     "deep-linkable page. Pick a family to filter, type in the box, or page "
     "through the table (20 at a time). The **Editions** column shows the AGS "
-    "edition span each group covers — so a group added in 4.2, or removed in "
+    "edition span each group covers, so a group added in 4.2, or removed in "
     "4.2, stands out. The left sidebar lists them by family too.",
     "",
     '<div class="grid cards" markdown>',
@@ -203,7 +206,7 @@ for fam, desc in cd.FAMILIES:
     n = sum(1 for r in index_rows if r[2] == fam)
     if not n:
         continue
-    label = f"**{fam}** — {n} groups"
+    label = f"**{fam}** · {n} groups"
     land.append(
         f'- [{label}](#group-table){{ data-family="{fam}" }}'
         + (f"<br><small>{desc}</small>" if desc else "")

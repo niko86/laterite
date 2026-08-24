@@ -28,7 +28,6 @@ _PYPROJECT = (
     Path(__file__).resolve().parents[3] / "packages" / "laterite" / "pyproject.toml"
 )
 _CHANGELOG = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
-_BASE = "laterite — MIT-licensed AGS4 tooling"
 
 
 def product_version() -> str:
@@ -36,9 +35,17 @@ def product_version() -> str:
     return tomllib.loads(_PYPROJECT.read_text(encoding="utf-8"))["project"]["version"]
 
 
-def stamp(version: str) -> str:
+def stamp(base: str, version: str) -> str:
+    """The footer, from the config's own `copyright` plus the version.
+
+    The base text was a literal here until #588, which is to say a second copy
+    of `mkdocs.yml`'s `copyright` — the very thing this module's docstring
+    argues against two paragraphs up, and it drifted exactly as predicted: the
+    two were edited apart, and because this one WINS at build time, a gate
+    reading the config saw the string nobody renders. Now there is one.
+    """
     return (
-        f"{_BASE} · documents <strong>v{version}</strong> · "
+        f"{base} · documents <strong>v{version}</strong> · "
         f'<a href="{_CHANGELOG}">changelog</a>'
     )
 
@@ -48,7 +55,17 @@ def on_config(config: Any, **_: Any) -> Any:
     # the path moved, and a footer quietly falling back to "unknown" is the kind
     # of silent degradation that survives for months.
     version = product_version()
-    config.copyright = stamp(version)
+    # Same reasoning as the version above, applied to the other half. mkdocs
+    # defaults `copyright` to None, and `f"{None} · documents v…"` renders the
+    # word "None" in every page footer — a silent degradation of exactly the
+    # kind this hook already refuses for the version.
+    if not config.copyright:
+        raise SystemExit(
+            "version_stamp: mkdocs.yml has no `copyright`, and the footer is "
+            "built from it. Set it rather than letting the stamp render a "
+            "footer with nothing in front of the version."
+        )
+    config.copyright = stamp(config.copyright, version)
     # The masthead lockup reads "laterite · docs · v<version>" (#401), and it
     # reads it from here rather than from a second lookup — the whole reason this
     # hook exists is that a hand-typed version is a copy, and a copy drifts.

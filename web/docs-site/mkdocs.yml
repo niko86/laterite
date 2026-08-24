@@ -1,7 +1,9 @@
 # laterite docs site (#201). Built with MkDocs + Material; published at
 # /laterite/docs/ on the same GitHub Pages artifact as the validator web app
-# (the deploy builds into ../dist/docs, which lives under web/dist that the
-# Pages workflow uploads). `strict: true` turns any broken internal link or
+# (the build lands in `site_dir` below, its OWN directory beside the app's
+# rather than inside it, and the deploy carries it from there — this line said
+# ../dist/docs until #588, long after that stopped being true). `strict: true`
+# turns any broken internal link or
 # missing-nav page into a build failure — the docs can't silently rot.
 #
 # Example-first: every code snippet is single-sourced from
@@ -25,15 +27,15 @@
 
 site_name: laterite
 site_description: >-
-  Read, validate, query and produce AGS4 geotechnical data — born-typed, fluent,
+  Read, validate, query and produce AGS4 geotechnical data: born-typed, fluent,
   one engine across Python, the CLI, Node and DuckDB.
 site_url: https://docs.laterite.dev/
 repo_url: https://github.com/niko86/laterite
 repo_name: niko86/laterite
-# Overwritten at build time by hooks/version_stamp.py, which appends the product
-# version + a changelog link. Kept here as the fallback text and so the footer is
-# still legible if the hook is ever removed.
-copyright: laterite — MIT-licensed AGS4 tooling
+# hooks/version_stamp.py reads THIS value and appends the product version plus a
+# changelog link. It used to carry its own copy of the text, which drifted from
+# this one and won at build time, so the footer said something no file here did.
+copyright: laterite, MIT-licensed AGS4 tooling
 hooks:
   - hooks/version_stamp.py
   # Holds the TOC rail's media query to mkdocs-material's own sidebar

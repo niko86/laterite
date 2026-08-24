@@ -9,14 +9,14 @@
 ```
 
 `laterite.read` hands back a group as a **born-typed** polars frame. Index it
-by 4-letter code (`ags["LOCA"]`) and you get a real DataFrame — already typed.
+by 4-letter code (`ags["LOCA"]`) and you get a real DataFrame, already typed.
 The dtype row _is_ the AGS TYPE row: `2DP` lands as `Float64`, `ID` as
 `String`. No `.cast(...)`, no `pd.to_numeric`, no per-column cleanup. The
 arithmetic just works because the column was numeric the moment it was read.
 
 ## Three doors in
 
-`read` takes whichever form your data already has — there's no separate
+`read` takes whichever form your data already has; there's no separate
 loader to pick:
 
 <!-- doc-code: skip — names placeholders to show the API shape; binding them would obscure the lesson -->

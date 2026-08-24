@@ -1,8 +1,8 @@
 # Node API reference
 
 The `laterite` npm package. Import the free functions, or chain on the `Ags4File`
-a `read()` returns. Full surface — see the [Node surface page](../node/index.md)
-for the guided tour.
+a `read()` returns. This is the full surface; for the guided tour, see the
+[Node surface page](../node/index.md).
 
 ## Free functions
 
@@ -27,7 +27,7 @@ import { read, validate, buildAgs4 } from "laterite";
 
 ## `Ags4File`
 
-Returned by `read()` and `buildAgs4()`. The read handle is **fluent** — the
+Returned by `read()` and `buildAgs4()`. The read handle is **fluent**: the
 chained verbs return something you keep working on.
 
 ### Inspect
@@ -68,6 +68,6 @@ if (!file.report.isValid) file.fix().save("clean.ags");
 ```
 
 !!! note "Python-only"
-    The `python-ags4` compat shim is the one Python-only surface — see the
+    The `python-ags4` compat shim is the one Python-only surface. See the
     [capability matrix](../surfaces/index.md#what-each-door-can-do). Excel I/O
     (`toExcel` / `fromExcel`) landed on Node in #358.

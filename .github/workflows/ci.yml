@@ -257,6 +257,13 @@ jobs:
               # a lockfile change did not trigger the strict build.
               - 'pyproject.toml'
               - 'uv.lock'
+              # The em-dash gate's BUILT half runs in this job and nowhere else
+              # (#588), because the built site is the only artefact that holds
+              # the prose of the three generated page families. Without this
+              # line, editing the gate would not re-run the job that executes
+              # it — which is exactly what test_every_executed_tool_fires_its_job
+              # is for, and it caught this.
+              - 'tools/check_docs_em_dash.py'
               - '.github/workflows/ci.yml'
             web:
               # ts-lint's web surface (the Solid browser validator's TS): eslint +
@@ -406,6 +413,19 @@ jobs:
 
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
+
+      # The buildless HALF of #588's gate. The other half is in the `docs` job,
+      # runs `--built` over what mkdocs just produced, and is the authority:
+      # three of this site's page families have no Markdown for this step to
+      # open, so a source scan alone reported clean while several hundred sat in
+      # the built site. The two are COMPLEMENTARY and neither subsumes the
+      # other: the built half excludes reference/api/ and reference/modules/ by
+      # path, and both of those pages are a MIX — hand-written intro and section
+      # prose around the generated API reference — so this step is the only gate
+      # those paragraphs have. It is also the faster of the two, and it names a
+      # file and a line rather than a rendered artefact nobody edits.
+      - name: no em dash in docs-site prose (source pre-check)
+        run: uv run --no-project python tools/check_docs_em_dash.py
 
       # Sibling of the gate above, and here for the same reason it is: no build,
       # a file walk, and an unconditional job so it cannot stop firing. A bare
@@ -1576,3 +1596,11 @@ jobs:
       - name: mkdocs build --strict
         working-directory: web/docs-site
         run: uv run --no-sync mkdocs build --strict
+      # No em dash reaches a docs-site READER (#588). This has to run here and
+      # not in repo-gates, because three of this site's page families
+      # (reference/groups/, types/, cli/) have no Markdown at all — they are
+      # emitted by web/docs-site/scripts/, so the only artefact that contains
+      # their prose is the one the step above just produced. repo-gates runs the
+      # buildless source half, which is a fast pre-check, not this.
+      - name: no em dash reaches a docs-site reader
+        run: uv run --no-sync python tools/check_docs_em_dash.py --built web/docs-dist

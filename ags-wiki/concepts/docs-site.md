@@ -22,6 +22,7 @@ repo_refs:
   duckdb_gate: "repo:tests/test_docs_duckdb_examples.py"
   header_gate: "repo:tests/test_docs_example_headers.py"
   type_gate: "repo:tools/check_doc_types.py"
+  em_dash_gate: "repo:tools/check_docs_em_dash.py"
   released_legs: "repo:.github/workflows/nightly.yml"
   released_crates: "repo:tools/check_released_crate_readmes.py"
   released_crates_gate: "repo:tests/test_released_crate_readmes.py"
@@ -36,8 +37,10 @@ sources: []
 The laterite suite's documentation website (#201): **MkDocs + Material**, sources
 under `repo:web/docs-site/`, published at **`/laterite/docs/`** on the *same*
 GitHub Pages artifact as the [[validator-site]] app — `mkdocs.yml` sets
-`site_dir: ../dist/docs`, so the static site lands under `web/dist` (the dir the
-Pages workflow uploads) and rides alongside the validator SPA at `/laterite/`.
+`site_dir: ../docs-dist`, so the static site lands in its **own** directory
+beside the app's rather than inside it, and the deploy step carries it to
+`/laterite/`. (This line said `../dist/docs` until #588, which is a directory
+`mkdocs.yml` has not named for some time; the config is the authority.)
 
 Key facts:
 
@@ -443,6 +446,24 @@ Key facts:
 > in-browser MCP tool, so Playwright against `mkdocs serve` is the path (restart
 > serve after a CSS edit — its file-watch can go stale).
 
+- **No em dash reaches a reader, and the gate has two halves** (#588,
+  `em_dash_gate`). The house style is that a dash standing in for a comma, a
+  colon or a bracket should be the comma, colon or bracket; the [[validator-site]]
+  landing holds that with a browser test over the rendered DOM, and this site
+  holds it with `repo:tools/check_docs_em_dash.py`. `--built` is the gate: it runs
+  in the `docs` job on what `mkdocs build --strict` just produced, because **three
+  of this site's page families have no Markdown at all** — `reference/groups/` is
+  174 pages from `catalogue`, and `reference/types/` and `reference/cli/` come from
+  `glossary` and its sibling, so all of their prose lives in f-strings a
+  `docs/**.md` walk never opens. The first draft scanned source only, reported
+  clean, and left several hundred in the built site; that is the whole reason the
+  built half exists. The buildless source half stays in `repo-gates`, and the two
+  are **complementary — neither subsumes the other**. The built half excludes
+  `reference/api/` and `reference/modules/` by path, and both of those pages are a
+  *mix*: a hand-written intro and section prose wrapped around the generated API
+  reference. So the source half is the only gate those paragraphs have, while the
+  built half is the only gate the three generated families have.
+
 > [!note] Deferred (the Phase-2 tail)
 > Done: the **Python** API reference (mkdocstrings), the **group catalogue** +
 > **AGS data-type glossary** (generated from the registry/dictionary and
@@ -492,6 +513,18 @@ None of the below is a known defect. Each is a place nobody has looked.
   nothing to say about one whose shape changed underneath it.
 - **Everything outside the docs site** — the PyPI, npm and crates.io landing READMEs
   were out of scope by choice.
+- **Three built page families, for the em dash gate specifically** (#588,
+  `em_dash_gate`). `reference/api/` and `reference/modules/` are mkdocstrings
+  rendering the wheel's own docstrings, and `reference/cli/` is the shipped
+  `lat --readme` guide mirrored into four packages: rewriting either would be an
+  API or a shipped-binary change, not a docs edit, so the gate counts them and
+  prints the counts rather than reading them. The first two are a *mix*, and a
+  path prefix cannot say so: their hand-written halves are gated by the source
+  scan reading `docs/reference/api.md` and `docs/reference/modules.md`. Two
+  narrower spots go with them —
+  the short note `gen_groups.py`'s sibling `gen_cli.py` writes *above* that
+  guide is ours but sits inside an excluded page, and attribute text other than
+  the meta description (an `alt`, a `title`) is dropped with the tags.
 
 **One entry has since been answered, and is recorded as corrected rather than
 deleted.** #510 listed `chaining/index.md` as entirely unaudited and a plausible

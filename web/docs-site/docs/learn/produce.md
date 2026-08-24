@@ -8,12 +8,12 @@
 --8<-- "python/ex09a_build_from_frames.out"
 ```
 
-`build_ags4` takes a `{code: frame}` mapping — the columns are your AGS
-headings — and constructs a file from exactly the groups you supplied.
+`build_ags4` takes a `{code: frame}` mapping (the columns are your AGS
+headings) and constructs a file from exactly the groups you supplied.
 
 AGS4 also mandates the metadata catalogs (`TRAN`, `UNIT`, `TYPE`, plus `ABBR`
 for any `PA` pick-list codes), which your frames don't carry. Those are
-**reported, not invented** — hence the three findings above, Rules 14/15/17.
+**reported, not invented**: hence the three findings above, Rules 14/15/17.
 `mode="autofix"` repairs what your input _contains_; it does not mint groups you
 never wrote.
 
@@ -33,11 +33,11 @@ res = laterite.build_ags4(
 )
 ```
 
-`UNIT` and `TYPE` are derived from your columns. `TRAN` is not derivable — only
-you know who sent what to whom — so you state it. Omit the stamp and no `TRAN`
+`UNIT` and `TYPE` are derived from your columns. `TRAN` is not derivable; only
+you know who sent what to whom, so you state it. Omit the stamp and no `TRAN`
 is written and Rule 14 reports the gap, rather than a placeholder being invented
 that would _satisfy_ the rule while asserting a transmission that never happened.
-All five are required together — they are REQUIRED headings, so `TranStamp`
+All five are required together: they are REQUIRED headings, so `TranStamp`
 demands them rather than letting a half-stamp reach the file. `TRAN_AGS`,
 `TRAN_DLIM` and `TRAN_RCON` are absent from it on purpose: they describe the
 file the emitter is writing, so it fills them.
@@ -58,7 +58,7 @@ appears in your file that you didn't ask for.
 
 The other door takes a typed graph: a `PROJ` with `LOCA` children attached via
 `.locas.append(...)` or the `locas=[...]` constructor kwarg. `build_ags4` walks
-it depth-first and — like the frames door — emits **only the headings you
+it depth-first and, like the frames door, emits **only the headings you
 set**, and only the groups you built. That's why a sparse graph builds clean:
 nothing is invented, in your data columns or around them. `synthesise_metadata=True`
 works here too, and reports the same Rules 14/15/17 without it. The managed child

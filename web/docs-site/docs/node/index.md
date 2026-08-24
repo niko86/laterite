@@ -7,8 +7,8 @@ npm install laterite
 
 `laterite` on npm is the **same engine** as the Python wheel, with a
 born-typed **arrow-js** decode. The verbs match the [shared
-vocabulary](../surfaces/index.md#the-shared-vocabulary) — `read`, `validate`,
-`buildAgs4` — and, like Python, the read handle **chains**.
+vocabulary](../surfaces/index.md#the-shared-vocabulary): `read`, `validate`,
+`buildAgs4`. And, like Python, the read handle **chains**.
 
 ## Validate
 
@@ -21,11 +21,11 @@ console.log(report.isValid, report.count, report.dictVersion, report.resolution)
 ```
 
 `validate(path)` runs the numbered-rules engine and returns a `Report`. `isValid`
-is the headline verdict — errors only, so a file carrying nothing but warnings is
+is the headline verdict. It weighs errors only, so a file carrying nothing but warnings is
 valid with a non-zero `count` (pass `{ warningsAsErrors: true }` to make warnings
 fatal). `count` is the number of findings shown, `errors`/`warnings`/`fyi` split it, and
-`dictVersion` / `resolution` tell you which AGS edition the rules came from —
-selected automatically from the file's `TRAN_AGS`, never passed in. Group them by
+`dictVersion` / `resolution` tell you which AGS edition the rules came from;
+the edition is selected automatically from the file's `TRAN_AGS`, never passed in. Group them by
 rule (the same shape as Python's `by_rule()`):
 
 ```js
@@ -48,7 +48,7 @@ const loca = file.table("LOCA"); // arrow-js Table, born-typed
 console.log(loca.numRows, file.headings("LOCA"));
 ```
 
-## The chain — validate · fix · diff · certify
+## The chain: validate · fix · diff · certify
 
 The read handle is fluent, so a whole workflow stays on one object:
 
@@ -88,5 +88,5 @@ out.save("out.ags"); // or out.text / out.bytes
 
 !!! note "Same engine, proven"
     Node's findings are asserted **byte-identical** to Python, wasm, and DuckDB
-    by the cross-surface compliance harness — see [One engine, every
+    by the cross-surface compliance harness. See [One engine, every
     stack](../surfaces/index.md).

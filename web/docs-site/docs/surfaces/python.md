@@ -1,18 +1,18 @@
-# Python — `laterite`
+# Python (`laterite`)
 
 <!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite
 ```
 
-Python is the **fullest surface** — every capability in the [matrix](index.md#what-each-door-can-do)
+Python is the **fullest surface**: every capability in the [matrix](index.md#what-each-door-can-do)
 lands here first. The deep content lives in the rest of this site:
 
-- **[Learn](../learn/index.md)** — the step-by-step tutorial (install → read → validate → query → produce).
-- **[Cookbook](../cookbook/index.md)** — task recipes.
-- **[Python API reference](../reference/api.md)** — the full generated API.
+- **[Learn](../learn/index.md)**: the step-by-step tutorial (install → read → validate → query → produce).
+- **[Cookbook](../cookbook/index.md)**: task recipes.
+- **[Python API reference](../reference/api.md)**: the full generated API.
 
-This page is just the map of what's **unique to Python** — the parts no other
+This page is just the map of what's **unique to Python**, the parts no other
 surface has.
 
 ## The fluent handle
@@ -25,19 +25,19 @@ surface has.
 --8<-- "python/ex23_fluent_handle.out"
 ```
 
-`read()` returns an `Ags4File` you keep chaining — `validate`, `fix`, `diff`,
-`certify`, query — on one handle. See [the fluent model](../concepts/fluent-model.md).
+`read()` returns an `Ags4File` you keep chaining (`validate`, `fix`, `diff`,
+`certify`, query) on one handle. See [the fluent model](../concepts/fluent-model.md).
 
 ## Only in Python
 
 | Feature                | What it is                                                                                                     |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **python-ags4 compat** | `from laterite import compat as AGS4` — a drop-in for the `python_ags4` API, so existing scripts run unchanged |
-| **Excel I/O**          | `to_excel()` / `from_excel()` — round-trip AGS4 ↔ XLSX                                                         |
+| **python-ags4 compat** | `from laterite import compat as AGS4`: a drop-in for the `python_ags4` API, so existing scripts run unchanged  |
+| **Excel I/O**          | `to_excel()` / `from_excel()`: round-trip AGS4 ↔ XLSX                                                          |
 | **`AgsQuery`**         | a lazy, chainable query view (`.query()` / `.filter()` / `.select()`) over the groups                          |
-| **`registry`**         | the typed group graph — `GROUPS`, `child_groups`, the KEY chain — as importable Python                         |
-| **transport**          | `pack` / `lock` — zstd + age-passphrase file envelopes (also on Node)                                          |
+| **`registry`**         | the typed group graph (`GROUPS`, `child_groups`, the KEY chain) as importable Python                           |
+| **transport**          | `pack` / `lock`: zstd + age-passphrase file envelopes (also on Node)                                           |
 
-Everything else — read, validate, build_ags4, fix, diff, certify — is the
+Everything else (read, validate, build_ags4, fix, diff, certify) is the
 [shared vocabulary](index.md#the-shared-vocabulary), documented once and mirrored
 on the other surfaces.

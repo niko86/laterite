@@ -18,10 +18,10 @@ locas = file.validate().query("SELECT * FROM LOCA")  # ── self → AgsQuery 
 | Method                                    | Returns                                           | Chainable?                                             |
 | ----------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
 | `read(path \| text= \| data=)`            | `Ags4File`                                        | the chain root                                         |
-| `.validate(warnings=)`                    | `self` (`Ags4File`) — `Report` on `.report`       | yes, slots mid-chain                                   |
+| `.validate(warnings=)`                    | `self` (`Ags4File`) with `Report` on `.report`    | yes, slots mid-chain                                   |
 | `.fix()`                                  | a **new** `Ags4File`                              | yes (off the fixed handle)                             |
-| `.at(code, ids)`                          | `AgsQuery` — **fan-out** (a borehole's group set) | yes (query branch)                                     |
-| `.query(sql)`                             | `AgsQuery` — **single-result**, lazy              | yes (query branch)                                     |
+| `.at(code, ids)`                          | a **fan-out** `AgsQuery` (a borehole's group set) | yes (query branch)                                     |
+| `.query(sql)`                             | a **single-result**, lazy `AgsQuery`              | yes (query branch)                                     |
 | `.sql(sql)`                               | `DuckDBPyRelation`                                | terminal (materialise with `.pl()`/`.df()`/`.arrow()`) |
 | `.pipe(fn, *args)`                        | whatever `fn` returns                             | yes, if `fn` returns a handle                          |
 | `["LOCA"]`                                | polars frame                                      | terminal                                               |
@@ -33,7 +33,7 @@ with `.frame()` / `.to_polars()` / `.to_pandas()` / `.relation()`; an `.at(...)`
 fan-out exposes `.groups` and `.frames()`.
 
 `.sql(...)` leaves laterite's surface: the `DuckDBPyRelation` it hands back
-materialises with **DuckDB's** terminals, which carry DuckDB's dependencies —
+materialises with **DuckDB's** terminals, which carry DuckDB's dependencies:
 `.pl()` and `.arrow()` need `laterite[pyarrow]`, `.df()` needs
 `laterite[compat]`. laterite's own terminals in the row above need neither; see
 [Dependency shape](dependency-shape.md).
@@ -42,7 +42,7 @@ materialises with **DuckDB's** terminals, which carry DuckDB's dependencies —
     The single-result methods (`.filter` / `.select` / `.frame()`) and the
     fan-out methods (`.groups` / `.frames()`) live on **different `AgsQuery`
     shapes** and don't mix on one handle. And every builder call returns a
-    **new, immutable** `AgsQuery` — reassign (`q = q.filter(...)`) rather than
+    **new, immutable** `AgsQuery`: reassign (`q = q.filter(...)`) rather than
     expecting in-place mutation, which also lets you fork a chain without one
     branch disturbing another.
 
@@ -51,10 +51,10 @@ materialises with **DuckDB's** terminals, which carry DuckDB's dependencies —
 Because the return type of each step is fixed and documented, you can read a
 chain left-to-right and know what's in your hand at every point: `read` gives an
 `Ags4File`, `.validate()` keeps it, `.query()` opens a lazy plan, a terminal
-cashes it in. The escape hatch — `.pipe(fn)` — never breaks the chain, since it
+cashes it in. The escape hatch, `.pipe(fn)`, never breaks the chain, since it
 just threads the handle through your own function.
 
 ## See also
 
-- [Chaining](../chaining/index.md) — the seven-rung power ladder, each rung runnable.
-- [Reference cheatsheet](../reference/cheatsheet.md) — the one-screen map of every method and its return type.
+- [Chaining](../chaining/index.md): the seven-rung power ladder, each rung runnable.
+- [Reference cheatsheet](../reference/cheatsheet.md): the one-screen map of every method and its return type.

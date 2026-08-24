@@ -3,7 +3,7 @@
 **Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 **When:** a resubmission lands and you need to know _what actually changed_ between
-Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
+Rev A and Rev B: not a line diff, but a KEY-aware, type-aware delta.
 
 === "Python"
 
@@ -15,7 +15,7 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     --8<-- "python/ex16_diff.out"
     ```
 
-    `laterite.diff(a, b)` compares two AGS4 texts and returns a `RevisionDelta` — a
+    `laterite.diff(a, b)` compares two AGS4 texts and returns a `RevisionDelta`, a
     per-group breakdown plus the `total_added` / `total_removed` / `total_changed`
     counts. It is **not** a text diff: rows are matched on each group's dictionary
     **KEY headings** (here `PROJ_ID`), so a row that moved or was reordered still
@@ -24,14 +24,14 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     `type`, and the `a`/`b` values.
 
     Because cells are compared through the [born-typed](../concepts/born-typed.md)
-    value, only a genuine quantity change registers — `1.50` vs `1.5` on a `2DP`
+    value, only a genuine quantity change registers. `1.50` vs `1.5` on a `2DP`
     column is the same number and produces **no** delta, where a naive line diff
     would flag it.
 
     Walk the structure to drive a review: each `group` in `delta["groups"]` carries
     `code`, `key_headings`, `keyed` (whether the group has KEYs to match on), and a
     `rows` list. Each row has a `kind` (`added` / `removed` / `changed`), its `key`,
-    and — for a changed row — a `cells` list of `{heading, type, a, b}`:
+    and, for a changed row, a `cells` list of `{heading, type, a, b}`:
 
     ```python
     for group in delta["groups"]:
@@ -57,11 +57,11 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     ```
 
     `diff(a, b)` runs the same `laterite-ags4-diff` engine and returns the
-    **byte-identical** `RevisionDelta` — the snake_case field names (`total_changed`,
+    **byte-identical** `RevisionDelta`: the snake_case field names (`total_changed`,
     `key_headings`, `keyed`) match Python one-for-one, so the same walk drives a
     review in either language. One surface note: a bare `string` is a **path** in
     Node (`diff("a.ags", "b.ags")` compares two files), so pass a `Buffer` /
-    `Uint8Array` — as above — when the revision only exists in memory. It's
+    `Uint8Array`, as above, when the revision only exists in memory. It's
     synchronous; no DuckDB peer needed.
 
 === "CLI"
@@ -77,8 +77,8 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     --8<-- "cli/diff_revisions.out"
     ```
 
-    The CLI reports the **summary** shape — per group, `+added −removed ~changed`
-    — off the same KEY-aware, type-aware engine, so the counts agree with every
+    The CLI reports the **summary** shape (per group, `+added −removed ~changed`)
+    off the same KEY-aware, type-aware engine, so the counts agree with every
     other surface. When you need the cell-level `a`/`b` detail shown in the
     Python/Node tabs, reach for `diff()` in a script.
 
