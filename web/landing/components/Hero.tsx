@@ -1,9 +1,14 @@
 /* The hero (#395).
  *
- * "AGS4, shown rather than explained" is the page's thesis and the demo below is
- * its proof, so the hero's job is to be brief and get out of the way. The
- * headline is capped near 22 characters a line — the measure Figtree 800 holds
- * at display size before it starts reading as a paragraph.
+ * The headline names the PROJECT, not this page (#642). "AGS4, shown rather
+ * than explained" described the demo below rather than the thing being
+ * demonstrated, and a reader who has just landed wants to know what laterite
+ * IS. It is the README's own opening line, deliberately: the site, PyPI and
+ * npm then lead with one sentence instead of three, and the line a reader
+ * meets first does not change with the surface they met it on. The demo is
+ * still the proof, so the hero's job is unchanged — be brief and get out of
+ * the way. The headline is capped near 22 characters a line — the measure
+ * Figtree 800 holds at display size before it starts reading as a paragraph.
  *
  * The file excerpt is a WIDE-VIEWPORT affordance, not a universal one. The
  * mobile artboard drops it, and it is right to: on a phone, an install command
@@ -35,7 +40,7 @@ export const Hero: Component = () => (
   <div class="grid items-center gap-10 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
     <div>
       <h1 class="max-w-[22ch] font-display text-h1 font-extrabold text-balance text-accent min-[30rem]:text-display min-[64rem]:text-hero">
-        AGS4, shown rather than explained.
+        A modern AGS4 toolkit, in Rust.
       </h1>
 
       <p class="mt-5 max-w-[54ch] text-lead text-fg-soft">
