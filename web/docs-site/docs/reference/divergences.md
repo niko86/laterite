@@ -27,6 +27,7 @@ same source, so a record cannot be resolved there and stay live here.
 | **O-41** | Rows before the first GROUP are reported as Rule 2 findings, not a parser crash. |
 | **O-42** | `TRAN_AGS="4.0"` resolves to **4.0.4**, the newest 4.0 patch; python-ags4's static map picks the oldest and over-reports Rule 10c on `PMTL`. |
 | **O-53** | A **blank** `TRAN_AGS` is reported once, as the Rule 10b error; which dictionary the verdict then fell back to is stated on the report itself rather than as a second finding. |
+| **O-45** | An unrecognised `TRAN_AGS` edition → a laterite **WARNING** (Related to Rule 14), shown by default and **not fatal**. |
 | **O-49** | A numeric TYPE's count — the `n` in `nDP`/`nSF`/`nSCI` — is clamped to **30**. Read uncapped, a crafted `9999999999SF` drives python-ags4 into a ~10 GB string. |
 | **O-50** | A 0DP value outside `i64` **converts to Null**; python-ags4's conversion keeps full precision. Both validators flag the cell — the difference is in conversion, not validation. |
 
@@ -50,7 +51,6 @@ same source, so a record cannot be resolved there and stay live here.
 |---|---|
 | **O-43** | A self-declared but non-standard `PA` abbreviation → a laterite **FYI** (Related to Rule 16). |
 | **O-44** | Structural validation of a file-level `DICT` group → a laterite **WARNING** (Related to Rule 18). |
-| **O-45** | An unrecognised `TRAN_AGS` edition → a laterite **WARNING** (Related to Rule 14), shown by default and **not fatal**. |
 | **O-51** | A custom-dictionary **overlay** that redefines the standard schema is reported — a **WARNING** when it changes row identity (re-parent, KEY demotion), an **FYI** otherwise. |
 | **O-52** | A child row whose parent-KEY cells are all empty gets a **WARNING** saying the parentage check was declined, rather than silently producing nothing. |
 

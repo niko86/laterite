@@ -110,18 +110,95 @@ COVERAGE_MARKER = "observations-coverage"
 #: coincidence, and one that would have made a derived rule look correct.
 DIVERGENCES = ROOT / "web" / "docs-site" / "docs" / "reference" / "divergences.md"
 
-#: The axes a user-facing record can sit on, in render order. The old page filed
-#: everything under "Known divergences from python-ags4", which was wrong for
-#: four of its own rows: O-1 and O-32 are cases where laterite MATCHES
-#: python-ags4 and both depart from the spec, and O-31/O-33 are laterite's own
-#: false negatives, found by the comparison and closed. Calling those
-#: "divergences from python-ags4" inverts what happened.
-AXES = {
+#: The sections a user-facing record can render under, in page order. The old
+#: page filed everything under "Known divergences from python-ags4", which was
+#: wrong for four of its own rows: O-1 and O-32 are cases where laterite
+#: MATCHES python-ags4 and both depart from the spec, and O-31/O-33 are
+#: laterite's own false negatives, found by the comparison and closed. Calling
+#: those "divergences from python-ags4" inverts what happened.
+SECTIONS = {
     "vs-python": "Where laterite differs from python-ags4",
     "vs-spec": "Where both depart from the written spec",
     "converged": "Where laterite changed to match python-ags4",
     "laterite-adds": "Checks laterite adds",
 }
+
+#: What python-ags4 does about the condition a record describes. A CLOSED SET,
+#: because the thing this replaced was a single `axis` string carrying three
+#: different questions at once — how we relate to python-ags4, how we relate to
+#: the spec, and whether we changed to match them — and one field answering
+#: three questions can only be checked by reading it.
+#:
+#: Three of these are near-silences and they are separate values on purpose.
+#: The line between them is drawn on the CONDITION THIS RECORD IS ABOUT, which
+#: is not always the rule number it sits under: python-ags4 has a Rule 10c, but
+#: O-52 is about a *declined* parentage check and it has nothing that asks
+#: that, while its Rule 6 is registered and returns unconditionally, so O-2 is
+#: a check they have and never fire. Getting the line wrong is not hypothetical
+#: — the first draft of this table gave O-53 (python reports an extra FYI on a
+#: blank TRAN_AGS) the same value as O-52, which filed O-53 under "Checks
+#: laterite adds", the exact inverse of what it says.
+PYTHON_RELATION = {
+    "reports-the-same": "python-ags4 reports the same thing, the same way",
+    "reports-differently": "both report it; the implementations disagree on which inputs",
+    "reports-at-another-tier": "both report it, at different severity tiers",
+    "reports-nothing": "python-ags4 has a check for this condition and it fires on nothing",
+    "reports-additionally": "python-ags4 reports where laterite is silent",
+    "has-no-such-check": "python-ags4 has no check whose subject is this condition",
+    "errors": "python-ags4 raises or crashes rather than reporting",
+}
+
+#: And how the pair relate to the WRITTEN spec, which is a different question
+#: from how they relate to each other — two implementations can agree with one
+#: another and both depart from the document.
+SPEC_RELATION = {
+    "matches": "the spec says what laterite does",
+    "departs": "laterite departs from the written spec, deliberately",
+    "ambiguous": "the spec admits both readings",
+    "silent": "the spec does not address this",
+}
+
+
+#: Which section each `relation.python` value renders under, once a converged
+#: record has been lifted off the top. EXHAUSTIVE over PYTHON_RELATION, and
+#: checked below to be. A mapping rather than a chain of ifs with a default,
+#: because a default is how an unrecognised relation gets a plausible section
+#: instead of a failure — and "Where laterite differs from python-ags4" is a
+#: claim about another project, not a shrug.
+#:
+#: `reports-the-same` is here on the strength of a validation rule, not a
+#: guess: two engines that agree only reach this page by agreeing in departing
+#: from the spec, and render_divergences refuses the record if they do not.
+SECTION_BY_PYTHON = {
+    "reports-the-same": "vs-spec",
+    "reports-differently": "vs-python",
+    "reports-at-another-tier": "vs-python",
+    "reports-nothing": "vs-python",
+    "reports-additionally": "vs-python",
+    "has-no-such-check": "laterite-adds",
+    "errors": "vs-python",
+}
+
+if _unmapped := sorted(PYTHON_RELATION.keys() - SECTION_BY_PYTHON.keys()):
+    raise SystemExit(
+        f"gen_observations: relation.python {_unmapped} has no entry in "
+        "SECTION_BY_PYTHON, so a record carrying it would render nowhere."
+    )
+
+
+def section_of(rec: dict) -> str:
+    """The page section a record renders under — DERIVED, never stored.
+
+    It used to be an authored `axis` field, which meant the grouping and the
+    facts it should follow from could disagree with nothing failing. They did:
+    O-45 sat under "Checks laterite adds" while its own body said python-ags4
+    reports the same condition as an FYI. It is not a check laterite adds, it
+    is a tier laterite promotes, and only putting the two beside each other
+    made that visible.
+    """
+    rel = rec["relation"]
+    return "converged" if rel["converged"] else SECTION_BY_PYTHON[rel["python"]]
+
 
 #: The register the `upstream` flag exists to feed: the AGS-DFWG proposal list.
 #: Its tiering and wording are editorial, so it is NOT generated — but its
@@ -204,35 +281,76 @@ def _all_records(data: dict) -> Iterator[dict]:
 def render_divergences(data: dict) -> str:
     """observations.json -> the exact bytes of the docs site's divergences page.
 
-    A record is on this page iff it carries `user_facing`, and it renders under
-    the axis that field names. A record with a `status` is by definition not
-    live and cannot carry `user_facing` — that pairing is what the old page got
-    wrong, telling readers `--dict` was deferred a release after it shipped.
+    A record is on this page iff it carries `user_facing`, and its section is
+    derived from its `relation` block rather than authored. A record with a
+    `status` is by definition not live and cannot carry `user_facing` — that
+    pairing is what the old page got wrong, telling readers `--dict` was
+    deferred a release after it shipped.
     """
     live = [r for r in _all_records(data) if r.get("user_facing")]
 
-    # Both of these are hard failures rather than --lint reports. A resolved
-    # record that keeps its `user_facing` block is the exact defect this page
-    # shipped for a release, and an axis nobody renders would drop a record off
-    # the page silently — a generated page that quietly omits a record is worse
-    # than the hand-written one it replaced, because it looks authoritative.
+    # These are hard failures rather than --lint reports. A resolved record
+    # that keeps its `user_facing` block is the exact defect this page shipped
+    # for a release, and a record whose section cannot be derived would drop
+    # off the page silently — a generated page that quietly omits a record is
+    # worse than the hand-written one it replaced, because it looks
+    # authoritative.
     if bad := [r["id"] for r in live if r.get("status")]:
         raise SystemExit(
             f"gen_observations: {', '.join(bad)} carries both `user_facing` and a "
             "`status` — a resolved record cannot be a live divergence. Drop the "
             "`user_facing` block, or the status if it is in fact still live."
         )
-    if unknown := sorted(
-        {r["user_facing"]["axis"] for r in live} - set(AXES),
-    ):
-        raise SystemExit(
-            f"gen_observations: unknown user_facing axis {unknown} — add it to "
-            f"AXES (with a heading) or use one of {sorted(AXES)}."
-        )
-
-    by_axis: dict[str, list[dict]] = {axis: [] for axis in AXES}
+    # The relation block is what the section is derived FROM, so every part of
+    # it a record can get wrong is checked here, BY NAME and per record. The
+    # first cut checked the two enum fields as a set comprehension over all
+    # records at once, which reported the bad value without saying whose it
+    # was, and raised a bare KeyError from inside the render for a sub-key that
+    # was absent rather than wrong — pointing at the line of code instead of at
+    # the record that needs editing.
     for rec in live:
-        by_axis[rec["user_facing"]["axis"]].append(rec)
+        rel = rec.get("relation")
+        if not isinstance(rel, dict):
+            raise SystemExit(
+                f"gen_observations: {rec['id']} is user-facing but carries no "
+                "`relation` block, so there is nothing to derive its section "
+                "from. Add `relation: {python, spec, converged}`."
+            )
+        for field, allowed in (("python", PYTHON_RELATION), ("spec", SPEC_RELATION)):
+            if (value := rel.get(field)) not in allowed:
+                raise SystemExit(
+                    f"gen_observations: {rec['id']} has relation.{field} "
+                    f"{value!r} — it is a closed set, so use one of "
+                    f"{sorted(allowed)}."
+                )
+        if not isinstance(rel.get("converged"), bool):
+            raise SystemExit(
+                f"gen_observations: {rec['id']} has relation.converged "
+                f"{rel.get('converged')!r} — it decides a whole section on its "
+                "own, before the other two fields are consulted, so it has to "
+                "be true or false rather than absent or a string."
+            )
+        # Two engines that agree are not a divergence. Such a record reaches
+        # this page for one of two reasons — they agree in DEPARTING from the
+        # spec (O-1, O-32), or laterite moved to join them (O-31, O-33) — and
+        # with neither recorded, SECTION_BY_PYTHON would file it under "Where
+        # both depart from the written spec" and say something false about the
+        # document.
+        if (
+            rel["python"] == "reports-the-same"
+            and not rel["converged"]
+            and rel["spec"] != "departs"
+        ):
+            raise SystemExit(
+                f"gen_observations: {rec['id']} says python-ags4 reports the "
+                "same thing and the spec is not departed from, which is not a "
+                "divergence at all. Say which of the two is actually the case, "
+                "or drop the `user_facing` block."
+            )
+
+    by_section: dict[str, list[dict]] = {section: [] for section in SECTIONS}
+    for rec in live:
+        by_section[section_of(rec)].append(rec)
 
     total = len(live)
     out = [
@@ -263,8 +381,8 @@ def render_divergences(data: dict) -> str:
         "\n",
     ]
 
-    for axis, heading in AXES.items():
-        recs = by_axis[axis]
+    for section, heading in SECTIONS.items():
+        recs = by_section[section]
         if not recs:
             continue
         out.append(f"## {heading}\n")
