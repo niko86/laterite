@@ -414,7 +414,14 @@ export const GroupTable: Component<{
                         {heading.name}
                       </span>
                     </span>
-                    <span class="mt-0.5 block font-normal text-fg-faint">
+                    {/* fg-MUTED, not fg-faint (#682). The AGS type and unit are
+                        what the column IS, not a hint about it, and the faint
+                        step is deliberately below body legibility — it is for
+                        taglines and line numbers. Raising the faint token
+                        instead was measured and rejected: to clear AA on the
+                        chip it has to reach fg-muted's own value, which would
+                        leave the ramp with two indistinguishable steps. */}
+                    <span class="mt-0.5 block font-normal text-fg-muted">
                       {heading.type}
                       {heading.unit ? ` · ${heading.unit}` : ""}
                     </span>
@@ -581,7 +588,22 @@ export const GroupTable: Component<{
                                         });
                                       else props.onPick(rowIndex(), col());
                                     }}
-                                    aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
+                                    aria-label={
+                                      /* The value leads (WCAG 2.5.3, label
+                                         in name): a speech-input user names
+                                         what's ON SCREEN, which is the
+                                         cell's data, never the heading it
+                                         sits under — the old label put the
+                                         heading first and the value never
+                                         appeared in the name at all. An
+                                         empty cell renders the "–" fallback
+                                         below, so its label says "Empty"
+                                         deliberately rather than starting
+                                         from nothing. */
+                                      row[col()]
+                                        ? `${row[col()]}, Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`
+                                        : `Empty, Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`
+                                    }
                                     class="w-full rounded-xs px-1 text-left font-mono transition-colors focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
                                     classList={{
                                       /* The wash stands down in a failing

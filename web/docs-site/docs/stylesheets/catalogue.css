@@ -147,8 +147,11 @@
    way back to the unfiltered table. */
 .group-pager .group-clear {
   margin-left: auto;
+  /* Rust edge, maroon label (#682). The border is a boundary and answers to the
+     3:1 component floor; the label is text and answers to 4.5, which rust does
+     not reach at this size. Same split as the app's `action` button. */
   border-color: var(--cta);
-  color: var(--cta);
+  color: var(--accent);
 }
 .group-pager .group-clear:hover {
   background: var(--cta-quiet);

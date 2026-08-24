@@ -99,7 +99,7 @@ test("dark: the delete-group control keeps its danger border", async ({
   // The light half lives in landing.spec.ts (#593); same shared contract
   // (tokens.ts), here under the dark token set.
   await page.goto("/");
-  await expectErrBorder(page, "Delete the PROJ group");
+  await expectErrBorder(page, "delete group for PROJ");
 });
 
 test("dark: the KEY region tint stays structural", async ({ page }) => {

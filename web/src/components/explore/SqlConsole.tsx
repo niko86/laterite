@@ -196,7 +196,7 @@ export const SqlConsole: Component<{
 
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <Button variant="action" onClick={runIt}>
-          Run <span class="text-cta/70">⌘/Ctrl+↵</span>
+          Run <span class="text-accent">⌘/Ctrl+↵</span>
         </Button>
         <Input
           width="w-32"

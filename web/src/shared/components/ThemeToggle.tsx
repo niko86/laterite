@@ -2,7 +2,14 @@ import { type Component } from "solid-js";
 import { theme, toggleTheme } from "../lib/theme";
 
 /** Header button that flips light/dark. Shows the icon of the theme you'd
- *  switch *to*, the common convention for a single-button toggle. */
+ *  switch *to*, the common convention for a single-button toggle.
+ *
+ *  A checker's label-content-name-mismatch (WCAG 2.5.3) flags this button:
+ *  the visible content is a "☀︎"/"☾" glyph and the name doesn't contain it.
+ *  That rule exists so a speech-input command matches what's on screen — but
+ *  "toggle colour theme, ☀︎" isn't a command anyone would say, and the glyph
+ *  carries no word to echo. Contorting the label to embed the symbol would
+ *  satisfy the checker and serve no one; left as is. */
 export const ThemeToggle: Component = () => {
   return (
     <button
