@@ -11,7 +11,7 @@
 //! Moved verbatim from `laterite-ags4-corpus-qa/src/parity.rs` (behaviour
 //! byte-identical — the unit tests below moved with it and assert it).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +65,23 @@ impl RustResult {
             .to_string(),
         )
     }
+}
+
+/// Per-rule finding counts from a finished Rust run — the numbers
+/// [`RustResult::from_findings`] deliberately throws away.
+///
+/// Same contract as [`crate::PyOracle::check_counts`]: for a reader, never
+/// for [`classify`]. The two validators split one defect across rules
+/// differently (O-11/O-16/O-22/O-26), so comparing counts manufactures
+/// divergences the presence model exists to avoid — but a person reading
+/// a report still wants to know that one side said this nine times and
+/// the other said it once (#654).
+#[must_use]
+pub fn rust_rule_counts(found: &laterite_ags4_validator::Findings) -> BTreeMap<String, u64> {
+    laterite_ags4_validator::findings::count_by_rule(found)
+        .into_iter()
+        .map(|(r, n)| (r.to_string(), u64::try_from(n).unwrap_or(u64::MAX)))
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

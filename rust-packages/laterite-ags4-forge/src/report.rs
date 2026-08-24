@@ -2,6 +2,7 @@
 //! json / ndjson, `--compact` projection), identical UX to
 //! laterite-ags4-corpus-qa.
 
+use std::collections::BTreeMap;
 use std::io::{self, Write};
 
 use laterite_ags4_parity::Parity;
@@ -41,6 +42,12 @@ pub(crate) fn verdict_parts(v: Option<&Parity>) -> (String, String) {
 }
 
 /// `forge check <file>` — one file's dual-validation.
+///
+/// Schema 2 adds the per-rule counts (#654). The verdict above is still
+/// presence-only; the counts sit beside it so a reader can see the thing
+/// the verdict is not allowed to judge — one side saying a rule nine
+/// times and the other saying it once is the same verdict and a very
+/// different file.
 #[derive(Debug, Serialize)]
 pub struct CheckReport {
     pub schema: u32,
@@ -51,13 +58,15 @@ pub struct CheckReport {
     pub detail: String,
     pub rust_rules: Vec<String>,
     pub python_rules: Vec<String>,
+    pub rust_rule_counts: BTreeMap<String, u64>,
+    pub python_rule_counts: BTreeMap<String, u64>,
 }
 
 impl CheckReport {
     pub fn new(file: String, o: &Outcome, oracle: bool) -> Self {
         let (verdict, detail) = verdict_parts(o.verdict.as_ref());
         Self {
-            schema: 1,
+            schema: 2,
             file,
             dict_used: o.dict_used.clone(),
             oracle,
@@ -65,7 +74,30 @@ impl CheckReport {
             detail,
             rust_rules: o.rust_rules(),
             python_rules: o.python_rules(),
+            rust_rule_counts: o.rust_counts.clone(),
+            python_rule_counts: o.python_counts.clone(),
         }
+    }
+
+    /// Every rule either side raised, with both tallies — `None` where a
+    /// side did not raise it at all, which is what the verdict keys off.
+    pub fn count_rows(&self) -> Vec<(String, Option<u64>, Option<u64>)> {
+        let mut keys: Vec<&String> = self
+            .rust_rule_counts
+            .keys()
+            .chain(self.python_rule_counts.keys())
+            .collect();
+        keys.sort_unstable();
+        keys.dedup();
+        keys.into_iter()
+            .map(|k| {
+                (
+                    k.clone(),
+                    self.rust_rule_counts.get(k).copied(),
+                    self.python_rule_counts.get(k).copied(),
+                )
+            })
+            .collect()
     }
     /// A real, unexplained divergence (drives the exit code).
     pub fn is_action(&self) -> bool {
@@ -97,7 +129,99 @@ impl Report for CheckReport {
                 ],
                 ctx.colour(),
             )
-        )
+        )?;
+        let rows = self.count_rows();
+        if !rows.is_empty() {
+            // A dash rather than a zero: the two mean different things
+            // here. Zero would say "raised it, nothing found"; the rule
+            // was not raised at all.
+            let cell = |n: Option<u64>| n.map_or_else(|| "-".to_string(), |v| v.to_string());
+            writeln!(
+                w,
+                "{}",
+                styled_table(
+                    &["Rule", "rust", "python"],
+                    rows.into_iter()
+                        .map(|(r, a, b)| vec![r, cell(a), cell(if self.oracle { b } else { None })])
+                        .collect(),
+                    ctx.colour(),
+                )
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// `forge check <dir-or-files>` — one report over many files.
+///
+/// The sweep exists so a corpus costs one invocation instead of one per
+/// file, and so the verdict tally is computed once over the whole set.
+#[derive(Debug, Serialize)]
+pub struct CheckSweepReport {
+    pub schema: u32,
+    pub oracle: bool,
+    /// What the sweep looked at, and what it walked past. A directory
+    /// holds more than `.ags` files, and a sweep that silently ignores
+    /// the rest reads as "checked everything" when it did not.
+    pub files_checked: usize,
+    pub skipped_not_ags: usize,
+    pub counts: BTreeMap<String, u64>,
+    pub files: Vec<CheckReport>,
+}
+
+impl CheckSweepReport {
+    pub fn new(files: Vec<CheckReport>, oracle: bool, skipped_not_ags: usize) -> Self {
+        let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+        for f in &files {
+            *counts.entry(f.verdict.clone()).or_default() += 1;
+        }
+        Self {
+            schema: 1,
+            oracle,
+            files_checked: files.len(),
+            skipped_not_ags,
+            counts,
+            files,
+        }
+    }
+    /// Any file a real, unexplained divergence (drives the exit code).
+    pub fn is_action(&self) -> bool {
+        self.files.iter().any(CheckReport::is_action)
+    }
+}
+
+impl Report for CheckSweepReport {
+    fn render_table(&self, w: &mut dyn Write, ctx: &Ctx) -> io::Result<()> {
+        writeln!(
+            w,
+            "{}",
+            styled_table(
+                &["Verdict", "Files"],
+                self.counts
+                    .iter()
+                    .map(|(k, v)| vec![k.clone(), v.to_string()])
+                    .collect(),
+                ctx.colour(),
+            )
+        )?;
+        writeln!(
+            w,
+            "{} file(s) checked, {} non-.ags entry(ies) walked past",
+            self.files_checked, self.skipped_not_ags
+        )?;
+        if ctx.compact {
+            writeln!(w, "rerun without --compact for per-file rows")?;
+        } else {
+            for f in &self.files {
+                writeln!(w, "  {:<22} {}\n       {}", f.verdict, f.file, f.detail)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// `--compact`: drop the per-file array, keep the tally.
+    fn compact_value(&self) -> serde_json::Value {
+        without_keys(self.full_value(), &["files"])
     }
 }
 
@@ -116,6 +240,11 @@ pub struct Candidate {
 }
 
 impl Candidate {
+    /// Deliberately WITHOUT the per-rule counts (#654). This row type is
+    /// the generated-candidate row for `gen`, `run` and `mine` alike, and
+    /// those emit them by the hundred or thousand — `--compact` exists
+    /// because that volume already tells. Counts are a reading aid for one
+    /// file at a time, which is `check`.
     pub fn from_outcome(
         seq: usize,
         injection: String,
@@ -567,5 +696,110 @@ impl Report for RunReport {
     /// (the agent-loop signal); drop the full per-generation stream.
     fn compact_value(&self) -> serde_json::Value {
         without_keys(self.full_value(), &["candidates"])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn counts(xs: &[(&str, u64)]) -> BTreeMap<String, u64> {
+        xs.iter().map(|(k, v)| ((*k).to_string(), *v)).collect()
+    }
+
+    fn report(verdict: &str, rust: &[(&str, u64)], py: &[(&str, u64)]) -> CheckReport {
+        CheckReport {
+            schema: 2,
+            file: "f.ags".into(),
+            dict_used: "4.2".into(),
+            oracle: true,
+            verdict: verdict.into(),
+            detail: String::new(),
+            rust_rules: rust.iter().map(|(k, _)| (*k).to_string()).collect(),
+            python_rules: py.iter().map(|(k, _)| (*k).to_string()).collect(),
+            rust_rule_counts: counts(rust),
+            python_rule_counts: counts(py),
+        }
+    }
+
+    #[test]
+    fn count_rows_pair_each_rule_and_keep_absence_distinct_from_zero() {
+        // The case #654 exists for: both raised Rule 16, only python
+        // raised 10c, and they disagree on how many times Rule 8 fired.
+        let r = report(
+            "RULES_DIFFER",
+            &[("AGS Format Rule 16", 1), ("AGS Format Rule 8", 1)],
+            &[
+                ("AGS Format Rule 10c", 9),
+                ("AGS Format Rule 16", 1),
+                ("AGS Format Rule 8", 3),
+            ],
+        );
+        assert_eq!(
+            r.count_rows(),
+            vec![
+                ("AGS Format Rule 10c".to_string(), None, Some(9)),
+                ("AGS Format Rule 16".to_string(), Some(1), Some(1)),
+                ("AGS Format Rule 8".to_string(), Some(1), Some(3)),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_rust_only_run_has_no_python_column_to_fill() {
+        let mut r = report("RUST_ONLY", &[("AGS Format Rule 1", 2)], &[]);
+        r.oracle = false;
+        assert_eq!(
+            r.count_rows(),
+            vec![("AGS Format Rule 1".to_string(), Some(2), None)]
+        );
+    }
+
+    #[test]
+    fn a_sweep_tallies_its_verdicts_and_is_an_action_if_any_file_is() {
+        let sweep = CheckSweepReport::new(
+            vec![
+                report("AGREE", &[], &[]),
+                report("AGREE", &[], &[]),
+                report("RUST_ONLY_RULES", &[("AGS Format Rule 8", 1)], &[]),
+            ],
+            true,
+            4,
+        );
+        assert_eq!(sweep.files_checked, 3);
+        assert_eq!(sweep.skipped_not_ags, 4);
+        assert_eq!(sweep.counts.get("AGREE"), Some(&2));
+        assert_eq!(sweep.counts.get("RUST_ONLY_RULES"), Some(&1));
+        assert!(sweep.is_action());
+    }
+
+    #[test]
+    fn counts_reach_the_report_and_never_the_verdict() {
+        // #654's standing condition: the counts are observable, never
+        // judged. `classify` takes presence sets and cannot see them, and
+        // this pins the wiring one level up — two outcomes that differ
+        // ONLY in how often each rule fired carry the same verdict and the
+        // same detail, and differ only where the counts are shown.
+        let quiet = report(
+            "AGREE",
+            &[("AGS Format Rule 8", 1)],
+            &[("AGS Format Rule 8", 1)],
+        );
+        let loud = report(
+            "AGREE",
+            &[("AGS Format Rule 8", 1)],
+            &[("AGS Format Rule 8", 9)],
+        );
+        assert_eq!(quiet.verdict, loud.verdict);
+        assert_eq!(quiet.detail, loud.detail);
+        assert_eq!(quiet.rust_rules, loud.rust_rules);
+        assert_eq!(quiet.python_rules, loud.python_rules);
+        assert_ne!(quiet.count_rows(), loud.count_rows());
+    }
+
+    #[test]
+    fn a_sweep_of_agreeing_files_is_not_an_action() {
+        let sweep = CheckSweepReport::new(vec![report("AGREE", &[], &[])], true, 0);
+        assert!(!sweep.is_action());
     }
 }

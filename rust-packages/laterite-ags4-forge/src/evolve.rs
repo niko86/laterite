@@ -180,11 +180,16 @@ pub fn evolve(
             let py = oracle.unwrap().check(&tmp);
             let _ = std::fs::remove_file(&tmp);
             let verdict = laterite_ags4_parity::classify(&rust, &py);
+            // No per-rule counts on a fuzzer candidate — see
+            // `Candidate::from_outcome`, which declines to carry them for
+            // every generated-row surface, this one included.
             crate::pipeline::Outcome {
                 rust,
                 python: Some(py),
                 verdict: Some(verdict),
                 dict_used: dict,
+                rust_counts: BTreeMap::new(),
+                python_counts: BTreeMap::new(),
             }
         } else {
             crate::pipeline::Outcome {
@@ -192,6 +197,8 @@ pub fn evolve(
                 python: None,
                 verdict: None,
                 dict_used: dict,
+                rust_counts: BTreeMap::new(),
+                python_counts: BTreeMap::new(),
             }
         };
 
