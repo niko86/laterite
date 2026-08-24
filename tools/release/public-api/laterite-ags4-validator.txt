@@ -298,6 +298,7 @@ pub mod laterite_ags4_validator::rules::references
 pub fn laterite_ags4_validator::rules::references::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut laterite_ags4_validator::findings::Findings)
 pub mod laterite_ags4_validator::rules::relational
 pub fn laterite_ags4_validator::rules::relational::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::relational::check_with(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &mut laterite_ags4_validator::findings::Findings)
 pub mod laterite_ags4_validator::rules::structure
 pub fn laterite_ags4_validator::rules::structure::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
 pub mod laterite_ags4_validator::rules::typed_values

@@ -135,9 +135,9 @@ fn bench_rule_families(c: &mut Criterion) {
     fam!("typed_values", |f: &mut Findings| {
         rules::typed_values::check(&parsed, f);
     });
-    fam!("relational", |f: &mut Findings| rules::relational::check(
-        &parsed, &dict, f
-    ));
+    fam!("relational", |f: &mut Findings| {
+        rules::relational::check_with(&parsed, &dict, &opts, f);
+    });
     fam!("references", |f: &mut Findings| rules::references::check(
         &parsed, &dict, f
     ));

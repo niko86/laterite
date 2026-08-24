@@ -360,6 +360,57 @@ fn rule10c_orphan_child_flagged() {
 }
 
 #[test]
+fn rule10c_standalone_child_is_warned_about_not_silently_skipped() {
+    // #656: a child row whose parent KEY cells are ALL empty claims no parent,
+    // so the link check is DECLINED (O-39). Declining is not the same as
+    // checking and finding nothing, and before this the two were
+    // indistinguishable — the row simply produced nothing. A legitimate
+    // standalone record and a key blanked by accident look identical here, and
+    // only the author knows which they meant.
+    let f = check_file(
+        &fixture("rule10c_standalone_child.ags"),
+        &CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        },
+    )
+    .expect("the fixture checks");
+    let warn = f
+        .get("Warning (Related to Rule 10c)")
+        .expect("the declined parentage check must say so");
+    assert_eq!(warn.len(), 1, "one standalone row, one warning: {warn:?}");
+    assert!(
+        warn[0].group == "SAMP" && warn[0].desc.contains("LOCA_ID"),
+        "the warning must name the key it could not check: {warn:?}"
+    );
+    assert_eq!(warn[0].severity, findings::Severity::Warning);
+    // The VERDICT does not move: the row is still not an orphan, and the file
+    // still has no Rule 10c error.
+    assert!(
+        !f.contains_key("AGS Format Rule 10c"),
+        "a standalone row is not an orphan: {:?}",
+        f.get("AGS Format Rule 10c")
+    );
+}
+
+#[test]
+fn the_declined_parentage_warning_obeys_the_warning_tier() {
+    // The tier flags are honoured at each emission site — there is no
+    // downstream severity filter — so a warning that ignores `include_warnings`
+    // reaches EVERY caller, `--no-warnings` and `laterite.compat` included.
+    // That is not hypothetical: this warning's label contains the word "Rule",
+    // and python-ags4's `test_file_with_standalone_SAMP_IDs` asserts that no
+    // key of a clean file's report does. Ungated, it broke the parity contract
+    // by identity on a file the shim is supposed to agree about.
+    let f = findings_for("rule10c_standalone_child.ags");
+    assert!(
+        !f.contains_key("Warning (Related to Rule 10c)"),
+        "CheckOptions::default() is errors-only: {:?}",
+        f.keys().collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn rule11c_invalid_record_link_flagged() {
     let f = findings_for("rule11c_bad_rl.ags");
     let r11c = f.get("AGS Format Rule 11c").expect("Rule 11c finding");
@@ -571,6 +622,7 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
         "FYI",
         "FYI (Related to Rule 1)",
         "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)",
         "Warning (Related to Rule 18)",
         // The custom-overlay buckets (laterite-dev#568, tiered by #321). No fixture in this
         // directory can emit them — they need a `--dict` overlay, which is an

@@ -211,6 +211,22 @@ fn reconcile(
     if ro.remove("AGS Format Rule 19b") {
         ids.push("O-7");
     }
+    // O-52: laterite REPORTS the Rule 10c parentage check it declined (a
+    // child row whose parent-KEY cells are all empty). python-ags4 has no
+    // equivalent and cannot have one — its rule_10c never knows it declined
+    // anything — so this label is rust-only by construction on every file
+    // with a standalone row.
+    //
+    // Live for FORGE, which validates with `include_warnings: true` so the
+    // Rust side is tier-comparable to python. corpus-qa's crawl→validate→
+    // parity run does NOT reach it: its validate stage is errors-only
+    // (`show_warnings: false`), so the label never enters `classify` there.
+    // The arm is for the pipeline that can see it; without it every forge
+    // run over a corpus with standalone rows fills its ACTION list with a
+    // divergence we wrote on purpose.
+    if ro.remove("Warning (Related to Rule 10c)") {
+        ids.push("O-52");
+    }
     // O-26: python triple-reports Rule 19b for a malformed heading the
     // Rust validator reports once → python uniquely has extra 19b.
     if po.remove("AGS Format Rule 19b") {
@@ -423,6 +439,28 @@ mod tests {
             other => panic!("expected KnownDivergence O-6+O-7, got {other:?}"),
         }
         assert!(!classify(&r, &p).is_action());
+    }
+
+    #[test]
+    fn o52_rust_only_declined_parentage_warning_is_known_divergence() {
+        // The warning laterite adds (#656) is rust-only on every file with a
+        // standalone row, and there are real corpora full of them. It must
+        // reconcile, or the dogfood ACTION list fills with a divergence we
+        // wrote on purpose.
+        let r = rules(&["Warning (Related to Rule 10c)"]);
+        let p = Ok(BTreeSet::new());
+        match classify(&r, &p) {
+            Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-52"),
+            other => panic!("expected KnownDivergence O-52, got {other:?}"),
+        }
+        assert!(!classify(&r, &p).is_action());
+        // Negative guard: it reconciles ITSELF, never a real Rule 10c
+        // difference standing beside it.
+        let both = rules(&["Warning (Related to Rule 10c)", "AGS Format Rule 10c"]);
+        assert!(matches!(
+            classify(&both, &Ok(BTreeSet::new())),
+            Parity::RustOnlyRules { .. }
+        ));
     }
 
     #[test]

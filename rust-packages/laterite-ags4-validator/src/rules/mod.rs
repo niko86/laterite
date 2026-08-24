@@ -54,7 +54,7 @@ pub(crate) fn run_all(
     naming::check(parsed, found); //             Rules 19, 19a, 19b
     dictionary::check(parsed, dict, found); //   Rules 7, 9
     typed_values::check(parsed, found); //       Rule 8
-    relational::check(parsed, dict, found); //   Rules 10a–10c, 11a–11c
+    relational::check_with(parsed, dict, opts, found); // Rules 10a–10c, 11a–11c
     references::check(parsed, dict, found); //   Rules 19b_2/3, 20 (data level)
     // Rule 18 reads Rule 9's output — must run after dictionary::check.
     // Groups takes opts (for FYI gates) AND dict (for Rule 16's FYI

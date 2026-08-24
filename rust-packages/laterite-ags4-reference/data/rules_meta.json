@@ -226,6 +226,10 @@
         {
           "id": "O-39",
           "note": "An empty KEY cell in a parent row is treated as 'no entry' (permissive) rather than a broken link, matching python-ags4, so blank-keyed parent rows do not trigger orphan errors."
+        },
+        {
+          "id": "O-52",
+          "note": "A row whose parent key fields are ALL empty claims no parent, so the parent check is skipped rather than failed - and you get a warning saying so, because a deliberately standalone record (a lab control, an off-site sample) and a key that was blanked by accident look identical from here. The warning does not fail the file. python-ags4 reports nothing at all for these rows."
         }
       ]
     },
