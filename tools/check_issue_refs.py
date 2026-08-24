@@ -226,6 +226,17 @@ def main() -> int:
         f"check_issue_refs: watermark #{watermark} ({how}); "
         f"{len(released)} number(s) released as this repo's own"
     )
+    # The satellite half of the set empties on a schedule — every number in it
+    # is one this repo's numbering eventually climbs past — and an empty half
+    # is indistinguishable from a working one in the counts above. Say it, so
+    # nobody reads a green tick as "the satellite refs are still guarded".
+    satellite = json.loads(DATA.read_text(encoding="utf-8"))["satellite"]
+    if not any(n in expected for n in satellite["numbers"]):
+        print(
+            "check_issue_refs: no satellite number is still held — the "
+            "numbering has climbed past every one cited so far, so nothing "
+            f"here is guarding a `{satellite['repo']}` reference right now"
+        )
     print(
         f"check_issue_refs: {scanned} bare `#N` scanned; "
         f"{len(unknown)} distinct number(s) not in the frozen set, so unjudged "
