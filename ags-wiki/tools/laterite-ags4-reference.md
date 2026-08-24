@@ -82,6 +82,16 @@ The `#[cfg(test)]` catalogue↔engine faithfulness gate
 fix engine?) **stays in the validator** — it needs
 `crate::fixes::FIXABLE_RULE_LABELS`, which the leaf deliberately can't see.
 
+Its sibling holds the catalogue's **divergence notes** — the practitioner-voiced
+`observations` blocks the webapp renders beside a rule — to the OBSERVATIONS
+canon: `repo:tools/check_rule_catalogue_refs.py` (a `repo-gates` step, #658).
+Identity only, never prose: the two are written for different readers and are
+*meant* to differ. It fails on a note citing a record that does not exist, or one
+the canon has marked superseded — which is what it found on arrival, two notes
+still telling the story [[O-10]] and [[O-20]] told before [[O-30]] replaced them.
+Rule *attachment* it cannot check at all (the canon records no rule per
+observation), and it says so on every run.
+
 ## Inputs / outputs
 
 In: nothing at runtime — everything is compiled in. At **build time**,

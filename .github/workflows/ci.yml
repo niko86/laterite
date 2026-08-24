@@ -421,6 +421,15 @@ jobs:
       - name: bare `#N` means an issue in this repo
         run: uv run --no-project python tools/check_issue_refs.py
 
+      # The OTHER body of divergence prose (#658). The canon's rendered views
+      # have `gen_observations.py --check` holding them; the rule catalogue's
+      # practitioner notes — the ones the webapp renders beside a failing rule —
+      # had nothing, and drifted onto two records the canon had retired. Here
+      # rather than in wiki-lint.yml because neither file it reads is a wiki
+      # page: it is the Rust reference data against the repo-root canon.
+      - name: rule catalogue cites live O-N records
+        run: uv run --no-project python tools/check_rule_catalogue_refs.py
+
       # The repo-truth suite, minus the handful that need a build. See the
       # `cadence` job above for why `-o addopts=""` is load-bearing (the root
       # pyproject sets --benchmark-disable, and pytest-benchmark is absent from

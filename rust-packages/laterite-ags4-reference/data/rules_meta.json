@@ -173,12 +173,8 @@
       "fixable": false,
       "observations": [
         {
-          "id": "O-10",
-          "note": "The dictionary edition is chosen explicitly (default 4.2 historically) rather than purely from TRAN_AGS. This is now superseded by O-30."
-        },
-        {
           "id": "O-30",
-          "note": "All five AGS4 editions are bundled and the edition is auto-selected from the file's TRAN_AGS value, with deliberate rules: bare '4.0' maps to the newest 4.0.x patch, bare '4' to the 4.0 line, and an AGS 3.x value is a hard error rather than silently falling back."
+          "note": "Which dictionary edition your file is judged against is resolved per file from its TRAN_AGS value, not fixed: all five AGS4 editions are bundled, and an explicit edition option overrides the file's own declaration. So a heading flagged here is one that is absent from THAT edition - check the file's TRAN_AGS before treating it as a typo. The resolution has deliberate rules: bare '4.0' maps to the newest 4.0.x patch, bare '4' to the 4.0 line, an AGS 3.x value is a hard error rather than a silent fallback, and anything missing or unrecognised falls back to 4.1.1 - the same edition python-ags4 falls back to."
         }
       ]
     },
@@ -301,8 +297,8 @@
           "note": "A zero-row TRAN is reported both here and by Rule 2 (empty group); the spec structure permits this double-report."
         },
         {
-          "id": "O-20",
-          "note": "TRAN_AGS is not checked for agreement with the dictionary edition being validated against - no AGS rule requires that. The value only influences which standard dictionary is auto-selected (the latest edition when absent); you can also set the edition explicitly."
+          "id": "O-30",
+          "note": "TRAN_AGS is not checked for agreement with the dictionary edition being validated against - no AGS rule requires that. The value only selects which standard dictionary is used, falling back to 4.1.1 when it is absent or unrecognised; you can also set the edition explicitly, which overrides the file's declaration."
         }
       ]
     },
