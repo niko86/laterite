@@ -47,6 +47,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::CheckOptions;
 use crate::dict::Dictionary;
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
@@ -54,6 +55,10 @@ use crate::parse::{ParsedFile, ParsedGroup};
 const RULE_10A: &str = "AGS Format Rule 10a";
 const RULE_10B: &str = "AGS Format Rule 10b";
 const RULE_10C: &str = "AGS Format Rule 10c";
+/// The tier a reader actually meets (warnings are on by default where FYI
+/// is not) for the parentage check this rule DECLINES to make — see the
+/// all-empty-key arm below.
+const RULE_10C_WARN: &str = "Warning (Related to Rule 10c)";
 const RULE_11A: &str = "AGS Format Rule 11a";
 const RULE_11B: &str = "AGS Format Rule 11b";
 const RULE_11C: &str = "AGS Format Rule 11c";
@@ -167,7 +172,27 @@ impl<'a> EffectiveDict<'a> {
     }
 }
 
+/// The published 3-argument entry point, kept because `rules` is public API
+/// and crates.io freezes what ships: breaking it would force a version bump
+/// across every crate in the workspace to change one finding's tier.
+///
+/// It means exactly what it always meant. `CheckOptions::default()` is
+/// errors-only, and before #656 this family emitted nothing above that tier —
+/// so a caller on the frozen signature gets byte-identical findings to the
+/// ones it got before the declined-parentage warning existed. [`check_with`]
+/// is the tier-aware form, and the two should converge on the next breaking
+/// bump (`groups::check` and `line_format::check` already take options).
 pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut Findings) {
+    check_with(parsed, dict, &CheckOptions::default(), found);
+}
+
+/// Rules 10a-10c and 11a-11c, honouring the tier flags.
+pub fn check_with(
+    parsed: &ParsedFile,
+    dict: &Dictionary<'_>,
+    opts: &CheckOptions,
+    found: &mut Findings,
+) {
     let eff = EffectiveDict::build(parsed, *dict);
 
     // A parent's KEY-tuple set depends only on the parent group, never on which
@@ -182,7 +207,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut Findings) {
         let g = &parsed.groups[code];
         rule_10a(g, code, &eff, found);
         rule_10b(g, code, &eff, found);
-        rule_10c(parsed, g, code, &eff, found, &mut parent_tuples);
+        rule_10c(parsed, g, code, &eff, opts, found, &mut parent_tuples);
     }
 
     rule_11(parsed, found);
@@ -364,6 +389,7 @@ fn rule_10c<'p>(
     g: &'p ParsedGroup,
     code: &str,
     eff: &EffectiveDict<'_>,
+    opts: &CheckOptions,
     found: &mut Findings,
     parent_tuples: &mut HashMap<String, HashSet<Vec<&'p str>>>,
 ) {
@@ -458,15 +484,42 @@ fn rule_10c<'p>(
     });
     for (ri, row) in g.rows.iter().enumerate() {
         let t = tuple_at(&cidx, row);
-        // O-39: skip child rows whose parent KEY cells are ALL empty
-        // — those are "standalone" rows by the file's own design
-        // (e.g. lab-control SAMP with no LOCA borehole, off-site
-        // samples). python-ags4 reads the spec ("every entry in the
-        // KEY fields must have a parent") as applying only to
-        // non-empty entries. Empty cells are not "entries". A row
-        // with even one non-empty parent KEY field, in contrast, IS
+        // O-39: a child row whose parent KEY cells are ALL empty is
+        // "standalone" by the file's own design (a lab-control SAMP with
+        // no LOCA borehole, an off-site sample), so the link requirement
+        // is read as applying to entries MADE — and an empty cell is not
+        // an entry. A row with even one non-empty parent KEY field IS
         // claiming a parent and gets the usual check.
+        //
+        // Declining to check is not the same as checking and finding
+        // nothing, and the reader could not tell which they got: the row
+        // simply produced no finding. A standalone row and a row whose key
+        // was dropped or typo'd to blank look identical here, and only the
+        // author knows which they meant. So the skip SAYS it happened
+        // (#656), at the warning tier — the one shown by default, unlike
+        // FYI. It never changes the verdict.
         if t.iter().all(|s| s.trim().is_empty()) {
+            if !opts.include_warnings {
+                continue; // errors-only: `--no-warnings` means what it says
+            }
+            add_at(
+                found,
+                RULE_10C_WARN,
+                Some(row.line),
+                code,
+                format!(
+                    "Parentage not checked: every {parent} key field on this \
+                     row ({}) is empty, so the row claims no parent; a \
+                     standalone record and a blanked key look the same here.",
+                    pkeys.join(", ")
+                ),
+                Location {
+                    target: Target::Cell,
+                    data_row: Some(ri as u32 + 1),
+                    ..Default::default()
+                },
+                Severity::Warning,
+            );
             continue;
         }
         if !ptuples.contains(&t) {
@@ -637,10 +690,17 @@ mod tests {
     }
 
     fn run_v(src: &str, v: DictVersion) -> Findings {
+        run_opts(src, v, &CheckOptions::default())
+    }
+
+    /// The tier flags are honoured at each emission site, so a test that only
+    /// ever runs at one tier cannot see a finding that ignores them — which is
+    /// exactly how the declined-parentage warning reached `laterite.compat`.
+    fn run_opts(src: &str, v: DictVersion, opts: &CheckOptions) -> Findings {
         let pf = parse_str(src).expect("fixture parses");
         let d = Dictionary::bundled(v);
         let mut f = Findings::new();
-        check(&pf, &d, &mut f);
+        check_with(&pf, &d, opts, &mut f);
         f
     }
 
