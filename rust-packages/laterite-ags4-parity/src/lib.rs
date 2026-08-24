@@ -18,4 +18,4 @@ pub mod verdict;
 
 pub use oracle::{EXPECTED_PYAGS4, OracleError, PyOracle, SelfCheck};
 pub use rng::{Rng, reservoir};
-pub use verdict::{Parity, RustResult, classify};
+pub use verdict::{Parity, RustResult, classify, rust_rule_counts};

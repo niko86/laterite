@@ -88,8 +88,13 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct CheckArgs {
-    /// The .ags file to dual-validate.
-    pub file: PathBuf,
+    /// The .ags file(s) to dual-validate. A directory is walked
+    /// recursively for `.ags` files, and several paths may be given at
+    /// once. One file in gives the single-file document; a directory or
+    /// more than one path gives the sweep document (a verdict tally plus
+    /// one entry per file).
+    #[arg(required = true)]
+    pub paths: Vec<PathBuf>,
     /// python-ags4 per-file timeout (seconds).
     #[arg(long, default_value_t = 120)]
     pub timeout: u64,

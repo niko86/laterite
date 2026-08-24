@@ -8,7 +8,7 @@
 //! caller keeps the *policy* (warn/skip/fail on drift/unavailable);
 //! this type is just the mechanism.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -98,7 +98,21 @@ impl PyOracle {
     /// Run the wrapper on one file with the hard timeout. Returns the
     /// set of rule labels python flagged, or an error reason. (Verbatim
     /// body of the former `parity.rs::run_py`.)
+    ///
+    /// Presence only — what the verdict is allowed to see. A caller that
+    /// wants to *show* how many times each rule fired asks
+    /// [`Self::check_counts`]; both run python exactly once.
     pub fn check(&self, target: &Path) -> Result<BTreeSet<String>, String> {
+        Ok(self.check_counts(target)?.into_keys().collect())
+    }
+
+    /// The same run, keeping the per-rule finding counts python reported.
+    ///
+    /// The counts are for a reader, never for `classify` — the two
+    /// validators split one defect across rules differently (O-11/O-16/
+    /// O-22/O-26), so a count comparison manufactures divergences the
+    /// presence model exists to avoid. Observable, never judged.
+    pub fn check_counts(&self, target: &Path) -> Result<BTreeMap<String, u64>, String> {
         // The child runs with cwd = repo root (so `uv run` resolves the
         // project's deps), so the target must be absolute — it's
         // relative to the *harness* cwd, not the repo.
@@ -147,15 +161,17 @@ impl PyOracle {
             return Err(err.to_string());
         }
         // Keys are already filtered to "AGS Format Rule ..." by the
-        // wrapper; a rule "fired" iff its array is non-empty.
-        let mut set = BTreeSet::new();
+        // wrapper; a rule "fired" iff its array is non-empty, and the
+        // array's length is how many times it fired.
+        let mut counts = BTreeMap::new();
         if let Some(obj) = v.as_object() {
             for (k, val) in obj {
-                if val.as_array().is_some_and(|a| !a.is_empty()) {
-                    set.insert(k.clone());
+                let n = val.as_array().map_or(0, Vec::len);
+                if n > 0 {
+                    counts.insert(k.clone(), u64::try_from(n).unwrap_or(u64::MAX));
                 }
             }
         }
-        Ok(set)
+        Ok(counts)
     }
 }

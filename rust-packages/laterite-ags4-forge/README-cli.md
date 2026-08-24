@@ -20,13 +20,25 @@ mutate/validate/report muscle and embeds **no LLM**.
 ## Commands
 
 ```
-laterite-ags4-forge check <file.ags> [--no-oracle] [--timeout S]
+laterite-ags4-forge check <path>... [--no-oracle] [--timeout S]
 laterite-ags4-forge gen [--scaffold minimal|loca-samp] [--inject TOK]... \
                [--validate] [--no-oracle] [--out-dir D]
 ```
 
-- **check** — dual-validate one existing file; print the Rust rule
-  set, the python rule set, and the parity verdict.
+- **check** — dual-validate existing files; print each side's rule set,
+  its **per-rule finding counts**, and the parity verdict. The verdict
+  stays presence-only by design (see `ags-wiki/concepts/parity-model.md`);
+  the counts sit beside it because one side saying a rule nine times and
+  the other saying it once is the same verdict and a very different file.
+  A **directory** is walked recursively for `.ags` files (extension match
+  is case-insensitive) and several paths may be given at once — one run,
+  one report, one python process per file rather than per invocation. The
+  report says how many non-`.ags` entries it walked past.
+
+  One file named directly emits the single-file document (schema 2); a
+  directory or more than one path emits the sweep document — a verdict
+  tally, the scanned/skipped counts, and one entry per file (dropped by
+  `--compact`).
 - **gen** — synthesize a spec-valid base (`loca-samp` adds a real
   LOCA→SAMP + ABBR relational scaffold, which is what makes the
   Rule 10a/10c/16 parity blind spots single-rule-injectable), apply

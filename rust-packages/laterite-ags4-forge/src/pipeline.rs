@@ -10,12 +10,12 @@
 //! ([`crate::confidence`]). A missing oracle degrades to a Rust-only verdict
 //! (optional QA), never an error.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use laterite_ags4_parity::{Parity, PyOracle, RustResult, classify};
+use laterite_ags4_parity::{Parity, PyOracle, RustResult, classify, rust_rule_counts};
 
 /// One candidate's dual-validation outcome.
 #[derive(Debug, Clone)]
@@ -29,6 +29,14 @@ pub struct Outcome {
     /// Bundled edition the file was judged against (`"4.2"`, …) +
     /// how it was resolved, for the report.
     pub dict_used: String,
+    /// How many findings each side raised per rule. Carried for the
+    /// report only — the verdict above never sees them (#654). Empty on a
+    /// side that did not run or hard-errored — and empty on BOTH from the
+    /// evolutionary loop, which declines to carry them per candidate (the
+    /// reason is at that call site). So empty means "not carried here",
+    /// never "the validator found nothing".
+    pub rust_counts: BTreeMap<String, u64>,
+    pub python_counts: BTreeMap<String, u64>,
 }
 
 impl Outcome {
@@ -52,6 +60,14 @@ impl Outcome {
 /// (O-27). A validator *panic* becomes `RustResult::Panic` (a found
 /// panic is a top finding, never a loop crash).
 pub fn rust_check(path: &Path) -> (RustResult, String) {
+    let (r, _counts, dict) = rust_check_counted(path);
+    (r, dict)
+}
+
+/// The same run, keeping the per-rule counts for the report. `rust_check`
+/// is this with the counts dropped — one code path, so a Rust-only run and
+/// a dual-validated one can never disagree about what the validator said.
+pub fn rust_check_counted(path: &Path) -> (RustResult, BTreeMap<String, u64>, String) {
     let opts = laterite_ags4_validator::CheckOptions {
         include_fyi: true,
         include_warnings: true,
@@ -63,9 +79,17 @@ pub fn rust_check(path: &Path) -> (RustResult, String) {
         laterite_ags4_validator::check_file_with_dict(&p, &opts)
     }));
     match res {
-        Ok(Ok((found, dict, _res))) => (RustResult::from_findings(&found), format!("{dict:?}")),
-        Ok(Err(e)) => (RustResult::from_validator_error(&e), "-".to_string()),
-        Err(_) => (RustResult::Panic, "-".to_string()),
+        Ok(Ok((found, dict, _res))) => (
+            RustResult::from_findings(&found),
+            rust_rule_counts(&found),
+            format!("{dict:?}"),
+        ),
+        Ok(Err(e)) => (
+            RustResult::from_validator_error(&e),
+            BTreeMap::new(),
+            "-".to_string(),
+        ),
+        Err(_) => (RustResult::Panic, BTreeMap::new(), "-".to_string()),
     }
 }
 
@@ -90,16 +114,22 @@ pub fn build_oracle(timeout_secs: u64) -> Option<(PyOracle, String)> {
 /// shared `classify` (with the O-2/O-3/O-26/O-30/O-34 reconcile arms)
 /// produces the verdict; otherwise it's a Rust-only outcome.
 pub fn dual_validate(path: &Path, oracle: Option<&PyOracle>) -> Outcome {
-    let (rust, dict_used) = rust_check(path);
+    let (rust, rust_counts, dict_used) = rust_check_counted(path);
     match oracle {
         Some(o) => {
-            let py = o.check(path);
+            // One python run answers both questions: the counts for the
+            // report, its keys for the verdict.
+            let counted = o.check_counts(path);
+            let python_counts = counted.clone().unwrap_or_default();
+            let py = counted.map(|c| c.into_keys().collect());
             let verdict = classify(&rust, &py);
             Outcome {
                 rust,
                 python: Some(py),
                 verdict: Some(verdict),
                 dict_used,
+                rust_counts,
+                python_counts,
             }
         }
         None => Outcome {
@@ -107,6 +137,8 @@ pub fn dual_validate(path: &Path, oracle: Option<&PyOracle>) -> Outcome {
             python: None,
             verdict: None,
             dict_used,
+            rust_counts,
+            python_counts: BTreeMap::new(),
         },
     }
 }
