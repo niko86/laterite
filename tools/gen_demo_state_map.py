@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -83,18 +84,31 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
             "pseudo-row through its merge"
         ),
     },
-    (("Warning (Related to Rule 14)",), ()): {
+    (("Warning (Related to Rule 14)",), ("FYI",)): {
         "triage": "O-45",
         "why": (
-            "an unrecognised TRAN_AGS edition is a laterite warning shown by "
-            "default; python-ags4 does not report it at all"
+            "one condition, two tiers: a TRAN_AGS that is present but not a "
+            "recognised edition is a laterite warning shown by default, and "
+            "the same finding in python-ags4's opt-in FYI tier. Both engines "
+            "report it, so this shape is a tier difference and not a silence"
+        ),
+    },
+    ((), ("FYI",)): {
+        "triage": "O-53",
+        "why": (
+            "a BLANK TRAN_AGS: python-ags4 stacks its unrecognised-edition FYI "
+            "on the cell, on top of the Rule 10b error the blank already "
+            "earns. laterite reports the cell once and states the schema it "
+            "fell back to on the report envelope instead"
         ),
     },
 }
 
 
-def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+def run(
+    cmd: list[str], cwd: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
 
 
 def python_ags4_version() -> str:
@@ -148,7 +162,17 @@ def dual_validate(out_dir: Path) -> dict:
     # PATH install, a release build and a debug build — and a stale one
     # produces a map that looks exactly like a fresh one.
     print(f"gen_demo_state_map: dual-validating with {binary}", file=sys.stderr)
-    proc = run([binary, "check", str(out_dir), "--json"], ROOT)
+    # BOTH sides unfiltered, which is the whole basis of a difference meaning
+    # anything. The python bridge defaults to error-tier rule keys only —
+    # correct for the parity gate, whose contract is exactly that (O-45) — and
+    # this sweep compares laterite's warnings and FYI too. Filtering one side
+    # while leaving the other whole does not under-report, it INVENTS findings:
+    # python-ags4 raises `FYI (Related to Rule 16)` for a drifted abbreviation
+    # description with the same message laterite does, and the first version of
+    # this map recorded 145 states as a laterite-only divergence on the strength
+    # of the filter dropping python's copy.
+    env = {**os.environ, "LAT_PY_AGS4_ALL_KEYS": "1"}
+    proc = run([binary, "check", str(out_dir), "--json"], ROOT, env)
     # A non-zero exit means "divergences found", which is the normal case here.
     if not proc.stdout.strip():
         print(proc.stderr, file=sys.stderr)

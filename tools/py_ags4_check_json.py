@@ -22,6 +22,7 @@ import contextlib
 import io
 import json
 import logging
+import os
 import pathlib
 import sys
 
@@ -130,11 +131,75 @@ def main() -> int:
         print(json.dumps({"error": f"{type(e).__name__}: {e}"}))
         return 2
 
-    rules = {
-        k: v
-        for k, v in errors.items()
-        if isinstance(k, str) and k.startswith("AGS Format Rule ")
-    }
+    # WHICH KEYS COME BACK, and why there are two answers.
+    #
+    # By default: only `AGS Format Rule N`. That is the parity gate's contract
+    # — error-tier rule identity, nothing else (O-45 states it outright: "the
+    # parity gate compares only `AGS Format Rule N` keys"). python-ags4 also
+    # emits `FYI`, `FYI (Related to Rule N)`, `Warning (...)`, `Summary of
+    # data` and `Metadata`, and folding those into the parity verdict would
+    # make a tier categorisation look like an error-parity break.
+    #
+    # `LAT_PY_AGS4_ALL_KEYS=1` keeps everything. A caller comparing FULL TIERS
+    # needs it, and filtering one side while leaving the other whole does not
+    # under-report — it INVENTS findings. The demo state sweep (#659) did
+    # exactly that: python-ags4 raises `FYI (Related to Rule 16)` for a drifted
+    # abbreviation description with the same message laterite does, this
+    # dropped python's copy, and 145 states were recorded as a laterite-only
+    # divergence when both engines agreed. It also hid a real python-only `FYI`
+    # in the other direction. A filter nobody can see is a blind spot with a
+    # green tick on it (CLAUDE.md, Conventions) — hence the report below, on
+    # every run, whichever mode.
+    # Report furniture, dropped in BOTH modes. These three sit in the same dict
+    # as the findings without being claims about the file's validity, and
+    # python-ags4 itself prints them ahead of the error list rather than in it
+    # (`AGS4.py::write_error_report`). Carrying them into a comparison would
+    # report a python-only difference on every file ever checked.
+    # `Metadata` is the run's own header (file name, hash, timestamp) and
+    # `Summary of data` a group inventory, so both read as furniture from the
+    # name alone. `General` does not, and is the one worth justifying: every
+    # site that raises it (`check.py`'s AGS3 caveat, `AGS4.py`'s extended-ASCII
+    # note and its "could not complete validation") emits prose ABOUT the run
+    # BESIDE the real finding, never in place of one — the abort case pairs it
+    # with a `Validator Process Error` key, which IS a finding and is kept.
+    NOT_FINDINGS = {"General", "Metadata", "Summary of data"}
+    all_keys = os.environ.get("LAT_PY_AGS4_ALL_KEYS") == "1"
+    if all_keys:
+        rules = {
+            k: v
+            for k, v in errors.items()
+            if isinstance(k, str) and k not in NOT_FINDINGS
+        }
+        dropped: list[str] = [k for k in errors if k in NOT_FINDINGS]
+    else:
+        rules = {
+            k: v
+            for k, v in errors.items()
+            if isinstance(k, str) and k.startswith("AGS Format Rule ")
+        }
+        dropped = [
+            k
+            for k in errors
+            if isinstance(k, str) and not k.startswith("AGS Format Rule ")
+        ]
+    # Two reasons a key is dropped, reported separately because they are not
+    # equally recoverable: furniture goes in BOTH modes and no flag brings it
+    # back, and saying otherwise would be a gate misreporting its own scope.
+    furniture = sorted(k for k in dropped if k in NOT_FINDINGS)
+    filtered = sorted(k for k in dropped if k not in NOT_FINDINGS)
+    report = f"py_ags4_check_json: {len(rules)} key(s) returned"
+    if furniture:
+        report += (
+            f"; {len(furniture)} dropped as report furniture "
+            f"({', '.join(furniture)}), in either mode"
+        )
+    if filtered:
+        report += (
+            f"; {len(filtered)} finding key(s) dropped by the error-tier "
+            f"filter ({', '.join(filtered)}) — set LAT_PY_AGS4_ALL_KEYS=1 "
+            f"to keep them"
+        )
+    print(report, file=sys.stderr)
     # `line` may be an int or the string "-"; left as-is — the Rust
     # side compares rule-key *presence* only, never line values.
     print(json.dumps(rules, ensure_ascii=False))

@@ -5,7 +5,7 @@ laterite is an **independent** implementation of the AGS4 rules, calibrated agai
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
 
-**19 of them change what you see.** They are not all the same kind of thing, which is why this
+**20 of them change what you see.** They are not all the same kind of thing, which is why this
 page is grouped by what actually happened rather than filed under one heading: some are deliberate
 differences from python-ags4, some are places the two agree and the *spec* is the outlier, and some are
 laterite's own false negatives that the comparison caught and closed.
@@ -26,6 +26,7 @@ same source, so a record cannot be resolved there and stay live here.
 | **O-37** | The native parser is **lenient** where python-ags4 raises hard (duplicate GROUP, ragged rows) — findings first, never a crash. |
 | **O-41** | Rows before the first GROUP are reported as Rule 2 findings, not a parser crash. |
 | **O-42** | `TRAN_AGS="4.0"` resolves to **4.0.4**, the newest 4.0 patch; python-ags4's static map picks the oldest and over-reports Rule 10c on `PMTL`. |
+| **O-53** | A **blank** `TRAN_AGS` is reported once, as the Rule 10b error; which dictionary the verdict then fell back to is stated on the report itself rather than as a second finding. |
 | **O-49** | A numeric TYPE's count — the `n` in `nDP`/`nSF`/`nSCI` — is clamped to **30**. Read uncapped, a crafted `9999999999SF` drives python-ags4 into a ~10 GB string. |
 | **O-50** | A 0DP value outside `i64` **converts to Null**; python-ags4's conversion keeps full precision. Both validators flag the cell — the difference is in conversion, not validation. |
 

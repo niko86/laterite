@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-08-24
-counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 34}
+counts: {rules: 28, groups: 177, types: 17, observations: 53, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 34}
 ---
 # AGS Wiki — Content Catalog
 
@@ -14,7 +14,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concept
 | Rules | 28 |
 | Groups | 177 |
 | Types | 17 |
-| Observations | 52 |
+| Observations | 53 |
 | Tools | 30 |
 | Concepts | 31 |
 | Editions | 5 |
@@ -23,10 +23,10 @@ counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concept
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 34 |
-| **Total (live)** | **417** |
+| **Total (live)** | **418** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 33 · `confirmed` 18 · `drafted` 335 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 33 · `confirmed` 18 · `drafted` 336 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -321,6 +321,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 52, tools: 30, concept
 | [[O-50]] | drafted | VARIANCE |
 | [[O-51]] | drafted | VARIANCE |
 | [[O-52]] | drafted | VARIANCE |
+| [[O-53]] | drafted | VARIANCE |
 
 ## Tools
 
