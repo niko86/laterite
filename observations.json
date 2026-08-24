@@ -35,7 +35,7 @@
             "summary": "Rule 6 is a **no-op** in python-ags4 — its body is `return ags_errors`. laterite implements the embedded-CR check."
           },
           "relation": {
-            "python": "has-no-such-check",
+            "python": "reports-nothing",
             "spec": "matches",
             "converged": false
           }
@@ -554,7 +554,7 @@
             "summary": "A child row whose parent-KEY cells are all empty gets a **WARNING** saying the parentage check was declined, rather than silently producing nothing."
           },
           "relation": {
-            "python": "reports-nothing",
+            "python": "has-no-such-check",
             "spec": "silent",
             "converged": false
           }
