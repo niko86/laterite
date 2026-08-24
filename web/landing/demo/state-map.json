@@ -89,7 +89,7 @@
       "setCell": 125,
       "sequence": 4
     },
-    "difference_shapes": 3,
+    "difference_shapes": 4,
     "count_differences": 0
   },
   "not_covered": {
@@ -115,7 +115,7 @@
     {
       "rust_only": [],
       "python_only": [],
-      "states": 145,
+      "states": 144,
       "triage": "no difference",
       "why": "the two engines agree on which rules the state breaks",
       "example": "add-row-LLPL"
@@ -131,13 +131,25 @@
       "example": "seq-add-row-then-blank-its-key"
     },
     {
+      "rust_only": [],
+      "python_only": [
+        "FYI"
+      ],
+      "states": 1,
+      "triage": "O-53",
+      "why": "a BLANK TRAN_AGS: python-ags4 stacks its unrecognised-edition FYI on the cell, on top of the Rule 10b error the blank already earns. laterite reports the cell once and states the schema it fell back to on the report envelope instead",
+      "example": "set-TRAN-0-TRAN_AGS-blank"
+    },
+    {
       "rust_only": [
         "Warning (Related to Rule 14)"
       ],
-      "python_only": [],
+      "python_only": [
+        "FYI"
+      ],
       "states": 1,
       "triage": "O-45",
-      "why": "an unrecognised TRAN_AGS edition is a laterite warning shown by default; python-ags4 does not report it at all",
+      "why": "one condition, two tiers: a TRAN_AGS that is present but not a recognised edition is a laterite warning shown by default, and the same finding in python-ags4's opt-in FYI tier. Both engines report it, so this shape is a tier difference and not a silence",
       "example": "set-TRAN-0-TRAN_AGS-non-ascii"
     }
   ],
@@ -5293,7 +5305,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI"
       ],
       "rust_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -5305,12 +5318,15 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI": 1
       },
       "difference": {
         "rust_only": [],
-        "python_only": [],
-        "triage": "no difference"
+        "python_only": [
+          "FYI"
+        ],
+        "triage": "O-53"
       }
     },
     {
@@ -5335,7 +5351,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI"
       ],
       "rust_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5348,13 +5365,16 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI": 1
       },
       "difference": {
         "rust_only": [
           "Warning (Related to Rule 14)"
         ],
-        "python_only": [],
+        "python_only": [
+          "FYI"
+        ],
         "triage": "O-45"
       }
     },

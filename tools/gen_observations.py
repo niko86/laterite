@@ -183,7 +183,12 @@ def render(data: dict) -> str:
         out.append(sec["intro"])
         for rec in sec["observations"]:
             out.append(f"### {rec['id']} [{rec['kind']}] {rec['title']}\n")
-            out.append(rec["body"])
+            # Normalised, not appended verbatim: a body is hand-authored JSON,
+            # and one whose trailing blank line went missing used to glue the
+            # next `##` heading onto its own last line. `--check` cannot catch
+            # that — it compares the render against itself, and both agree on
+            # the broken text. So the separator is the renderer's to supply.
+            out.append(rec["body"].rstrip("\n") + "\n\n")
 
     foot = data["footer"]
     out.append(f"## {foot['heading']}\n")

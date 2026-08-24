@@ -576,6 +576,15 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Upstream-reportable**: No — internal cross-surface design; nothing here diverges from python-ags4 (the parity path is O-32).
 - **Our decision** (#168 Phase 7): the lean read path's message is pinned to the shared leaf's **"input is not valid UTF-8"**; the fork — lean reject, validator/bindings lossy (O-32) — is retained as intended.
 
+### O-53 [VARIANCE] A blank TRAN_AGS earns its Rule 10b error and nothing else — python-ags4 stacks its unrecognised-edition FYI on the same cell, while laterite carries the schema-fallback fact on the report envelope, where every run shows it
+- **Observed**: `TRAN_AGS` is present as a heading but its DATA cell is **blank**. Neither validator can resolve an edition from it, so both fall back to 4.1.1 ([[O-30]]) and judge the file against a schema its author never declared.
+- **Spec** (`spec:AGS4-4.2-2025.pdf` §4.1.1 Rules 10b/14): requires the TRAN group and its REQUIRED headings — a blank REQUIRED cell is a Rule 10b breach — and says nothing about what a validator should report once it has fallen back.
+- **python-ags4** (`check.py::is_TRAN_AGS_valid`): applies its unrecognised-edition advisory to the blank as well as to an unknown label, emitting `"'' in TRAN_AGS is not a recognized AGS4 version. Therefore, v4.1.1 ... will be used"` as a top-level `FYI` — on top of the Rule 10b error the same cell already earns. Because that tier is opt-in, a DEFAULT python run reports the blank but never says which schema it then used.
+- **Us** (`rules/groups.rs::tran_ags_unrecognised`): returns early on an empty value, so a blank produces the Rule 10b error and nothing more; the unrecognised-edition finding is reserved for a value that is present but unknown ([[O-45]]). The fallback is not dropped, it is carried somewhere else — on the report envelope (`Report.dict_version` + `Report.resolution`, which `lat validate` renders as `dictionary 4.1.1 (fallback)` against the seed's `dictionary 4.1 (exact)`), printed on every run at every tier.
+- **Assessment**: one fact, attached in two different places. python attaches it to the cell, which costs a second finding about a cell already flagged and puts it behind an opt-in tier; we attach it to the verdict, where it is unconditional and answers the question once for the file rather than once per offending cell. Ours is the more visible of the two, and it is why the wrong-schema risk [[O-45]] promoted to WARNING for a *present* unknown edition needs no promotion here — the envelope already states it.
+- **Upstream-reportable**: **[NO]** — python's extra line is redundant rather than wrong, and which tier it sits in is their categorisation to make.
+- **Our decision**: keep the early return. One finding per broken cell; the schema a verdict was actually reached against is a property of the verdict, not of a cell, and belongs on the report.
+
 ## Post-V8 — laterite-originated checks (no python-ags4 equivalent)
 
 ### O-43 [VARIANCE] A self-declared but non-standard PA abbreviation is a laterite-originated FYI (Related to Rule 16); python-ags4 has no such check

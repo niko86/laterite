@@ -79,6 +79,13 @@ jobs:
               - 'web/landing/demo/**'
               - 'web/scripts/sweep-demo-states.mjs'
               - 'tools/gen_demo_state_map.py'
+              # The python half of the dual-validation. The generator shells
+              # out to the forge, which shells out to this bridge — so what
+              # this script chooses to return IS one of the two answers being
+              # compared, and changing it moves every state at once. Left out,
+              # the gate would switch itself off for the one edit guaranteed
+              # to move the map.
+              - 'tools/py_ags4_check_json.py'
               - 'rust-packages/laterite-ags4-validator/**'
               - 'rust-packages/laterite-ags4-parse/**'
               # The dictionary and rules catalogue the validator PROJECTS from.

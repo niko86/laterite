@@ -105,14 +105,29 @@ rejected a shape that turned out to be the declined-parentage warning added
 hours earlier: a validator change had moved four demo states, and the sweep is
 what noticed.
 
-Then it did the more useful thing. Asked why one FYI was firing on nearly every
-state, the answer was that the seeded delivery carried its own wording for
-eleven UNIT, TYPE and ABBR descriptions rather than the dictionary's — and two
-of the ABBR ones were what raised that FYI. So the demo's claim to differ from
-python-ags4 almost everywhere was an artifact of two typos in our own fixture.
-Correcting them moved the map from one difference in nearly every state to five
-in total. A sweep is worth having partly because it makes a claim like that
-checkable at all; the number was never wrong, but what it MEANT was.
+Then it did the more useful thing, twice, on the same finding.
+
+Asked why one FYI was firing on nearly every state, the answer was that the
+seeded delivery carried its own wording for eleven UNIT, TYPE and ABBR
+descriptions rather than the dictionary's — and two of the ABBR ones were what
+raised that FYI. Two typos in our own fixture, correctable, and corrected.
+
+The second lesson is the one worth carrying, because the first reading of that
+FYI recorded it as a state where laterite reported something python-ags4 did
+not — and that was never true. python-ags4 raises the same FYI, with the same
+message. What differed was the BRIDGE: `tools/py_ags4_check_json.py` filters
+its side to `AGS Format Rule N` keys, which is exactly right for the parity gate
+(whose contract is error-key parity, see [[O-45]]) and exactly wrong for a sweep
+that also compares warnings and FYIs. Filtering one side and not the other does
+not under-report a difference. It INVENTS one, in the direction of whichever
+side was left whole, and every state the map called a divergence there was an
+artifact of the instrument.
+
+So the sweep compares both engines unfiltered (`LAT_PY_AGS4_ALL_KEYS=1`, an
+opt-in the parity gate does not take), and the two remaining TRAN_AGS shapes —
+[[O-45]] and [[O-53]] — are tier differences on findings both engines raise,
+not silences. A difference between two engines means nothing until you can say
+that both were asked the same question.
 
 ## Reading the map
 
