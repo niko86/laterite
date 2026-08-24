@@ -134,14 +134,17 @@ BUILT_SKIP = {
     # measurement counted `docs/**.md` only, which this page is not. So this
     # exclusion is a scope call made HERE, and it leaves an acceptance criterion
     # ("no U+2014 in rendered docs prose") unmet on one page rather than met.
-    # #588's own rule for a case like this is that it is worth its own ticket.
+    # #588's own rule for a case like this is that it is worth its own ticket,
+    # which is #681: either the guide is rewritten and this entry goes, or the
+    # policy is declared not to cover terminal output and this reason is
+    # rewritten to say so. Until one of those, the count below is not a zero.
     "reference/cli/": (
         "EXCLUDED BY A CALL MADE HERE, NOT BY #588. The page is the shipped "
         "`lat --readme` guide, mirrored byte-identical into four packages and "
         "held there by tools/gen_cli_readme.py, so rewriting it changes what two "
         "binaries print rather than what this site says. That is a "
-        "shipped-content change and wants its own ticket; until then these are "
-        "known-unfixed, not known-absent"
+        "shipped-content change, and #681 is where it gets decided; until then "
+        "these are known-unfixed, not known-absent"
     ),
 }
 

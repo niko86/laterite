@@ -334,7 +334,11 @@ def test_the_cli_exclusion_does_not_claim_the_issue_granted_it(gate):
     true is "criterion knowingly unmet on one page"."""
     reason = gate.BUILT_SKIP["reference/cli/"]
     assert "NOT BY #588" in reason
-    assert "own ticket" in reason, "an unmet criterion must point somewhere"
+    assert "#681" in reason, (
+        "an unmet criterion has to point somewhere a reader can go; #681 is "
+        "where the shipped guide's punctuation gets decided, and if that is "
+        "settled this whole entry should be gone rather than reworded vaguely"
+    )
 
 
 def test_the_two_halves_are_not_described_as_one_subsuming_the_other(gate):
