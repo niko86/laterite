@@ -3480,6 +3480,11 @@ test("fine: the demo shows what python-ags4 said, not just that it differs (#673
   // Beside ours, not instead of it: the two totals are only worth showing
   // together.
   await expect(page.locator("#findings")).toContainText("Findings");
+  const seedHeaderHeight = await page
+    .locator("#findings p")
+    .first()
+    .boundingBox()
+    .then((b) => b?.height);
 
   test.skip(hasTouch, "drives the in-place editor (#525)");
 
@@ -3497,6 +3502,18 @@ test("fine: the demo shows what python-ags4 said, not just that it differs (#673
   await clearTranCell(page, "TRAN_AGS");
   await expect(value).toHaveText(String(swept.withAgs));
   expect(swept.withAgs).not.toBe(swept.withoutAgs);
+
+  // And the box did not move across any of those, either. Same reservation,
+  // different lever: a count that gained a digit would otherwise reflow the
+  // header for a reason a reader cannot see.
+  expect(
+    await page
+      .locator("#findings p")
+      .first()
+      .boundingBox()
+      .then((b) => b?.height),
+    "the findings header must not grow when the count does",
+  ).toBe(seedHeaderHeight);
 });
 
 test("fine: the demo says so where the sweep never looked (#673)", async ({
@@ -3541,10 +3558,17 @@ test("fine: the demo says so where the sweep never looked (#673)", async ({
     `python-ags4 ${swept.version}`,
   );
 
-  // The header holds its box across that change. "not measured for this state"
-  // wraps where a digit does not, and the header sits INSIDE #findings — so
-  // without a reserved box, showing this message would grow the panel under a
-  // reader mid-edit, which is exactly what #657 capped the list to stop.
+  // The header holds its box across that change, at whatever width this lane
+  // runs. "not measured for this state" wraps where a digit does not — one
+  // line at 1280 and two at 390 — and the header sits INSIDE #findings, so
+  // without a reservation this message would grow the panel under a reader
+  // mid-edit, which is exactly what #657 capped the list to stop.
+  //
+  // Asserted per lane rather than against a pixel count, because the number of
+  // lines is a fact about the viewport and the face. A first attempt reserved
+  // a fixed two line-heights and passed here and failed on the narrow lane,
+  // which is the whole argument for measuring the longest string instead of
+  // guessing at it.
   expect(
     await header.boundingBox().then((b) => b?.height),
     "the findings header must not grow when the number becomes a sentence",
