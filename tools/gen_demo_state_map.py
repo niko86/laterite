@@ -56,11 +56,34 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Literal, NotRequired, TypedDict
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 MAP = ROOT / "web" / "landing" / "demo" / "state-map.json"
+NOTES = ROOT / "web" / "landing" / "demo" / "divergence-notes.json"
 FORGE = "laterite-ags4-forge"
+
+
+class Reader(TypedDict):
+    """The reader-facing half of a triage entry: which direction the difference
+    goes, and what the demo says about it. Typed rather than left as a loose
+    dict because `side` is what the page switches its whole rendering on."""
+
+    side: Literal["ours", "theirs", "tier"]
+    text: str
+
+
+class Triage(TypedDict):
+    """One difference shape's explanation. `why` is for whoever maintains this
+    sweep; `reader` is for whoever is looking at the demo. They are separate
+    fields because they are written for different people and should read
+    differently — collapsing them produces prose that serves neither."""
+
+    triage: str
+    why: str
+    reader: NotRequired[Reader]
+
 
 #: The difference shapes this sweep knows how to explain. A shape is the pair
 #: (rules only laterite raised, rules only python-ags4 raised) — the key sets,
@@ -69,7 +92,7 @@ FORGE = "laterite-ags4-forge"
 #:
 #: Keyed by the frozen pair so a shape cannot be matched loosely. Anything not
 #: here stops the run.
-KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
+KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], Triage] = {
     ((), ()): {
         "triage": "no difference",
         "why": "the two engines agree on which rules the state breaks",
@@ -83,6 +106,15 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
             "O-52 documents: the all-empty key matches the parent's UNIT "
             "pseudo-row through its merge"
         ),
+        "reader": {
+            "side": "ours",
+            "text": (
+                "python-ags4 stays silent here. Not because it decided the "
+                "row was fine: its parent lookup happens to match an empty "
+                "key against the parent group's units row, so it never asks "
+                "the question."
+            ),
+        },
     },
     (("Warning (Related to Rule 14)",), ("FYI",)): {
         "triage": "O-45",
@@ -92,6 +124,15 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
             "the same finding in python-ags4's opt-in FYI tier. Both engines "
             "report it, so this shape is a tier difference and not a silence"
         ),
+        "reader": {
+            "side": "tier",
+            "text": (
+                "python-ags4 reports this too, as an FYI you have to ask for. "
+                "We show it by default: the edition could not be matched, so "
+                "the file was checked against a dictionary its author never "
+                "named."
+            ),
+        },
     },
     ((), ("FYI",)): {
         "triage": "O-53",
@@ -101,6 +142,15 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
             "earns. laterite reports the cell once and states the schema it "
             "fell back to on the report envelope instead"
         ),
+        "reader": {
+            "side": "theirs",
+            "text": (
+                "python-ags4 adds a second note on this cell, saying the "
+                "blank is not a recognised AGS4 version. We report the empty "
+                "required field once, and say which dictionary we fell back "
+                "to on the result itself rather than on the cell."
+            ),
+        },
     },
 }
 
@@ -303,6 +353,117 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
     return doc, unknown
 
 
+def build_notes(doc: dict) -> tuple[dict, list[str]]:
+    """The reader-facing half of the map: one note per difference shape the
+    demo can actually meet, small enough to ship to a browser.
+
+    The map is the evidence and is ~150x the size of this; the landing page
+    does not need 150 states to explain the one it is in. What it needs is the
+    note keyed by something it can match against its own state WITHOUT
+    reimplementing a rule:
+
+    * `ours` / `tier` — matched on the RULE KEY. The finding is already on the
+      page carrying that key, so the note attaches to it and needs nothing
+      else. It generalises for free: any state that raises the key gets the
+      explanation, including states this sweep never enumerated.
+    * `theirs` — there is no finding to attach to, which is the whole point of
+      the case. Matched instead on the CELL the state was reached by, carried
+      as the literal value the enumerator wrote. Comparing one cell to one
+      string is something a browser can do exactly; deciding "is this value
+      non-ASCII for its declared type" is not, and a demo that re-derived it
+      would be a second validator disagreeing with the first.
+
+    A shape with no `reader` entry stops the run, for the same reason an
+    untriaged shape does: silence here renders as "this state has nothing to
+    explain", which is indistinguishable from the truth and is not it.
+    """
+    by_state = {st["id"]: st for st in doc["states"]}
+    notes: list[dict] = []
+    missing: list[str] = []
+
+    for shape in doc["difference_shapes"]:
+        if not shape["rust_only"] and not shape["python_only"]:
+            continue
+        key = (tuple(shape["rust_only"]), tuple(shape["python_only"]))
+        reader = KNOWN.get(key, {}).get("reader")
+        if not reader:
+            missing.append(
+                f"{shape['triage']}: shape {key} has no `reader` note, so the "
+                f"demo would show its {shape['states']} state(s) with nothing "
+                f"said about them"
+            )
+            continue
+
+        note = {
+            "observation": shape["triage"],
+            "side": reader["side"],
+            "text": reader["text"],
+            "states": shape["states"],
+        }
+        if reader["side"] == "theirs":
+            # Every cell edit that reaches this shape, so a reader who finds it
+            # by another route is not met with silence.
+            cells = []
+            for state_id in sorted(
+                st["id"]
+                for st in doc["states"]
+                if tuple(st["difference"]["python_only"]) == key[1]
+                and tuple(st["difference"]["rust_only"]) == key[0]
+            ):
+                by = by_state[state_id]["reached_by"]
+                if "value" in by:
+                    cells.append(
+                        {
+                            "group": by["group"],
+                            "row": by["row"],
+                            "heading": by["heading"],
+                            "value": by["value"],
+                        }
+                    )
+            if not cells:
+                missing.append(
+                    f"{shape['triage']}: reached by no single cell edit, so "
+                    f"the demo has nothing exact to match on — this shape "
+                    f"needs a trigger the browser can evaluate"
+                )
+                continue
+            note["when_cell_is"] = cells
+        else:
+            note["rules"] = list(shape["rust_only"])
+        notes.append(note)
+
+    # The third case the demo was asked to explain — the same rule key raised by
+    # both engines at DIFFERENT counts — has no note here, and deliberately no
+    # render path either. It is not a difference SHAPE (the shapes compare key
+    # sets; this is `count_differences`, a separate list), it has no O-N because
+    # none has ever occurred, and shipping a generic path for it would put code
+    # on the page that has never rendered and cannot be tested against anything.
+    #
+    # So the guard goes here instead, which is the stronger half of "not dropped
+    # silently": if one ever appears, this STOPS rather than writing a map the
+    # demo would be quiet about. Nobody has to remember to look.
+    missing.extend(
+        f"{diff['state']}: the two engines raise {diff['rule']!r} a different "
+        f"number of times, which no O-N explains and the demo has no way to "
+        f"say — the louder of the two signals this sweep watches for"
+        for diff in doc["count_differences"]
+    )
+
+    notes.sort(key=lambda n: n["observation"])
+    return {
+        "schema": 1,
+        "generator": "tools/gen_demo_state_map.py",
+        "source": str(MAP.relative_to(ROOT)),
+        "python_ags4_version": doc["python_ags4_version"],
+        "sides": {
+            "ours": "laterite reports it, python-ags4 does not",
+            "theirs": "python-ags4 reports it, laterite does not",
+            "tier": "both report it, at different tiers",
+        },
+        "notes": notes,
+    }, missing
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="fail on drift, write nothing")
@@ -313,6 +474,8 @@ def main() -> int:
         manifest = emit_states(out_dir)
         report = dual_validate(out_dir)
         doc, unknown = build_map(manifest, report, python_ags4_version())
+    notes, note_gaps = build_notes(doc)
+    unknown.extend(note_gaps)
 
     # The scope statement, printed pass or fail. A sweep that says only "199
     # states, no surprises" reads as "the demo has been swept".
@@ -351,25 +514,45 @@ def main() -> int:
             print(f"  … and {len(unknown) - 20} more", file=sys.stderr)
         return 1
 
+    print(
+        f"gen_demo_state_map: {len(notes['notes'])} reader note(s) for the "
+        f"demo ({', '.join(n['observation'] for n in notes['notes']) or 'none'})"
+    )
+
     rendered = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+    rendered_notes = json.dumps(notes, indent=2, ensure_ascii=False) + "\n"
     if args.check:
-        current = MAP.read_text(encoding="utf-8") if MAP.exists() else ""
-        if current != rendered:
+        stale = [
+            path
+            for path, want in ((MAP, rendered), (NOTES, rendered_notes))
+            if (path.read_text(encoding="utf-8") if path.exists() else "") != want
+        ]
+        if stale:
             print(
-                f"\ngen_demo_state_map: {MAP.relative_to(ROOT)} has DRIFTED. "
-                "Re-run without --check and read the diff — it says which of "
-                "the three this is: a state whose answer moved (the states "
-                "block changes), the OTHER engine moving under us "
-                "(`python_ags4_version` changes), or the reachable set itself "
-                "changing (`counts` and `scope` change).",
+                "\ngen_demo_state_map: "
+                + ", ".join(str(x.relative_to(ROOT)) for x in stale)
+                + " has DRIFTED. Re-run without --check and read the diff — "
+                "it says which of the four this is: a state whose answer moved "
+                "(the states block changes), the OTHER engine moving under us "
+                "(`python_ags4_version` changes), the reachable set itself "
+                "changing (`counts` and `scope` change), or a difference "
+                "gaining/losing the note the demo shows for it (only "
+                "divergence-notes.json changes).",
                 file=sys.stderr,
             )
             return 1
-        print(f"gen_demo_state_map: {MAP.relative_to(ROOT)} is up to date")
+        print(
+            f"gen_demo_state_map: {MAP.relative_to(ROOT)} and "
+            f"{NOTES.relative_to(ROOT)} are up to date"
+        )
         return 0
 
     MAP.write_text(rendered, encoding="utf-8")
-    print(f"gen_demo_state_map: wrote {MAP.relative_to(ROOT)}")
+    NOTES.write_text(rendered_notes, encoding="utf-8")
+    print(
+        f"gen_demo_state_map: wrote {MAP.relative_to(ROOT)} and "
+        f"{NOTES.relative_to(ROOT)}"
+    )
     return 0
 
 

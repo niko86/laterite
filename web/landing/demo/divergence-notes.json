@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "generator": "tools/gen_demo_state_map.py",
+  "source": "web/landing/demo/state-map.json",
+  "python_ags4_version": "1.2.0",
+  "sides": {
+    "ours": "laterite reports it, python-ags4 does not",
+    "theirs": "python-ags4 reports it, laterite does not",
+    "tier": "both report it, at different tiers"
+  },
+  "notes": [
+    {
+      "observation": "O-45",
+      "side": "tier",
+      "text": "python-ags4 reports this too, as an FYI you have to ask for. We show it by default: the edition could not be matched, so the file was checked against a dictionary its author never named.",
+      "states": 1,
+      "rules": [
+        "Warning (Related to Rule 14)"
+      ]
+    },
+    {
+      "observation": "O-52",
+      "side": "ours",
+      "text": "python-ags4 stays silent here. Not because it decided the row was fine: its parent lookup happens to match an empty key against the parent group's units row, so it never asks the question.",
+      "states": 4,
+      "rules": [
+        "Warning (Related to Rule 10c)"
+      ]
+    },
+    {
+      "observation": "O-53",
+      "side": "theirs",
+      "text": "python-ags4 adds a second note on this cell, saying the blank is not a recognised AGS4 version. We report the empty required field once, and say which dictionary we fell back to on the result itself rather than on the cell.",
+      "states": 1,
+      "when_cell_is": [
+        {
+          "group": "TRAN",
+          "row": 0,
+          "heading": "TRAN_AGS",
+          "value": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1035,7 +1035,8 @@
         "row": 0,
         "heading": "LLPL_LL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1072,7 +1073,8 @@
         "row": 0,
         "heading": "LLPL_LL",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1109,7 +1111,8 @@
         "row": 0,
         "heading": "LLPL_PL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1146,7 +1149,8 @@
         "row": 0,
         "heading": "LLPL_PL",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1187,7 +1191,8 @@
         "row": 0,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1224,7 +1229,8 @@
         "row": 0,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1261,7 +1267,8 @@
         "row": 0,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1298,7 +1305,8 @@
         "row": 0,
         "heading": "SAMP_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1335,7 +1343,8 @@
         "row": 0,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1372,7 +1381,8 @@
         "row": 0,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1413,7 +1423,8 @@
         "row": 0,
         "heading": "SAMP_REF",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1450,7 +1461,8 @@
         "row": 0,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1487,7 +1499,8 @@
         "row": 0,
         "heading": "SAMP_TOP",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "999.00"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1524,7 +1537,8 @@
         "row": 0,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1561,7 +1575,8 @@
         "row": 0,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1598,7 +1613,8 @@
         "row": 0,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1635,7 +1651,8 @@
         "row": 0,
         "heading": "SAMP_TYPE",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1672,7 +1689,8 @@
         "row": 0,
         "heading": "SPEC_DPTH",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1709,7 +1727,8 @@
         "row": 0,
         "heading": "SPEC_DPTH",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1746,7 +1765,8 @@
         "row": 0,
         "heading": "SPEC_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1783,7 +1803,8 @@
         "row": 0,
         "heading": "SPEC_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1824,7 +1845,8 @@
         "row": 1,
         "heading": "LLPL_LL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1861,7 +1883,8 @@
         "row": 1,
         "heading": "LLPL_LL",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1898,7 +1921,8 @@
         "row": 1,
         "heading": "LLPL_PL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1935,7 +1959,8 @@
         "row": 1,
         "heading": "LLPL_PL",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1976,7 +2001,8 @@
         "row": 1,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2013,7 +2039,8 @@
         "row": 1,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2050,7 +2077,8 @@
         "row": 1,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2087,7 +2115,8 @@
         "row": 1,
         "heading": "SAMP_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2124,7 +2153,8 @@
         "row": 1,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2161,7 +2191,8 @@
         "row": 1,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2202,7 +2233,8 @@
         "row": 1,
         "heading": "SAMP_REF",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2239,7 +2271,8 @@
         "row": 1,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2276,7 +2309,8 @@
         "row": 1,
         "heading": "SAMP_TOP",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "999.00"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2313,7 +2347,8 @@
         "row": 1,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2350,7 +2385,8 @@
         "row": 1,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2387,7 +2423,8 @@
         "row": 1,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2424,7 +2461,8 @@
         "row": 1,
         "heading": "SAMP_TYPE",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2461,7 +2499,8 @@
         "row": 1,
         "heading": "SPEC_DPTH",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2498,7 +2537,8 @@
         "row": 1,
         "heading": "SPEC_DPTH",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2535,7 +2575,8 @@
         "row": 1,
         "heading": "SPEC_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2572,7 +2613,8 @@
         "row": 1,
         "heading": "SPEC_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2613,7 +2655,8 @@
         "row": 2,
         "heading": "LLPL_LL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2650,7 +2693,8 @@
         "row": 2,
         "heading": "LLPL_LL",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2687,7 +2731,8 @@
         "row": 2,
         "heading": "LLPL_PL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2724,7 +2769,8 @@
         "row": 2,
         "heading": "LLPL_PL",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2765,7 +2811,8 @@
         "row": 2,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2802,7 +2849,8 @@
         "row": 2,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2839,7 +2887,8 @@
         "row": 2,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2876,7 +2925,8 @@
         "row": 2,
         "heading": "SAMP_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2913,7 +2963,8 @@
         "row": 2,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2950,7 +3001,8 @@
         "row": 2,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2991,7 +3043,8 @@
         "row": 2,
         "heading": "SAMP_REF",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3028,7 +3081,8 @@
         "row": 2,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3065,7 +3119,8 @@
         "row": 2,
         "heading": "SAMP_TOP",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "999.00"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3102,7 +3157,8 @@
         "row": 2,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3139,7 +3195,8 @@
         "row": 2,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3176,7 +3233,8 @@
         "row": 2,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3213,7 +3271,8 @@
         "row": 2,
         "heading": "SAMP_TYPE",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3250,7 +3309,8 @@
         "row": 2,
         "heading": "SPEC_DPTH",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3287,7 +3347,8 @@
         "row": 2,
         "heading": "SPEC_DPTH",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3324,7 +3385,8 @@
         "row": 2,
         "heading": "SPEC_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3361,7 +3423,8 @@
         "row": 2,
         "heading": "SPEC_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3402,7 +3465,8 @@
         "row": 0,
         "heading": "LOCA_FDEP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3439,7 +3503,8 @@
         "row": 0,
         "heading": "LOCA_FDEP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3476,7 +3541,8 @@
         "row": 0,
         "heading": "LOCA_GL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3509,7 +3575,8 @@
         "row": 0,
         "heading": "LOCA_GL",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3546,7 +3613,8 @@
         "row": 0,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3583,7 +3651,8 @@
         "row": 0,
         "heading": "LOCA_REM",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3620,7 +3689,8 @@
         "row": 0,
         "heading": "LOCA_REM",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3661,7 +3731,8 @@
         "row": 0,
         "heading": "LOCA_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3698,7 +3769,8 @@
         "row": 0,
         "heading": "LOCA_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3735,7 +3807,8 @@
         "row": 1,
         "heading": "LOCA_FDEP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3772,7 +3845,8 @@
         "row": 1,
         "heading": "LOCA_FDEP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3809,7 +3883,8 @@
         "row": 1,
         "heading": "LOCA_GL",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3846,7 +3921,8 @@
         "row": 1,
         "heading": "LOCA_GL",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3883,7 +3959,8 @@
         "row": 1,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3920,7 +3997,8 @@
         "row": 1,
         "heading": "LOCA_REM",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3957,7 +4035,8 @@
         "row": 1,
         "heading": "LOCA_REM",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3998,7 +4077,8 @@
         "row": 1,
         "heading": "LOCA_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4035,7 +4115,8 @@
         "row": 1,
         "heading": "LOCA_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4072,7 +4153,8 @@
         "row": 0,
         "heading": "PROJ_CLNT",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4109,7 +4191,8 @@
         "row": 0,
         "heading": "PROJ_CLNT",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4150,7 +4233,8 @@
         "row": 0,
         "heading": "PROJ_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4191,7 +4275,8 @@
         "row": 0,
         "heading": "PROJ_NAME",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4228,7 +4313,8 @@
         "row": 0,
         "heading": "PROJ_NAME",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4269,7 +4355,8 @@
         "row": 0,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4310,7 +4397,8 @@
         "row": 0,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4347,7 +4435,8 @@
         "row": 0,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4384,7 +4473,8 @@
         "row": 0,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4421,7 +4511,8 @@
         "row": 0,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4462,7 +4553,8 @@
         "row": 0,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4499,7 +4591,8 @@
         "row": 0,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4536,7 +4629,8 @@
         "row": 0,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4573,7 +4667,8 @@
         "row": 0,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4610,7 +4705,8 @@
         "row": 1,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4651,7 +4747,8 @@
         "row": 1,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4688,7 +4785,8 @@
         "row": 1,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4725,7 +4823,8 @@
         "row": 1,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4762,7 +4861,8 @@
         "row": 1,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4803,7 +4903,8 @@
         "row": 1,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4840,7 +4941,8 @@
         "row": 1,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4877,7 +4979,8 @@
         "row": 1,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4914,7 +5017,8 @@
         "row": 1,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4951,7 +5055,8 @@
         "row": 2,
         "heading": "LOCA_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4992,7 +5097,8 @@
         "row": 2,
         "heading": "LOCA_ID",
         "class": "unmatched-parent-key",
-        "rule": "10c (a child row must match a parent row)"
+        "rule": "10c (a child row must match a parent row)",
+        "value": "NO-SUCH-VALUE"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5029,7 +5135,8 @@
         "row": 2,
         "heading": "SAMP_ID",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5066,7 +5173,8 @@
         "row": 2,
         "heading": "SAMP_REF",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5103,7 +5211,8 @@
         "row": 2,
         "heading": "SAMP_REF",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5144,7 +5253,8 @@
         "row": 2,
         "heading": "SAMP_TOP",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5181,7 +5291,8 @@
         "row": 2,
         "heading": "SAMP_TOP",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5218,7 +5329,8 @@
         "row": 2,
         "heading": "SAMP_TYPE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5255,7 +5367,8 @@
         "row": 2,
         "heading": "SAMP_TYPE",
         "class": "unlisted-abbreviation",
-        "rule": "16 (a PA value must be listed in ABBR)"
+        "rule": "16 (a PA value must be listed in ABBR)",
+        "value": "ZZZ"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5292,7 +5405,8 @@
         "row": 0,
         "heading": "TRAN_AGS",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1_1",
       "rust_rules": [
@@ -5337,7 +5451,8 @@
         "row": 0,
         "heading": "TRAN_AGS",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1_1",
       "rust_rules": [
@@ -5386,7 +5501,8 @@
         "row": 0,
         "heading": "TRAN_DATE",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5427,7 +5543,8 @@
         "row": 0,
         "heading": "TRAN_DATE",
         "class": "wrong-for-type",
-        "rule": "8 (the value must match its declared TYPE)"
+        "rule": "8 (the value must match its declared TYPE)",
+        "value": "not-a-number"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5464,7 +5581,8 @@
         "row": 0,
         "heading": "TRAN_ISNO",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5505,7 +5623,8 @@
         "row": 0,
         "heading": "TRAN_ISNO",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5546,7 +5665,8 @@
         "row": 0,
         "heading": "TRAN_PROD",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5587,7 +5707,8 @@
         "row": 0,
         "heading": "TRAN_PROD",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5628,7 +5749,8 @@
         "row": 0,
         "heading": "TRAN_RECV",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5669,7 +5791,8 @@
         "row": 0,
         "heading": "TRAN_RECV",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5710,7 +5833,8 @@
         "row": 0,
         "heading": "TRAN_STAT",
         "class": "blank",
-        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
+        "value": ""
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5751,7 +5875,8 @@
         "row": 0,
         "heading": "TRAN_STAT",
         "class": "non-ascii",
-        "rule": "1 (the file must be ASCII)"
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
       },
       "dictionary": "V4_1",
       "rust_rules": [

@@ -327,6 +327,13 @@ async function main() {
               heading: h.name,
               class: cls.id,
               rule: cls.rule,
+              // The literal the class produced, not just its name. A consumer
+              // that wants to know "is the page in this state right now" can
+              // compare one cell against one string; deriving it from the
+              // class instead would mean reimplementing the rule the class is
+              // named for, in the browser, beside the engine that already
+              // decides it.
+              value,
             },
           );
         }
