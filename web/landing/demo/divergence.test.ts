@@ -14,9 +14,12 @@ import {
   PYTHON_AGS4_VERSION,
   divergenceForRule,
   divergencesTheyRaise,
+  pythonFindingCount,
 } from "./divergence";
 import { SEEDED, parse, emit } from "./delivery";
+import type { Finding } from "./engine";
 import notes from "./divergence-notes.json";
+import counts from "./python-counts.json";
 
 const map = JSON.parse(
   readFileSync(fileURLToPath(new URL("./state-map.json", import.meta.url)), {
@@ -29,7 +32,45 @@ const map = JSON.parse(
     python_only: string[];
     triage: string;
   }[];
+  states: {
+    id: string;
+    rust_rule_counts: Record<string, number>;
+    python_rule_counts: Record<string, number>;
+  }[];
 };
+
+/** Findings shaped as the engine hands them over, from a rule-to-count map.
+ *  Only `rule` and `severity` are read by the signature, and building them
+ *  here rather than running the wasm engine keeps this a test of the LOOKUP. */
+const findingsFrom = (tally: Record<string, number>): Finding[] =>
+  Object.entries(tally).flatMap(([rule, n]) =>
+    Array.from(
+      { length: n },
+      () => ({ rule, severity: "error" }) as unknown as Finding,
+    ),
+  );
+
+/** Clear one cell of the seeded delivery, through the demo's own emitter so
+ *  the result is a delivery the page could actually be in. */
+const clearCell = (group: string, heading: string) =>
+  parse(
+    emit(
+      SEEDED.map((g) =>
+        g.code === group
+          ? {
+              ...g,
+              rows: g.rows.map((row, i) =>
+                i === 0
+                  ? row.map((cell, c) =>
+                      g.headings[c] === heading ? "" : cell,
+                    )
+                  : row,
+              ),
+            }
+          : g,
+      ),
+    ),
+  );
 
 describe("the notes cover the map they are drawn from", () => {
   it("has a note for every difference shape the sweep found", () => {
@@ -127,5 +168,103 @@ describe("divergencesTheyRaise", () => {
     expect(
       divergencesTheyRaise(SEEDED.filter((g) => g.code !== "TRAN")),
     ).toEqual([]);
+  });
+});
+
+describe("pythonFindingCount", () => {
+  it("is a claim about the same python-ags4 the map was swept against", () => {
+    expect(counts.python_ags4_version).toBe(map.python_ags4_version);
+  });
+
+  it("reads the seeded delivery's answer off the sweep", () => {
+    // Pinned by IDENTITY against the map's own `seed` state rather than by a
+    // literal: a hard-coded 4 would keep passing while the sweep moved under
+    // it, which is exactly the drift this table exists to make visible.
+    const seed = map.states.find((s) => s.id === "seed")!;
+    const expected = Object.values(seed.python_rule_counts).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    expect(
+      pythonFindingCount(findingsFrom(seed.rust_rule_counts), SEEDED),
+    ).toBe(expected);
+  });
+
+  it("agrees with the map on every state the sweep measured", () => {
+    // The lookup IS the map, restated in a form a browser can key on. If any
+    // state disagrees, the signature is not the function the sweep proved it
+    // to be — and only the collision below is allowed to need a cell.
+    const collided = new Set(
+      counts.signatures
+        .filter((e) => "when_cell_is" in e)
+        .map((e) => e.signature),
+    );
+    // Collected and asserted once, so a failure names every state that
+    // disagrees rather than the first one the loop reached.
+    const wrong: string[] = [];
+    for (const state of map.states) {
+      const signature = Object.keys(state.rust_rule_counts)
+        .sort()
+        .map((rule) => `${rule}=${state.rust_rule_counts[rule]}`)
+        .join("|");
+      if (collided.has(signature)) continue;
+      const expected = Object.values(state.python_rule_counts).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      const got = pythonFindingCount(
+        findingsFrom(state.rust_rule_counts),
+        SEEDED,
+      );
+      if (got !== expected) wrong.push(`${state.id}: ${got} != ${expected}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("resolves the TRAN_AGS collision: the same findings, two answers", () => {
+    // The one signature that is not a function of the findings alone. Clearing
+    // TRAN_STAT and clearing TRAN_AGS leave laterite saying exactly the same
+    // thing, and only the second earns python-ags4's extra FYI (O-53).
+    const entry = counts.signatures.find((e) => "when_cell_is" in e)!;
+    const tally = Object.fromEntries(
+      entry.signature.split("|").map((part) => {
+        const at = part.lastIndexOf("=");
+        return [part.slice(0, at), Number(part.slice(at + 1))];
+      }),
+    );
+    const findings = findingsFrom(tally);
+    const viaAgs = pythonFindingCount(findings, clearCell("TRAN", "TRAN_AGS"));
+    const viaStat = pythonFindingCount(
+      findings,
+      clearCell("TRAN", "TRAN_STAT"),
+    );
+    expect(viaStat).toBe(entry.python);
+    expect(viaAgs).not.toBe(viaStat);
+  });
+
+  it("says nothing rather than guessing about a state the sweep never saw", () => {
+    // Silence would be indistinguishable from the two engines agreeing, which
+    // is the confusion the whole feature exists to remove — so the caller gets
+    // null and the page says so.
+    expect(
+      pythonFindingCount(findingsFrom({ "AGS Format Rule 99": 3 }), SEEDED),
+    ).toBeNull();
+  });
+
+  it("keys on the tiers the demo shows, not the tiers the sweep measured", () => {
+    // The sweep measures laterite with FYI on so the two engines are
+    // tier-comparable; the demo's validate call leaves it off. An FYI arriving
+    // in the findings must not change the key, or every lookup misses at once.
+    const seed = map.states.find((s) => s.id === "seed")!;
+    const withFyi = [
+      ...findingsFrom(seed.rust_rule_counts),
+      {
+        rule: "FYI (Related to Rule 16)",
+        severity: "fyi",
+      } as unknown as Finding,
+    ];
+    expect(pythonFindingCount(withFyi, SEEDED)).toBe(
+      pythonFindingCount(findingsFrom(seed.rust_rule_counts), SEEDED),
+    );
   });
 });

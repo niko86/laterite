@@ -77,16 +77,20 @@
     {
       "id": "unlisted-abbreviation",
       "rule": "16 (a PA value must be listed in ABBR)"
+    },
+    {
+      "id": "arbitrary-text",
+      "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell"
     }
   ],
   "counts": {
-    "states": 150,
+    "states": 200,
     "by_lever": {
       "seed": 1,
       "deleteGroup": 5,
       "addRow": 5,
       "deleteRow": 10,
-      "setCell": 125,
+      "setCell": 175,
       "sequence": 4
     },
     "difference_shapes": 4,
@@ -109,13 +113,63 @@
         "why": "identity on the seed, since nothing is deleted yet, so it has no depth-1 state. It is exercised by `assertDeleteRestoreRoundTrips` instead, which is the stronger claim: not that it reaches a new state, but that it returns EXACTLY to the one it started from"
       }
     ],
-    "cell_values": "setCell takes free text, so values are unbounded and are covered by equivalence class, not enumerated; a value outside every class below is outside this map"
+    "cell_values": "setCell takes free text, so values are unbounded and are covered by equivalence class, not enumerated; a value outside every class below is outside this map",
+    "inert_columns": [
+      {
+        "group": "PROJ",
+        "heading": "PROJ_NAME",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "PROJ",
+        "heading": "PROJ_CLNT",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "TRAN",
+        "heading": "TRAN_PROD",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "TRAN",
+        "heading": "TRAN_STAT",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "TRAN",
+        "heading": "TRAN_AGS",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "TRAN",
+        "heading": "TRAN_RECV",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "LOCA",
+        "heading": "LOCA_REM",
+        "type": "X",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      },
+      {
+        "group": "LLPL",
+        "heading": "LLPL_PL",
+        "type": "XN",
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+      }
+    ]
   },
   "difference_shapes": [
     {
       "rust_only": [],
       "python_only": [],
-      "states": 144,
+      "states": 194,
       "triage": "no difference",
       "why": "the two engines agree on which rules the state breaks",
       "example": "add-row-LLPL"
@@ -1028,6 +1082,44 @@
       }
     },
     {
+      "id": "set-LLPL-0-LLPL_LL-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LLPL_LL",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-LLPL_LL-blank",
       "lever": "setCell",
       "reached_by": {
@@ -1184,6 +1276,44 @@
       }
     },
     {
+      "id": "set-LLPL-0-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-LOCA_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -1260,6 +1390,44 @@
       }
     },
     {
+      "id": "set-LLPL-0-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -1307,6 +1475,44 @@
         "class": "unmatched-parent-key",
         "rule": "10c (a child row must match a parent row)",
         "value": "NO-SUCH-VALUE"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -1454,6 +1660,44 @@
       }
     },
     {
+      "id": "set-LLPL-0-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -1560,6 +1804,44 @@
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -1682,6 +1964,44 @@
       }
     },
     {
+      "id": "set-LLPL-0-SPEC_DPTH-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_DPTH",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-SPEC_DPTH-blank",
       "lever": "setCell",
       "reached_by": {
@@ -1750,6 +2070,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SPEC_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -1830,6 +2188,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LLPL_LL-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LLPL_LL",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
       },
       "difference": {
         "rust_only": [],
@@ -1994,6 +2390,44 @@
       }
     },
     {
+      "id": "set-LLPL-1-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-1-LOCA_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2070,6 +2504,44 @@
       }
     },
     {
+      "id": "set-LLPL-1-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-1-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2117,6 +2589,44 @@
         "class": "unmatched-parent-key",
         "rule": "10c (a child row must match a parent row)",
         "value": "NO-SUCH-VALUE"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -2264,6 +2774,44 @@
       }
     },
     {
+      "id": "set-LLPL-1-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-1-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2370,6 +2918,44 @@
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -2492,6 +3078,44 @@
       }
     },
     {
+      "id": "set-LLPL-1-SPEC_DPTH-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_DPTH",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-1-SPEC_DPTH-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2560,6 +3184,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SPEC_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -2640,6 +3302,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LLPL_LL-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LLPL_LL",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
       },
       "difference": {
         "rust_only": [],
@@ -2804,6 +3504,44 @@
       }
     },
     {
+      "id": "set-LLPL-2-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-2-LOCA_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2880,6 +3618,44 @@
       }
     },
     {
+      "id": "set-LLPL-2-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-2-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -2927,6 +3703,44 @@
         "class": "unmatched-parent-key",
         "rule": "10c (a child row must match a parent row)",
         "value": "NO-SUCH-VALUE"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3074,6 +3888,44 @@
       }
     },
     {
+      "id": "set-LLPL-2-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-2-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3180,6 +4032,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -3302,6 +4192,44 @@
       }
     },
     {
+      "id": "set-LLPL-2-SPEC_DPTH-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_DPTH",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-2-SPEC_DPTH-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3370,6 +4298,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SPEC_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -3458,6 +4424,44 @@
       }
     },
     {
+      "id": "set-LOCA-0-LOCA_FDEP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_FDEP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-0-LOCA_FDEP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3534,6 +4538,44 @@
       }
     },
     {
+      "id": "set-LOCA-0-LOCA_GL-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_GL",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-0-LOCA_GL-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3596,6 +4638,44 @@
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
       },
@@ -3724,6 +4804,44 @@
       }
     },
     {
+      "id": "set-LOCA-0-LOCA_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-0-LOCA_TYPE-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3800,6 +4918,44 @@
       }
     },
     {
+      "id": "set-LOCA-1-LOCA_FDEP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_FDEP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-1-LOCA_FDEP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -3847,6 +5003,44 @@
         "class": "wrong-for-type",
         "rule": "8 (the value must match its declared TYPE)",
         "value": "not-a-number"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_GL-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_GL",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -3944,6 +5138,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -4061,6 +5293,44 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -4226,6 +5496,44 @@
       }
     },
     {
+      "id": "set-PROJ-0-PROJ_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-PROJ-0-PROJ_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4348,6 +5656,44 @@
       }
     },
     {
+      "id": "set-SAMP-0-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-LOCA_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4428,6 +5774,44 @@
       }
     },
     {
+      "id": "set-SAMP-0-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4437,6 +5821,44 @@
         "class": "blank",
         "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
         "value": ""
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4546,6 +5968,44 @@
       }
     },
     {
+      "id": "set-SAMP-0-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4622,6 +6082,44 @@
       }
     },
     {
+      "id": "set-SAMP-0-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-SAMP_TYPE-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4688,6 +6186,44 @@
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-1-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
       },
@@ -4778,6 +6314,44 @@
       }
     },
     {
+      "id": "set-SAMP-1-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-1-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4787,6 +6361,44 @@
         "class": "blank",
         "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
         "value": ""
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -4896,6 +6508,44 @@
       }
     },
     {
+      "id": "set-SAMP-1-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-1-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4972,6 +6622,44 @@
       }
     },
     {
+      "id": "set-SAMP-1-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-1-SAMP_TYPE-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5039,6 +6727,44 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-2-LOCA_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -5128,6 +6854,44 @@
       }
     },
     {
+      "id": "set-SAMP-2-SAMP_ID-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-2-SAMP_ID-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5137,6 +6901,44 @@
         "class": "blank",
         "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)",
         "value": ""
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_REF-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
       },
       "dictionary": "V4_1",
       "rust_rules": [
@@ -5246,6 +7048,44 @@
       }
     },
     {
+      "id": "set-SAMP-2-SAMP_TOP-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-2-SAMP_TOP-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5314,6 +7154,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TYPE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],
@@ -5494,6 +7372,44 @@
       }
     },
     {
+      "id": "set-TRAN-0-TRAN_DATE-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_DATE",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-TRAN-0-TRAN_DATE-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5566,6 +7482,44 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_ISNO-arbitrary-text",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_ISNO",
+        "class": "arbitrary-text",
+        "rule": "none on its own — this class exists because the five above are each engineered to reach a named rule, and none of them is the thing a reader actually does, which is type a phrase into a cell",
+        "value": "Riverside Depot Phase 2"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
       },
       "difference": {
         "rust_only": [],

@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "generator": "tools/gen_demo_state_map.py",
+  "source": "web/landing/demo/state-map.json",
+  "python_ags4_version": "1.2.0",
+  "measured": {
+    "states": 200,
+    "signatures": 28,
+    "laterite_tiers": "errors and warnings, which are the tiers the demo's own validate call surfaces. The map itself measures FYI too, and a state that raised one would fail this generator rather than reach here",
+    "python_total": "every finding python-ags4 reports at any tier, which is what its own report shows a reader"
+  },
+  "not_measured": "a signature absent from this table is a state the sweep never validated, and the page must say so rather than go quiet. Silence is indistinguishable from the two engines agreeing, which is the confusion this whole line of work exists to remove",
+  "signatures": [
+    {
+      "signature": "AGS Format Rule 10a=2|AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=3",
+      "python": 9,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10b=1|AGS Format Rule 10c=1|AGS Format Rule 13=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10b=1|AGS Format Rule 10c=1|AGS Format Rule 14=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10b=1|AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 7,
+      "when_cell_is": [
+        {
+          "group": "TRAN",
+          "row": 0,
+          "heading": "TRAN_AGS",
+          "value": "",
+          "python": 6
+        }
+      ]
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 13=1|AGS Format Rule 16=2|AGS Format Rule 2=1|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 13=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 14=1|AGS Format Rule 16=2|AGS Format Rule 2=1|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 14=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=1|AGS Format Rule 8=1",
+      "python": 3,
+      "states": 2
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=2",
+      "python": 3,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 4,
+      "states": 52
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1|Warning (Related to Rule 10c)=1",
+      "python": 4,
+      "states": 2
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=2",
+      "python": 5,
+      "states": 24
+    },
+    {
+      "signature": "AGS Format Rule 10c=1|AGS Format Rule 16=3|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 9
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=1|AGS Format Rule 8=1",
+      "python": 4,
+      "states": 3
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=2",
+      "python": 4,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 45
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=1|Warning (Related to Rule 10c)=1",
+      "python": 5,
+      "states": 2
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=2",
+      "python": 6,
+      "states": 8
+    },
+    {
+      "signature": "AGS Format Rule 10c=2|AGS Format Rule 16=3|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 5
+    },
+    {
+      "signature": "AGS Format Rule 10c=3|AGS Format Rule 16=1|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=3|AGS Format Rule 16=2",
+      "python": 5,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 10c=3|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 6
+    },
+    {
+      "signature": "AGS Format Rule 16=1|AGS Format Rule 8=1",
+      "python": 2,
+      "states": 2
+    },
+    {
+      "signature": "AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 3,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 5,
+      "states": 16
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1|Warning (Related to Rule 14)=1",
+      "python": 6,
+      "states": 1
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 4
+    }
+  ]
+}
