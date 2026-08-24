@@ -6,7 +6,7 @@ tags: [design, decision, roadmap]
 decided: 2026-05-30
 supersedes: []
 from_gap: []
-related: [dec-laterite-ags4-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-cli, parity-model, effective-dictionary, design/_README]
+related: [dec-laterite-ags4-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-cli, parity-model, effective-dictionary, design/_README, demo-state-sweep]
 sources: []
 ---
 
@@ -683,4 +683,4 @@ graph LR
 token layer both surfaces read (#394) ·
 [[dec-laterite-ags4-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-cli]] ·
 laterite-ags5-db · [[parity-model]] · [[effective-dictionary]] ·
-[[design/_README\|AGS5 register]]
+[[design/_README\|AGS5 register]] · [[demo-state-sweep]]

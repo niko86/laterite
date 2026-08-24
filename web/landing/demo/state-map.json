@@ -1,0 +1,6367 @@
+{
+  "schema": 1,
+  "generator": "tools/gen_demo_state_map.py",
+  "python_ags4_version": "1.2.0",
+  "engines": {
+    "laterite": "the in-process Rust validator, warnings and FYI ON",
+    "note": "forge validates with both tiers enabled so the Rust side is tier-comparable to python-ags4, which reports several of them at error tier. That is why laterite-only tier findings appear here at all, and why they are triaged rather than counted as disagreements about the file."
+  },
+  "scope": {
+    "exhaustive_to": 1,
+    "meaning": "every state one lever from the seed, over the groups the demo renders as editable: each group deleted, each row deleted, a row added to each group, and each cell set to each value class that can apply to it",
+    "beyond": "multi-lever states are covered only by the named sequences below; the full product of the levers is 2^groups x 2^rows over the seeded delivery and is NOT swept",
+    "sequences": [
+      {
+        "id": "seq-delete-parent-row-then-child-row",
+        "why": "the orphan teach loop: remove a LOCA, then a SAMP that hung off it"
+      },
+      {
+        "id": "seq-add-row-then-blank-its-key",
+        "why": "an appended row inherits its parent KEY; blanking it strands the row"
+      },
+      {
+        "id": "seq-duplicate-a-whole-key-tuple",
+        "why": "Rule 10a is about the TUPLE, so copying one cell cannot reach it in a group whose key is several headings; this copies the whole tuple of row 1 onto row 2"
+      },
+      {
+        "id": "seq-delete-a-group-and-use-what-it-defined",
+        "why": "Rule 16 with nothing left to check against, which is a different answer"
+      }
+    ],
+    "levers_not_enumerated": [
+      {
+        "lever": "applyGroupFixes",
+        "why": "it applies the ENGINE's own fixes to one group, so reproducing it faithfully means running the wasm engine inside the enumerator rather than the pure model. Reaching for `lat fix` instead would validate a DIFFERENT state, because the demo applies one group's share of the fixes and not the whole file's. Named rather than approximated: a state produced by a near-miss of the demo's own lever is exactly the plausible-but-unreachable entry this sweep exists to keep out"
+      },
+      {
+        "lever": "undo / redo / reset",
+        "why": "navigation, not mutation — each returns to a state some other lever already produced, so they add nothing to enumerate"
+      },
+      {
+        "lever": "restoreGroup",
+        "why": "identity on the seed, since nothing is deleted yet, so it has no depth-1 state. It is exercised by `assertDeleteRestoreRoundTrips` instead, which is the stronger claim: not that it reaches a new state, but that it returns EXACTLY to the one it started from"
+      }
+    ],
+    "groups_not_enumerated": [
+      {
+        "group": "UNIT",
+        "why": "present in the delivery but not in the demo's own group schema, so the page renders no editable table for it: no cell edit, no row add, no group delete. Enumerating it would put states in the map that nothing can produce"
+      },
+      {
+        "group": "TYPE",
+        "why": "present in the delivery but not in the demo's own group schema, so the page renders no editable table for it: no cell edit, no row add, no group delete. Enumerating it would put states in the map that nothing can produce"
+      },
+      {
+        "group": "ABBR",
+        "why": "present in the delivery but not in the demo's own group schema, so the page renders no editable table for it: no cell edit, no row add, no group delete. Enumerating it would put states in the map that nothing can produce"
+      }
+    ]
+  },
+  "value_classes": [
+    {
+      "id": "blank",
+      "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+    },
+    {
+      "id": "non-ascii",
+      "rule": "1 (the file must be ASCII)"
+    },
+    {
+      "id": "wrong-for-type",
+      "rule": "8 (the value must match its declared TYPE)"
+    },
+    {
+      "id": "unmatched-parent-key",
+      "rule": "10c (a child row must match a parent row)"
+    },
+    {
+      "id": "unlisted-abbreviation",
+      "rule": "16 (a PA value must be listed in ABBR)"
+    }
+  ],
+  "counts": {
+    "states": 150,
+    "by_lever": {
+      "seed": 1,
+      "deleteGroup": 5,
+      "addRow": 5,
+      "deleteRow": 10,
+      "setCell": 125,
+      "sequence": 4
+    },
+    "difference_shapes": 3,
+    "count_differences": 0
+  },
+  "not_covered": {
+    "levers_that_were_no_ops": [],
+    "beyond_depth_1": "multi-lever states are covered only by the named sequences below; the full product of the levers is 2^groups x 2^rows over the seeded delivery and is NOT swept",
+    "levers_not_enumerated": [
+      {
+        "lever": "applyGroupFixes",
+        "why": "it applies the ENGINE's own fixes to one group, so reproducing it faithfully means running the wasm engine inside the enumerator rather than the pure model. Reaching for `lat fix` instead would validate a DIFFERENT state, because the demo applies one group's share of the fixes and not the whole file's. Named rather than approximated: a state produced by a near-miss of the demo's own lever is exactly the plausible-but-unreachable entry this sweep exists to keep out"
+      },
+      {
+        "lever": "undo / redo / reset",
+        "why": "navigation, not mutation — each returns to a state some other lever already produced, so they add nothing to enumerate"
+      },
+      {
+        "lever": "restoreGroup",
+        "why": "identity on the seed, since nothing is deleted yet, so it has no depth-1 state. It is exercised by `assertDeleteRestoreRoundTrips` instead, which is the stronger claim: not that it reaches a new state, but that it returns EXACTLY to the one it started from"
+      }
+    ],
+    "cell_values": "setCell takes free text, so values are unbounded and are covered by equivalence class, not enumerated; a value outside every class below is outside this map"
+  },
+  "difference_shapes": [
+    {
+      "rust_only": [
+        "FYI (Related to Rule 16)"
+      ],
+      "python_only": [],
+      "states": 145,
+      "triage": "O-43",
+      "why": "a self-declared but non-standard PA abbreviation is a laterite-originated FYI; python-ags4 has no FYI tier at all",
+      "example": "add-row-LLPL"
+    },
+    {
+      "rust_only": [
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)"
+      ],
+      "python_only": [],
+      "states": 4,
+      "triage": "O-43 + O-52",
+      "why": "as O-43, plus a child row whose parent KEY cells are all empty: the row claims no parent, so laterite DECLINES the parentage check and says so at the warning tier. python-ags4 reports nothing, for the reason O-52 documents — the all-empty key matches the parent's UNIT pseudo-row through its merge",
+      "example": "seq-add-row-then-blank-its-key"
+    },
+    {
+      "rust_only": [
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 14)"
+      ],
+      "python_only": [],
+      "states": 1,
+      "triage": "O-43 + O-45",
+      "why": "as O-43, plus an unrecognised TRAN_AGS edition, which laterite reports as a warning shown by default and python-ags4 does not report at all",
+      "example": "set-TRAN-0-TRAN_AGS-non-ascii"
+    }
+  ],
+  "count_differences": [],
+  "states": [
+    {
+      "id": "add-row-LLPL",
+      "lever": "addRow",
+      "reached_by": {
+        "group": "LLPL",
+        "parent": "SAMP"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "add-row-LOCA",
+      "lever": "addRow",
+      "reached_by": {
+        "group": "LOCA",
+        "parent": "PROJ"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "add-row-PROJ",
+      "lever": "addRow",
+      "reached_by": {
+        "group": "PROJ",
+        "parent": null
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "add-row-SAMP",
+      "lever": "addRow",
+      "reached_by": {
+        "group": "SAMP",
+        "parent": "LOCA"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "add-row-TRAN",
+      "lever": "addRow",
+      "reached_by": {
+        "group": "TRAN",
+        "parent": null
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-group-LLPL",
+      "lever": "deleteGroup",
+      "reached_by": {
+        "group": "LLPL"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-group-LOCA",
+      "lever": "deleteGroup",
+      "reached_by": {
+        "group": "LOCA"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-group-PROJ",
+      "lever": "deleteGroup",
+      "reached_by": {
+        "group": "PROJ"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-group-SAMP",
+      "lever": "deleteGroup",
+      "reached_by": {
+        "group": "SAMP"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-group-TRAN",
+      "lever": "deleteGroup",
+      "reached_by": {
+        "group": "TRAN"
+      },
+      "dictionary": "V4_1_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-LLPL-0",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-LLPL-1",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-LLPL-2",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-LOCA-0",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-LOCA-1",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-PROJ-0",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 2",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 13",
+        "AGS Format Rule 16",
+        "AGS Format Rule 2",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 2": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 13": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 2": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-SAMP-0",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-SAMP-1",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-SAMP-2",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "delete-row-TRAN-0",
+      "lever": "deleteRow",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0
+      },
+      "dictionary": "V4_1_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 2",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 14",
+        "AGS Format Rule 16",
+        "AGS Format Rule 2",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 2": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 14": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 2": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "seed",
+      "lever": "seed",
+      "reached_by": {
+        "why": "the delivery as the page loads"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "seq-add-row-then-blank-its-key",
+      "lever": "sequence",
+      "reached_by": {
+        "why": "an appended row inherits its parent KEY; blanking it strands the row",
+        "steps": 2
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
+        "Warning (Related to Rule 10c)": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)",
+          "Warning (Related to Rule 10c)"
+        ],
+        "python_only": [],
+        "triage": "O-43 + O-52"
+      }
+    },
+    {
+      "id": "seq-delete-a-group-and-use-what-it-defined",
+      "lever": "sequence",
+      "reached_by": {
+        "why": "Rule 16 with nothing left to check against, which is a different answer",
+        "steps": 2
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "seq-delete-parent-row-then-child-row",
+      "lever": "sequence",
+      "reached_by": {
+        "why": "the orphan teach loop: remove a LOCA, then a SAMP that hung off it",
+        "steps": 2
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "seq-duplicate-a-whole-key-tuple",
+      "lever": "sequence",
+      "reached_by": {
+        "why": "Rule 10a is about the TUPLE, so copying one cell cannot reach it in a group whose key is several headings; this copies the whole tuple of row 1 onto row 2",
+        "steps": 1
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10a",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10a",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10a": 2,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 3,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10a": 2,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 3
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LLPL_LL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LLPL_LL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LLPL_LL-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LLPL_LL",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LLPL_PL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LLPL_PL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LLPL_PL-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LLPL_PL",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_REF-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TOP-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TYPE-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SPEC_DPTH-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_DPTH",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SPEC_DPTH-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_DPTH",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SPEC_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SPEC_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SPEC_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LLPL_LL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LLPL_LL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LLPL_LL-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LLPL_LL",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LLPL_PL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LLPL_PL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LLPL_PL-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LLPL_PL",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_REF-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TOP-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TYPE-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SPEC_DPTH-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_DPTH",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SPEC_DPTH-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_DPTH",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SPEC_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SPEC_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SPEC_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LLPL_LL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LLPL_LL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LLPL_LL-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LLPL_LL",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LLPL_PL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LLPL_PL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LLPL_PL-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LLPL_PL",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_REF-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TOP-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TYPE-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SPEC_DPTH-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_DPTH",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SPEC_DPTH-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_DPTH",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SPEC_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SPEC_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SPEC_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_FDEP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_FDEP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_FDEP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_FDEP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_GL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_GL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_GL-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_GL",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_REM-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_REM",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_REM-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_REM",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_FDEP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_FDEP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_FDEP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_FDEP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_GL-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_GL",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_GL-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_GL",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_REM-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_REM",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_REM-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_REM",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-PROJ-0-PROJ_CLNT-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_CLNT",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-PROJ-0-PROJ_CLNT-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_CLNT",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-PROJ-0-PROJ_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-PROJ-0-PROJ_NAME-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_NAME",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-PROJ-0-PROJ_NAME-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_NAME",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
+        "Warning (Related to Rule 10c)": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)",
+          "Warning (Related to Rule 10c)"
+        ],
+        "python_only": [],
+        "triage": "O-43 + O-52"
+      }
+    },
+    {
+      "id": "set-SAMP-0-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
+        "Warning (Related to Rule 10c)": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)",
+          "Warning (Related to Rule 10c)"
+        ],
+        "python_only": [],
+        "triage": "O-43 + O-52"
+      }
+    },
+    {
+      "id": "set-SAMP-1-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-LOCA_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 10c)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
+        "Warning (Related to Rule 10c)": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)",
+          "Warning (Related to Rule 10c)"
+        ],
+        "python_only": [],
+        "triage": "O-43 + O-52"
+      }
+    },
+    {
+      "id": "set-SAMP-2-LOCA_ID-unmatched-parent-key",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "unmatched-parent-key",
+        "rule": "10c (a child row must match a parent row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_ID-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_REF-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_REF-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_REF",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TOP-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TOP-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TOP",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TYPE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TYPE-unlisted-abbreviation",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "unlisted-abbreviation",
+        "rule": "16 (a PA value must be listed in ABBR)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_AGS-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_AGS",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_AGS-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_AGS",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 14)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
+        "Warning (Related to Rule 14)": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)",
+          "Warning (Related to Rule 14)"
+        ],
+        "python_only": [],
+        "triage": "O-43 + O-45"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_DATE-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_DATE",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_DATE-wrong-for-type",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_DATE",
+        "class": "wrong-for-type",
+        "rule": "8 (the value must match its declared TYPE)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 2
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_ISNO-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_ISNO",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_ISNO-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_ISNO",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_PROD-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_PROD",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_PROD-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_PROD",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_RECV-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_RECV",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_RECV-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_RECV",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_STAT-blank",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_STAT",
+        "class": "blank",
+        "rule": "10b (REQUIRED must be present) / 10a (the KEY tuple identifies the row)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 10b",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 10b": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    },
+    {
+      "id": "set-TRAN-0-TRAN_STAT-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "TRAN",
+        "row": 0,
+        "heading": "TRAN_STAT",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
+        "python_only": [],
+        "triage": "O-43"
+      }
+    }
+  ]
+}
