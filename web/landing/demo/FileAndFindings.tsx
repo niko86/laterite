@@ -126,6 +126,12 @@ const FindingRow: Component<{ finding: Finding }> = (props) => {
   );
 };
 
+/** What the slot says where the sweep never measured this state. One constant
+ *  because the ghost that reserves the slot's height renders the same string:
+ *  two copies of a wording is two chances for the reservation to stop matching
+ *  what it reserves for. */
+const UNMEASURED = "not measured for this state";
+
 export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
   /* The aligned VIEW (#620, the webapp's grammar recomputed in align.ts):
@@ -344,29 +350,41 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         {/* The findings list. The id is the scoreboard's jump target (#531):
             the chip states the verdict, this panel is its evidence. */}
         <div id="findings" class="min-w-0 scroll-mt-16">
-          {/* Two lines held open, always. The other engine's total shares
-              this line, and its longest form ("not measured for this state")
-              wraps where a digit does not — so without a reserved box the
-              header grows and shrinks under an edit, which is the whole thing
-              #657 capped the list below to stop. Reserved in LINE-HEIGHTS
-              rather than pixels: the box is then a fact about this element's
-              own type, and no wording change can outgrow a number written
-              somewhere else. */}
-          <p class="mt-3 flex min-h-[2lh] flex-wrap items-start gap-x-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+          <p class="mt-3 flex flex-wrap items-start gap-x-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report() && !refusal()}>
               <span class="text-fg-faint">{findings().length}</span>
               {/* The other engine's total, beside ours rather than instead of
                   it. Named with its version because the number is a claim
                   about one release, and the version comes from the map rather
-                  than from prose so it cannot be right here and stale there. */}
-              <span
-                class="ml-1 flex gap-x-2 text-fg-faint"
-                data-testid="python-count"
-              >
-                python-ags4 {PYTHON_AGS4_VERSION}
-                <span data-testid="python-count-value">
-                  {theirCount() ?? "not measured for this state"}
+                  than from prose so it cannot be right here and stale there.
+
+                  Its box is held open by a GHOST of its own longest content,
+                  stacked in the same grid cell. The slot holds a digit most of
+                  the time and a sentence when the sweep never measured the
+                  state, and a sentence wraps where a digit does not — so
+                  without this the header grows under an edit, which is the
+                  whole thing #657 capped the list below to stop. A reserved
+                  number of line-heights was the first attempt and was wrong on
+                  the narrow lane, because how many lines the sentence takes is
+                  a fact about the viewport and the face, not something to
+                  guess at: at 1280 it is one line and at 390 it is two. The
+                  ghost measures instead of guessing, so a reworded slot cannot
+                  outgrow its own reservation. `invisible` is
+                  visibility:hidden, which keeps it out of the a11y tree. */}
+              <span class="ml-1 grid text-fg-faint" data-testid="python-count">
+                <span
+                  aria-hidden="true"
+                  class="invisible col-start-1 row-start-1 flex gap-x-2"
+                >
+                  python-ags4 {PYTHON_AGS4_VERSION}
+                  <span>{UNMEASURED}</span>
+                </span>
+                <span class="col-start-1 row-start-1 flex gap-x-2">
+                  python-ags4 {PYTHON_AGS4_VERSION}
+                  <span data-testid="python-count-value">
+                    {theirCount() ?? UNMEASURED}
+                  </span>
                 </span>
               </span>
             </Show>
