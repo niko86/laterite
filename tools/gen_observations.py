@@ -373,10 +373,10 @@ def render_divergences(data: dict) -> str:
         "*spec* is the outlier, and some are\n"
         "laterite's own false negatives that the comparison caught and closed.\n",
         "\n",
-        "This is the user-facing list. The full catalogue — including the "
-        "internal NOTE/SPEC entries and the\n"
-        "records since resolved — lives in `OBSERVATIONS.md` in the repo, and "
-        "this page is generated from the\n"
+        "This is the user-facing list. The full catalogue lives in "
+        "`OBSERVATIONS.md` in the repo, and adds the\n"
+        "internal NOTE/SPEC entries along with the records since resolved. "
+        "This page is generated from the\n"
         "same source, so a record cannot be resolved there and stay live here.\n",
         "\n",
     ]

@@ -11,7 +11,7 @@ npm i @laterite/ags4-wasm
 ```
 
 The [web app](../surfaces/browser.md) is built on this same crate, which makes it
-a worked example rather than a demo — everything below is a practice taken from
+a worked example rather than a demo: everything below is a practice taken from
 its source, with the reason it is done that way. (It compiles the crate itself,
 with every feature on; see [what's in the package](#whats-in-the-package).)
 
@@ -30,7 +30,7 @@ actually needs and leaves the rest to a from-source build:
 | `certify` · `diff` · `merge` · `censor` | build from source |
 
 That is **1.8 MiB raw / 749 KiB gzipped**, against 5.1 MiB / 1.71 MiB for
-everything — roughly 2.3× smaller on the wire. The whole read → validate → **fix** → write
+everything, which is roughly 2.3× smaller on the wire. The whole read → validate → **fix** → write
 chain is present; nothing shipped breaks it in the middle.
 
 Two of the omissions have a replacement rather than simply being absent:
@@ -40,7 +40,7 @@ same data as JSON that `build_ags4_ipc` takes as Arrow.
 ### Building a bigger engine
 
 The crate's cargo features are `excel`, `arrow`, `certify`, `diff`, `merge` and
-`censor`, and they are **on by default** — so a source build gives you the full
+`censor`, and they are **on by default**, so a source build gives you the full
 engine, and the published package is the deliberately trimmed one:
 
 <!-- doc-code: skip — a `wasm-pack` build of this repo, not something a reader runs -->
@@ -69,7 +69,7 @@ zero if they land in the wrong place, so check the artifact, not the exit code.
 Two things here are easy to get wrong and expensive to debug.
 
 **Pass `module_or_path` explicitly.** Omitted, the glue falls back to fetching
-relative to `import.meta.url` — which breaks the moment your app is served from a
+relative to `import.meta.url`, which breaks the moment your app is served from a
 non-root `base`. The app hit exactly that.
 
 **Init once, at module scope, and let everything await the same promise.** Every
@@ -79,7 +79,7 @@ early calls queue instead.
 
 !!! note "The one difference between these examples and your app"
     Everything on this page runs under Node so it can be tested, and Node has no
-    `fetch` for a file path — so `module_or_path` gets the bytes. In a bundler it
+    `fetch` for a file path, so `module_or_path` gets the bytes. In a bundler it
     gets an asset URL: `import wasmUrl from "@laterite/ags4-wasm/ags4_wasm_bg.wasm?url"`.
     The **call is the same**; only that argument differs.
 
@@ -94,7 +94,7 @@ early calls queue instead.
 ```
 
 **An absent `severity` means `error`.** The engine omits the field rather than
-spelling it out, so the default you write is load-bearing — and it belongs in one
+spelling it out, so the default you write is load-bearing. It belongs in one
 resolver that everything calls. The app defaulted to `"warning"` at five separate
 sites, which silently reclassified every error in the browser: the summary banner
 counted errors as warnings, and the severity filter hid them from the "error"
@@ -116,7 +116,7 @@ import type {
 } from "@laterite/ags4-wasm";
 ```
 
-`import type` is erased at compile time, so this costs **no runtime import** — a
+`import type` is erased at compile time, so this costs **no runtime import**: a
 module that only needs the shapes stays free of the wasm entirely, which is what
 lets the app share types between its main thread and its worker.
 
@@ -137,27 +137,27 @@ crate publishes every result shape and there is no `any` left in the `.d.ts`.
 
 `read()` returns a `ParsedDataset` that lives in wasm memory. Each group is built
 **lazily** on the call and dropped on return, so the dataset has to outlive every
-pull — hold it rather than chaining off the call — and **free it before the next
+pull (hold it rather than chaining off the call), and **free it before the next
 parse**, or wasm memory holds two datasets at once. `using dataset = read(…)`
 does that for you where `Symbol.dispose` is supported.
 
 `meta()` and `rows_json()` are positional against each other: `headings[i]` names
 `rows[r][i]`. Values arrive **typed**, off the file's own `TYPE` row and through
-the same cast the Python wheel and the DuckDB extension apply — a `2DP` heading
+the same cast the Python wheel and the DuckDB extension apply: a `2DP` heading
 is a JSON number, a `DT` a `"yyyy-mm-dd hh:mm:ss"` string, a blank cell `null`.
 
 ### Arrow IPC, and why it isn't in the package
 
 There is a second read door, `arrow_ipc()`, that frames a group as an Arrow IPC
-stream for [duckdb-wasm](https://duckdb.org/docs/api/wasm/overview) — with
-`keys: true` prepending the content-addressed `_id` / `_parent_id` columns (the
+stream for [duckdb-wasm](https://duckdb.org/docs/api/wasm/overview). With
+`keys: true` it prepends the content-addressed `_id` / `_parent_id` columns (the
 same UUIDv8s the wheel, Node and the DuckDB extension produce, from the one
 shared keychain) so cross-group joins resolve.
 
 It is **not in the published package**. Arrow is roughly a third of the compiled
 engine and it exists to feed duckdb-wasm; a caller who is not doing that pays
 half a megabyte for bytes they will only parse back. If you want it, build the
-crate from source with the `arrow` feature (it is on by default — see
+crate from source with the `arrow` feature (it is on by default; see
 [Building a bigger engine](#building-a-bigger-engine)).
 
 ## Repair: propose, then apply
@@ -171,13 +171,13 @@ crate from source with the `arrow` feature (it is on by default — see
 ```
 
 `compute_fixes` and `apply_fixes` are separate calls so you can show the user
-what will change before anything is rewritten — each fix carries its `kind`, the
+what will change before anything is rewritten. Each fix carries its `kind`, the
 `rule` it answers, the `line` and a `risk`. And because `apply_fixes` takes the
 ledger back, you can hand it a **subset**: whatever the user actually ticked.
 
 Notice what repair does _not_ do. Rule 4 is gone; Rules 13/14/15/16/17 remain,
 because those are the mandatory catalogs this fragment never had and no repair
-will invent them. "Fixed" means the defects a machine can settle are settled — it
+will invent them. "Fixed" means the defects a machine can settle are settled. It
 does not mean valid.
 
 ## Produce AGS4
@@ -195,19 +195,19 @@ does not mean valid.
 asymmetry is deliberate: a stub `TRAN` reading `TBC` / `1900-01-01` still
 _satisfies_ Rule 14, so a recipient could not tell an invented transmission
 record from a real one and nothing downstream would flag it. Who produced a file,
-for whom, when and at what status is knowable only to you — so state it via
+for whom, when and at what status is knowable only to you: state it via
 `tran`, or let Rule 14 report the gap.
 
 ## Keep it off the main thread
 
 The engine is synchronous and uninterruptible once entered. A pathologically
-dirty file — millions of findings — will hold the thread for tens of seconds, so
+dirty file (millions of findings) will hold the thread for tens of seconds, so
 the app puts every wasm call in a worker and talks to it over a small request /
 response protocol where each message carries a monotonic `id`.
 
 The consequence is worth stating plainly: **"cancel" can only mean discard the
 stale result**, never abort mid-rule. But because the work happens off the main
-thread, a superseded run never blocks the next paint — the UI stays live and
+thread, a superseded run never blocks the next paint: the UI stays live and
 simply ignores the answer when it arrives.
 
 Transfer the file's `ArrayBuffer` to the worker rather than copying it; the

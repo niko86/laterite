@@ -1,7 +1,7 @@
 # DuckDB
 
 The `laterite_ags4` extension puts the **same engine inside DuckDB** as SQL
-table functions — read and query AGS4 files _in place_, no import step, no
+table functions: read and query AGS4 files _in place_, no import step, no
 other language.
 
 ```sql
@@ -13,12 +13,12 @@ Needs **DuckDB 1.5.4 or newer**, on every host. The community repository publish
 one build per DuckDB release from the point an extension is accepted, so earlier
 DuckDB versions have nothing to fetch.
 
-## Read-only — validation lives in the CLI & library
+## Read-only: validation lives in the CLI & library
 
 The extension is a **read-only reader**: it reads, joins and inspects, but it
 doesn't validate or certify. Run the numbered rules and mint an `.ags.idx`
 certificate with the [`lat` CLI](../reference/cli.md) (`lat validate` /
-`lat certify`) or the [`laterite`](../surfaces/python.md) library — `read_ags`
+`lat certify`) or the [`laterite`](../surfaces/python.md) library; `read_ags`
 then _consumes_ that `.ags.idx` beside the file for fast single-group reads.
 
 ## Read a group as typed columns
@@ -30,8 +30,8 @@ FROM read_ags('delivery.ags', 'LOCA')
 WHERE loca_gl < 27;
 ```
 
-Because every group is a table function, **joins across groups are plain SQL** —
-pull a borehole's samples and their lab results in one query, no glue code:
+Because every group is a table function, **joins across groups are plain SQL**.
+Pull a borehole's samples and their lab results in one query, no glue code:
 
 ```sql
 SELECT s.samp_id, s.samp_top, g.geol_leg
@@ -57,7 +57,7 @@ path.
 
 ## Inspect the dictionary
 
-The dictionary ships _inside_ the extension — no download:
+The dictionary ships _inside_ the extension, so there is nothing to download:
 
 ```sql
 SELECT "group", heading, unit, ags_type, sql_type
@@ -68,12 +68,12 @@ WHERE "group" = 'LOCA';
 ## Recipes
 
 A read-only reader plus DuckDB's own SQL is enough for multi-file, external-data
-and spatial work. These are illustrative — swap in your own file names.
+and spatial work. These are illustrative; swap in your own file names.
 
 ### Merge two deliveries, one row per location
 
-Union two phases of a site. `_id` is content-addressed on a row's **identity** —
-its AGS key plus its parent chain, _not_ its every value — so the same borehole
+Union two phases of a site. `_id` is content-addressed on a row's **identity**
+(its AGS key plus its parent chain, _not_ its every value), so the same borehole
 from either file shares an `_id`, and `DISTINCT ON (_id)` collapses it to one row
 with no key columns to name:
 
@@ -84,7 +84,7 @@ FROM (SELECT * FROM read_ags('phase1.ags', 'LOCA')
 ```
 
 Because `_id` keys on identity, a location that was _revised_ between phases
-(same `LOCA_ID`, changed data) shares that `_id` too — so `DISTINCT ON` keeps an
+(same `LOCA_ID`, changed data) shares that `_id` too, so `DISTINCT ON` keeps an
 **arbitrary** version. To keep a _specific_ one, dedup on the AGS key instead:
 carry a version column and let `QUALIFY` pick the winner per key:
 
@@ -101,8 +101,8 @@ QUALIFY row_number() OVER (PARTITION BY loca_id ORDER BY ver DESC) = 1;
 
 `_id` keys on identity, so the `DISTINCT ON (_id)` above collapses a _revised_
 borehole (same `LOCA_ID`, changed data) to a single arbitrary row. To keep one
-row per distinct **value** instead — folding away rows that are genuinely
-identical, but keeping both the original and its revision — dedup on
+row per distinct **value** instead (folding away rows that are genuinely
+identical, but keeping both the original and its revision), dedup on
 `_content_hash`, the value twin of `_id`:
 
 ```sql
@@ -115,13 +115,13 @@ ORDER BY _content_hash;
 `_content_hash` fingerprints a row's values _through their declared type_, so
 `10.0` and `10.00` under `2DP` share one fingerprint where a plain string compare
 would not. Like `_id` and `_parent_id`, it is always present on every `read_ags`
-row — drop all three with `SELECT * EXCLUDE (_id, _parent_id, _content_hash)` when
+row; drop all three with `SELECT * EXCLUDE (_id, _parent_id, _content_hash)` when
 you want only the AGS columns.
 
 ### Join AGS4 to external data
 
 `read_ags` is just another table, so it joins straight to a Parquet (or CSV,
-JSON, database) table — here tagging each borehole with its planning zone:
+JSON, database) table, here tagging each borehole with its planning zone:
 
 <!-- doc-code: skip — joins an external dataset the reader supplies; the point is that `read_ags` is just another table, and inventing a parquet to prove it would only test DuckDB -->
 ```sql
@@ -130,16 +130,16 @@ FROM read_ags('site.ags', 'LOCA') l
 JOIN 'planning_zones.parquet' z ON z.parcel = l.loca_id;
 ```
 
-…and the reverse — export a typed group straight to Parquet for a warehouse:
+…and the reverse: export a typed group straight to Parquet for a warehouse:
 
 ```sql
 COPY (SELECT * FROM read_ags('site.ags', 'LOCA')) TO 'loca.parquet';
 ```
 
-### Spatial — boreholes near an alignment
+### Spatial: boreholes near an alignment
 
 With DuckDB's `spatial` extension the born-typed easting/northing become
-geometry — find every borehole within 50 m of a route centre-line:
+geometry. Find every borehole within 50 m of a route centre-line:
 
 ```sql
 LOAD spatial;
@@ -169,6 +169,6 @@ GROUP BY l.loca_id;
 !!! note "One engine, every stack"
     `read_ags` is the identical born-typing engine behind
     [Python](../surfaces/python.md), [Node](../node/index.md), and the
-    [browser app](../surfaces/browser.md) — the cross-surface compliance matrix
+    [browser app](../surfaces/browser.md). The cross-surface compliance matrix
     proves every read surface agrees, so a column's type is the same wherever
     you read it.

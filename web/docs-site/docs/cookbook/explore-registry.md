@@ -1,10 +1,10 @@
 # Explore the registry & KEY chain
 
-**Available in:** Python (`laterite.registry` is a Python-only module — see the
+**Available in:** Python (`laterite.registry` is a Python-only module; see the
 [capability matrix](../surfaces/index.md#what-each-door-can-do))
 
 Ask the AGS dictionary itself which groups hang off a parent, and which KEY
-headings a child inherits — without opening a file. The registry is the
+headings a child inherits, without opening a file. The registry is the
 in-memory AGS group graph; reach for it to drive UI, build joins, or validate a
 schema before you have data.
 
@@ -17,24 +17,24 @@ schema before you have data.
 ```
 
 `child_groups("LOCA")` returns the `GroupDescriptor` objects that name `LOCA` as
-their parent — 50 of them, from `BKFL` through `CDIA` to `CHIS`. Each descriptor
+their parent: 50 of them, from `BKFL` through `CDIA` to `CHIS`. Each descriptor
 carries the static facts for one group: `.code`, `.parent`, `.headings`, and
-`.key_headings` / `.non_key_headings`. None of this needs a delivery loaded —
-it's projected from the single-source dictionary, so it answers "what _could_ be
+`.key_headings` / `.non_key_headings`. None of this needs a delivery loaded.
+It's projected from the single-source dictionary, so it answers "what _could_ be
 here" rather than "what _is_ here".
 
 `inherited_key_names("SAMP")` walks the parent chain and returns the KEY
 headings a child inherits from its **direct** parent: a `SAMP` sample is located
-by its borehole, so it inherits `{LOCA_ID}`. This is the join key — when you fan
+by its borehole, so it inherits `{LOCA_ID}`. This is the join key. When you fan
 out with `.at(...)` or stitch groups in SQL, the inherited KEY is the column the
 child shares with its parent. Read it straight off the registry to build a join
 condition before touching the data.
 
-The last two lines show the `xn="numeric"` read knob in passing — `LLPL_PL`
+The last two lines show the `xn="numeric"` read knob in passing: `LLPL_PL`
 (plastic limit, an `XN`/numeric-as-text heading) comes back as `Float64`. That's
 a read-side concern covered on its own page below.
 
-One variation — to list every group code, not just `LOCA`'s children, import the
+One variation: to list every group code, not just `LOCA`'s children, import the
 whole graph:
 
 ```python
@@ -45,8 +45,8 @@ whole graph:
 --8<-- "python/ex20_registry_graph.out"
 ```
 
-Gotcha: `child_groups` is **one level** of the tree, not the full subtree —
-`SAMP` is a `LOCA` child but `LLPL` (which hangs off `SAMP`) is not in
+Gotcha: `child_groups` is **one level** of the tree, not the full subtree.
+`SAMP` is a `LOCA` child, but `LLPL` (which hangs off `SAMP`) is not in
 `child_groups("LOCA")`. Recurse on `.code` if you want the whole branch.
 Likewise `inherited_key_names` returns the _direct_ parent's KEY only, not the
 full ancestor chain.

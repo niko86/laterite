@@ -2,8 +2,8 @@
 
 **Available in:** Python · Node · DuckDB · [Browser](../surfaces/browser.md)
 
-**When:** you need a real join across two or more groups — counts, lookups,
-aggregates — that a single-group query can't express. Drop to SQL.
+**When:** you need a real join across two or more groups (counts, lookups,
+aggregates) that a single-group query can't express. Drop to SQL.
 
 === "Python"
 
@@ -17,23 +17,23 @@ aggregates — that a single-group query can't express. Drop to SQL.
 
     `.sql(...)` exposes every group in the file as a DuckDB table named by its
     four-letter code, so `SAMP s JOIN LOCA l USING (LOCA_ID)` joins on the
-    shared key with no setup — the columns are already born-typed, so
+    shared key with no setup. The columns are already born-typed, so
     `count(*)`, `GROUP BY`, and numeric comparisons mean what they say.
 
-    `.sql()` is a **terminal** — it returns a `DuckDBPyRelation`, not an
+    `.sql()` is a **terminal**: it returns a `DuckDBPyRelation`, not an
     `AgsQuery`. Finish it by materialising into the frame library you want:
 
-    - `.pl()` → polars (shown above) — needs `laterite[pyarrow]`
-    - `.df()` → pandas — needs `laterite[compat]`
-    - `.arrow()` → an Arrow table — needs `laterite[pyarrow]`
+    - `.pl()` → polars (shown above); needs `laterite[pyarrow]`
+    - `.df()` → pandas; needs `laterite[compat]`
+    - `.arrow()` → an Arrow table; needs `laterite[pyarrow]`
 
     Those are **DuckDB's** terminals, not laterite's, so they carry DuckDB's
     dependencies rather than ours: `.pl()` goes through Arrow even though polars
     is in the base install, which is why the example above pins
-    `laterite[pyarrow]`. laterite's own materialisers stay pyarrow-free — see
+    `laterite[pyarrow]`. laterite's own materialisers stay pyarrow-free; see
     [Dependency shape](../concepts/dependency-shape.md).
 
-    One variation — fold a third group in with another `JOIN` and pull real
+    One variation folds a third group in with another `JOIN` and pulls real
     columns instead of a count:
 
     ```python
@@ -58,10 +58,10 @@ aggregates — that a single-group query can't express. Drop to SQL.
     ```
 
     Identical SQL, identical table names. `sql()` is `async` and returns plain
-    row objects (note DuckDB's `BIGINT` arrives as JS `BigInt` — the `4n`);
+    row objects (note DuckDB's `BIGINT` arrives as JS `BigInt`, the `4n`);
     pass `{ arrow: true }` for an arrow-js `Table` instead. The SQL door is
-    the one Node feature behind an **optional peer** — `npm i @duckdb/node-api`
-    — so services that only read/validate/fix never pull a database in.
+    the one Node feature behind an **optional peer** (`npm i @duckdb/node-api`),
+    so services that only read/validate/fix never pull a database in.
     `close()` (or `using`) releases the connection.
 
 === "DuckDB"
@@ -70,7 +70,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
     --8<-- "duckdb/ex06_sql_join.sql"
     ```
 
-    In DuckDB itself there's nothing to leave — each group is a `read_ags()`
+    In DuckDB itself there's nothing to leave: each group is a `read_ags()`
     table function and the join is plain SQL. The same born-typed columns
     apply, and `load_ags(path)` emits the DDL to materialise every group as an
     `ags_<code>` table when you'd rather query a warehouse than a file.
@@ -78,7 +78,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
 ### Join without knowing the keys
 
 Every group also carries two synthetic **content-addressed** columns in the
-engine — `_id` and `_parent_id` — so a parent/child join is the _same_ column
+engine (`_id` and `_parent_id`), so a parent/child join is the _same_ column
 pair for every edge, with no `USING (…)` to look up per group:
 
 ```python
@@ -93,8 +93,8 @@ you ask with `ags.table("SAMP", keys=True)` (Node:
 model.
 
 **Gotcha:** `.sql()` is the escape hatch, not the guard-railed builder. Use
-[`.query()`](./filter-select.md) for narrowing and selecting within one group —
-it keeps you in the typed `AgsQuery` chain and stays lazy until a terminal.
+[`.query()`](./filter-select.md) for narrowing and selecting within one group.
+It keeps you in the typed `AgsQuery` chain and stays lazy until a terminal.
 Reach for `.sql()` only when you need a cross-group join or aggregate. Both
 share the same DuckDB engine, so the type fidelity is identical.
 

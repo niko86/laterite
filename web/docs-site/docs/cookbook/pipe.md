@@ -2,7 +2,7 @@
 
 **Available in:** Python (a fluent-chain idiom of the Python handle)
 
-**When:** the chain doesn't have a method for the thing you want to do next —
+**When:** the chain doesn't have a method for the thing you want to do next:
 inline a function without breaking out of the flow. `.pipe(fn, *args)` passes the
 handle as `fn`'s first argument and returns whatever `fn` returns.
 
@@ -14,11 +14,11 @@ handle as `fn`'s first argument and returns whatever `fn` returns.
 --8<-- "python/ex07_pipe.out"
 ```
 
-`.pipe(fn, *args)` calls `fn(handle, *args)` and returns the result verbatim — so
+`.pipe(fn, *args)` calls `fn(handle, *args)` and returns the result verbatim, so
 it's an escape hatch that keeps the chain flowing instead of forcing a temporary
 variable. It works on both `Ags4File` and `AgsQuery`, and the contract is the
 same on each: the handle goes in first, your extra positional args follow, and
-you get back exactly what `fn` returns (a list, a scalar, another handle —
+you get back exactly what `fn` returns (a list, a scalar, another handle,
 anything).
 
 Because `fn` receives the live handle, anything you can read off the object is
@@ -34,10 +34,10 @@ ags = (
 )
 ```
 
-**Gotcha:** `.pipe` doesn't materialise or copy anything — it just hands `fn` the
+**Gotcha:** `.pipe` doesn't materialise or copy anything; it just hands `fn` the
 same handle you already hold (`ags.pipe(lambda a: a is ags)` is `True`). If `fn`
-returns a non-handle value (a count, a list), that value is your chain's new end
-— you can't `.query()` off an `int`. To stay in the chain, have `fn` return a
+returns a non-handle value (a count, a list), that value is your chain's new
+end. You can't `.query()` off an `int`. To stay in the chain, have `fn` return a
 handle.
 
 See also: [Chaining](../chaining/index.md).

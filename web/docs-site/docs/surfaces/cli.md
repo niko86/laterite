@@ -1,6 +1,6 @@
-# CLI — one tool, three launchers
+# CLI: one tool, three launchers
 
-`lat` is the AGS4 engine for the **shell** — verb-oriented, built for CI gates and
+`lat` is the AGS4 engine for the **shell**: verb-oriented, built for CI gates and
 one-liners, with machine-readable output and meaningful exit codes. It is the same
 tool however you launch it, so everything below is written as `lat …`:
 
@@ -11,15 +11,15 @@ tool however you launch it, so everything below is written as `lat …`:
 | **Node** (`npx`)   | `npm install -g laterite`                                      | `npx laterite …` (or `lat …`)            |
 
 Same verbs, same flags, and **byte-identical** `--json` / `--ndjson` output across
-all three — so a CI gate, a Python shop, and a Node service can share the same
+all three. That lets a CI gate, a Python shop, and a Node service share the same
 downstream tooling.
 
-What that promise does and does not cover — the **launcher contract**:
+What that promise does and does not cover is the **launcher contract**:
 
 | | Across all three launchers |
 | --- | --- |
 | Verbs and flags | identical |
-| `--json` / `--ndjson` / `--csv` | **byte-identical** — one renderer in the engine, checked nightly against raw output |
+| `--json` / `--ndjson` / `--csv` | **byte-identical**: one renderer in the engine, checked nightly against raw output |
 | Human-readable output | the same **facts**, drawn each launcher's own way |
 
 So a table you read on this site may have different rules and spacing than the one
@@ -30,9 +30,9 @@ you less. Scriptable output is the part you can diff.
 
 | Verb                  | What it does                                                                                                 |
 | --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `validate <file>`     | run the numbered AGS Format Rules (the **default** — a bare `lat <file>` runs it)                            |
+| `validate <file>`     | run the numbered AGS Format Rules (the **default**: a bare `lat <file>` runs it)                             |
 | `read <file> [group]` | dump a group's rows (table / `--csv` / `--json`), or list the group codes                                    |
-| `fix <file>`          | mechanically repair — safe fixes by default, `--risky` for the intent-guessing ones                          |
+| `fix <file>`          | mechanically repair: safe fixes by default, `--risky` for the intent-guessing ones                           |
 | `diff <a> <b>`        | the KEY-aware / type-aware revision delta                                                                    |
 | `certify <file>`      | mint the [`.ags.idx`](../concepts/certificate-lifecycle.md) validity certificate                             |
 | `rules`               | print the AGS4 rule catalogue                                                                                |
@@ -41,13 +41,13 @@ you less. Scriptable output is the part you can diff.
 | `excel <in> <out>`    | convert AGS4 ↔ Excel (direction inferred from the output extension)                                          |
 
 For querying across groups (SQL) or building AGS4 from data, reach for
-[Python](python.md) or [DuckDB](../duckdb/index.md) — the [capability
+[Python](python.md) or [DuckDB](../duckdb/index.md). The [capability
 matrix](index.md#what-each-door-can-do) shows the split.
 
 ## CLI-native idioms
 
-**A CI gate is just the exit code** — `0` when the file passed, non-zero when it
-did not:
+**A CI gate is just the exit code.** It is `0` when the file passed, non-zero
+when it did not:
 
 <!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
 ```bash
@@ -58,12 +58,13 @@ lat validate "$f" --warnings-as-errors || exit 1  # …and on a warning too
 `0` passed · `1` failed · `3` not-found / unreadable · `4` not-AGS4 / bad input ·
 `5` bad arguments · `6` schema violation.
 
-Errors decide the verdict. A warning is shown and does not fail the run — add
+Errors decide the verdict. A warning is shown and does not fail the run; add
 `--warnings-as-errors` for a stricter gate, the way `-Werror` works. See
 [severity tiers](../concepts/severity-tiers.md).
 
-**Pipe the machine output.** `--json` is pretty, `--ndjson` is one finding per line
-— both stream to `jq`, and both are the same bytes the Python and Node reports emit:
+**Pipe the machine output.** `--json` is pretty, `--ndjson` is one finding per
+line. Both stream to `jq`, and both are the same bytes the Python and Node
+reports emit:
 
 <!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
 ```bash
@@ -72,11 +73,11 @@ lat read delivery.ags LOCA --csv > loca.csv
 ```
 
 **A bare file validates.** `lat delivery.ags` is shorthand for
-`lat validate delivery.ags` — the common case needs no verb.
+`lat validate delivery.ags`. The common case needs no verb.
 
 **Help is scoped to the verb.** `lat certify --help` prints that verb's flags plus
 the global ones; `lat --readme` prints the whole guide. Both answer the same on all
-three launchers — one document, mirrored into each package and held byte-identical
+three launchers: one document, mirrored into each package and held byte-identical
 by a gate, so `lat --readme` is not a different guide depending on how you
 installed it.
 
@@ -87,8 +88,8 @@ lat --readme         # the whole reference
 ```
 
 **Package for transport without a data round-trip.** `pack` / `lock` move bytes
-(any file type), so a `pack`ed-then-`unpack`ed file is byte-identical — safe to
-validate later. The passphrase for `lock` / `unlock` never appears on the command
+(any file type), so a `pack`ed-then-`unpack`ed file is byte-identical and safe
+to validate later. The passphrase for `lock` / `unlock` never appears on the command
 line (it would leak into `ps` and shell history):
 
 <!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
@@ -98,5 +99,5 @@ lat unlock delivery.ags.age out.ags --password-file pw.txt
 ```
 
 !!! tip "The full reference"
-    Every verb, flag, and exit code — the shipped `lat --readme` guide — is the
-    [CLI command reference](../reference/cli.md).
+    The [CLI command reference](../reference/cli.md) is the shipped
+    `lat --readme` guide: every verb, every flag, and every exit code.

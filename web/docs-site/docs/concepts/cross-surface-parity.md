@@ -1,25 +1,25 @@
 # Cross-surface parity
 
-Four surfaces run "the same" AGS4 validator. That's a strong claim — so it's
+Four surfaces run "the same" AGS4 validator. That's a strong claim, so it's
 **tested**, not asserted.
 
 ## One engine, many doors
 
 Python, Node, the browser (wasm), and the `lat` CLI don't each re-implement the
 AGS4 rules. They're thin bindings over **one** Rust core. A finding
-you get in Python is produced by the exact code that produces it in the browser —
-the only thing that differs is the door.
+you get in Python is produced by the exact code that produces it in the browser.
+The only thing that differs is the door.
 
 The DuckDB extension is a fifth door, but a **read-only** one: it shares the same
 core read path and runs no rules at all, so it has no findings to compare. Its
-agreement is proven on what it actually does — that its `read_ags` produces the
+agreement is proven on what it actually does: that its `read_ags` produces the
 same content-addressed key set as the core reader.
 
 ## How it's proven
 
 A **compliance harness** turns "the same engine" into a checkable property. Over a
 real corpus of AGS4 files, it runs every read surface and reduces each to the same
-currency — the set of `"AGS Format Rule N"` labels that fired — then asserts:
+currency (the set of `"AGS Format Rule N"` labels that fired), then asserts:
 
 1. **The laterite surfaces agree exactly.** rust, python-laterite, node and wasm
    must report a **byte-identical** rule floor on every file. A mismatch is a
@@ -37,7 +37,7 @@ DuckDB extension built from source), which is run on-demand.
 ## Why it matters to you
 
 It means you can **choose a surface for its ergonomics, not its correctness**.
-Validate in a notebook, in a CI shell, in the browser, or in a SQL query — the
+Validate in a notebook, in a CI shell, in the browser, or in a SQL query. The
 verdict is the same one, and there's a gate standing over the codebase to keep it
 that way.
 

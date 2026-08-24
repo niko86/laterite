@@ -407,6 +407,16 @@ jobs:
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
 
+      # Sibling of the gate above and here for the same reasons: no build, a
+      # file walk, and an unconditional job. The landing holds the same policy
+      # with a browser test over the rendered DOM; the docs site is fifty-odd
+      # mkdocs pages, and building the site to find a character would put this
+      # behind the docs job instead of finishing in a second here. It reads the
+      # source, which is where a fix goes, and says so on every run along with
+      # what it skipped.
+      - name: no em dash in docs-site prose
+        run: uv run --no-project python tools/check_docs_em_dash.py
+
       # Sibling of the gate above, and here for the same reason it is: no build,
       # a file walk, and an unconditional job so it cannot stop firing. A bare
       # `#N` is a claim that a number is OURS — #458 is the write-up of what

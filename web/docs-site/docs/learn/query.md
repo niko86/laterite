@@ -1,7 +1,7 @@
 # Query across groups
 
 A single AGS file is a graph: a `LOCA` borehole owns its `SAMP` samples, which
-own their test results. `laterite` gives you four ways to walk that graph —
+own their test results. `laterite` gives you four ways to walk that graph,
 from a one-line fan-out to raw SQL.
 
 ## Fan out to a borehole's group set
@@ -16,7 +16,7 @@ from a one-line fan-out to raw SQL.
 
 `ags.at("LOCA", ["BH01", "BH02"])` follows the dictionary's parent/child links
 and returns a query scoped to just those boreholes. `.groups` tells you which
-group codes came along for the ride — here the locations plus the samples and
+group codes came along for the ride: here, the locations plus the samples and
 plasticity tests that hang off them.
 
 ## Materialise the record set as frames
@@ -32,7 +32,7 @@ plasticity tests that hang off them.
 `.frames()` turns that scoped query into a plain `dict` of born-typed polars
 frames, keyed by group code. Pull one out with `frames["SAMP"]` (the dict, not
 the query, is what you subscript) and you have BH01's four samples ready to work
-with — already typed, no casting.
+with. Already typed, no casting.
 
 ## Build a query lazily
 
@@ -45,7 +45,7 @@ with — already typed, no casting.
 ```
 
 `.query(sql)` returns a lazy `AgsQuery`. Chain `.filter(...)` and `.select(...)`
-to refine it — each call hands back a new `AgsQuery`, and **nothing runs** until
+to refine it. Each call hands back a new `AgsQuery`, and **nothing runs** until
 a terminal is called. There are four: `.frame()` (the handle's default backend),
 `.to_polars()`, `.to_pandas()`, and `.relation()` (the raw `DuckDBPyRelation`,
 still lazy). Because the type IS the AGS type, `LOCA_GL > 28` compares numbers,
@@ -62,11 +62,11 @@ not strings.
 ```
 
 When you need a real join, `.sql(...)` exposes every group as a DuckDB table by
-its code — so `SAMP s JOIN LOCA l USING (LOCA_ID)` just works. It returns a
+its code, so `SAMP s JOIN LOCA l USING (LOCA_ID)` just works. It returns a
 `DuckDBPyRelation` (a terminal); call `.pl()`, `.df()`, or `.arrow()` to land it
 as polars, pandas, or Arrow. Those three are DuckDB's, and they bring DuckDB's
 dependencies: `.pl()` and `.arrow()` need `laterite[pyarrow]`, `.df()` needs
-`laterite[compat]` — see [Dependency shape](../concepts/dependency-shape.md).
+`laterite[compat]` (see [Dependency shape](../concepts/dependency-shape.md)).
 
 !!! tip
     `.query()` is the guard-railed builder for single-group work; `.sql()` is

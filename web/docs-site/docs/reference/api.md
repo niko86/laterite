@@ -66,8 +66,8 @@ recipe set. Cross-references below are clickable.
 
 ## Type aliases
 
-The enumerated string choices accepted by the API, as `Literal` types — so editors
-autocomplete the valid values and type-checkers reject typos. Each is gated in the
+The enumerated string choices accepted by the API, as `Literal` types so that
+editors autocomplete the valid values and type-checkers reject typos. Each is gated in the
 test suite against its source of truth.
 
 ::: laterite.Edition
