@@ -27,6 +27,10 @@ pub(crate) fn verdict_parts(v: Option<&Parity>) -> (String, String) {
                 }
                 Parity::RustOnlyRules { rules } => format!("rust-only {rules:?}"),
                 Parity::PythonOnlyRules { rules } => format!("python-only {rules:?}"),
+                Parity::RulesDiffer {
+                    rust_only,
+                    python_only,
+                } => format!("rust-only {rust_only:?} python-only {python_only:?}"),
                 Parity::ValidityDisagree { rust, python } => {
                     format!("rust={rust} python={python}")
                 }
@@ -65,10 +69,7 @@ impl CheckReport {
     }
     /// A real, unexplained divergence (drives the exit code).
     pub fn is_action(&self) -> bool {
-        matches!(
-            self.verdict.as_str(),
-            "RUST_ONLY_RULES" | "PYTHON_ONLY_RULES" | "VALIDITY_DISAGREE"
-        )
+        Parity::is_action_tag(&self.verdict)
     }
 }
 
@@ -151,12 +152,9 @@ pub struct ForgeReport {
 
 impl ForgeReport {
     pub fn actions_present(&self) -> bool {
-        self.candidates.iter().any(|c| {
-            matches!(
-                c.verdict.as_str(),
-                "RUST_ONLY_RULES" | "PYTHON_ONLY_RULES" | "VALIDITY_DISAGREE"
-            )
-        })
+        self.candidates
+            .iter()
+            .any(|c| Parity::is_action_tag(&c.verdict))
     }
 }
 
@@ -358,11 +356,7 @@ impl MineCandidate {
     /// A real, unexplained divergence (drives the exit code) — only
     /// meaningful when the oracle actually ran.
     pub fn is_action(&self) -> bool {
-        self.oracle_ran
-            && matches!(
-                self.verdict.as_str(),
-                "RUST_ONLY_RULES" | "PYTHON_ONLY_RULES" | "VALIDITY_DISAGREE"
-            )
+        self.oracle_ran && Parity::is_action_tag(&self.verdict)
     }
 }
 

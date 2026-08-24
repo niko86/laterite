@@ -71,11 +71,32 @@ impl RustResult {
 #[serde(tag = "verdict", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Parity {
     Agree,
-    RustOnlyRules { rules: Vec<String> },
-    PythonOnlyRules { rules: Vec<String> },
-    ValidityDisagree { rust: String, python: String },
-    KnownDivergence { observation: String, detail: String },
-    PythonError { reason: String },
+    RustOnlyRules {
+        rules: Vec<String>,
+    },
+    PythonOnlyRules {
+        rules: Vec<String>,
+    },
+    /// Both sides carry rules the other does not (#652). Kept distinct from
+    /// the one-sided verdicts because the two halves mean opposite things:
+    /// a rust-only rule is usually a check we add on purpose, a python-only
+    /// one is the shape of a false negative in our own engine. Collapsing
+    /// this into either of them discards the half that matters most.
+    RulesDiffer {
+        rust_only: Vec<String>,
+        python_only: Vec<String>,
+    },
+    ValidityDisagree {
+        rust: String,
+        python: String,
+    },
+    KnownDivergence {
+        observation: String,
+        detail: String,
+    },
+    PythonError {
+        reason: String,
+    },
 }
 
 impl Parity {
@@ -85,6 +106,7 @@ impl Parity {
             Parity::Agree => "AGREE",
             Parity::RustOnlyRules { .. } => "RUST_ONLY_RULES",
             Parity::PythonOnlyRules { .. } => "PYTHON_ONLY_RULES",
+            Parity::RulesDiffer { .. } => "RULES_DIFFER",
             Parity::ValidityDisagree { .. } => "VALIDITY_DISAGREE",
             Parity::KnownDivergence { .. } => "KNOWN_DIVERGENCE",
             Parity::PythonError { .. } => "PYTHON_ERROR",
@@ -95,11 +117,32 @@ impl Parity {
     /// python-side error).
     #[must_use]
     pub fn is_action(&self) -> bool {
-        matches!(
-            self,
+        match self {
             Parity::RustOnlyRules { .. }
-                | Parity::PythonOnlyRules { .. }
-                | Parity::ValidityDisagree { .. }
+            | Parity::PythonOnlyRules { .. }
+            | Parity::RulesDiffer { .. }
+            | Parity::ValidityDisagree { .. } => true,
+            Parity::Agree | Parity::KnownDivergence { .. } | Parity::PythonError { .. } => false,
+        }
+    }
+
+    /// The same question asked of a **serialized** verdict, for the readers
+    /// that have only the tag back from a report file. It lives here so the
+    /// answer has one home: #652 was a verdict that stopped naming half of
+    /// what it saw, and that fault copied into every reader's own tag list
+    /// is a variant that quietly stops counting as an action.
+    ///
+    /// An allow-list, and it has to be one: the tag space is WIDER than this
+    /// enum. `forge` mints `RUST_ONLY` for a candidate the oracle never saw,
+    /// which is an absence of comparison, not a divergence — so "anything
+    /// unrecognised is an action" would file every oracle-less run as a
+    /// finding. The paired test is what keeps this list in step with the
+    /// variants, since the compiler cannot.
+    #[must_use]
+    pub fn is_action_tag(tag: &str) -> bool {
+        matches!(
+            tag,
+            "RUST_ONLY_RULES" | "PYTHON_ONLY_RULES" | "RULES_DIFFER" | "VALIDITY_DISAGREE"
         )
     }
 }
@@ -279,13 +322,23 @@ pub fn classify(rust: &RustResult, py: &Result<BTreeSet<String>, String>) -> Par
             detail: format!("rust_only={rust_only:?} python_only={py_only:?}"),
         };
     }
+    // One-sided first, then the both-sided residue. The middle arm is the
+    // one #652 was missing: `rust_only` non-empty used to answer for the
+    // whole difference, and every python-only rule beside it went unsaid.
+    // Neither side empty is the only case left — the sets differ, so at
+    // least one rule is unmatched somewhere.
     if rust_only.is_empty() {
         Parity::PythonOnlyRules {
             rules: py_only.into_iter().collect(),
         }
-    } else {
+    } else if py_only.is_empty() {
         Parity::RustOnlyRules {
             rules: rust_only.into_iter().collect(),
+        }
+    } else {
+        Parity::RulesDiffer {
+            rust_only: rust_only.into_iter().collect(),
+            python_only: py_only.into_iter().collect(),
         }
     }
 }
@@ -496,6 +549,90 @@ mod tests {
             classify(&RustResult::Clean, &p2),
             Parity::PythonOnlyRules { .. }
         ));
+    }
+
+    #[test]
+    fn both_directions_are_reported_together() {
+        // The landing demo's shape (#652): laterite emits an FYI python has
+        // no equivalent for, python emits the Rule 10c of O-39. Neither side
+        // may be dropped for the other's sake — a python-only rule is the
+        // shape of a false negative in OUR engine, so it is the one that
+        // must never go missing.
+        let r = rules(&[
+            "AGS Format Rule 16",
+            "AGS Format Rule 8",
+            "FYI (Related to Rule 16)",
+        ]);
+        let p = Ok(set(&[
+            "AGS Format Rule 10c",
+            "AGS Format Rule 16",
+            "AGS Format Rule 8",
+        ]));
+        match classify(&r, &p) {
+            Parity::RulesDiffer {
+                rust_only,
+                python_only,
+            } => {
+                assert_eq!(rust_only, vec!["FYI (Related to Rule 16)".to_string()]);
+                assert_eq!(python_only, vec!["AGS Format Rule 10c".to_string()]);
+            }
+            other => panic!("expected RulesDiffer, got {other:?}"),
+        }
+        assert!(classify(&r, &p).is_action());
+    }
+
+    #[test]
+    fn every_verdict_answers_the_same_whether_read_live_or_from_a_tag() {
+        // The readers downstream have only the serialized tag, so the two
+        // answers must never part. The exhaustive match is the point: a new
+        // variant fails to compile here until it is listed, which is what
+        // stops it from being born already invisible to the action list.
+        // Compiler-checked completeness of the list below: a new variant
+        // stops this compiling until someone gives it a value to test.
+        fn ordinal(p: &Parity) -> usize {
+            match p {
+                Parity::Agree => 0,
+                Parity::RustOnlyRules { .. } => 1,
+                Parity::PythonOnlyRules { .. } => 2,
+                Parity::RulesDiffer { .. } => 3,
+                Parity::ValidityDisagree { .. } => 4,
+                Parity::KnownDivergence { .. } => 5,
+                Parity::PythonError { .. } => 6,
+            }
+        }
+        let all = [
+            Parity::Agree,
+            Parity::RustOnlyRules { rules: vec![] },
+            Parity::PythonOnlyRules { rules: vec![] },
+            Parity::RulesDiffer {
+                rust_only: vec![],
+                python_only: vec![],
+            },
+            Parity::ValidityDisagree {
+                rust: String::new(),
+                python: String::new(),
+            },
+            Parity::KnownDivergence {
+                observation: String::new(),
+                detail: String::new(),
+            },
+            Parity::PythonError {
+                reason: String::new(),
+            },
+        ];
+        let seen: BTreeSet<usize> = all.iter().map(ordinal).collect();
+        assert_eq!(seen.len(), all.len(), "one value per variant, no repeats");
+        for p in &all {
+            assert_eq!(
+                Parity::is_action_tag(p.tag()),
+                p.is_action(),
+                "{} disagrees with its own tag",
+                p.tag()
+            );
+        }
+        // `forge` mints this one where no verdict exists at all — the oracle
+        // did not run. No comparison happened, so there is nothing to file.
+        assert!(!Parity::is_action_tag("RUST_ONLY"));
     }
 
     #[test]
