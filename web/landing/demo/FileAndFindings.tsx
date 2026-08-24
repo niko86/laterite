@@ -55,6 +55,17 @@ import type { Finding } from "./engine";
    against SAMP and against LLPL, with byte-identical text — a duplicate to
    the eye until something names the group (#526). The `li` belongs to the
    callers since #592: the stack and the carousel each bring their own. */
+/* The file pane and the findings list beside it stand the same height
+   (#657). The pane has always been capped; the list was not, so the page
+   grew and shrank under every edit — and an edit is what a reader is
+   doing when they need the page to hold still. One literal, used by both,
+   so the two cannot drift apart into a ragged pair.
+
+   No `tabindex` on the scroller: every row carries a button (a finding
+   jumps the pane to its line), so tabbing reaches the content below the
+   fold and the browser scrolls it into view. */
+const PANE_HEIGHT = "max-h-[26rem] overflow-auto overscroll-contain";
+
 const FindingRow: Component<{ finding: Finding }> = (props) => (
   <FindingCallout
     severity={props.finding.severity}
@@ -168,7 +179,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                 onChange={(e) => setAlignedView(e.currentTarget.checked)}
               />
             </div>
-            <div class="max-h-[26rem] overflow-auto overscroll-contain">
+            <div class={PANE_HEIGHT}>
               <Show
                 when={armed()}
                 fallback={
@@ -328,7 +339,17 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                     every row per keystroke and re-fire the entrance fade
                     across the whole panel. Index updates rows in place; only
                     a row that genuinely appears fades in. */}
-                <ul class="mt-3 list-none space-y-2 p-0">
+                {/* Only the desktop stack scrolls: below the breakpoint the
+                    carousel above is already one card, which has no height to
+                    hold. `pr-1` keeps the scrollbar off the callout borders. */}
+                {/* Named like the carousel it swaps with (#592 gave that
+                    dress the label and this one none), because a scroll
+                    container a screen reader cannot name is a region a
+                    reader lands inside with no idea where they are. */}
+                <ul
+                  aria-label="Findings"
+                  class={`mt-3 list-none space-y-2 p-0 pr-1 ${PANE_HEIGHT}`}
+                >
                   <Index each={findings()}>
                     {(finding) => (
                       <li>

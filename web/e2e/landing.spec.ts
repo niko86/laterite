@@ -56,6 +56,14 @@ function seededFinalDepthLabel(): string {
 const scroller = (page: Page, section: string) =>
   page.locator(`section#${section} table`).locator("xpath=..");
 
+/** The file pane's scroller. Named rather than spelled out at each call
+ *  site (#657): the findings list beside it wears the same scroller
+ *  utilities now, so `.overscroll-contain` alone matches two elements and
+ *  every reader of it had to learn that. The `div` is the discriminator —
+ *  the list is a `ul`. */
+const filePane = (page: Page) =>
+  page.locator("section#file div.overscroll-contain");
+
 /** The failing cell's corner flag (#616; re-anchored to the cell by
  *  #632) — the one absolutely-positioned span inside the cell's td. */
 const cornerFlag = (cell: Locator) =>
@@ -1058,7 +1066,7 @@ test("the aligned view keeps every line where it was, and jumps still land", asy
   const toggle = file.getByRole("checkbox", { name: "Aligned columns" });
   await expect(toggle).not.toBeChecked();
 
-  const pane = file.locator(".overscroll-contain");
+  const pane = filePane(page);
   const rows = pane.locator("div.flex");
   const rawCount = await rows.count();
 
@@ -1123,7 +1131,7 @@ test("phone: aligned mode trades the wrap for a pan", async ({ page }) => {
   await page.goto("/");
   const file = page.locator("section#file");
   await expect(file.locator("li").first()).toBeVisible({ timeout: 15_000 });
-  const scroller = file.locator(".overscroll-contain");
+  const scroller = filePane(page);
   const overflowsX = () =>
     scroller.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
   expect(await overflowsX(), "raw wraps, no sideways scroll").toBe(false);
@@ -2280,9 +2288,7 @@ test("the findings panel is one card below the breakpoint, a stack at desktop", 
   // A REAL mouse drag that starts on the card's own button must page — and
   // ONLY page: a mouse fires `click` after any down/up pair, so without the
   // swallow the swipe would also focus the card's file line.
-  const ringed = page.locator(
-    "section#file .overscroll-contain [class*='--focus-ring']",
-  );
+  const ringed = filePane(page).locator("[class*='--focus-ring']");
   const box = await panel.locator("ul li:visible button").first().boundingBox();
   if (!box) throw new Error("the visible card has no button to drag");
   const y = box.y + box.height / 2;
@@ -2301,6 +2307,55 @@ test("the findings panel is one card below the breakpoint, a stack at desktop", 
   // RowCarousel's keyboard idiom answers here too: Alt+Arrow pages.
   await page.keyboard.press("Alt+ArrowRight");
   await expect(panel.getByText("3 / 4")).toBeVisible();
+});
+
+test("the findings panel holds its height while findings pile up", async ({
+  page,
+}) => {
+  // #657: the panel was an uncapped column beside a capped file pane, so it
+  // grew and shrank under every edit — and an edit is exactly when a reader
+  // needs the page to hold still. Desktop only: below the breakpoint the
+  // panel is already one card (#592), which has no height to hold.
+  test.skip(width(page) < 1024, "the stacked panel is the desktop dress");
+  await page.goto("/");
+  const panel = page.locator("#findings");
+  const rows = panel.locator("ul li");
+  const list = panel.getByRole("list", { name: "Findings" });
+  await expect(rows).toHaveCount(4, { timeout: 15_000 });
+
+  // The cap is READ from the pane rather than restated as pixels: "matches
+  // the file pane" is the contract, and a literal here would be a second
+  // copy of a number that lives in the stylesheet.
+  const cap = (l: Locator) =>
+    l.evaluate((el) => getComputedStyle(el).maxHeight);
+  expect(await cap(list), "the list takes the pane's own cap").toBe(
+    await cap(filePane(page)),
+  );
+
+  // Six findings is where the list reaches that cap.
+  await page.getByRole("button", { name: "Delete row 1 of TRAN" }).click();
+  await expect(rows).toHaveCount(6);
+  const box = await list.boundingBox();
+  if (!box) throw new Error("the findings list has no box");
+  expect(box.height, "the list stops at its cap").toBeLessThanOrEqual(
+    parseFloat(await cap(list)),
+  );
+  expect(
+    await list.evaluate((el) => el.scrollHeight > el.clientHeight),
+    "the overflow goes inside the list, not onto the column",
+  ).toBe(true);
+
+  // The property itself: past the cap, another finding does not move the
+  // column. Measured on the panel rather than the document, because the
+  // lever that adds a finding also deletes a table row above — the page
+  // height moves for a reason that is not this one.
+  const height = async () => (await panel.boundingBox())?.height;
+  const before = await height();
+  await page.getByRole("button", { name: "Delete row 1 of LOCA" }).click();
+  await expect(rows).toHaveCount(7);
+  expect(await height(), "one more finding must not move the column").toBe(
+    before,
+  );
 });
 
 test("touch: under-table findings page one at a time, and one finding gets no affordance", async ({
@@ -2718,7 +2773,7 @@ test("the file pane wraps on a phone and side-scrolls on desktop", async ({
   await expect(page.locator("#findings li").first()).toBeVisible({
     timeout: 15_000,
   });
-  const scroller = page.locator("section#file .overscroll-contain");
+  const scroller = filePane(page);
   const overflowsX = () =>
     scroller.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
 
