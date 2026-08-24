@@ -85,12 +85,12 @@ def test_it_counts_what_it_scanned(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def _exemplars() -> list[int]:
-    """One satellite number and one third-party number, taken FROM the set.
+    """The still-held numbers to drive the matcher with, taken FROM the set.
 
     These were written as literals — `[475, 1327]` — and 475 was claimed by this
     repo four months later, at which point the test asserted that a number the
-    set had correctly released was still in it. The exemplar is now the LOWEST
-    satellite number STILL HELD, which is the one nearest to being claimed next
+    set had correctly released was still in it. The satellite exemplar is now
+    the LOWEST number STILL HELD, which is the one nearest to being claimed next
     and therefore the most useful canary; the third-party numbers belong to
     other projects and cannot be claimed here at all, so the lowest of those is
     a stable pick.
@@ -99,12 +99,21 @@ def _exemplars() -> list[int]:
     JSON: the list holds every satellite number ever cited here, released ones
     included, so `min()` over the raw file is once again a number this repo owns
     — the same trap the literals fell into, one layer along.
+
+    The satellite half is CONDITIONAL, because that pool empties on a schedule:
+    every number in it is one this repo's numbering eventually climbs past, and
+    when the last one is released there is no satellite canary until the next
+    citation of a higher one lands. That is the set working, not a fault — so
+    the exemplars shrink to the third-party numbers, which no watermark can
+    ever release, and the test keeps its teeth. Asserting a satellite canary
+    exists would turn this repo's own numbering into a red build.
     """
     doc = json.loads(DATA.read_text(encoding="utf-8"))
     held, _ = gate.load_expected(gate.resolve_watermark()[0])
     satellite = [n for n in doc["satellite"]["numbers"] if n in held]
-    assert satellite, "every satellite number has been claimed — pick a new canary"
-    return [min(satellite), min(int(n) for n in doc["foreign"])]
+    foreign = [int(n) for n in doc["foreign"]]
+    assert foreign, "the third-party numbers are the exemplar of last resort"
+    return ([min(satellite)] if satellite else []) + [min(foreign)]
 
 
 @pytest.mark.parametrize("number", _exemplars())
@@ -188,6 +197,41 @@ def test_a_number_at_or_below_the_watermark_is_released() -> None:
 
     frozen, released = gate.load_expected(watermark=n - 1)
     assert n in frozen and n not in released
+
+
+def test_it_says_when_no_satellite_number_is_still_held(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The satellite half empties as this repo's numbering climbs past every
+    number cited from it, and the counts above cannot show that — a run with an
+    empty half prints exactly what a working one prints. So the gate says it,
+    and this asserts both directions: silence over an empty half is the same
+    green tick over an unguarded set that #458 is about."""
+    data = tmp_path / "foreign-issue-refs.json"
+    monkeypatch.setattr(gate, "DATA", data)
+    monkeypatch.setattr(gate, "tracked_files", list)
+    monkeypatch.setattr(gate, "is_shallow", lambda: False)
+    monkeypatch.setattr(gate, "watermark_from_git", lambda: (500, "origin/main"))
+
+    def satellite(numbers: list[int]) -> None:
+        doc = {
+            "satellite": {"repo": "sat", "numbers": numbers},
+            "foreign": {"9001": "x"},
+        }
+        data.write_text(json.dumps(doc), encoding="utf-8")
+
+    # Every cited number is below the watermark: nothing is guarded any more.
+    satellite([100, 200])
+    gate.main()
+    assert "no satellite number is still held" in capsys.readouterr().out
+
+    # One number above it, and the half is doing its job again — the line must
+    # go away, or it would be noise nobody reads.
+    satellite([100, 900])
+    gate.main()
+    assert "no satellite number is still held" not in capsys.readouterr().out
 
 
 def test_the_override_and_git_take_whichever_is_higher(
