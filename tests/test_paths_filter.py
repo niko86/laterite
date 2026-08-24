@@ -73,6 +73,12 @@ only thing that shows the claim is not stale:
                         — `tools/check_doc_types.py` joined the `node` filter
                           (the gate runs in `node` and `ts-lint`, both gated on
                           it). `dot: true`, as above.
+  #588 (built em dash)  1760 paths x 50 patterns = 88000 pairs, exact agreement
+                        — `tools/check_docs_em_dash.py` joined the `docs`
+                          filter: its `--built` half runs in that job and
+                          nowhere else, because the built site is the only
+                          artefact holding the generated pages' prose.
+                          `dot: true`, as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are

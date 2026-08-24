@@ -1,6 +1,6 @@
 # Python (`laterite`)
 
-<!-- doc-code: skip — installs packages; a gate that ran it would rewrite its own environment -->
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite
 ```

@@ -55,6 +55,16 @@ def on_config(config: Any, **_: Any) -> Any:
     # the path moved, and a footer quietly falling back to "unknown" is the kind
     # of silent degradation that survives for months.
     version = product_version()
+    # Same reasoning as the version above, applied to the other half. mkdocs
+    # defaults `copyright` to None, and `f"{None} · documents v…"` renders the
+    # word "None" in every page footer — a silent degradation of exactly the
+    # kind this hook already refuses for the version.
+    if not config.copyright:
+        raise SystemExit(
+            "version_stamp: mkdocs.yml has no `copyright`, and the footer is "
+            "built from it. Set it rather than letting the stamp render a "
+            "footer with nothing in front of the version."
+        )
     config.copyright = stamp(config.copyright, version)
     # The masthead lockup reads "laterite · docs · v<version>" (#401), and it
     # reads it from here rather than from a second lookup — the whole reason this

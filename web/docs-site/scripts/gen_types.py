@@ -27,14 +27,14 @@ _READS_AS = {
 out: list[str] = [
     "# AGS data types",
     "",
-    "Every heading in an AGS4 file declares a **data type** — the short code in "
+    "Every heading in an AGS4 file declares a **data type**: the short code in "
     "its `TYPE` row (`ID`, `2DP`, `DT`, …). The type fixes how the value is "
     "written, validated (AGS Format Rule 8 enforces numeric precision), and read "
     "back. laterite maps each AGS type to a **canonical** type and reads every "
     "column [born-typed](../concepts/born-typed.md): a `2DP` heading arrives as a "
     "float, a `DT` as a datetime.",
     "",
-    "Three families are **parametric** — the leading digit is the precision: "
+    "Three families are **parametric**; the leading digit is the precision: "
     "`nDP` is *n* decimal places (`1DP`…`4DP`), `nSF` is *n* significant figures, "
     "`nSCI` is scientific notation with *n* mantissa decimals.",
     "",

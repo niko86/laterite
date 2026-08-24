@@ -257,6 +257,13 @@ jobs:
               # a lockfile change did not trigger the strict build.
               - 'pyproject.toml'
               - 'uv.lock'
+              # The em-dash gate's BUILT half runs in this job and nowhere else
+              # (#588), because the built site is the only artefact that holds
+              # the prose of the three generated page families. Without this
+              # line, editing the gate would not re-run the job that executes
+              # it — which is exactly what test_every_executed_tool_fires_its_job
+              # is for, and it caught this.
+              - 'tools/check_docs_em_dash.py'
               - '.github/workflows/ci.yml'
             web:
               # ts-lint's web surface (the Solid browser validator's TS): eslint +
@@ -407,14 +414,16 @@ jobs:
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
 
-      # Sibling of the gate above and here for the same reasons: no build, a
-      # file walk, and an unconditional job. The landing holds the same policy
-      # with a browser test over the rendered DOM; the docs site is fifty-odd
-      # mkdocs pages, and building the site to find a character would put this
-      # behind the docs job instead of finishing in a second here. It reads the
-      # source, which is where a fix goes, and says so on every run along with
-      # what it skipped.
-      - name: no em dash in docs-site prose
+      # The buildless HALF of #588's gate. The other half is in the `docs` job,
+      # runs `--built` over what mkdocs just produced, and is the authority:
+      # three of this site's page families have no Markdown for this step to
+      # open, so a source scan alone reported clean while several hundred sat in
+      # the built site. What this step sees is a strict SUBSET of what the built
+      # half sees, and that is written down rather than dressed up: it is kept
+      # for feedback speed and for naming a file and a line to edit, not because
+      # it covers anything the `docs` job misses. If it ever costs more than it
+      # saves, delete this step and keep the other one.
+      - name: no em dash in docs-site prose (source pre-check)
         run: uv run --no-project python tools/check_docs_em_dash.py
 
       # Sibling of the gate above, and here for the same reason it is: no build,
@@ -1586,3 +1595,11 @@ jobs:
       - name: mkdocs build --strict
         working-directory: web/docs-site
         run: uv run --no-sync mkdocs build --strict
+      # No em dash reaches a docs-site READER (#588). This has to run here and
+      # not in repo-gates, because three of this site's page families
+      # (reference/groups/, types/, cli/) have no Markdown at all — they are
+      # emitted by web/docs-site/scripts/, so the only artefact that contains
+      # their prose is the one the step above just produced. repo-gates runs the
+      # buildless source half, which is a fast pre-check, not this.
+      - name: no em dash reaches a docs-site reader
+        run: uv run --no-sync python tools/check_docs_em_dash.py --built web/docs-dist

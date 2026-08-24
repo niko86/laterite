@@ -85,11 +85,44 @@ def test_a_multi_line_html_comment_is_skipped_without_moving_line_numbers(gate):
     assert [n for n, _ in hits] == [3]
 
 
-def test_the_gate_reads_the_config_keys_that_reach_every_page(gate):
-    """`site_description` is the search snippet and `copyright` is the footer.
-    One string each, in a file a docs/**.md scan has no reason to open, and both
-    on every built page: between them they were the largest single source in the
-    built site while the source scan reported it clean."""
+CONFIG = """\
+site_name: laterite
+site_description: >-
+  Read, validate and query AGS4 data — born-typed, fluent, one engine.
+site_url: https://docs.laterite.dev/
+# A comment — not rendered, so not this gate's business.
+copyright: laterite — MIT-licensed AGS4 tooling
+theme:
+  features:
+    - navigation.tabs — not a reader key, and indented besides
+"""
+
+
+def test_the_config_values_that_reach_every_page_are_reported(gate):
+    """The defect the source-only scan had. `site_description` is the search
+    snippet and `copyright` is the footer: one string each, in a file a
+    docs/**.md walk has no reason to open, and between them they were the
+    largest single source in the BUILT site while the source scan called it
+    clean."""
+    found = {key: (n, v) for n, key, v in gate.scan_config(CONFIG)}
+    assert sorted(found) == ["copyright", "site_description"]
+    assert found["copyright"][0] == 6
+    # The wrapped value is followed to its end, or the dash on its second line
+    # would be missed for exactly the key that matters most.
+    assert "born-typed" in found["site_description"][1]
+
+
+def test_the_config_scan_ignores_what_no_reader_sees(gate):
+    """A YAML comment and an indented value are not reader copy, and a key that
+    is not in the reader set is not this gate's business however it is written.
+    Without this, the gate would demand rewrites of the config's own notes."""
+    clean = CONFIG.replace(" — born-typed, fluent, one engine.", ".").replace(
+        "copyright: laterite — MIT-licensed AGS4 tooling", "copyright: laterite"
+    )
+    assert gate.scan_config(clean) == []
+
+
+def test_the_reader_keys_are_the_ones_that_render(gate):
     assert "site_description" in gate.MKDOCS_READER_KEYS
     assert "copyright" in gate.MKDOCS_READER_KEYS
     assert gate.MKDOCS.is_file()
@@ -106,3 +139,180 @@ def test_the_footer_is_built_from_the_config_not_a_second_copy(hook):
         "hook is supplying its own text again"
     )
     assert "9.9.9" in stamped
+
+
+def test_a_fence_marker_inside_a_comment_does_not_swallow_prose(gate):
+    """The bug review found. The fence test read the RAW line while the prose
+    test read the comment-masked one, so a fence-shaped line inside a comment
+    opened a block that was never open: the real prose after it was passed AND
+    counted as skipped, so the gate under-reported and misdescribed why."""
+    hits, skipped = gate.scan("<!--\n```\n-->\nreal — prose here\n")
+    assert [n for n, _ in hits] == [4]
+    assert skipped == 0
+
+
+def test_a_mismatched_fence_token_does_not_close_the_block(gate):
+    """``` and ~~~ do not close each other. A `~~~` printed inside a ``` block
+    is content, and closing on it would end the fence early and report the code
+    after it as prose."""
+    hits, _ = gate.scan("```\nx\n~~~\nstill — code\n```\nreal — prose\n")
+    assert [n for n, _ in hits] == [6]
+
+
+def test_the_footer_guard_refuses_a_missing_copyright(hook):
+    """The hook's own comment refuses to stamp a guessed VERSION; the base is
+    the other half of the same footer. mkdocs defaults `copyright` to None, and
+    stamping it renders the word "None" in front of the version on every page."""
+
+    class Config:
+        copyright = None
+        extra = {}  # noqa: RUF012 - a stand-in for mkdocs' config object
+
+    with pytest.raises(SystemExit, match=r"no `copyright`"):
+        hook.on_config(Config())
+
+
+# --- the built half, which is the gate proper (#588) --------------------------
+#
+# `--built` reads what `mkdocs build` produced, because three of this site's
+# page families are emitted by web/docs-site/scripts/ and have no Markdown at
+# all. The source-only draft reported clean while several hundred sat in the
+# built site, so these hold the parts of the HTML walk that were wrong at least
+# once while it was being written.
+
+
+def test_built_prose_is_reported(gate):
+    """The positive control for everything below."""
+    excerpts, _ = gate.scan_html("<p>A sentence — with a dash.</p>")
+    assert len(excerpts) == 1
+    assert "with a dash" in excerpts[0]
+
+
+def test_built_code_is_skipped_and_counted(gate):
+    """The built-site counterpart of the fence rule: a `<pre>` holds what a tool
+    printed, so rewriting it would misquote the tool."""
+    excerpts, skipped = gate.scan_html("<pre>lat: a — b</pre><p>fine</p>")
+    assert excerpts == []
+    assert skipped == 1
+
+
+def test_a_pre_wrapping_a_code_block_is_counted_once(gate):
+    """Every highlighted block is `<pre><code>`, so double-counting here would
+    inflate the skip total on essentially every page — and the skip total is the
+    number this gate publishes to make its own blind spot visible."""
+    _, skipped = gate.scan_html("<pre><code>a — b</code></pre>")
+    assert skipped == 1
+
+
+def test_a_code_block_closes_on_its_own_tag_not_the_first_one_seen(gate):
+    """The shape every highlighted block on the site actually has. Pygments
+    wraps each token in a `<span>`, so a close-on-any-tag pattern ends the block
+    at the first `</span>` and reports the REST of the code as reader prose.
+    Nothing else here would catch that: it needs a nested element and a dash on
+    each side of it."""
+    excerpts, skipped = gate.scan_html(
+        '<pre><code>a — b <span class="k">let</span> c — d</code></pre>'
+    )
+    assert excerpts == [], excerpts
+    assert skipped == 2
+
+
+def test_code_leaves_a_mark_so_the_excerpt_stays_greppable(gate):
+    """The excerpt is the only locator this half gives: generated HTML has no
+    line a person edits. Deleting code spans outright produced excerpts like
+    "Stack / — nothing runs" that match nothing in any source file."""
+    (excerpt,) = gate.scan_html("<p>Stack <code>a</code>/<code>b</code> — go.</p>")[0]
+    assert "`…`" in excerpt
+
+
+def test_an_entity_encoded_dash_reaches_a_reader_too(gate):
+    """`&mdash;` renders as an em dash. A byte-level search for U+2014 would
+    call this page clean while a reader looks straight at one."""
+    excerpts, _ = gate.scan_html("<p>A sentence &mdash; with a dash.</p>")
+    assert len(excerpts) == 1
+
+
+def test_an_entity_encoded_dash_inside_code_still_counts_as_skipped(gate):
+    """The other side of the same coin. Counting the raw match rather than the
+    unescaped one understates the skip total, which is the one number here whose
+    whole job is to be honest about what went unread."""
+    excerpts, skipped = gate.scan_html("<pre>a &mdash; b</pre>")
+    assert excerpts == []
+    assert skipped == 1
+
+
+def test_the_meta_description_is_read_although_it_is_an_attribute(gate):
+    """`site_description` renders on every page as `<meta content=…>`, so it has
+    no text node: stripping tags drops it. It is also the search snippet and the
+    link preview, which makes it the most-read string on the site."""
+    excerpts, _ = gate.scan_html(
+        '<meta name="description" content="Read AGS4 — born-typed."><p>ok</p>'
+    )
+    assert len(excerpts) == 1
+    assert "born-typed" in excerpts[0]
+
+
+def test_the_meta_description_is_found_whichever_order_it_is_written_in(gate):
+    """Attribute order is the theme template's business, not this gate's."""
+    excerpts, _ = gate.scan_html('<meta content="Read AGS4 — fast" name="description">')
+    assert len(excerpts) == 1
+
+
+def test_a_meta_tag_that_is_not_the_description_is_left_alone(gate):
+    """Without this the `name=description` test passes on a scanner that reads
+    the content of every meta tag, including generator and theme-colour ones."""
+    assert gate.scan_html('<meta name="generator" content="mkdocs — 1.6">')[0] == []
+
+
+def test_stripped_tags_do_not_glue_neighbouring_words(gate):
+    """Substituting nothing for a tag runs the last word of one block into the
+    first of the next, which corrupts every excerpt that spans a tag boundary."""
+    (excerpt,) = gate.scan_html("<p>alpha</p><p>beta — gamma</p>")[0]
+    assert "alpha beta" in excerpt
+
+
+def test_a_site_that_did_not_build_is_not_a_pass(gate, tmp_path):
+    """A gate that sees no input has checked nothing. An empty site dir means
+    the build failed or the path is wrong, and returning 0 there would report
+    green over an unscanned site."""
+    assert gate.check_built(tmp_path, False) == 1
+
+
+def test_an_excluded_family_is_counted_and_reported_not_passed_over(
+    gate, tmp_path, capsys
+):
+    """The exclusions are a decision, so they are printed with their counts on
+    every run: a declared exclusion nobody can see is a blind spot with a green
+    tick on it (CLAUDE.md, Conventions)."""
+    (tmp_path / "reference" / "api").mkdir(parents=True)
+    (tmp_path / "reference" / "api" / "index.html").write_text(
+        "<p>a docstring — rendered by mkdocstrings</p>", encoding="utf-8"
+    )
+    (tmp_path / "index.html").write_text("<p>clean</p>", encoding="utf-8")
+
+    assert gate.check_built(tmp_path, False) == 0
+    out = capsys.readouterr().out
+    assert "reference/api/ — 1 occurrence(s)" in out
+    assert "read 1 built page(s)" in out, "the excluded page must not be counted twice"
+
+
+def test_a_page_outside_the_excluded_families_still_fails(gate, tmp_path):
+    """The negative control for the test above: the exclusions must be the three
+    named prefixes, not a rule that quietly swallows the whole reference tree."""
+    (tmp_path / "reference" / "groups" / "LOCA").mkdir(parents=True)
+    (tmp_path / "reference" / "groups" / "LOCA" / "index.html").write_text(
+        "<h1>LOCA — General information</h1>", encoding="utf-8"
+    )
+    assert gate.check_built(tmp_path, False) == 1
+
+
+def test_every_exclusion_carries_a_reason_and_a_blind_spot_is_named(gate):
+    """A path list with no reasons is the same silent scope the discipline is
+    against, one indirection later."""
+    assert set(gate.BUILT_SKIP) == {
+        "reference/api/",
+        "reference/modules/",
+        "reference/cli/",
+    }
+    assert all(len(r) > 40 for r in gate.BUILT_SKIP.values())
+    assert any("gen_cli.py" in s for s in gate.BUILT_BLIND_SPOTS)

@@ -27,10 +27,10 @@ _body = _guide.split("\n", 1)[1] if _guide.startswith("# ") else _guide
 _page = f"""# `lat` command reference
 
 !!! note "Generated from the shipped guide"
-    This page **is** `lat --readme` — the guide bundled in the binary and the wheel,
+    This page **is** `lat --readme`: the guide bundled in the binary and the wheel,
     the single source of truth for every verb, flag, and exit code (so it can't drift
-    from the tool). For how to run it — the native binary, `uvx --from laterite lat`,
-    or `npx laterite` — see [CLI — one tool, three launchers](../surfaces/cli.md).
+    from the tool). For how to run it (the native binary, `uvx --from laterite lat`,
+    or `npx laterite`), see [CLI: one tool, three launchers](../surfaces/cli.md).
 {_body}"""
 
 with mkdocs_gen_files.open("reference/cli.md", "w") as fd:

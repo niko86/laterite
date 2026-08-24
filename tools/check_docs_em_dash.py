@@ -2,36 +2,50 @@
 """No em dash reaches a docs-site reader (#588, the docs half of #587).
 
 The em dash is out of reader-facing copy across this project's surfaces. The
-landing page holds that with a browser test that walks the rendered DOM; the
-docs site is fifty-odd Markdown pages built by mkdocs, and walking the built
-HTML would mean building the site to find a character. This walks the SOURCE
-instead, which is also where the fix belongs.
+landing page holds that with a browser test that walks the rendered DOM. This is
+the docs-site equivalent, and it has two halves because the site has two kinds of
+page and neither half can see the other's.
+
+**`--built <site-dir>` is the gate**, and it runs in the `docs` job on what
+`mkdocs build --strict` just produced, because that is the only artefact the
+policy is actually about. A source scan cannot be it: three of this site's page
+families have no `.md` at all. `reference/groups/` is 174 pages emitted by
+`scripts/gen_groups.py`, `reference/types/` and `reference/cli/` are emitted by
+their own `gen-files` scripts, and the prose in all of them lives in f-strings a
+`docs/**.md` walk never opens. That is not hypothetical: the source-only draft of
+this gate reported clean while several hundred sat in the built site, which is
+exactly the cost #588 predicted when it asked for the built scan.
+
+The default (no argument) walks the SOURCE instead: `docs/**.md` plus the
+`mkdocs.yml` keys that render on every page. It runs in `repo-gates`, needs no
+build, answers in under a second, and points at the file and line to edit rather
+than at a rendered artefact nobody hand-edits.
+
+What it sees is a strict SUBSET of what `--built` sees, and that is worth saying
+plainly rather than dressing up: it is kept for feedback speed and for naming a
+line, not because it covers anything the built scan misses. Two gates over one
+policy is the shape this repo keeps getting burned by, so the division is stated
+here rather than inferred — and if the pre-check ever costs more than it saves,
+it is the half to delete.
 
 ## What it does not look at, and why that is written down
 
 Every gate here carries a class of input it silently does not read, and an
 unstated scope is a green tick over exactly the thing that later breaks
-(CLAUDE.md, Conventions). So this reports its exclusions on every run, pass or
-fail, rather than only when it is unhappy:
+(CLAUDE.md, Conventions). So both halves report their exclusions on every run,
+pass or fail, rather than only when unhappy:
 
-* **Fenced code blocks and inline code spans.** A fence reproduces what a tool
-  actually printed, and an `.out` capture that says `—` says it because the
-  tool did. Rewriting one would make the page a claim about output nobody can
-  reproduce. Counted and reported, never edited.
+* **Fenced code blocks and inline code spans** (source), **`<pre>` and `<code>`**
+  (built). A fence reproduces what a tool actually printed, and an `.out` capture
+  that says `—` says it because the tool did. Rewriting one would make the page a
+  claim about output nobody can reproduce. Counted and reported, never edited.
 * **HTML comments**, which mkdocs does not render. The `doc-code: skip — why`
   markers live in them and spell their reason after an em dash, and a policy
   about what a reader sees has nothing to say about text no reader sees.
-* **Two whole page families that exist only after a build.** `reference/groups/`
-  is one page per AGS4 group, rendered from `ags_dictionary.json`, and its prose
-  is the STANDARD's own heading descriptions: rewriting those would not fix a
-  house style, it would misquote the specification. `reference/api`, `types`,
-  `modules` and `cli` are mkdocstrings rendering the shipped wheel's docstrings,
-  which #588 puts out of scope explicitly. Neither has a `.md` this gate could
-  read, and neither should be rewritten, so naming them is the whole of what can
-  be done about them here.
-* **Anything the theme itself injects.** A dash from a template override or a
-  plugin is outside this. Named because "no em dash reaches the reader" is the
-  policy and a source scan is a proxy for it.
+* **Three built page families, by decision, listed in `BUILT_SKIP`** with the
+  reason on each and the count printed every run. They are the pages whose prose
+  belongs to something other than this site: the wheel's docstrings, and a guide
+  that ships inside two binaries. Neither is a docs-site edit.
 * **CSS and JS under `docs/`.** Comments in the stylesheets and the two small
   scripts are not reader-facing copy, and #588 puts them out of scope
   explicitly. Counted so the number is visible rather than assumed to be zero.
@@ -47,11 +61,13 @@ message says so rather than inviting a hand-edit the next regeneration undoes.
 Usage:
     uv run --no-project python tools/check_docs_em_dash.py
     uv run --no-project python tools/check_docs_em_dash.py --skipped
+    uv run --no-project python tools/check_docs_em_dash.py --built web/docs-dist
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import sys
 from pathlib import Path
@@ -81,6 +97,56 @@ INLINE_CODE_RE = re.compile(r"`[^`]*`")
 #: to touch the markers rather than work around the gate.
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 
+#: Built pages whose prose is not this site's to rewrite, each with the reason.
+#: Keys are path prefixes relative to the site dir. Their em dashes are COUNTED
+#: and printed on every run rather than passed over in silence, because a
+#: declared exclusion nobody can see is the blind spot with a green tick on it.
+#:
+#: Both entries are the same judgement: the text belongs to something the docs
+#: site only displays. #588 draws that line explicitly, and it is the line that
+#: keeps this gate from turning a docs task into an API or a shipped-binary
+#: change.
+BUILT_SKIP = {
+    "reference/api/": (
+        "mkdocstrings rendering the shipped wheel's own docstrings; #588 puts "
+        "them out of scope, and the fix would be an API-surface edit"
+    ),
+    "reference/modules/": (
+        "mkdocstrings rendering the shipped wheel's own docstrings; #588 puts "
+        "them out of scope, and the fix would be an API-surface edit"
+    ),
+    "reference/cli/": (
+        "the shipped `lat --readme` guide, mirrored byte-identical into four "
+        "packages and gated there by tools/gen_cli_readme.py; rewriting it "
+        "changes what two binaries print, not what this site says"
+    ),
+}
+
+#: What this half still cannot see, printed with the exclusions rather than left
+#: for someone to discover. Neither is hypothetical: the first is a string this
+#: repo owns, and the second is how `site_description` escaped the source scan.
+BUILT_BLIND_SPOTS = (
+    "reference/cli/ also carries the note scripts/gen_cli.py writes above the "
+    "shipped guide, which IS ours; the exclusion is by path, so that note is "
+    "unread by this half, and it has no `.md` for the other half to read",
+    "attribute text other than the meta description — an `alt` or a `title` is "
+    "read aloud or shown on hover, but tag-stripping drops both",
+)
+
+#: Everything between these tags is what a tool printed, not what an author
+#: wrote — the built-site counterpart of the source scan's fences. Anchored with
+#: a backreference so `<pre><code>…</code></pre>` is consumed once, by `pre`.
+HTML_CODE_RE = re.compile(r"<(script|style|pre|code)\b[^>]*>.*?</\1\s*>", re.S | re.I)
+HTML_TAG_RE = re.compile(r"<[^>]+>")
+#: `site_description` reaches a reader as an ATTRIBUTE, never as a text node, so
+#: stripping tags would drop the single string that renders on every page. Read
+#: in two steps rather than one pattern so it does not depend on the theme
+#: emitting `name` before `content`, which is a detail of whoever wrote the
+#: template and not something this gate should be pinned to.
+META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.I)
+META_IS_DESC_RE = re.compile(r"""\bname=["']description["']""", re.I)
+META_CONTENT_RE = re.compile(r"""\bcontent=["']([^"']*)""", re.I)
+
 #: Pages no hand-edit can fix, mapped to what to edit instead. A gate that says
 #: "line 12 has an em dash" about a rendered file sends someone to edit a file
 #: the next `--check` overwrites.
@@ -102,19 +168,31 @@ def scan(text: str) -> tuple[list[tuple[int, str]], int]:
     """
     hits: list[tuple[int, str]] = []
     skipped = 0
-    in_fence = False
+    #: Which token opened the fence we are inside, or None. Tracked rather than
+    #: toggled on any fence-shaped line, because ``` and ~~~ do not close each
+    #: other: a `~~~` printed inside a ``` block is content, and treating it as
+    #: a close would end the fence early and report the code after it as prose.
+    fence: str | None = None
     # Comments are blanked across the WHOLE text first, so one spanning several
     # lines needs no second state machine beside the fence one. Newlines are
-    # kept, so line numbers still point where they should.
+    # kept, so line numbers still point where they should. EVERY decision below
+    # reads the masked copy: testing the raw line for a fence while testing the
+    # masked one for prose let a fence marker inside a comment open a block that
+    # was never open, and the real prose after it was then passed AND counted as
+    # skipped, so the gate under-reported and lied about why.
     masked = HTML_COMMENT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
     for n, (line, clean) in enumerate(
         zip(text.split("\n"), masked.split("\n"), strict=True), start=1
     ):
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        if m := FENCE_RE.match(clean):
+            token = m.group(1)
+            if fence is None:
+                fence = token
+            elif token == fence:
+                fence = None
             skipped += line.count(EM_DASH)
             continue
-        if in_fence:
+        if fence is not None:
             skipped += line.count(EM_DASH)
             continue
         prose = INLINE_CODE_RE.sub("", clean)
@@ -124,28 +202,20 @@ def scan(text: str) -> tuple[list[tuple[int, str]], int]:
     return hits, skipped
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--skipped",
-        action="store_true",
-        help="list every occurrence this gate deliberately does not read",
-    )
-    args = ap.parse_args()
+def scan_config(text: str) -> list[tuple[int, str, str]]:
+    """Reader-facing `mkdocs.yml` values carrying an em dash: (line, key, value).
 
-    if not DOCS.is_dir():
-        print(f"check_docs_em_dash: {DOCS} is not a directory", file=sys.stderr)
-        return 1
+    Separate from `scan` and separately testable, because this half is the one
+    the source-only gate was missing: `site_description` and `copyright` are one
+    string each, in a file a `docs/**.md` walk has no reason to open, and they
+    render on every built page.
 
-    failures: list[str] = []
-    pages = files_with_prose = skipped_in_code = 0
-    skipped_detail: list[str] = []
-
-    # Read as text, not as YAML: this gate is stdlib-only so it runs in the
-    # buildless job, and the values wanted are single scalars a line scan reads
-    # exactly. A value that wraps across lines is followed until the indentation
-    # ends, which is how `site_description` is written today.
-    lines = MKDOCS.read_text(encoding="utf-8").split("\n")
+    Read as text rather than as YAML so this stays stdlib-only and runs in the
+    buildless job. A value that wraps across lines is followed until the
+    indentation ends, which is how `site_description` is written.
+    """
+    out: list[tuple[int, str, str]] = []
+    lines = text.split("\n")
     for n, line in enumerate(lines):
         if line.startswith((" ", "\t", "#")) or ":" not in line:
             continue
@@ -157,18 +227,164 @@ def main() -> int:
             if not cont.strip() or not cont.startswith((" ", "\t")):
                 break
             block.append(cont)
-        joined = " ".join(" ".join(block).split())
-        if EM_DASH in joined:
-            where = (
-                'the <meta name="description">, so it is the search snippet '
-                "and the link preview"
-                if key == "site_description"
-                else "in the page footer"
+        value = " ".join(" ".join(block).split())
+        if EM_DASH in value:
+            out.append((n + 1, key, value))
+    return out
+
+
+def scan_html(text: str) -> tuple[list[str], int]:
+    """Reader-visible em dashes in one BUILT page, and how many were skipped.
+
+    Excerpts come back rather than line numbers. A line number in generated HTML
+    points at a file nobody edits and a column nobody can find; the sentence
+    itself is what someone greps for to reach the f-string that produced it.
+
+    Order matters here. Comments and code are removed while the markup is still
+    intact, because that is the only point at which their boundaries exist —
+    after tags are stripped, a fence is indistinguishable from a paragraph.
+    """
+    skipped = 0
+
+    def _drop(m: re.Match[str]) -> str:
+        nonlocal skipped
+        # Unescaped before counting, or a `&mdash;` inside a fence is dropped
+        # from the skip total and the reported scope understates itself — the
+        # one number this gate exists to keep honest.
+        matched = m.group(0)
+        skipped += html.unescape(matched).count(EM_DASH)
+        # Code leaves a mark and comments do not. The excerpt is the only
+        # locator this half can give, and a sentence with its code spans
+        # silently deleted ("Stack / — nothing runs") is one nobody can grep
+        # back to the f-string that produced it.
+        return " " if matched.startswith("<!--") else "`…`"
+
+    body = HTML_CODE_RE.sub(_drop, HTML_COMMENT_RE.sub(_drop, text))
+    # Pulled out before the tags go, because this one is an ATTRIBUTE: it is the
+    # search snippet and the link preview, so it is read far more often than the
+    # page, and stripping tags would silently drop it.
+    meta = " ".join(
+        html.unescape(c.group(1))
+        for tag in META_TAG_RE.findall(body)
+        if META_IS_DESC_RE.search(tag) and (c := META_CONTENT_RE.search(tag))
+    )
+    prose = f"{html.unescape(HTML_TAG_RE.sub(' ', body))} {meta}"
+
+    excerpts: list[str] = []
+    for m in re.finditer(EM_DASH, prose):
+        window = prose[max(0, m.start() - 45) : m.start() + 45]
+        excerpts.append(" ".join(window.split()))
+    return excerpts, skipped
+
+
+def check_built(site: Path, show_skipped: bool) -> int:
+    """The gate proper: what `mkdocs build` actually produced (#588).
+
+    This is the half that can see the 174 group pages, the type catalogue and
+    the CLI reference, none of which have a `.md` for the source scan to open.
+    """
+    pages = [p for p in sorted(site.rglob("*.html")) if p.is_file()]
+    if not pages:
+        print(
+            f"check_docs_em_dash: no HTML under {site} — the site did not build, "
+            f"and a scan of nothing is not a pass",
+            file=sys.stderr,
+        )
+        return 1
+
+    failures: list[str] = []
+    scanned = skipped_in_code = 0
+    excluded: dict[str, int] = dict.fromkeys(BUILT_SKIP, 0)
+    skipped_detail: list[str] = []
+
+    for path in pages:
+        rel = path.relative_to(site).as_posix()
+        excerpts, skipped = scan_html(path.read_text(encoding="utf-8", errors="ignore"))
+        if prefix := next((p for p in BUILT_SKIP if rel.startswith(p)), None):
+            excluded[prefix] += len(excerpts)
+            continue
+        scanned += 1
+        skipped_in_code += skipped
+        if skipped and show_skipped:
+            skipped_detail.append(f"{rel}: {skipped} inside code")
+        failures.extend(f"  {rel}\n      … {excerpt} …" for excerpt in excerpts)
+
+    print(
+        f"check_docs_em_dash --built: read {scanned} built page(s) under "
+        f"{site}, everything a reader sees INCLUDING the pages that have no "
+        f"Markdown source. Skipped {skipped_in_code} occurrence(s) inside "
+        f"<pre>, <code> and HTML comments, none of which is authored prose "
+        f"(--skipped lists them). Not read, by decision:"
+    )
+    for prefix, reason in BUILT_SKIP.items():
+        print(f"  {prefix} — {excluded[prefix]} occurrence(s): {reason}")
+    for spot in BUILT_BLIND_SPOTS:
+        print(f"  still unread: {spot}")
+    if show_skipped:
+        for line in skipped_detail:
+            print(f"  {line}")
+
+    if failures:
+        print(
+            f"\ncheck_docs_em_dash --built: {len(failures)} em dash(es) reached a "
+            f"reader. Fix the SOURCE, which for a page with no `.md` is the "
+            f"generator that emits it (web/docs-site/scripts/), then rebuild:",
+            file=sys.stderr,
+        )
+        for line in failures[:40]:
+            print(line, file=sys.stderr)
+        if len(failures) > 40:
+            print(f"  … and {len(failures) - 40} more", file=sys.stderr)
+        return 1
+
+    print("check_docs_em_dash --built: OK, no em dash reached a docs-site reader")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--skipped",
+        action="store_true",
+        help="list every occurrence this gate deliberately does not read",
+    )
+    ap.add_argument(
+        "--built",
+        metavar="SITE_DIR",
+        type=Path,
+        help="scan a built site instead of the source — this is the gate (#588)",
+    )
+    args = ap.parse_args()
+
+    if args.built:
+        if not args.built.is_dir():
+            print(
+                f"check_docs_em_dash: {args.built} is not a directory — run "
+                f"`mkdocs build` first",
+                file=sys.stderr,
             )
-            failures.append(
-                f"  {MKDOCS.name}:{n + 1}  {key}: {joined[:100]}"
-                f"\n      ^ renders on EVERY built page ({where})"
-            )
+            return 1
+        return check_built(args.built, args.skipped)
+
+    if not DOCS.is_dir():
+        print(f"check_docs_em_dash: {DOCS} is not a directory", file=sys.stderr)
+        return 1
+
+    failures: list[str] = []
+    pages = files_with_prose = skipped_in_code = 0
+    skipped_detail: list[str] = []
+
+    for n, key, value in scan_config(MKDOCS.read_text(encoding="utf-8")):
+        where = (
+            'the <meta name="description">, so it is the search snippet and the '
+            "link preview"
+            if key == "site_description"
+            else "in the page footer"
+        )
+        failures.append(
+            f"  {MKDOCS.name}:{n}  {key}: {value[:100]}"
+            f"\n      ^ renders on EVERY built page ({where})"
+        )
 
     for path in sorted(DOCS.rglob("*.md")):
         pages += 1
@@ -202,10 +418,11 @@ def main() -> int:
         f"reader sees (--skipped lists them), and {non_md} in the "
         f"stylesheets and scripts, which are not reader-facing copy. Also read: "
         f"{MKDOCS.name}'s {', '.join(MKDOCS_READER_KEYS)}, which render on every "
-        f"built page. NOT read: the built site, nor the two page families that "
-        f"only exist in it, being reference/groups/ (the AGS4 dictionary's own "
-        f"descriptions, which this may not rewrite) and the mkdocstrings API "
-        f"pages (the wheel's docstrings, out of scope per #588)."
+        f"built page. NOT read: the built site, and therefore none of the pages "
+        f"that exist only in it (reference/groups/, reference/types/ and "
+        f"reference/cli/ are emitted by web/docs-site/scripts/ and have no `.md` "
+        f"to open), nor anything the theme injects. `--built` is the half that "
+        f"reads those; this one is the fast pre-check that names a line to edit."
     )
     if args.skipped:
         for line in skipped_detail:

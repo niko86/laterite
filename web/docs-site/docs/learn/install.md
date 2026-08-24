@@ -1,6 +1,6 @@
 # Install & first validate
 
-<!-- doc-code: skip — installs packages; a gate that ran it would rewrite its own environment -->
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite
 ```
@@ -9,7 +9,7 @@ That one line gives you the library **and** the `lat` CLI. The base
 install is **polars + duckdb**: pyarrow-free, no pandas. Optional extras
 add drop-in surfaces only if you want them:
 
-<!-- doc-code: skip — installs packages; a gate that ran it would rewrite its own environment -->
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite[compat]          # the python-ags4 drop-in shim (adds pandas) — pyarrow-free
 pip install laterite[compat,pyarrow]  # + pyarrow accelerator (faster pandas hop + string dtype)
