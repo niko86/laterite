@@ -20,6 +20,15 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "laterite-site",
   "compatibility_date": "2026-08-14",
+  // Production stays OFF workers.dev — the apex custom domain below is the
+  // only front door — while preview URLs stay ON, so `wrangler versions
+  // upload` can put a branch build on an unguessable
+  // <version-prefix>-laterite-site.<subdomain>.workers.dev for review
+  // without shifting a byte of production traffic. Both stated rather than
+  // defaulted: `preview_urls` otherwise inherits `workers_dev`, so turning
+  // the front door off would silently take the review lane with it.
+  "workers_dev": false,
+  "preview_urls": true,
   "assets": {
     "directory": "./dist",
   },
