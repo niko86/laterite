@@ -73,29 +73,21 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], dict[str, str]] = {
         "triage": "no difference",
         "why": "the two engines agree on which rules the state breaks",
     },
-    (("FYI (Related to Rule 16)",), ()): {
-        "triage": "O-43",
+    (("Warning (Related to Rule 10c)",), ()): {
+        "triage": "O-52",
         "why": (
-            "a self-declared but non-standard PA abbreviation is a "
-            "laterite-originated FYI; python-ags4 has no FYI tier at all"
+            "a child row whose parent KEY cells are all empty claims no "
+            "parent, so laterite DECLINES the parentage check and says so at "
+            "the warning tier. python-ags4 reports nothing, for the reason "
+            "O-52 documents: the all-empty key matches the parent's UNIT "
+            "pseudo-row through its merge"
         ),
     },
-    (("FYI (Related to Rule 16)", "Warning (Related to Rule 10c)"), ()): {
-        "triage": "O-43 + O-52",
+    (("Warning (Related to Rule 14)",), ()): {
+        "triage": "O-45",
         "why": (
-            "as O-43, plus a child row whose parent KEY cells are all empty: "
-            "the row claims no parent, so laterite DECLINES the parentage "
-            "check and says so at the warning tier. python-ags4 reports "
-            "nothing, for the reason O-52 documents — the all-empty key "
-            "matches the parent's UNIT pseudo-row through its merge"
-        ),
-    },
-    (("FYI (Related to Rule 16)", "Warning (Related to Rule 14)"), ()): {
-        "triage": "O-43 + O-45",
-        "why": (
-            "as O-43, plus an unrecognised TRAN_AGS edition, which laterite "
-            "reports as a warning shown by default and python-ags4 does not "
-            "report at all"
+            "an unrecognised TRAN_AGS edition is a laterite warning shown by "
+            "default; python-ags4 does not report it at all"
         ),
     },
 }
