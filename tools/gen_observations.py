@@ -123,6 +123,67 @@ AXES = {
     "laterite-adds": "Checks laterite adds",
 }
 
+#: What python-ags4 does about the condition a record describes. A CLOSED SET,
+#: because the thing this replaced was a single `axis` string carrying three
+#: different questions at once — how we relate to python-ags4, how we relate to
+#: the spec, and whether we changed to match them — and one field answering
+#: three questions can only be checked by reading it.
+#:
+#: The two silences are separate values on purpose. "They say nothing where we
+#: report" and "they report where we say nothing" are opposite facts that a
+#: single `silent` would merge, and the merge is not hypothetical: the first
+#: draft of this table had O-53 (python reports an extra FYI on a blank
+#: TRAN_AGS) sharing a value with O-52 (python is silent on a declined
+#: parentage check), which filed O-53 under "Checks laterite adds" — the exact
+#: inverse of what it says.
+PYTHON_RELATION = {
+    "reports-the-same": "python-ags4 reports the same thing, the same way",
+    "reports-differently": "both report it; the implementations disagree on which inputs",
+    "reports-at-another-tier": "both report it, at different severity tiers",
+    "reports-nothing": "python-ags4 is silent where laterite reports",
+    "reports-additionally": "python-ags4 reports where laterite is silent",
+    "has-no-such-check": "python-ags4 has no equivalent check at all",
+    "errors": "python-ags4 raises or crashes rather than reporting",
+}
+
+#: And how the pair relate to the WRITTEN spec, which is a different question
+#: from how they relate to each other — two implementations can agree with one
+#: another and both depart from the document.
+SPEC_RELATION = {
+    "matches": "the spec says what laterite does",
+    "departs": "laterite departs from the written spec, deliberately",
+    "ambiguous": "the spec admits both readings",
+    "silent": "the spec does not address this",
+}
+
+
+def axis_of(rec: dict) -> str:
+    """The page section a record renders under — DERIVED, never stored.
+
+    It used to be an authored `axis` field, which meant the grouping and the
+    facts it should follow from could disagree with nothing failing. They did:
+    O-45 sat under "Checks laterite adds" while its own body said python-ags4
+    reports the same condition as an FYI. It is not a check laterite adds, it
+    is a tier laterite promotes, and only putting the two beside each other
+    made that visible.
+    """
+    rel = rec["relation"]
+    if rel["converged"]:
+        return "converged"
+    if rel["spec"] == "departs" and rel["python"] == "reports-the-same":
+        return "vs-spec"
+    # A check they do not have, or one they have and never fire, is an
+    # ADDITION. A check they have and get wrong is a DIFFERENCE, which is why
+    # the kind is in the test: O-2 (their Rule 6 body is `pass`) is a BUG in
+    # their implementation, not a check we invented.
+    if (
+        rel["python"] in ("has-no-such-check", "reports-nothing")
+        and rec["kind"] == "VARIANCE"
+    ):
+        return "laterite-adds"
+    return "vs-python"
+
+
 #: The register the `upstream` flag exists to feed: the AGS-DFWG proposal list.
 #: Its tiering and wording are editorial, so it is NOT generated — but its
 #: MEMBERSHIP is not, and six flagged observations had gone missing from it,
@@ -222,17 +283,31 @@ def render_divergences(data: dict) -> str:
             "`status` — a resolved record cannot be a live divergence. Drop the "
             "`user_facing` block, or the status if it is in fact still live."
         )
-    if unknown := sorted(
-        {r["user_facing"]["axis"] for r in live} - set(AXES),
-    ):
+    # The relation block is what the grouping is derived FROM, so a live record
+    # without one has no section to render under. Absent rather than wrong is
+    # the failure that goes quiet, so it is a hard error like the two above.
+    if missing := [r["id"] for r in live if "relation" not in r]:
         raise SystemExit(
-            f"gen_observations: unknown user_facing axis {unknown} — add it to "
-            f"AXES (with a heading) or use one of {sorted(AXES)}."
+            f"gen_observations: {', '.join(missing)} is user-facing but carries "
+            "no `relation` block, so there is nothing to derive its section "
+            "from. Add `relation: {python, spec, converged}`."
         )
+    for field, allowed in (("python", PYTHON_RELATION), ("spec", SPEC_RELATION)):
+        if bad := sorted(
+            {
+                r["relation"][field]
+                for r in live
+                if r["relation"].get(field) not in allowed
+            }
+        ):
+            raise SystemExit(
+                f"gen_observations: unknown relation.{field} {bad} — it is a "
+                f"closed set, so use one of {sorted(allowed)}."
+            )
 
     by_axis: dict[str, list[dict]] = {axis: [] for axis in AXES}
     for rec in live:
-        by_axis[rec["user_facing"]["axis"]].append(rec)
+        by_axis[axis_of(rec)].append(rec)
 
     total = len(live)
     out = [
