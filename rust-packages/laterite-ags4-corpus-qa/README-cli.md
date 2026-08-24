@@ -19,7 +19,8 @@ Pipeline (each stage is also a standalone subcommand):
   hard-errored / panicked / looked surprising — plus an optional
   random sample) and run them through **python-ags4** too, then
   classify each: `AGREE`, `RUST_ONLY_RULES`, `PYTHON_ONLY_RULES`
-  (a Rust under-detection), `KNOWN_DIVERGENCE` (a documented
+  (a Rust under-detection), `RULES_DIFFER` (both, each carrying rules
+  the other lacks), `KNOWN_DIVERGENCE` (a documented
   OBSERVATIONS variance), `PYTHON_ERROR`. Writes `parity.json` + an
   ACTION list of genuine divergences worth filing. Optional QA: if
   `uv`/`python-ags4` isn't available it prints a notice and exits 0.

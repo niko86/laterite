@@ -189,6 +189,7 @@ impl Ledger {
             Parity::Agree | Parity::KnownDivergence { .. } => e.agree += 1,
             Parity::RustOnlyRules { .. }
             | Parity::PythonOnlyRules { .. }
+            | Parity::RulesDiffer { .. }
             | Parity::ValidityDisagree { .. } => {
                 e.action += 1;
                 e.burst = self.force_burst; // force-recheck after a collapse

@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use anyhow::Result;
-use laterite_ags4_parity::{PyOracle, Rng};
+use laterite_ags4_parity::{Parity, PyOracle, Rng};
 
 use crate::confidence::{Ledger, class_key, validator_fingerprint};
 use crate::ops::{Injection, synth_injected};
@@ -304,10 +304,7 @@ fn record(
     } else {
         *stale += 1;
     }
-    let is_action = matches!(
-        tag.as_str(),
-        "RUST_ONLY_RULES" | "PYTHON_ONLY_RULES" | "VALIDITY_DISAGREE"
-    );
+    let is_action = Parity::is_action_tag(&tag);
     if is_action && novel {
         findings.push(Candidate::from_outcome(
             seq,
