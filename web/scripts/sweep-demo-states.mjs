@@ -97,7 +97,15 @@ const CLASSES = [
   {
     id: "non-ascii",
     rule: "1 (the file must be ASCII)",
-    applies: (h) => h.type === "X" || h.type === "XN",
+    // Rule 1 is about the FILE, so it is reachable from any column at all —
+    // bounded here only by where a non-ASCII value would trip Rule 8 on its
+    // way and confound the state. That is exactly the types that constrain
+    // nothing, which is why this reads as the inverse of `typeConstrainsText`
+    // rather than as a list. It matters: `textCanMatter` below deliberately
+    // leaves Rule 1 out on the grounds that this class covers it, and a class
+    // narrower than "every column that can hold arbitrary text" would make
+    // that reasoning false for the columns it missed.
+    applies: (h) => !typeConstrainsText(h.type),
     value: () => "Ceci n’est pas ASCII",
   },
   {
@@ -347,9 +355,11 @@ async function main() {
             type: h.type,
             why:
               "not a KEY, not PA, and its declared type constrains nothing a " +
-              "reader can type, so arbitrary text here reaches no rule. " +
-              "Measured byte-exact before this class was written: free-text " +
-              "and non-KEY ID columns leave BOTH engines' findings unchanged",
+              "reader can type, so arbitrary ASCII text here reaches no rule. " +
+              "Non-ASCII text does, through Rule 1, and the `non-ascii` class " +
+              "covers this column for exactly that. Measured byte-exact " +
+              "before this class was written: free-text and non-KEY ID " +
+              "columns leave BOTH engines' findings unchanged",
           });
         }
         const ctx = {

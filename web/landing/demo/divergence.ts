@@ -30,6 +30,17 @@ import type { Finding } from "./engine";
 
 export type DivergenceSide = "ours" | "theirs" | "tier";
 
+/** The one trigger a browser can evaluate without a second opinion about the
+ *  rules: this exact value, in this exact cell. Declared once because both the
+ *  notes and the count below match on it, and three copies of a shape is three
+ *  chances for one of them to drift. */
+export type CellMatch = {
+  readonly group: string;
+  readonly row: number;
+  readonly heading: string;
+  readonly value: string;
+};
+
 export type DivergenceNote = {
   /** The O-N record in `OBSERVATIONS.md` this explanation is drawn from. */
   readonly observation: string;
@@ -39,12 +50,7 @@ export type DivergenceNote = {
    *  about the state on screen. */
   readonly states: number;
   readonly rules?: readonly string[];
-  readonly whenCellIs?: readonly {
-    readonly group: string;
-    readonly row: number;
-    readonly heading: string;
-    readonly value: string;
-  }[];
+  readonly whenCellIs?: readonly CellMatch[];
 };
 
 const ALL: readonly DivergenceNote[] = notes.notes.map((n) => ({
@@ -79,18 +85,15 @@ export function divergencesTheyRaise(
   return THEIRS.filter((note) => (note.whenCellIs ?? []).some(holds(delivery)));
 }
 
-/** Does the delivery hold this exact value in this exact cell? The one trigger
- *  a browser can evaluate without a second opinion about the rules — shared by
- *  the notes above and the count below, which match on the same thing for the
- *  same reason. */
-const holds =
-  (delivery: Delivery) =>
-  (cell: { group: string; row: number; heading: string; value: string }) => {
-    const group = delivery.find((g) => g.code === cell.group);
-    const col = group?.headings.indexOf(cell.heading) ?? -1;
-    if (!group || col < 0) return false;
-    return group.rows[cell.row]?.[col] === cell.value;
-  };
+/** Does the delivery hold this exact value in this exact cell? Shared by the
+ *  notes above and the count below, which match on the same thing for the same
+ *  reason. */
+const holds = (delivery: Delivery) => (cell: CellMatch) => {
+  const group = delivery.find((g) => g.code === cell.group);
+  const col = group?.headings.indexOf(cell.heading) ?? -1;
+  if (!group || col < 0) return false;
+  return group.rows[cell.row]?.[col] === cell.value;
+};
 
 /** The version of python-ags4 every note above is a claim about. Carried so the
  *  page can name it rather than saying "the other tool" and leaving a reader to
@@ -114,21 +117,16 @@ export const PYTHON_AGS4_VERSION: string = notes.python_ags4_version;
  * Two designs were measured and rejected, so they do not get retried. Hashing
  * the delivery text is exact but over-strict: typing a project name changes the
  * bytes while changing neither engine's findings. Per-lever addition is simply
- * wrong: orphaning a SAMP row (+2) then deleting the LOCA group (+0) predicts
- * six findings and the measured answer is five.
+ * wrong: levers do not compose, and orphaning a SAMP row then deleting the LOCA
+ * group predicts more findings than the measured answer, because deleting the
+ * parent changes what the first edit meant.
  */
 
 type CountEntry = {
   readonly signature: string;
   readonly python: number;
   readonly states: number;
-  readonly when_cell_is?: readonly {
-    readonly group: string;
-    readonly row: number;
-    readonly heading: string;
-    readonly value: string;
-    readonly python: number;
-  }[];
+  readonly when_cell_is?: readonly (CellMatch & { readonly python: number })[];
 };
 
 const BY_SIGNATURE = new Map<string, CountEntry>(
@@ -146,7 +144,13 @@ const BY_SIGNATURE = new Map<string, CountEntry>(
 function signatureOf(findings: readonly Finding[]): string {
   const tally = new Map<string, number>();
   for (const f of findings) {
-    if (f.severity === "fyi") continue;
+    // TWO discriminators on purpose. The generator sees forge's report and
+    // drops on the rule key's tier prefix; this sees the wasm engine's and has
+    // a real severity to read. They describe the same tier through different
+    // producers, and nothing gates that those two producers name a tier the
+    // same way — so this drops on either, and a disagreement between them
+    // costs a state's lookup rather than every state's.
+    if (f.severity === "fyi" || f.rule.startsWith("FYI")) continue;
     tally.set(f.rule, (tally.get(f.rule) ?? 0) + 1);
   }
   return [...tally.keys()]

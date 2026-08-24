@@ -84,13 +84,13 @@
     }
   ],
   "counts": {
-    "states": 200,
+    "states": 223,
     "by_lever": {
       "seed": 1,
       "deleteGroup": 5,
       "addRow": 5,
       "deleteRow": 10,
-      "setCell": 175,
+      "setCell": 198,
       "sequence": 4
     },
     "difference_shapes": 4,
@@ -119,49 +119,49 @@
         "group": "PROJ",
         "heading": "PROJ_NAME",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "PROJ",
         "heading": "PROJ_CLNT",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "TRAN",
         "heading": "TRAN_PROD",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "TRAN",
         "heading": "TRAN_STAT",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "TRAN",
         "heading": "TRAN_AGS",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "TRAN",
         "heading": "TRAN_RECV",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "LOCA",
         "heading": "LOCA_REM",
         "type": "X",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       },
       {
         "group": "LLPL",
         "heading": "LLPL_PL",
         "type": "XN",
-        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary text here reaches no rule. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
+        "why": "not a KEY, not PA, and its declared type constrains nothing a reader can type, so arbitrary ASCII text here reaches no rule. Non-ASCII text does, through Rule 1, and the `non-ascii` class covers this column for exactly that. Measured byte-exact before this class was written: free-text and non-KEY ID columns leave BOTH engines' findings unchanged"
       }
     ]
   },
@@ -169,7 +169,7 @@
     {
       "rust_only": [],
       "python_only": [],
-      "states": 194,
+      "states": 217,
       "triage": "no difference",
       "why": "the two engines agree on which rules the state breaks",
       "example": "add-row-LLPL"
@@ -1352,6 +1352,48 @@
       }
     },
     {
+      "id": "set-LLPL-0-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-0-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -1455,6 +1497,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -1879,6 +1963,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 1,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-0-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -2466,6 +2592,48 @@
       }
     },
     {
+      "id": "set-LLPL-1-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-1-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -2569,6 +2737,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -2993,6 +3203,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-1-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -3580,6 +3832,48 @@
       }
     },
     {
+      "id": "set-LLPL-2-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LLPL-2-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -3683,6 +3977,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -4107,6 +4443,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LLPL-2-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LLPL",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -4724,6 +5102,48 @@
       }
     },
     {
+      "id": "set-LOCA-0-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-0-LOCA_REM-blank",
       "lever": "setCell",
       "reached_by": {
@@ -4871,6 +5291,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-0-LOCA_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 0,
+        "heading": "LOCA_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -5222,6 +5684,48 @@
       }
     },
     {
+      "id": "set-LOCA-1-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-LOCA-1-LOCA_REM-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5369,6 +5873,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-LOCA-1-LOCA_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "LOCA",
+        "row": 1,
+        "heading": "LOCA_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {
@@ -5576,6 +6122,48 @@
       }
     },
     {
+      "id": "set-PROJ-0-PROJ_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "PROJ",
+        "row": 0,
+        "heading": "PROJ_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-PROJ-0-PROJ_NAME-blank",
       "lever": "setCell",
       "reached_by": {
@@ -5736,6 +6324,48 @@
       }
     },
     {
+      "id": "set-SAMP-0-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -5839,6 +6469,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-0-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -6158,6 +6830,48 @@
       }
     },
     {
+      "id": "set-SAMP-0-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 0,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-0-SAMP_TYPE-unlisted-abbreviation",
       "lever": "setCell",
       "reached_by": {
@@ -6276,6 +6990,48 @@
       }
     },
     {
+      "id": "set-SAMP-1-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 3,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-1-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -6379,6 +7135,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-1-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -6698,6 +7496,48 @@
       }
     },
     {
+      "id": "set-SAMP-1-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 1,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-1-SAMP_TYPE-unlisted-abbreviation",
       "lever": "setCell",
       "reached_by": {
@@ -6816,6 +7656,48 @@
       }
     },
     {
+      "id": "set-SAMP-2-LOCA_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "LOCA_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 2,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
       "id": "set-SAMP-2-LOCA_ID-unmatched-parent-key",
       "lever": "setCell",
       "reached_by": {
@@ -6919,6 +7801,48 @@
         "AGS Format Rule 8": 1
       },
       "python_rule_counts": {
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_ID-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_ID",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
@@ -7229,6 +8153,48 @@
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
+        "AGS Format Rule 8": 1
+      },
+      "difference": {
+        "rust_only": [],
+        "python_only": [],
+        "triage": "no difference"
+      }
+    },
+    {
+      "id": "set-SAMP-2-SAMP_TYPE-non-ascii",
+      "lever": "setCell",
+      "reached_by": {
+        "group": "SAMP",
+        "row": 2,
+        "heading": "SAMP_TYPE",
+        "class": "non-ascii",
+        "rule": "1 (the file must be ASCII)",
+        "value": "Ceci n’est pas ASCII"
+      },
+      "dictionary": "V4_1",
+      "rust_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "python_rules": [
+        "AGS Format Rule 1",
+        "AGS Format Rule 10c",
+        "AGS Format Rule 16",
+        "AGS Format Rule 8"
+      ],
+      "rust_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
+        "AGS Format Rule 8": 1
+      },
+      "python_rule_counts": {
+        "AGS Format Rule 1": 1,
+        "AGS Format Rule 10c": 1,
+        "AGS Format Rule 16": 3,
         "AGS Format Rule 8": 1
       },
       "difference": {

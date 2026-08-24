@@ -190,8 +190,8 @@ The two cases are not matched the same way, and the asymmetry is the point:
 ## The third output: what the other engine COUNTED
 
 A note says the two engines differ. It does not say what python-ags4 actually
-reported, and the demo showing its own four findings beside no number at all
-leaves a reader to guess. The same run writes
+reported, and the demo showing its own findings beside no number at all leaves
+a reader to guess. The same run writes
 `repo:web/landing/demo/python-counts.json`, and the page reads its total from
 there — python-ags4 is a dev-only dependency and never runs in a browser
 (#673).

@@ -4,8 +4,8 @@
   "source": "web/landing/demo/state-map.json",
   "python_ags4_version": "1.2.0",
   "measured": {
-    "states": 200,
-    "signatures": 28,
+    "states": 223,
+    "signatures": 31,
     "laterite_tiers": "errors and warnings, which are the tiers the demo's own validate call surfaces. The map itself measures FYI too, and a state that raised one would fail this generator rather than reach here",
     "python_total": "every finding python-ags4 reports at any tier, which is what its own report shows a reader"
   },
@@ -148,7 +148,7 @@
     {
       "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1",
       "python": 5,
-      "states": 16
+      "states": 20
     },
     {
       "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=1|AGS Format Rule 16=2|AGS Format Rule 8=1|Warning (Related to Rule 14)=1",
@@ -156,9 +156,24 @@
       "states": 1
     },
     {
-      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=1|AGS Format Rule 16=3|AGS Format Rule 8=1",
       "python": 6,
       "states": 4
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=2|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 6,
+      "states": 14
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=2|AGS Format Rule 16=3|AGS Format Rule 8=1",
+      "python": 7,
+      "states": 2
+    },
+    {
+      "signature": "AGS Format Rule 1=1|AGS Format Rule 10c=3|AGS Format Rule 16=2|AGS Format Rule 8=1",
+      "python": 7,
+      "states": 3
     }
   ]
 }

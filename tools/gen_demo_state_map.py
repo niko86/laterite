@@ -346,7 +346,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
             # The `arbitrary-text` class covers the four surfaces where free
             # text can change an answer; these are the columns where it cannot,
             # named rather than left as an unexplained gap in the sweep.
-            "inert_columns": manifest.get("inert_columns", []),
+            "inert_columns": manifest["inert_columns"],
         },
         "difference_shapes": [
             {
@@ -571,7 +571,10 @@ def build_python_counts(doc: dict) -> tuple[dict, list[str]]:
             )
             continue
 
-        majority = max(by_total, key=lambda total: len(by_total[total]))
+        # Ties broken on the total, not on dict order: this file is compared
+        # byte for byte by --check, so "whichever the sweep happened to reach
+        # first" would be a diff nobody could explain.
+        majority = max(by_total, key=lambda total: (len(by_total[total]), -total))
         majority_cells = {
             tuple(cell.values())
             for st in by_total[majority]
@@ -587,6 +590,30 @@ def build_python_counts(doc: dict) -> tuple[dict, list[str]]:
                     unresolved.append(st["id"])
                 else:
                     overrides.append({**cell, "python": total})
+        # The browser matches an override against what the delivery CURRENTLY
+        # holds; this matched against the cell a state was REACHED BY. The two
+        # agree only because the enumerator refuses a class value equal to what
+        # the cell already holds, so no override can carry a seed value and
+        # fire on every delivery at once. Stated rather than asserted because
+        # the seed's cell values are not in this map to check against.
+        #
+        # What IS checkable here is the way a RESOLVED collision still goes
+        # wrong. The browser takes the first override that matches, and two
+        # overrides name two different cells — so a delivery holding both is a
+        # state where the page shows whichever happened to be written first,
+        # silently. That delivery is reachable the moment there are two: the
+        # sweep is exhaustive to depth 1 and both cells are one edit each.
+        # One override has no such state, which is why the collision that
+        # exists today is safe and a second one would not be.
+        if len(overrides) > 1:
+            unresolved.append(
+                "the resolution needs "
+                + " and ".join(
+                    f"{o['group']}.{o['heading']} row {o['row']}" for o in overrides
+                )
+                + ", and a delivery can hold both at once — the page would "
+                "show whichever was written first"
+            )
         if unresolved:
             problems.append(
                 f"laterite signature {signature!r} has python-ags4 answers "
@@ -695,8 +722,8 @@ def main() -> int:
     print(
         f"gen_demo_state_map: {len(counts['signatures'])} laterite signature(s) "
         f"carry a python-ags4 total, {resolved} of them resolving a collision "
-        f"by cell; {len(inert)} column(s) where arbitrary text is inert and was "
-        "not enumerated"
+        f"by cell; {len(inert)} column(s) where arbitrary ASCII text is inert "
+        "and was not enumerated (they are still swept for Rule 1)"
     )
 
     rendered = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"

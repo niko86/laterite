@@ -170,3 +170,26 @@ def test_the_signature_is_what_the_demo_can_see(gen):
     )
     assert visible == "AGS Format Rule 1=1|AGS Format Rule 8=2"
     assert dropped == ["FYI (Related to Rule 16)"]
+
+
+def test_a_collision_needing_two_overrides_stops_the_run(gen, committed):
+    """A resolved collision can still be wrong. The browser takes the first
+    override that MATCHES, and two overrides name two different cells — so a
+    delivery holding both shows whichever was written first, silently. That
+    delivery is one edit away from each of them, so it is reachable the moment
+    there are two. The collision that exists today needs exactly one override,
+    which is why it is safe."""
+    doc = json.loads(json.dumps(committed))
+    victim = next(
+        st
+        for st in doc["states"]
+        if st["lever"] == "setCell" and "value" in st["reached_by"]
+    )
+    for n in range(2):
+        twin = json.loads(json.dumps(victim))
+        twin["id"] = f"invented-two-overrides-{n}"
+        twin["reached_by"] = {**victim["reached_by"], "heading": f"MADE_UP_{n}"}
+        twin["python_rule_counts"] = {"AGS Format Rule 99": 99}
+        doc["states"].append(twin)
+    _, problems = gen.build_python_counts(doc)
+    assert any("hold both at once" in p for p in problems), problems

@@ -203,7 +203,12 @@ describe("pythonFindingCount", () => {
     // disagrees rather than the first one the loop reached.
     const wrong: string[] = [];
     for (const state of map.states) {
+      // Built from the NON-FYI keys, the same subset the generator keys on:
+      // the map measures both engines with every tier on and the demo shows
+      // one fewer. Rebuilding it from every key would agree only while nothing
+      // raises an FYI, which is the coincidence this whole gate exists over.
       const signature = Object.keys(state.rust_rule_counts)
+        .filter((rule) => !rule.startsWith("FYI"))
         .sort()
         .map((rule) => `${rule}=${state.rust_rule_counts[rule]}`)
         .join("|");
