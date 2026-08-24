@@ -271,6 +271,9 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
 
     // Line number -> what happens to it. Absent means Keep.
     let mut plan: BTreeMap<u32, Line> = BTreeMap::new();
+    // Group -> the columns to drop from it, resolved against the ORIGINAL
+    // headings and applied right-to-left after every other operation.
+    let mut columns: BTreeMap<String, std::collections::BTreeSet<usize>> = BTreeMap::new();
     // Line number -> rows appended after it.
     let mut inserts: BTreeMap<u32, Vec<Pending>> = BTreeMap::new();
 
@@ -326,7 +329,11 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 // reaches the group's FULL arity, not just the target column —
                 // stopping at the column is what "leaving it ragged" means.
                 let at = col + 1;
-                let want = (g.headings.len() + 1).max(at + 1);
+                // `col` is an index INTO `headings`, so the group's arity is
+                // always the larger bound — there is no separate "at least the
+                // target column" case to defend against. `resize` truncates
+                // when it shrinks, so an over-long row is left alone.
+                let want = g.headings.len() + 1;
                 if fields.len() < want {
                     fields.resize(want, String::new());
                 }
@@ -382,40 +389,56 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 }
             }
             Op::DeleteColumn { heading, group } => {
+                // Resolved here against the ORIGINAL headings, applied below.
+                // Two columns dropped from one group used to shift each
+                // other: the second removal's index was computed against the
+                // headings the first had already shortened, so it took the
+                // wrong field or ran off the end and reported the row as too
+                // short. Collecting them and removing right-to-left is what
+                // makes the pair mean the same thing in either order.
                 let col = g.col(heading).ok_or_else(|| EditError::NoSuchHeading {
                     group: group.clone(),
                     heading: heading.clone(),
                 })?;
-                let at = col + 1;
-                let lines = [g.heading_line, g.unit_line, g.type_line]
-                    .into_iter()
-                    .flatten()
-                    .chain(g.rows.iter().map(|r| r.line));
-                for n in lines {
-                    if matches!(plan.get(&n), Some(Line::Drop)) {
-                        continue; // already gone; a removal outranks a rewrite
-                    }
-                    let mut fields = split_ags_line(&current(&plan, n));
-                    if at >= fields.len() {
-                        // Dropping the column from this row's siblings and not
-                        // from this row is how a ragged row gets made. Refuse
-                        // by name rather than produce one silently.
-                        return Err(EditError::ShortRow {
-                            group: group.clone(),
-                            line: n,
-                            fields: fields.len().saturating_sub(1),
-                            headings: g.headings.len(),
-                        });
-                    }
-                    fields.remove(at);
-                    plan.insert(n, Line::Replace(rebuild(&fields)));
+                columns.entry(group.clone()).or_default().insert(col);
+            }
+        }
+    }
+
+    // Right-to-left, so an earlier removal cannot move a later one's index.
+    for (code, cols) in &columns {
+        let g = &parsed.groups[code];
+        let lines: Vec<u32> = [g.heading_line, g.unit_line, g.type_line]
+            .into_iter()
+            .flatten()
+            .chain(g.rows.iter().map(|r| r.line))
+            .collect();
+        for col in cols.iter().rev() {
+            let at = col + 1;
+            for n in &lines {
+                if matches!(plan.get(n), Some(Line::Drop)) {
+                    continue; // already gone; a removal outranks a rewrite
                 }
-                // Rows this patch has already appended are part of the group
-                // too, and nothing else will come back for them.
-                for pending in inserts.values_mut().flatten() {
-                    if &pending.group == group && at < pending.fields.len() {
-                        pending.fields.remove(at);
-                    }
+                let mut fields = split_ags_line(&current(&plan, *n));
+                if at >= fields.len() {
+                    // Dropping the column from this row's siblings and not
+                    // from this row is how a ragged row gets made. Refuse by
+                    // name rather than produce one silently.
+                    return Err(EditError::ShortRow {
+                        group: code.clone(),
+                        line: *n,
+                        fields: fields.len().saturating_sub(1),
+                        headings: g.headings.len(),
+                    });
+                }
+                fields.remove(at);
+                plan.insert(*n, Line::Replace(rebuild(&fields)));
+            }
+            // Rows this patch has already appended are part of the group too,
+            // and nothing else will come back for them.
+            for pending in inserts.values_mut().flatten() {
+                if &pending.group == code && at < pending.fields.len() {
+                    pending.fields.remove(at);
                 }
             }
         }
@@ -1173,5 +1196,88 @@ mod tests {
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_REM"), comma);
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_NATE"), "");
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_ID"), "BH2");
+    }
+
+    /// Deleting the LAST group in a file: there is no separator line after it,
+    /// so the lookahead must not read past the end. A mutation sweep found
+    /// this — every deletion test until now removed a group with another one
+    /// behind it.
+    #[test]
+    fn deleting_the_last_group_in_the_file_does_not_read_past_the_end() {
+        let out = apply(
+            FILE,
+            &[Op::DeleteGroup {
+                group: "LOCA".into(),
+            }],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert!(!p.groups.contains_key("LOCA"));
+        assert_eq!(p.groups["PROJ"].rows.len(), 1);
+        // The blank separator BEFORE it belonged to PROJ's section and stays;
+        // what must not happen is a panic or a swallowed PROJ row.
+        assert!(out.contains("\"DATA\",\"P1\""), "{out}");
+    }
+
+    /// A row appended to one group while a column is dropped from ANOTHER.
+    /// The pending-row fixup is guarded on the group; without that guard it
+    /// would strip a field from a row that has nothing to do with the column.
+    #[test]
+    fn dropping_a_column_leaves_a_row_added_to_a_different_group_alone() {
+        let out = apply(
+            FILE,
+            &[
+                Op::AddRow {
+                    group: "PROJ".into(),
+                    cells: BTreeMap::from([("PROJ_ID".into(), "P2".into())]),
+                },
+                Op::DeleteColumn {
+                    group: "LOCA".into(),
+                    heading: "LOCA_NATE".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert_eq!(p.groups["PROJ"].headings.len(), 2);
+        assert_eq!(p.groups["PROJ"].rows.len(), 2);
+        assert!(
+            p.groups["PROJ"].rows.iter().all(|r| r.values.len() == 2),
+            "PROJ's appended row must keep PROJ's arity: {:?}",
+            p.groups["PROJ"].rows
+        );
+        assert_eq!(cell(&out, "PROJ", 2, "PROJ_ID"), "P2");
+        assert_eq!(p.groups["LOCA"].headings.len(), 2);
+    }
+
+    /// TWO columns dropped from one group. Each removal shortens the line, so
+    /// the second one's index — computed against the ORIGINAL headings — lands
+    /// somewhere else, or past the end. A mutation sweep pointed at the guard
+    /// that was silently absorbing it.
+    #[test]
+    fn dropping_two_columns_from_one_group_removes_both_whichever_order() {
+        let first = Op::DeleteColumn {
+            group: "LOCA".into(),
+            heading: "LOCA_NATE".into(),
+        };
+        let second = Op::DeleteColumn {
+            group: "LOCA".into(),
+            heading: "LOCA_REM".into(),
+        };
+        for ops in [
+            vec![first.clone(), second.clone()],
+            vec![second.clone(), first.clone()],
+        ] {
+            let out = apply(FILE, &ops).unwrap();
+            let p = laterite_ags4_parse::parse_str(&out).unwrap();
+            let g = &p.groups["LOCA"];
+            assert_eq!(g.headings, ["LOCA_ID"], "both columns must go: {out}");
+            assert!(
+                g.rows.iter().all(|r| r.values.len() == 1),
+                "no row may be left ragged: {:?}",
+                g.rows
+            );
+            assert_eq!(cell(&out, "LOCA", 1, "LOCA_ID"), "BH1");
+        }
     }
 }

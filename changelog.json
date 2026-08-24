@@ -64,6 +64,9 @@
     "removed": [],
     "fixed": [
       {
+        "text": "**Dropping two columns from one group with `forge edit` now removes both.** Each removal shortened the line the other was indexing into, so the second one took the wrong field or ran off the end — which surfaced as a spurious \"row too short\" refusal or, for a row the same patch had appended, a silently ragged row. Which of the two happened depended on the order the flags were written in. Columns are now resolved against the original headings and removed right-to-left, so the pair means the same thing either way. Found by a `cargo mutants` sweep: the surviving mutant was on the bounds guard that was absorbing the fault (#655)."
+      },
+      {
         "text": "**The minimizer no longer tears a value that contains a comma.** Its field pass split a DATA line on `,` with no quote awareness, so shrinking a value like `\"north, then east\"` dropped ` then east\"` — cutting the value in half and leaving the quote unterminated, at the SAME field count, so no arity rule noticed. When the input already violated Rule 5 the tear added no new finding either, so the signature held and the shrink was accepted: the reproducer that came out was not a smaller version of its input but a differently-broken file. It now reduces through the same tokenizer-backed layer as `forge edit` (#655)."
       },
       {
