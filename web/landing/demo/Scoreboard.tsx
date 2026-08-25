@@ -102,11 +102,34 @@ export const Scoreboard: Component = () => {
   );
 };
 
-/** The floating mount: visible while any of the demo's tables is on screen,
- *  so the verdict follows the reader through the sections that can change
- *  it. IntersectionObserver over the table-bearing sections rather than a
- *  scroll listener — the browser already knows what is on screen. */
-export const FloatingScoreboard: Component = () => {
+/** The masthead mount: visible while any of the demo's tables is on screen,
+ *  so the verdict follows the reader through the sections that can change it.
+ *  IntersectionObserver over the table-bearing sections rather than a scroll
+ *  listener — the browser already knows what is on screen.
+ *
+ *  DOCKED, not floating (#691). It was `fixed right-4 bottom-4`, which put a
+ *  clickable overlay on top of whatever the page had in its bottom-right
+ *  corner — and the demo's tables reach that corner at every width except the
+ *  one where the content column stops short of it. Measured by walking the
+ *  page and hit-testing under the chip: at 1280 it covered a fix button, at
+ *  1024 a cell editor, at 390 three different controls at three scroll
+ *  positions. Only 1440 was clean, and only by accident of gutter width.
+ *
+ *  The e2e suite could not catch it, and still cannot: Playwright scrolls a
+ *  target into view before clicking, which lands it away from a viewport-fixed
+ *  chip. A reader clicking where the button already is gets the chip.
+ *
+ *  In the masthead it overlaps nothing, keeps its door to the findings panel,
+ *  and still follows the reader, because the masthead is sticky. It is hidden
+ *  below the same breakpoint the text nav uses: the mobile masthead is full —
+ *  measured at 6 free pixels against a chip that needs eighty-odd — and the
+ *  phone already renders findings under each table, so the verdict is not the
+ *  only feedback there. */
+/** True while any table-bearing section is on screen. Shared by both mounts
+ *  (#691), so the two can never disagree about when the verdict is live —
+ *  IntersectionObserver over the sections rather than a scroll listener,
+ *  because the browser already knows what is on screen. */
+const useTablesOnScreen = () => {
   const [onScreen, setOnScreen] = createSignal(false);
   onMount(() => {
     // Derived from sections.ts, the page's one copy of the sequence: the
@@ -127,9 +150,43 @@ export const FloatingScoreboard: Component = () => {
       io.disconnect();
     });
   });
+  return onScreen;
+};
+
+export const DockedScoreboard: Component = () => {
+  const onScreen = useTablesOnScreen();
   return (
     <Show when={onScreen()}>
-      <div data-scoreboard="floating" class="fixed right-4 bottom-4 z-30">
+      <div data-scoreboard="verdict" class="hidden min-[52rem]:block">
+        <Scoreboard />
+      </div>
+    </Show>
+  );
+};
+
+/** The phone mount (#691). Below the breakpoint the masthead is full — measured
+ *  at single-figure free pixels against a chip that needs eighty-odd — so the
+ *  chip stays the corner float it has always been there, and stays in the page
+ *  body, where its tab order matches where it draws. Mounting one chip in the
+ *  header and letting it render as a corner float traded an overlap defect for
+ *  a focus-order one, which is how this shape was arrived at.
+ *
+ *  #531 recorded the 390 touch reader as this chip's audience, so hiding it
+ *  there instead was not this ticket's call. The overlap is therefore FIXED
+ *  above the breakpoint and KNOWN below it, and the landing lane pins that
+ *  state rather than skipping it — whoever solves the phone case is told by a
+ *  red test that this comment is out of date.
+ *
+ *  Same `data-scoreboard` hook as the docked mount: callers want "the verdict
+ *  the reader can see", never "the desktop one". Exactly one is ever visible. */
+export const FloatingScoreboard: Component = () => {
+  const onScreen = useTablesOnScreen();
+  return (
+    <Show when={onScreen()}>
+      <div
+        data-scoreboard="verdict"
+        class="fixed right-4 bottom-4 z-30 min-[52rem]:hidden"
+      >
         <Scoreboard />
       </div>
     </Show>
