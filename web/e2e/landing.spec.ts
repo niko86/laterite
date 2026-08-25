@@ -3574,3 +3574,64 @@ test("fine: the demo says so where the sweep never looked (#673)", async ({
     "the findings header must not grow when the number becomes a sentence",
   ).toBe(seedHeight);
 });
+
+// #679: the deck's page dots were a 10px tap target in a 6px gap, which fails
+// 2.5.8 twice over — the target is under 24 and, being undersized, it does not
+// reach the spacing exception either.
+//
+// MEASURED, not named. The obvious assertion is that the utility class changed,
+// and that is the one thing worth not asserting: the requirement is about a box
+// in CSS pixels, so a rename of the utility must not be able to satisfy it and a
+// re-tune of the design must not be able to quietly shrink it. Everything below
+// comes off boundingBox().
+test("a page dot is a small mark with a full-size target", async ({ page }) => {
+  test.skip(width(page) >= 608, "the deck is a grid at this width — no dots");
+  await page.goto("/");
+
+  const install = page.locator("#install");
+  const dots = install.getByRole("button", { name: /Go to card/ });
+  await expect(dots).toHaveCount(INSTALL_CHANNELS.length);
+
+  const boxes = [];
+  for (let i = 0; i < INSTALL_CHANNELS.length; i++) {
+    const box = await dots.nth(i).boundingBox();
+    expect(box, `dot ${i + 1} must be laid out`).not.toBeNull();
+    boxes.push(box!);
+  }
+
+  // The target itself.
+  for (const [i, box] of boxes.entries()) {
+    expect(box.width, `dot ${i + 1} target width`).toBeGreaterThanOrEqual(24);
+    expect(box.height, `dot ${i + 1} target height`).toBeGreaterThanOrEqual(24);
+  }
+
+  // ...and no two of them fight over the same pixels. A 24-wide box that
+  // overlaps its neighbour only satisfies a checker measuring elements one at a
+  // time: the covered strip belongs to whichever paints last, so the dot
+  // underneath is back under the minimum for the half a reader aims at.
+  for (let i = 1; i < boxes.length; i++) {
+    const left = boxes[i - 1];
+    const right = boxes[i];
+    expect(
+      right.x,
+      `dot ${i + 1} must start where dot ${i} ends, not inside it`,
+    ).toBeGreaterThanOrEqual(left.x + left.width - 0.5);
+  }
+
+  // The MARK stays small — this is a hit-area fix, not a visual one. The dot is
+  // whatever the button paints inside itself, found by structure rather than by
+  // class so the check survives a restyle.
+  const mark = dots.first().locator("> *");
+  await expect(mark).toHaveCount(1);
+  const markBox = await mark.boundingBox();
+  expect(markBox!.width, "the visible dot must not have grown").toBeLessThan(
+    16,
+  );
+  expect(markBox!.height, "the visible dot must not have grown").toBeLessThan(
+    16,
+  );
+
+  // And it is still a door.
+  await dots.nth(2).click();
+  await expect(dots.nth(2)).toHaveAttribute("aria-current", "true");
+});

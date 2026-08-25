@@ -200,22 +200,39 @@ export function Carousel<T>(props: {
               </span>
             }
           >
-            <span class="flex items-center gap-1.5">
+            {/* A small MARK inside a full-size TARGET (#679). The dot used to
+                be the button, at 10px in a 6px gap, which misses 2.5.8 twice:
+                the target is under 24, and being undersized it does not reach
+                the spacing exception either.
+
+                The mark keeps its diameter and the button grows around it. That
+                necessarily widens the ROW — 24px targets that do not overlap put
+                the dots 24px apart on centre, where they were 16px — and the
+                extra air is the visible cost of the fix. Overlapping the targets
+                instead would hold the old spacing and satisfy a checker that
+                measures elements one at a time, while the covered strip went to
+                whichever painted last; the dot underneath would be back under
+                the minimum for the half a reader aims at, with nothing red. */}
+            <span class="flex items-center">
               <Index each={props.items}>
                 {(_, i) => (
                   <button
                     type="button"
                     aria-label={`Go to ${props.noun} ${i + 1}`}
                     aria-current={i === at() || undefined}
-                    class="size-2.5 rounded-full border border-line"
-                    classList={{
-                      "bg-accent": i === at(),
-                      "bg-transparent": i !== at(),
-                    }}
+                    class="flex size-6 items-center justify-center"
                     onClick={() => {
                       jumpTo(i);
                     }}
-                  />
+                  >
+                    <span
+                      class="size-2.5 rounded-full border border-line"
+                      classList={{
+                        "bg-accent": i === at(),
+                        "bg-transparent": i !== at(),
+                      }}
+                    />
+                  </button>
                 )}
               </Index>
             </span>
