@@ -120,10 +120,9 @@ pub struct GenArgs {
     /// the seed only controls reproducibility (same seed → same bytes).
     #[arg(long, default_value_t = 0)]
     pub seed: u64,
-    /// Single-rule violation to inject into the clean base:
-    /// `none|rule10a|rule10c|rule8|rule5|rule19|rule13`. Repeatable
-    /// (one single-fault candidate each).
-    #[arg(long = "inject")]
+    /// Single-rule violation to inject into the clean base. One
+    /// single-fault candidate each.
+    #[arg(long = "inject", long_help = crate::ops::Injection::inject_help())]
     pub inject: Vec<String>,
     /// Combined multi-fault candidate: a comma-separated list of inject
     /// tokens applied to ONE base (e.g. `rule10a,rule8,rule5`). Repeatable
@@ -159,8 +158,8 @@ pub struct RunArgs {
     #[arg(long, default_value = "loca-samp")]
     pub scaffold: String,
     /// Injector pool (repeatable). Empty → the built-in blind-spot
-    /// backlog (Rule 10a/10c/8/5/19/13).
-    #[arg(long = "inject")]
+    /// backlog.
+    #[arg(long = "inject", long_help = crate::ops::Injection::inject_help())]
     pub inject: Vec<String>,
     #[arg(long, default_value_t = 200)]
     pub max_generations: u64,
@@ -290,8 +289,10 @@ pub struct ScaleArgs {
 
 #[derive(Args)]
 pub struct EditArgs {
-    /// The .ags file to edit.
-    pub file: PathBuf,
+    /// The .ags file to edit. Required by every mode except
+    /// `--patch-template`, which prints the patch shape and reads no file.
+    #[arg(required_unless_present = "patch_template")]
+    pub file: Option<PathBuf>,
     /// `GROUP:ROW:HEADING=VALUE`. ROW counts the file's ORIGINAL data rows,
     /// 1-indexed, so a patch reads the way it was written however much it
     /// changes. Repeatable.

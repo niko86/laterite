@@ -185,6 +185,32 @@ impl Injection {
         }
     }
 
+    /// The `--inject` token list, rendered for `--help` from `ALL` itself.
+    ///
+    /// A hand-maintained list in a doc comment is what produced #709: the help
+    /// advertised seven tokens where the binary accepted ten, and a caller who
+    /// trusted it never learned the other four existed. Deriving it here means
+    /// the two cannot drift — adding a variant to `ALL` updates the help.
+    ///
+    /// Aliases and scaffold-qualified forms (`rule10a:dup-samp-key`) also parse
+    /// and are named rather than enumerated: the qualified suffix is open-ended,
+    /// so `catalog` stays the exhaustive source and the help says so.
+    pub fn inject_help() -> &'static str {
+        static HELP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        HELP.get_or_init(|| {
+            let toks: Vec<&str> = std::iter::once("none")
+                .chain(Self::ALL.iter().map(|i| i.token()))
+                .collect();
+            format!(
+                "Rule violation to inject into the clean base: `{}`. \
+                 Each also accepts its alias, and a scaffold-qualified form \
+                 (e.g. `rule10a:dup-samp-key`); `forge catalog` prints the \
+                 authoritative injector→rule map. Repeatable.",
+                toks.join("|"),
+            )
+        })
+    }
+
     /// One-line description of the mutation (for `forge catalog`).
     pub fn description(self) -> &'static str {
         match self {
