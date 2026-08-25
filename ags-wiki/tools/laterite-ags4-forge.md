@@ -32,8 +32,14 @@ sources: []
 > `gen --combine` multi-fault, each landing at a seeded *placement*) or
 > **evolves** toward novel divergences (`run`). It runs every candidate
 > through the in-process Rust validator and (confidence-gated)
-> python-ags4. The search has two axes: **rule** (small, enumerable) and
-> **placement** (large, sampled). `mine` exploits the rule axis — it
+> python-ags4. The search has three axes: **rule** (small, enumerable),
+> **placement** (large, sampled), and **type** — the AGS TYPE a value is
+> declared as. Type behaves like rule rather than placement (small,
+> enumerable), and was collapsed into placement until
+> [[dec-forge-type-axis-instrument]] named it; what a scaffold can actually
+> reach is pinned by `scaffolds_reach_a_pinned_set_of_ags_types` in
+> `repo:rust-packages/laterite-ags4-forge/src/synth/mod.rs`, so it cannot
+> widen unnoticed. `mine` exploits the rule axis — it
 > synthesizes *every* rule-combination across a placement-seed sweep,
 > subtracts the rule-break shapes the python-ags4 fixture corpus already
 > covers, and spends the oracle only on the novel **divergence-prone**

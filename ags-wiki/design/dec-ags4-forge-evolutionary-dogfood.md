@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-05-17
 supersedes: []
 from_gap: [parity-triage-sampling-bias, parity-cascade-unreconcilable]
-related: [parity-triage-sampling-bias, parity-cascade-unreconcilable, laterite-ags4-forge, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model]
+related: [parity-triage-sampling-bias, parity-cascade-unreconcilable, laterite-ags4-forge, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model, dec-forge-audience-boundary, dec-forge-type-axis-instrument]
 sources: []
 ---
 # Evolutionary dual-validation dogfood tool (laterite-ags4-forge)
