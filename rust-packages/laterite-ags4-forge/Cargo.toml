@@ -45,6 +45,8 @@ anyhow = "1"
 chrono = { version = "0.4", features = ["clock"] }
 
 [dev-dependencies]
+# Pins the synthesizer's output bytes (see synth::tests). Test-only.
+sha2 = "0.11"
 tempfile = "3"
 
 [lints]
