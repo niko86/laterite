@@ -58,6 +58,21 @@ pub fn synth(scaffold: Scaffold, seed: u64) -> String {
     emit::emit_to_string(&model::varied_model(scaffold, seed))
 }
 
+/// Lowercase hex, for the byte pins in this module and in `bs5930`.
+///
+/// A `map(format!).collect()` reads better and is what clippy's
+/// `format_collect` exists to stop: it allocates a `String` per byte.
+#[cfg(test)]
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,6 +122,104 @@ mod tests {
             codes.len() > narrow,
             "Wide must exceed LocaSamp's group count"
         );
+    }
+
+    /// The synthesizer's OUTPUT BYTES, pinned.
+    ///
+    /// Nothing pinned them before, and that absence is what makes a silent
+    /// re-roll possible: `describe()` opens with a coarse/fine `rng.below(2)`,
+    /// so adding a vocabulary lane shifts that draw and every draw after it —
+    /// every seed then produces a different file, and nothing fails.
+    ///
+    /// The two tests that look like they would catch it cannot:
+    ///
+    /// * `synth_is_deterministic_per_seed_and_varies_across_seeds` compares one
+    ///   binary against itself. It is trivially true either side of a re-roll.
+    /// * `scaffolds_reach_a_pinned_set_of_ags_types` reads only `TYPE`
+    ///   descriptor rows. A description lands in a `GEOL_DESC` DATA cell, whose
+    ///   declared type is `X` either way, so the pinned set never moves.
+    ///
+    /// What DOES break is comparability: `tools/gen-bench-fixtures.sh`,
+    /// `tools/bench-vs-python-ags4.py` and `tools/bench-cert-parse-share.py`
+    /// all draw fixtures from this engine, so numbers taken either side of an
+    /// unannounced content change stop measuring the same file.
+    ///
+    /// Same ratchet as the type pin: a DELIBERATE re-roll is an edit here that
+    /// a reviewer sees, and regenerating the bench fixtures belongs in the same
+    /// change. An accidental one is a red test.
+    ///
+    /// The length is asserted alongside the hash on purpose — a mismatch in
+    /// both says the content moved, a mismatch in the hash alone would point at
+    /// the encoding rather than the draw.
+    #[test]
+    fn synth_output_bytes_are_pinned() {
+        use sha2::{Digest, Sha256};
+        for (scaffold, seed, sha, len) in [
+            (
+                Scaffold::Minimal,
+                0u64,
+                "a9a314972f1101b80bfb60258d725c039ee6a4208eb09733eaaf805f8290cb4c",
+                717usize,
+            ),
+            (
+                Scaffold::Minimal,
+                1,
+                "db2ebc485e61a606aa106f2ba26ccc02b8abf425142ce4565bdb61fb7044852d",
+                717,
+            ),
+            (
+                Scaffold::Minimal,
+                2,
+                "68b3b576d9377c17826749998046ef16fe47d90676ec8b9bd5100b9b3904b0cd",
+                713,
+            ),
+            (
+                Scaffold::LocaSamp,
+                0,
+                "9ba41962016792aea4e864901c54fbce00958ff8cd476d25a4578433234c7667",
+                3184,
+            ),
+            (
+                Scaffold::LocaSamp,
+                1,
+                "024335aa10eb8e6c6ea9b008c0cef3e2be75a2aba69873d50e04cf20a56e1666",
+                2780,
+            ),
+            (
+                Scaffold::LocaSamp,
+                2,
+                "34a01519060f5c3688da4ff951b1c4a8bd5ad65b47e923b428b4e083719f9368",
+                3054,
+            ),
+            (
+                Scaffold::Wide,
+                0,
+                "6153b01623ca9618f65791f3c452890488a6be249ff1f9c303ecc9a3ec7c2eeb",
+                63913,
+            ),
+            (
+                Scaffold::Wide,
+                1,
+                "0a279fbd0f5ac291da9d659a475bbd3d2fc78c9f677e780040f8c46fe49e8a6c",
+                45106,
+            ),
+            (
+                Scaffold::Wide,
+                2,
+                "a9682a3b4c9ed908c24a0f6392e6b3302fb71cf229f61cd5062797d0e871881d",
+                41347,
+            ),
+        ] {
+            let out = synth(scaffold, seed);
+            let got = hex(&Sha256::digest(out.as_bytes()));
+            assert_eq!(
+                (got.as_str(), out.len()),
+                (sha, len),
+                "{scaffold:?} seed {seed}: the synthesizer's output moved. If that \
+                 was deliberate, update these pins AND regenerate the bench \
+                 fixtures in the same change — the benches draw from here."
+            );
+        }
     }
 
     /// The determinism contract: a seed pins the bytes exactly, and
