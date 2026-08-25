@@ -95,7 +95,7 @@ The external API contract — what a developer gets after `import laterite`
   one call. Pure **base** path (no DuckDB): builds the tree from
   `parse_primitives` + the registry + `parse_value`, porting the
   decoupled `.ags5db` converter's shared-keys linkage (W2, 2026-06-16; the
-  byte-equality parity test moved to `ags5/` with the engine).
+  byte-equality parity test moved out of this tree with the engine).
 - `from laterite import compat as AGS4` — the **python-ags4-compatible
   shim** (`AGS4.AGS4_to_dataframe(...)`, etc.) for legacy callers porting
   off [[python-ags4]]; defaults to pandas frames (needs `[compat]`).

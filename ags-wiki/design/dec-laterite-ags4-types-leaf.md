@@ -23,7 +23,7 @@ browser wasm bundle.
 
 The browser **data explorer** (see [[validator-site]] Phase 2) must cast
 an AGS4 file's cells to typed columns *exactly* as the native `.ags5db`
-conversion does (`ags5/rust-packages/laterite-ags5-db/src/convert.rs` casts off the
+conversion does (`laterite-ags5-db`'s converter — dormant, not in this tree — casts off the
 file's TYPE row via the same functions) — otherwise the in-browser table
 and a real `.ags5db` would disagree on types/values. That casting logic
 *is* `ags_types`. So the explorer needs it without `laterite-ags4-core`'s

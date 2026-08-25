@@ -114,10 +114,10 @@ accelerators** — the byte-index, the `.ags.idx` sidecar, the parse cache, and
   edit is the documented blind spot (a content-hash key is the upgrade path).
 - **Spin-offs / follow-ons** (recorded, not built here):
   - **Lift the pure DDL generators** (`table_ddl` / `index_ddl` / `view_ddl`,
-    `ags5/rust-packages/laterite-ags5-db/src/ddl.rs`) into core so the writer and
+    in `laterite-ags5-db`, not in this tree) into core so the writer and
     the extension single-source them, rather than the extension re-emitting CTAS.
   - **Writer-keychain → stateless `.ags5db` merge.** The writer still mints random
-    UUID7 (`ags5/rust-packages/laterite-ags5-db/src/convert.rs`,
+    UUID7 (`laterite-ags5-db`'s converter, not in this tree;
     exp-uuid7-surrogate-keys); adopting the already-in-core deterministic
     keychain would let separately-written `.ags5db` files merge by `UNION` /
     `ON CONFLICT` instead of reconciliation. This is the [[dec-duckdb-extension]]

@@ -107,5 +107,5 @@ not by a repo boundary — which keeps that concern orthogonal to this decision.
 [[crate-map]] · [[dec-rust-drives-python|Rust ships, Python is a library]] ·
 [[pyo3-boundary]] · [[dec-python-imports-rust-library|laterite: scoped Python→Rust exception]] ·
 [[dec-laterite-ags4-types-leaf|laterite-ags4-types wasm-safe leaf]] ·
-AGS5 decoupled to ags5/ ·
+AGS5 decoupled out of this tree ·
 [[design/_README|AGS5 design register]]
