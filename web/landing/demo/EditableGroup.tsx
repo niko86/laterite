@@ -199,11 +199,17 @@ export const EditableGroup: Component<{
               </Show>
             </Button>
             {/* The toolbar button, danger-repainted (#593) — the ghost's
-                transparent border made this verb read as a caption. */}
+                transparent border made this verb read as a caption.
+                aria-label leads with the visible "delete group" text
+                (WCAG 2.5.3, label in name): a speech-input user names what
+                they see, and the group code — the only thing telling this
+                button apart from its identical siblings in the other
+                tables — comes after it rather than swallowing it mid
+                sentence the way "Delete the PROJ group" did. */}
             <Button
               variant="default"
               tone="danger"
-              aria-label={`Delete the ${props.code} group`}
+              aria-label={`delete group for ${props.code}`}
               onClick={() => {
                 deleteGroup(props.code);
               }}

@@ -117,7 +117,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
         with five note lengths still read as one row of doors. */}
     <p class="mt-auto pt-3 text-caption">
       <a
-        class="font-semibold text-cta no-underline transition-colors hover:underline"
+        class="font-semibold text-accent no-underline transition-colors hover:underline"
         href={props.channel.docs}
       >
         Get started
@@ -148,14 +148,14 @@ export const InstallGrid: Component = () => (
         diverge. The engine also packs deliveries for sending, zstd compressed
         and optionally passphrase encrypted:{" "}
         <a
-          class="font-semibold text-cta no-underline transition-colors hover:underline"
+          class="font-semibold text-accent underline underline-offset-2 decoration-1 transition-colors hover:decoration-2"
           href="https://docs.laterite.dev/cookbook/transport/"
         >
           Pack / encrypt for transport
         </a>
         .{" "}
         <a
-          class="font-semibold text-cta no-underline transition-colors hover:underline"
+          class="font-semibold text-accent underline underline-offset-2 decoration-1 transition-colors hover:decoration-2"
           href="https://docs.laterite.dev/learn/install/"
         >
           Full install guide

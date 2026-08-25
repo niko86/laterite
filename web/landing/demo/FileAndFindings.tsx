@@ -491,7 +491,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           <p class="mt-3 text-caption text-fg-muted">
             Want to run this on your own delivery?{" "}
             <a
-              class="font-semibold text-cta no-underline transition-colors hover:underline"
+              class="font-semibold text-accent underline underline-offset-2 decoration-1 transition-colors hover:decoration-2"
               href="https://app.laterite.dev/"
             >
               Open the webapp

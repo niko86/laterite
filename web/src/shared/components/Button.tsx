@@ -48,11 +48,20 @@ const SHAPES: Record<ButtonVariant, string> = {
 
 const COLORS: Record<ButtonVariant, string> = {
   default: "border-line bg-surface text-fg hover:bg-chip",
-  primary:
-    "border-cta bg-cta text-fg-on-cta hover:bg-cta-hover hover:border-cta-hover",
-  // Tinted wash, rust text.
+  // The border does NOT follow the fill on hover (#682). It is what carries the
+  // control's edge against the page (1.4.11), and the hover band is dark enough
+  // that in the dark theme it sinks into the canvas — under the boundary floor
+  // contrast.test.ts holds, where the resting band clears it. So the fill
+  // darkens for feedback and the border stays put, holding the edge.
+  primary: "border-cta bg-cta text-fg-on-cta hover:bg-cta-hover",
+  // Rust tint, rust edge, MAROON label (#682). The wash and the border stay
+  // rust because #406 is right that an action which runs should sit in a rust
+  // tint. The label is the one part that is text, and rust cannot carry text at
+  // this size: on its own wash it lands nearer the boundary floor than the text
+  // one. Maroon clears the text bar with room, and it is the same call
+  // `outline` below already made, for the same reason.
   action:
-    "border-cta bg-cta-quiet text-cta hover:text-cta-hover hover:border-cta-hover",
+    "border-cta bg-cta-quiet text-accent hover:text-accent-hover hover:bg-cta-quiet",
   add: "border-line-strong bg-surface text-accent hover:text-accent-hover hover:border-accent",
   // Muted until hover.
   ghost: "bg-transparent text-fg-muted hover:text-fg",

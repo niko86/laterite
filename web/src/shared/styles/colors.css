@@ -107,9 +107,29 @@
   /* ── Acts: every button and CTA ──
      Rust on near-white. The pair is a token rather than two utility classes
      because the text colour is not free: mid-ramp bands fail contrast against
-     both white and black, so a CTA that picks its own foreground picks wrong. */
-  --cta: var(--laterite-500);
-  --cta-hover: var(--laterite-600);
+     both white and black, so a CTA that picks its own foreground picks wrong.
+
+     #682 raised the fill to the AA TEXT bar, off the 1.4.11 component floor
+     it had been held to. What made that possible was not a better rust: no
+     lightening of `--fg-on-cta` reaches the bar, since it is already all but
+     white, so the FILL had to darken — and darkening it made rust-as-TEXT
+     worse, which is why the lower floor existed. Retiring rust as a text
+     colour removed that second constraint; contrast.test.ts carries the bar.
+
+     `--cta` IS NOT A RAMP STEP, and cannot be. The obvious move was one band
+     down, to `--laterite-600`: it clears every contrast bar and then collides
+     with `--warn` under simulated colour-blindness, under the floor
+     separation.test.ts holds — an action and a warning the same colour for
+     exactly the readers that gate exists for. Sweeping the whole 8-bit space
+     against every gate at once returns plenty of colours that pass and NOT ONE
+     ramp step among them, so this is a literal. It is also chosen for margin
+     rather than nearness: the passing colour closest to the old rust clears the
+     text bar in its fourth decimal place, which is a pass that the next edit to
+     a neighbouring token silently spends. Re-run that sweep before moving this,
+     and BOTH gates after — separation.test.ts also pins `--chart-1` equal to
+     it. */
+  --cta: #b05647;
+  --cta-hover: var(--laterite-700);
   --fg-on-cta: var(--stone-50);
   /* The tinted wash under a "runs something" control (#406). The design system
      put that variant on `--accent-quiet`, but its `--accent` was brick and ours
@@ -211,14 +231,17 @@
   --accent-quiet: #3a2620;
 
   /* The rust CTA does NOT change. It is the one object that is the same colour
-     in both themes, which is what makes it read as the action everywhere. That
-     has to be said in VALUES here, not left to inheritance: the light block
-     writes `--cta: var(--laterite-500)`, and this block shifts the ramp, so an
-     un-redeclared CTA silently rides it to burnt orange — the exact drift this
-     comment used to deny was happening (#403). Steps down the SHIFTED ramp, so
-     the resolved pair is identical to light's rust/vermilion. */
-  --cta: var(--laterite-600);
-  --cta-hover: var(--laterite-700);
+     in both themes, which is what makes it read as the action everywhere.
+
+     Since #682 that is stated rather than arranged: the same literal is written
+     in both blocks, so the two are equal BY CONSTRUCTION. It used to hold
+     because each block named a ramp step and the dark ramp was offset by
+     exactly one — a property nothing checked, and which had already failed once
+     when an un-redeclared CTA rode the shifted ramp to burnt orange (#403).
+     The hover pair still steps the ramp, and still resolves identically across
+     the two blocks; it is only the resting value that had to leave. */
+  --cta: #b05647;
+  --cta-hover: var(--laterite-800);
   /* The wash under a "runs something" control dials down like every other
      quiet: the light block's pale pink is the one wash #400 missed, and it
      glowed on near-black (#403). Same family as the neighbouring quiets,

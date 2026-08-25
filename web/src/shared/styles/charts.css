@@ -52,7 +52,7 @@
 :root {
   /* Slots 1-3 are theme-stable: the same value reads on both surfaces, so the
      dark block below only has to restate the two that move. */
-  --chart-1: #ce5640; /* rust — equal to --cta by assertion, not by reference */
+  --chart-1: #b05647; /* rust — equal to --cta by assertion, not by reference */
   --chart-2: #0a6f95; /* cyan */
   --chart-3: #7370dc; /* indigo */
   --chart-4: #278a42; /* green */
