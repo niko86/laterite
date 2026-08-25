@@ -653,12 +653,59 @@ pub fn catalog(ctx: Ctx) -> Result<i32> {
 /// `forge describe` — preview the BS 5930 soil-description engine (the
 /// realistic `GEOL_DESC` source). Pure generation; always exit 0.
 pub fn describe(args: &crate::cli::DescribeArgs, ctx: Ctx) -> Result<i32> {
+    use crate::synth::bs5930::{Lanes, PrincipalClass};
     use laterite_ags4_parity::Rng;
-    let vocab = crate::synth::bs5930::Vocab::load();
-    let descriptions = (0..args.count)
-        .map(|i| {
-            let seed = args.seed.wrapping_add(i);
-            let d = crate::synth::bs5930::describe(&vocab, &mut Rng::seeded(seed));
+    // The memoized vocabulary, not a fresh `Vocab::load()` — the JSON parses
+    // once per process, and a large `--count` paid it per call.
+    let vocab = crate::synth::bs5930::vocab();
+
+    let wants_peat = args
+        .principal
+        .iter()
+        .any(|p| p.eq_ignore_ascii_case("PEAT"))
+        || args.lane.iter().any(|l| l.eq_ignore_ascii_case("peat"));
+    // Asking for peat and not getting it would be the surprising outcome, so a
+    // peat selector implies the flag rather than silently returning nothing.
+    let lanes = if args.organic || wants_peat {
+        Lanes::ALL
+    } else {
+        Lanes::STANDARD
+    };
+
+    let matches = |d: &crate::synth::bs5930::SoilDescription| -> bool {
+        let principal_ok = args.principal.is_empty()
+            || args
+                .principal
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case(d.principal));
+        let lane_ok = args.lane.is_empty()
+            || args.lane.iter().any(|l| {
+                let l = l.to_ascii_lowercase();
+                match d.principal_class {
+                    PrincipalClass::Coarse => l == "coarse",
+                    PrincipalClass::Fine => l == "fine",
+                    PrincipalClass::Peat => l == "peat",
+                }
+            });
+        principal_ok && lane_ok
+    };
+
+    // A selector filters the pool rather than steering the draw, so `--seed N`
+    // still means what it meant and every row reports the seed that produced
+    // it. Drawing continues past a non-match to fill `--count`, with a ceiling
+    // so an impossible selection ends rather than spins: `--principal PEAT`
+    // without the lane reachable would otherwise never fill.
+    let ceiling = args.count.saturating_mul(200).max(10_000);
+    let mut descriptions = Vec::new();
+    let mut drawn = 0u64;
+    while (descriptions.len() as u64) < args.count && drawn < ceiling {
+        let seed = args.seed.wrapping_add(drawn);
+        drawn += 1;
+        let d = crate::synth::bs5930::describe_with(vocab, &mut Rng::seeded(seed), lanes);
+        if !matches(&d) {
+            continue;
+        }
+        descriptions.push({
             let fractions = d
                 .secondaries
                 .iter()
@@ -683,8 +730,16 @@ pub fn describe(args: &crate::cli::DescribeArgs, ctx: Ctx) -> Result<i32> {
                 text: d.text,
                 fractions,
             }
-        })
-        .collect::<Vec<_>>();
+        });
+    }
+    let selecting = !args.principal.is_empty() || !args.lane.is_empty();
+    if selecting && descriptions.is_empty() {
+        eprintln!(
+            "describe: no description matched that selection in {drawn} draws \
+             (principal={:?}, lane={:?})",
+            args.principal, args.lane
+        );
+    }
     let report = DescribeReport {
         schema: 1,
         count: descriptions.len(),

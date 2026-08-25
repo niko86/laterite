@@ -94,6 +94,17 @@ Commits us to:
   being comparable across the change. #698 asked for this discipline for its
   own request; #697 inherits it. Turning the lane on by default is a deliberate
   re-roll with the fixtures regenerated in the same change.
+- **A re-roll reaches further than our own fixtures.** The downstream consumer
+  commits output drawn from this engine, so the same shift that de-bases our
+  benches invalidates *their* checked-in files, on their schedule and in their
+  repo where nothing here can see it. Flipping the default is therefore a
+  notify-and-re-baseline change, not a regenerate-ours-and-ship change — the
+  bullet above is the smaller half of the obligation. #697 closed the silent
+  part of this: `the_unflagged_draw_is_pinned_to_pre_lane_bytes` pins the
+  default draw of `forge describe` to bytes captured before the lane existed,
+  so a re-roll now has to be argued past a red test instead of landing green.
+  That is a tripwire on the sequence, not the missing interface gate named
+  above; it says the draw moved, never that a consumer was told.
 
 Rules out:
 

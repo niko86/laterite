@@ -35,6 +35,11 @@ const PARTICLE_SIZES_JSON: &str = include_str!("../../data/bs5930/particle-sizes
 /// "reddish" must never precede these.
 const ACHROMATIC_HUES: &[&str] = &["white", "grey", "black", "cream"];
 
+/// The hues a peat actually takes — clause 33.4.6 describes it as "usually dark
+/// brown or black". Constraining the draw to these is exposing the existing
+/// palette under a constraint, not authoring new vocabulary.
+const PEAT_HUES: &[&str] = &["brown", "black", "grey"];
+
 /// A `terms.json` entry — only the fields the generator reads (serde
 /// ignores the rest).
 #[derive(Deserialize)]
@@ -55,6 +60,25 @@ struct Terms {
     relative_density: Vec<Term>,
     colour: Vec<Term>,
     angularity: Vec<Term>,
+    // The organic/peat lane's vocabularies. Already vendored — the v1 scope
+    // note staged the terms and left the lane unbuilt, so nothing here is
+    // newly authored.
+    #[serde(default, rename = "peatTypes")]
+    peat_types: Vec<Term>,
+    #[serde(default, rename = "peatCondition")]
+    peat_condition: Vec<Term>,
+    #[serde(default, rename = "secondaryOrganic")]
+    secondary_organic: Vec<OrganicTerm>,
+}
+
+/// A `secondaryOrganic` entry — Table 20 pairs each amount with the colour
+/// that typically accompanies it, and the pairing is the point: "Very organic"
+/// reads wrong against a pale hue.
+#[derive(Deserialize)]
+struct OrganicTerm {
+    term: String,
+    #[serde(rename = "typicalColour")]
+    typical_colour: String,
 }
 
 #[derive(Deserialize)]
@@ -88,6 +112,14 @@ pub struct Vocab {
     angularity: Vec<String>,
     /// SAND/GRAVEL size sub-bands (fine/medium/coarse).
     grading: Vec<String>,
+    /// Table 21 peat condition (Firm/Spongy/Plastic) — the leading word for a
+    /// peat, standing where consistency or density stands in the other lanes.
+    peat_condition: Vec<String>,
+    /// Clause 33.4.6 peat types (PEAT, Fibrous PEAT, …). The fibre descriptor
+    /// is part of the term, not a separate qualifier.
+    peat_types: Vec<String>,
+    /// Table 20 organic amounts, each with its typical colour.
+    secondary_organic: Vec<(String, String)>,
 }
 
 impl Vocab {
@@ -123,6 +155,13 @@ impl Vocab {
                 .find(|f| f.name == "SAND")
                 .map(|f| f.subdivisions.iter().map(|s| s.name.clone()).collect())
                 .unwrap_or_default(),
+            peat_condition: t.peat_condition.iter().map(|x| x.text.clone()).collect(),
+            peat_types: t.peat_types.iter().map(|x| x.text.clone()).collect(),
+            secondary_organic: t
+                .secondary_organic
+                .iter()
+                .map(|x| (x.term.clone(), x.typical_colour.clone()))
+                .collect(),
         }
     }
 }
@@ -134,6 +173,39 @@ pub enum PrincipalClass {
     Coarse,
     /// SILT / CLAY — leading term is consistency.
     Fine,
+    /// PEAT — leading term is the Table 21 condition, and the fibre descriptor
+    /// rides on the principal itself ("Pseudo-fibrous PEAT"), so this lane does
+    /// not share the other two's word order. Clause 33.4.6.
+    Peat,
+}
+
+/// Which description lanes `describe_with` may draw from.
+///
+/// **`STANDARD` is not merely the default — it is a byte-compatibility
+/// contract.** The organic lane needs a third branch where the engine has a
+/// coarse/fine coin flip, and changing that draw shifts every draw after it,
+/// so every seed would yield a different file. Nothing would fail:
+/// `synth_is_deterministic_per_seed_and_varies_across_seeds` compares one
+/// binary against itself and `scaffolds_reach_a_pinned_set_of_ags_types` reads
+/// only TYPE rows, while a description lands in a `GEOL_DESC` cell typed `X`
+/// either way. What would break is comparability — `gen-bench-fixtures.sh` and
+/// the two bench scripts draw their fixtures from this engine.
+///
+/// So `STANDARD` runs the ORIGINAL two-way branch, not a three-way branch with
+/// one arm disabled. `synth_output_bytes_are_pinned` is what holds that, and it
+/// was verified to redden against a simulated extra draw.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Lanes {
+    /// Draw organic soils and peat as well as the natural inorganic lanes.
+    pub organic: bool,
+}
+
+impl Lanes {
+    /// The v1 lanes: natural inorganic coarse and fine. Draws exactly as the
+    /// engine drew before the organic lane existed.
+    pub const STANDARD: Lanes = Lanes { organic: false };
+    /// Every lane, including organic soils and peat.
+    pub const ALL: Lanes = Lanes { organic: true };
 }
 
 /// One secondary constituent, with the field-estimate percentage it was
@@ -179,6 +251,11 @@ impl Secondary {
 #[derive(Debug, Clone)]
 pub struct SoilDescription {
     pub text: String,
+    /// The leading term — a consistency, a relative density, or a peat
+    /// condition. Carried rather than recovered from `text`, because it is one
+    /// word in "Firm" and two in "Very dense", and a lane that rebuilt the
+    /// sentence by splitting on the first space silently dropped half of it.
+    pub lead: String,
     pub principal: &'static str,
     pub principal_class: PrincipalClass,
     /// Coarse secondaries first, then any fine secondary (file order).
@@ -295,7 +372,7 @@ fn describe_coarse(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
 
     let density = rng.choose(&vocab.density).clone();
     let col = colour(vocab, rng);
-    let mut words = vec![density, col];
+    let mut words = vec![density.clone(), col];
     // Coarse-then-fine order is already the push order above.
     for s in &secondaries {
         words.push(s.adjective());
@@ -310,6 +387,7 @@ fn describe_coarse(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
 
     SoilDescription {
         text,
+        lead: density,
         principal,
         principal_class: PrincipalClass::Coarse,
         secondaries,
@@ -364,7 +442,7 @@ fn describe_fine(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
 
     let consistency = rng.choose(&vocab.consistency).clone();
     let col = colour(vocab, rng);
-    let mut words = vec![consistency, col];
+    let mut words = vec![consistency.clone(), col];
     for s in &secondaries {
         words.push(s.adjective());
     }
@@ -374,6 +452,7 @@ fn describe_fine(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
 
     SoilDescription {
         text,
+        lead: consistency,
         principal,
         principal_class: PrincipalClass::Fine,
         secondaries,
@@ -411,18 +490,282 @@ pub fn vocab() -> &'static Vocab {
     V.get_or_init(Vocab::load)
 }
 
-/// Generate one constraint-valid BS 5930 soil description for `rng`.
-pub fn describe(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
-    if rng.below(2) == 0 {
+/// An organic soil: a fine or coarse principal carrying a Table 20 organic
+/// amount in the qualifier slot, e.g. `Very soft dark grey slightly sandy
+/// organic CLAY.`
+///
+/// The amount is drawn WITH its typical colour rather than against the general
+/// palette — Table 20 pairs them, and "Very organic" against a pale hue reads
+/// wrong to anyone who logs soil. That pairing is the whole reason the vendored
+/// data carries `typicalColour` alongside the term.
+fn describe_organic(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
+    let mut d = if rng.below(2) == 0 {
         describe_coarse(vocab, rng)
     } else {
         describe_fine(vocab, rng)
+    };
+
+    let (amount, colour) = rng.choose(&vocab.secondary_organic).clone();
+    // Rebuild rather than patch the string: the organic qualifier sits
+    // immediately before the principal, and the colour Table 20 pairs with the
+    // amount replaces the drawn one, so the word order stays the standard one.
+    let mut words = vec![d.lead.clone(), colour.to_lowercase()];
+    for s in &d.secondaries {
+        words.push(s.adjective());
+    }
+    words.push(amount.to_lowercase());
+    words.push(d.principal.to_string());
+    d.text = words.join(" ");
+    d.text.push('.');
+    d
+}
+
+/// A peat: `Firm dark brown pseudo-fibrous PEAT.`
+///
+/// Its own lane rather than a principal in the fine one — the leading word is
+/// the Table 21 condition, not a consistency, and the fibre descriptor is part
+/// of the clause-33.4.6 term rather than a separate qualifier. Peat takes no
+/// secondaries here.
+///
+/// The von Post humification scale is deliberately absent: the vendored data
+/// carries `vonPost` as an EMPTY list with a note recording that BS 5930
+/// Section 6 does not print it and only references it as an external scheme.
+/// Inventing those terms would be authoring vocabulary rather than exposing it.
+fn describe_peat(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
+    let condition = rng.choose(&vocab.peat_condition).clone();
+    // The hues clause 33.4.6 names, drawn from the same vocabulary the other
+    // lanes use rather than a new one — "usually dark brown or black".
+    let peat_hues: Vec<String> = vocab
+        .hue
+        .iter()
+        .filter(|h| PEAT_HUES.contains(&h.as_str()))
+        .cloned()
+        .collect();
+    let hue = rng.choose(&peat_hues).clone();
+    let col = if rng.below(2) == 0 {
+        format!("dark {hue}")
+    } else {
+        hue
+    };
+    let kind = rng.choose(&vocab.peat_types).clone();
+    // "Fibrous PEAT" carries its own principal; bare "PEAT" needs none.
+    let mut text = format!("{condition} {col} {}", kind.to_lowercase());
+    // Restore the principal's capitalisation — it is PEAT in every term.
+    text = text.replace("peat", "PEAT");
+    text.push('.');
+
+    SoilDescription {
+        text,
+        lead: condition,
+        principal: "PEAT",
+        principal_class: PrincipalClass::Peat,
+        secondaries: Vec::new(),
+    }
+}
+
+/// Generate one constraint-valid BS 5930 soil description for `rng`, using the
+/// v1 lanes only. Byte-compatible with every seed drawn before the organic
+/// lane existed — see [`Lanes`].
+pub fn describe(vocab: &Vocab, rng: &mut Rng) -> SoilDescription {
+    describe_with(vocab, rng, Lanes::STANDARD)
+}
+
+/// Generate one description, drawing from `lanes`.
+///
+/// The two-way branch under `STANDARD` is the ORIGINAL code path, not a
+/// three-way branch with an arm disabled — see [`Lanes`] for why that
+/// distinction is the whole contract.
+pub fn describe_with(vocab: &Vocab, rng: &mut Rng, lanes: Lanes) -> SoilDescription {
+    if !lanes.organic {
+        return if rng.below(2) == 0 {
+            describe_coarse(vocab, rng)
+        } else {
+            describe_fine(vocab, rng)
+        };
+    }
+    // Organic ground is a minority of most profiles, so the two natural lanes
+    // keep the bulk of the draw rather than each lane taking a third.
+    match rng.below(4) {
+        0 => describe_coarse(vocab, rng),
+        1 => describe_fine(vocab, rng),
+        2 => describe_organic(vocab, rng),
+        _ => describe_peat(vocab, rng),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two entry points agree: `describe` is `describe_with(STANDARD)`.
+    ///
+    /// This is a routing check, NOT the downstream contract — it compares the
+    /// lane machinery against itself, so a change to the shared branch moves
+    /// both sides together and leaves it green (verified: forcing `STANDARD`
+    /// down the four-way branch reddens the byte pins and not this). What it
+    /// does catch is `describe` being re-pointed at `ALL`. The contract that
+    /// protects downstream consumers is
+    /// `the_unflagged_draw_is_pinned_to_pre_lane_bytes`.
+    #[test]
+    fn standard_lanes_draw_exactly_as_the_bare_entry_point() {
+        let v = Vocab::load();
+        for seed in 0..40u64 {
+            let a = describe(&v, &mut Rng::seeded(seed)).text;
+            let b = describe_with(&v, &mut Rng::seeded(seed), Lanes::STANDARD).text;
+            assert_eq!(a, b, "seed {seed}: STANDARD must be the original path");
+        }
+    }
+
+    /// The **downstream contract**, pinned to bytes captured on `main` before
+    /// the organic lane existed. `standard_lanes_draw_exactly_as_the_bare
+    /// _entry_point` only proves the two entry points agree with each other —
+    /// both would move together if the shared branch moved, and it would stay
+    /// green. These hashes come from the other side of the change, so they are
+    /// the assertion that the draw did not move at all.
+    ///
+    /// The sequence pinned is the one `forge describe --seed S --count N`
+    /// walks: `Rng::seeded(S + i)` for `i` in `0..N`, texts joined by newline.
+    /// That is the surface a downstream consumer reads, so a re-roll that this
+    /// catches is a re-roll that would have invalidated their committed
+    /// fixtures — see `ags-wiki/design/dec-forge-audience-boundary.md`.
+    ///
+    /// Raising these pins is legitimate only alongside deliberately re-rolling
+    /// the default draw, which is a notify-downstream change, never a quiet one.
+    #[test]
+    fn the_unflagged_draw_is_pinned_to_pre_lane_bytes() {
+        use sha2::{Digest, Sha256};
+        let v = Vocab::load();
+        for (seed, count, sha, len) in [
+            (
+                0u64,
+                12u64,
+                "8b84da7f9492c31ffef1778d9cd41fc0140c9874ed93c3496b55ddade3a0ef2b",
+                751usize,
+            ),
+            (
+                1,
+                12,
+                "5f596af9881dc3e748af4869d0d70e1d906f7c69c44410506469285ef3d11e80",
+                748,
+            ),
+            (
+                7,
+                40,
+                "76d886dc66c75bafbad0f7e763d4e492013edc2d44d23b2cfac0b6cdf5b733f7",
+                1946,
+            ),
+        ] {
+            let joined = (0..count)
+                .map(|i| describe(&v, &mut Rng::seeded(seed.wrapping_add(i))).text)
+                .collect::<Vec<_>>()
+                .join("\n");
+            let got = crate::synth::hex(&Sha256::digest(joined.as_bytes()));
+            assert_eq!(
+                (got.as_str(), joined.len()),
+                (sha, len),
+                "seed {seed} count {count}: the DEFAULT description draw moved. \
+                 Downstream consumers commit output from this sequence, so this \
+                 is a re-baseline for them, not just for us."
+            );
+        }
+    }
+
+    /// The lane is opt-in, so the default vocabulary must not reach it. This is
+    /// the assertion #697 exists to keep true — a downstream build that never
+    /// passes the flag must never see organic ground appear.
+    #[test]
+    fn the_organic_lane_is_unreachable_without_the_flag() {
+        let v = Vocab::load();
+        for seed in 0..600u64 {
+            let d = describe(&v, &mut Rng::seeded(seed));
+            assert_ne!(d.principal, "PEAT", "seed {seed}: peat without the flag");
+            assert_ne!(
+                d.principal_class,
+                PrincipalClass::Peat,
+                "seed {seed}: peat class without the flag"
+            );
+            let lower = d.text.to_lowercase();
+            assert!(
+                !lower.contains("organic") && !lower.contains("peat"),
+                "seed {seed}: organic vocabulary without the flag — {}",
+                d.text
+            );
+        }
+    }
+
+    /// …and reachable with it. Both halves the issue asks for: an organic
+    /// modifier on a natural soil, and PEAT as a principal in its own right.
+    #[test]
+    fn the_flag_reaches_both_organic_soils_and_peat() {
+        let v = Vocab::load();
+        let (mut organic, mut peat) = (0u32, 0u32);
+        for seed in 0..600u64 {
+            let d = describe_with(&v, &mut Rng::seeded(seed), Lanes::ALL);
+            if d.principal == "PEAT" {
+                peat += 1;
+                assert_eq!(d.principal_class, PrincipalClass::Peat);
+            } else if d.text.to_lowercase().contains("organic") {
+                organic += 1;
+                assert_ne!(
+                    d.principal_class,
+                    PrincipalClass::Peat,
+                    "an organic modifier rides a natural principal"
+                );
+            }
+        }
+        assert!(organic > 0, "the flag reached no organic soil in 600 draws");
+        assert!(peat > 0, "the flag reached no peat in 600 draws");
+    }
+
+    /// Peat does not share the other lanes' word order: the leading word is a
+    /// Table 21 condition, not a consistency or a density.
+    #[test]
+    fn peat_leads_with_its_own_condition_vocabulary() {
+        let v = Vocab::load();
+        let mut seen = 0u32;
+        for seed in 0..600u64 {
+            let d = describe_with(&v, &mut Rng::seeded(seed), Lanes::ALL);
+            if d.principal != "PEAT" {
+                continue;
+            }
+            seen += 1;
+            let lead = d.text.split(' ').next().unwrap_or_default();
+            assert!(
+                v.peat_condition.iter().any(|c| c == lead),
+                "peat led with {lead:?}, which is not a Table 21 condition: {}",
+                d.text
+            );
+            assert!(
+                d.text.contains("PEAT"),
+                "principal lost its case: {}",
+                d.text
+            );
+            assert!(
+                d.secondaries.is_empty(),
+                "this lane draws no secondaries: {}",
+                d.text
+            );
+        }
+        assert!(seen > 0, "no peat drawn to check");
+    }
+
+    /// The von Post scale stays out. The vendored data records that BS 5930
+    /// Section 6 does not print it, so emitting H1–H10 would be authoring
+    /// vocabulary rather than exposing what was staged.
+    #[test]
+    fn no_von_post_humification_terms_are_invented() {
+        let v = Vocab::load();
+        for seed in 0..600u64 {
+            let d = describe_with(&v, &mut Rng::seeded(seed), Lanes::ALL);
+            for h in 1..=10 {
+                assert!(
+                    !d.text.contains(&format!("H{h}")),
+                    "seed {seed}: von Post term H{h} in {}",
+                    d.text
+                );
+            }
+        }
+    }
 
     fn vocab() -> Vocab {
         Vocab::load()

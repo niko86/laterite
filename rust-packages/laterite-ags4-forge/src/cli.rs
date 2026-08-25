@@ -251,6 +251,25 @@ pub struct DescribeArgs {
     /// Base seed — description `i` uses `seed + i` (same seed → same text).
     #[arg(long, default_value_t = 0)]
     pub seed: u64,
+    /// Draw organic soils and PEAT as well as the natural inorganic lanes.
+    ///
+    /// Opt-in, and deliberately so: the lane needs a third branch where the
+    /// engine has a coarse/fine coin flip, which shifts every draw after it.
+    /// Without this flag the engine draws exactly as it did before the lane
+    /// existed, so a consumer's committed output does not move under them.
+    #[arg(long)]
+    pub organic: bool,
+    /// Keep only descriptions with this principal (`CLAY`, `SILT`, `SAND`,
+    /// `GRAVEL`, `PEAT`). Repeatable. `PEAT` implies `--organic`.
+    ///
+    /// The seed→text mapping is unchanged: this filters the drawn pool rather
+    /// than steering the draw, so `--seed N` still means what it meant.
+    #[arg(long = "principal", value_name = "PRINCIPAL")]
+    pub principal: Vec<String>,
+    /// Keep only descriptions from this lane (`coarse` | `fine` | `peat`).
+    /// Repeatable. `peat` implies `--organic`.
+    #[arg(long = "lane", value_name = "LANE")]
+    pub lane: Vec<String>,
 }
 
 #[derive(Args)]

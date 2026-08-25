@@ -58,6 +58,21 @@ pub fn synth(scaffold: Scaffold, seed: u64) -> String {
     emit::emit_to_string(&model::varied_model(scaffold, seed))
 }
 
+/// Lowercase hex, for the byte pins in this module and in `bs5930`.
+///
+/// A `map(format!).collect()` reads better and is what clippy's
+/// `format_collect` exists to stop: it allocates a `String` per byte.
+#[cfg(test)]
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,10 +124,6 @@ mod tests {
         );
     }
 
-    /// The determinism contract: a seed pins the bytes exactly, and
-    /// different seeds genuinely diverge (the realism is real variety,
-    /// not a constant).
-    #[test]
     /// The synthesizer's OUTPUT BYTES, pinned.
     ///
     /// Nothing pinned them before, and that absence is what makes a silent
@@ -200,10 +211,7 @@ mod tests {
             ),
         ] {
             let out = synth(scaffold, seed);
-            let got: String = Sha256::digest(out.as_bytes())
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect();
+            let got = hex(&Sha256::digest(out.as_bytes()));
             assert_eq!(
                 (got.as_str(), out.len()),
                 (sha, len),
@@ -214,6 +222,9 @@ mod tests {
         }
     }
 
+    /// The determinism contract: a seed pins the bytes exactly, and
+    /// different seeds genuinely diverge (the realism is real variety,
+    /// not a constant).
     #[test]
     fn synth_is_deterministic_per_seed_and_varies_across_seeds() {
         assert_eq!(

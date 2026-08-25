@@ -62,7 +62,14 @@ sources: []
 > deterministic synthesize/inject/evolve/mine/catalog/report muscle and
 > embeds **no LLM**. `describe` previews the **BS 5930** soil-description
 > engine ([[bs5930-soil-descriptions]]) — the constraint-valid `GEOL_DESC`
-> source for realistic strata. The synthesizer has three scaffolds:
+> source for realistic strata. `describe --organic` opens the third
+> (organic/peat) lane; it is off by default because turning it on re-rolls
+> every seed, which re-bases our benches **and** a downstream consumer's
+> committed output ([[dec-forge-audience-boundary]]). `--principal <SOIL>`
+> and `--lane <coarse|fine|peat>` filter the drawn pool rather than steering
+> the draw, so `--seed` keeps its meaning and each row still reports the seed
+> that produced it; asking for peat implies `--organic`, since the alternative
+> is silently returning nothing. The synthesizer has three scaffolds:
 > `minimal` (PROJ/TRAN), `loca-samp` (the LOCA→SAMP→GEOL borehole core),
 > and `wide` — a **dictionary-driven** fill of every *safe* LOCA-child group
 > (breadth) **plus the lab-test depth below SAMP**: the ~30 SAMP-child result

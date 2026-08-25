@@ -54,11 +54,28 @@ tests, so a vocab refresh can't silently break the rules.
 
 ## Scope
 
-v1 covers natural inorganic **coarse** (SAND/GRAVEL) and **fine**
-(SILT/CLAY) soils — the two lanes that share the standard word order. Very
-coarse (BOULDERS/COBBLES), peat/organic and anthropogenic ground use
-different apportionment/word orders and are staged for later (as the source
-skill itself stages them).
+The **default** draw is natural inorganic **coarse** (SAND/GRAVEL) and
+**fine** (SILT/CLAY) — the two lanes that share the standard word order.
+
+**Organic ground is a third lane, opt-in behind `describe --organic`** (#697).
+It covers organic coarse/fine soils (Table 20's *slightly/very organic*
+qualifiers, carried as an ordinary secondary so the standard word order still
+holds) and **PEAT** as a principal in its own right, led by Table 21
+condition rather than consistency or relative density, and typed by clause
+33.4.6 (fibrous / pseudo-fibrous / amorphous). Peat draws from its own hue
+set: the general colour palette is inorganic-plausible and reads wrong on
+peat. The **von Post humification scale is deliberately absent** — the source
+standard does not use it for field description, and inventing a scale reading
+would be a fabricated measurement rather than a generated description.
+
+The lane is opt-in because the draw is a shared random sequence: adding a
+third branch shifts every subsequent draw, so every seed would produce a
+different file. See [[dec-forge-audience-boundary]] for who that breaks and
+what flipping the default would oblige.
+
+Very coarse (BOULDERS/COBBLES) and anthropogenic ground use different
+apportionment/word orders and remain staged for later (as the source skill
+itself stages them).
 
 ## In the synthetic files
 
