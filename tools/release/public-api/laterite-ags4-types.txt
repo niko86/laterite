@@ -54,6 +54,7 @@ pub fn laterite_ags4_types::ags4_str(&serde_json::value::Value, &str) -> alloc::
 pub fn laterite_ags4_types::canonical_type(&str) -> core::option::Option<laterite_ags4_types::CanonicalType>
 pub fn laterite_ags4_types::decimal_places(&str) -> core::option::Option<usize>
 pub fn laterite_ags4_types::display_hint(&str) -> core::option::Option<alloc::string::String>
+pub fn laterite_ags4_types::dt_to_unit_precision(&str, &str) -> core::option::Option<alloc::string::String>
 pub fn laterite_ags4_types::format_ndp(f64, usize) -> alloc::string::String
 pub fn laterite_ags4_types::format_nsci(f64, usize) -> alloc::string::String
 pub fn laterite_ags4_types::format_nsf(f64, usize) -> alloc::string::String
