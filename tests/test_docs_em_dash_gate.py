@@ -355,3 +355,41 @@ def test_the_two_halves_are_not_described_as_one_subsuming_the_other(gate):
             f"{prefix} is excluded wholesale but is a MIX; the reason must say "
             "so, or the printed count reads as 'all generated'"
         )
+
+
+def test_the_cli_exclusion_describes_the_real_file_topology(gate):
+    """Triage of #681 found this reason asserting the guide was "mirrored
+    byte-identical into four packages". It is one authority plus two generated
+    mirrors; the fourth file merely shares a filename and is an unrelated dev
+    tool's readme. The reason prints on every CI run, so a wrong claim there is
+    published on every run."""
+    reason = gate.BUILT_SKIP["reference/cli/"]
+    assert "four packages" not in reason
+    assert "rust-packages/laterite-cli/README-cli.md" in reason, (
+        "name the authority, so a reader knows which of the copies to edit"
+    )
+
+
+def test_an_excluded_page_reports_prose_only_not_its_code(gate, tmp_path):
+    """What the printed count MEANS, pinned because the reason now says it. An
+    excluded page's dashes are counted through the same prose filter as any
+    other page, so a guide that is mostly quoted `--help` output does not have
+    that output inflating the number a reader is asked to judge."""
+    (tmp_path / "reference" / "cli").mkdir(parents=True)
+    (tmp_path / "reference" / "cli" / "index.html").write_text(
+        "<p>real — prose</p><pre>lat: a — b — c</pre>", encoding="utf-8"
+    )
+    (tmp_path / "index.html").write_text("<p>clean</p>", encoding="utf-8")
+    assert gate.check_built(tmp_path, False) == 0
+    # One prose dash, not three: the two inside <pre> are code on this page too.
+    assert "reference/cli/ — 1 occurrence(s)" in _capture(gate, tmp_path)
+
+
+def _capture(gate, site) -> str:
+    import contextlib
+    import io
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        gate.check_built(site, False)
+    return buf.getvalue()
