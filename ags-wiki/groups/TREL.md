@@ -11,9 +11,9 @@ key_headings: [LOCA_ID, SAMP_TOP, SAMP_REF, SAMP_TYPE, SAMP_ID, SPEC_REF, SPEC_D
 required_headings: []
 ags_editions: [4.1]
 repo_refs:
-  dictionary: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=TREL]"
+  absence_test: "repo:rust-packages/laterite-ags4-reference/src/union.rs::dropped_agsl_drafts_are_absent"
 related: [parent-child-graph, key-tuple-pseudo-keys, heading-status-vocabulary, rule-10c-parent-child, TRET]
-sources: []
+sources: [ags-library-xlsx]
 ---
 # TREL — Triaxial Tests - Logged Data
 
@@ -21,11 +21,16 @@ sources: []
 > [!quote] The **TREL** group — Triaxial Tests - Logged Data. It is a **child of [[TRET]]** in the PROJ-rooted hierarchy. See [[parent-child-graph]].
 
 > [!warning] AGS-L draft group — not in the AGS4 4.x spec
-> TREL is part of **AGS-L** (the AGS Library extension, expected publish 2026),
-> scaffolded from `reports/AGSL4_2_*.xlsx`. It is **retained** in the
-> dictionary (never deleted) but is **not** a standard AGS4 4.x group. The
-> AGS-L correction (PR #45) flags its dictionary `contents`
-> `(AGS-L draft, publish 2026)`. See [[ags-4.2]].
+> TREL is part of **AGS-L** (the AGS Library extension, expected publish
+> 2026), hand-authored from the AGS-L draft library workbooks — see
+> [[ags-library-xlsx]]. It is **not** part of the AGS4 4.x standard, so it is
+> **absent from `ags_dictionary.json`**, the union that drives the generated
+> group tier: there is no typed `laterite.groups` class for it and no validator
+> dictionary membership. That absence is asserted, not incidental — see
+> `repo:rust-packages/laterite-ags4-reference/src/union.rs::dropped_agsl_drafts_are_absent`.
+> To carry the group in a file, declare it in the [[effective-dictionary]]
+> (in-file `DICT`, [[rule-18-dict-group]]) or register it dynamically. See
+> [[ags-4.2]].
 
 ## Position in the model
 
@@ -50,7 +55,7 @@ erDiagram
 - See [[parent-child-graph]] · [[key-tuple-pseudo-keys]] · [[heading-status-vocabulary]]
 
 ## Headings
-> [!quote] Rendered from `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=TREL]` (the repo's model authority — AGS edition 4.1). Suggested UNITs + worked examples are in the cited spec PDF, not duplicated here.
+> [!quote] Hand-authored from the AGS-L draft library workbooks (`AGSL4_2_*.xlsx` — not vendored; see [[ags-library-xlsx]]). **Not** rendered from `ags_dictionary.json`, which has no TREL entry. Suggested UNITs + worked examples live in the workbook, not duplicated here.
 
 33 heading(s) — `**KEY**` = pseudo-key tuple, `*REQ*` = REQUIRED (non-null, Rule 10b), OTHER = scope-dependent.
 
