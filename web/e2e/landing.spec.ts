@@ -1256,11 +1256,11 @@ test("fine: a deleted group leaves a restore stub — restore means the seed, un
   // (UNIT/TYPE/ABBR) have no table, so they get no control (#529).
   for (const code of ["PROJ", "LOCA", "SAMP", "LLPL", "TRAN"]) {
     await expect(
-      page.getByRole("button", { name: `Delete the ${code} group` }),
+      page.getByRole("button", { name: `delete group for ${code}` }),
     ).toBeVisible();
   }
   await expect(
-    page.getByRole("button", { name: /Delete the (UNIT|TYPE|ABBR) group/ }),
+    page.getByRole("button", { name: /delete group for (UNIT|TYPE|ABBR)/ }),
   ).toHaveCount(0);
 
   // Edit TRAN_STAT first, so restore-vs-undo semantics become observable:
@@ -1276,7 +1276,7 @@ test("fine: a deleted group leaves a restore stub — restore means the seed, un
   // Delete the group, keyboard-activated (#529's keyboard-only criterion):
   // the stub stands in the table's place and Rule 14 fires live.
   await file
-    .getByRole("button", { name: "Delete the TRAN group" })
+    .getByRole("button", { name: "delete group for TRAN" })
     .press("Enter");
   await expect(file.getByText("TRAN deleted")).toBeVisible();
   await expect(file.locator("table")).toHaveCount(0);
@@ -1319,7 +1319,7 @@ test("fine: a descent group's stub restores from its own button, and Reset clear
   // GroupSection's fallback branch — the TRAN loop above exercises only the
   // cover sheet's. LOCA's table swaps for the stub, in the same section.
   const loca = page.locator("section#loca");
-  await loca.getByRole("button", { name: "Delete the LOCA group" }).click();
+  await loca.getByRole("button", { name: "delete group for LOCA" }).click();
   await expect(loca.getByText("LOCA deleted")).toBeVisible();
   await expect(loca.locator("table")).toHaveCount(0);
   await loca.getByRole("button", { name: "Restore LOCA" }).click();
@@ -1327,7 +1327,7 @@ test("fine: a descent group's stub restores from its own button, and Reset clear
 
   // "Reset the delivery" is the everything-at-once verb: it must clear a
   // deleted-group state exactly like any edit.
-  await loca.getByRole("button", { name: "Delete the LOCA group" }).click();
+  await loca.getByRole("button", { name: "delete group for LOCA" }).click();
   await expect(loca.getByText("LOCA deleted")).toBeVisible();
   await page.getByRole("button", { name: "Reset the delivery" }).click();
   await expect(loca.locator("table")).toHaveCount(1);
@@ -1350,7 +1350,7 @@ test("touch: the delete/restore loop works from a tap, and closes an open carous
   await expect(carousel).toBeVisible();
 
   const file = page.locator("section#file");
-  await file.getByRole("button", { name: "Delete the TRAN group" }).click();
+  await file.getByRole("button", { name: "delete group for TRAN" }).click();
   await expect(carousel).toBeHidden();
   await expect(file.getByText("TRAN deleted")).toBeVisible();
   await expect(
@@ -1883,7 +1883,7 @@ test("no em dash reaches the reader", async ({ page }) => {
   expect(await offenders()).toEqual([]);
 
   await page.locator("section#llpl").scrollIntoViewIfNeeded();
-  await page.getByRole("button", { name: "Delete the LLPL group" }).click();
+  await page.getByRole("button", { name: "delete group for LLPL" }).click();
   await expect(page.getByText("LLPL deleted")).toBeVisible();
   expect(await offenders()).toEqual([]);
 
@@ -2082,7 +2082,7 @@ test("the delete-group control reads as a button, not a caption", async ({
   // repainted by the danger tone — the shared contract in tokens.ts, which
   // the dark spec asserts under its own token set.
   await page.goto("/");
-  await expectErrBorder(page, "Delete the PROJ group");
+  await expectErrBorder(page, "delete group for PROJ");
 });
 
 test("fine: the bad abbreviation lights its cell, and fixing the value clears it", async ({

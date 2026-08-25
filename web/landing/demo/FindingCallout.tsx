@@ -75,7 +75,13 @@ export const FindingCallout: Component<{
           </span>
         </Show>
         <Show when={props.line != null}>
-          <span class="font-mono text-micro opacity-70">line {props.line}</span>
+          {/* No opacity modifier (#682). Faded, this composited under the AA
+              bar against the callout's own wash — and contrast.test.ts cannot
+              see a modifier, since it compares token PAIRS, so the defect sat
+              there with the gate green. Full strength uses the severity/wash
+              pairing that IS gated, and mono at micro already separates the
+              line reference from the rule name beside it. */}
+          <span class="font-mono text-micro">line {props.line}</span>
         </Show>
       </span>
     </Show>

@@ -19,11 +19,30 @@ import { INSTALL_CHANNELS } from "../../../landing/installChannels";
 //   - Two lower floors for fg-faint and fg-dim — hints, taglines, line
 //     numbers: deliberately below body text, floored only so a retune
 //     cannot make them vanish outright.
-//   - The UI-component floor for the rust CTA pair: mid-ramp bands cannot
-//     reach the normal-text bar against either extreme (the reason
-//     --fg-on-cta is a token at all), and the light theme accepted that
-//     trade at #406. The gate catches the failure dark actually shipped
-//     with — a wash the dark pass never dialled down (fixed in #403).
+//   - AA normal-text for the rust CTA pair as of #682. It sat at the
+//     UI-component floor until then, on the reasoning that a mid-ramp band
+//     cannot reach the text bar against either extreme; that stopped being
+//     true once rust was retired as a TEXT colour, which freed the fill to
+//     move down a band. The boundary half of that pair is still 3.0, because
+//     an edge answers to 1.4.11 rather than 1.4.3.
+//
+// ## What this gate cannot see, and where that has bitten
+//
+// It compares resolved TOKEN PAIRS. It has no DOM, no stacking context and no
+// compositing, so:
+//
+//   - **Opacity modifiers are invisible to it.** A `text-cta/70` or an
+//     `opacity-70` renders a colour that is in no token, against a background
+//     it never computes. Both instances #682 found were under the bar while
+//     this file was green — one in the SQL console's keyboard hint, one on the
+//     finding callout's line reference. Neither was a token defect and neither
+//     could have been caught here. Resolving them needs a real browser, which
+//     is what the Lighthouse pass over the built landing is for.
+//   - **It does not know which pairs actually RENDER.** Every assertion below
+//     is a claim that some element sets that foreground on that ground. When a
+//     role is retired the assertion has to go with it, or the gate starts
+//     defending a pairing nothing paints — see the CTA block below, where
+//     `cta-quiet` left the boundary list for exactly that reason.
 
 const read = (file: string): string =>
   readFileSync(resolve(import.meta.dirname, file), "utf8");
@@ -160,10 +179,31 @@ describe.each(Object.entries(themes))("%s theme", (_name, tokens) => {
     }
   });
 
-  it("holds the rust CTA pair to the UI-component floor", () => {
-    expect(ratio(tokens, "fg-on-cta", "cta")).toBeGreaterThanOrEqual(3.0);
-    expect(ratio(tokens, "fg-on-cta", "cta-hover")).toBeGreaterThanOrEqual(3.0);
-    for (const bg of ["canvas", "surface", "cta-quiet"]) {
+  // The rust CTA (#682). This pair sat at the 3.0 UI-component floor because a
+  // mid-ramp band could not reach the normal-text bar against either extreme,
+  // and the light theme accepted that trade at #406. Lighthouse reported it on
+  // every run, correctly: text on a fill is text, and 1.4.3 wants 4.5.
+  //
+  // What broke the deadlock was not a better rust. `--fg-on-cta` had no
+  // headroom left — it is already all but white — so the FILL had to darken,
+  // and darkening it made `cta`-as-TEXT worse, which is why the floor existed.
+  // Retiring `cta` as a text colour (the `action` variant now takes the accent
+  // family, as `outline` already did) removed that second constraint and freed
+  // the fill to darken.
+  //
+  // It did NOT free it onto the ramp. The band below collides with `--warn`
+  // under simulated colour-blindness, which separation.test.ts beside this file
+  // catches and this one cannot — the two gates have to be read together, and a
+  // `--cta` that satisfies only this one is not shippable. So the value is a
+  // literal off the ramp, and the sweep that found it is described where it
+  // lives, in colors.css.
+  it("holds the rust CTA pair to AA now that rust is a fill and not a text", () => {
+    expect(ratio(tokens, "fg-on-cta", "cta")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(tokens, "fg-on-cta", "cta-hover")).toBeGreaterThanOrEqual(4.5);
+    // The fill's own EDGE against the page it sits on is 1.4.11, not 1.4.3 —
+    // a boundary, not a text. `cta-quiet` has left this list because nothing
+    // renders rust against it any more; the wash keeps its own family's text.
+    for (const bg of ["canvas", "surface"]) {
       expect(ratio(tokens, "cta", bg), `cta on ${bg}`).toBeGreaterThanOrEqual(
         3.0,
       );
