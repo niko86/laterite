@@ -17,7 +17,7 @@ sources: []
 
 The toolkit could already turn an AGS4 file into typed tables, but only by
 going *through* a heavy host: the `.ags5db` writer
-(`ags5/rust-packages/laterite-ags5-db/src/convert.rs`) ingests a file into a
+(`laterite-ags5-db`'s converter, dormant and not in this tree) ingests a file into a
 DuckDB database, minting **random UUID7 surrogate keys** + a content-hash
 lookup table to resolve parent links (exp-uuid7-surrogate-keys). That is
 the right shape for a *persisted, merge-able* store, but it is the wrong shape

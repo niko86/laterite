@@ -139,7 +139,7 @@ feeds it as IPC.
   qualifier token for dual (numeric + faithful) access, bidirectional so a numeric edit
   re-emits valid AGS4, opt-in across read/typed-graph/node/wasm — is future work (#178).
 - **Experimental AGS5 is decoupled, not converging here.** The `.ags5db`/`.agsx` surface
-  moved to a dormant `ags5/` holding folder (dec-ags5-decouple, #177) — it no longer
+  moved to a dormant holding folder outside this tree (dec-ags5-decouple, #177) — it no longer
   ships with `laterite`. A future AGS5 strand re-links it against the shared libs and
   would publish it separately; the planner-split convergence idea lives with that strand.
 - **The DuckDB community extension shipped.** `laterite_ags4` (`read_ags()` across CLI /

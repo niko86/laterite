@@ -18,8 +18,8 @@ related: [_registry, vendored-authority-faithful]
 > page. Bootstrap-era filename/citations across ~97 pages read this as
 > `ags5_dictionary.json` (fixed 2026-07-09, A4 unit); this page itself was
 > renamed to match. Not to be confused with the dormant AGS5 concept's own
-> 92-group `ags5_dictionary.json`, a *different* file at
-> `ags5/rust-packages/laterite-ags5-db/data/ags5_dictionary.json`.
+> 92-group `ags5_dictionary.json` — a *different* file, carried with the
+> dormant AGS5 strand and not in this tree.
 
 ## How to cite into it
 See `AGS-WIKI.md §1`. Location: `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`.

@@ -11,9 +11,9 @@ key_headings: [LOCA_ID, SAMP_TOP, SAMP_REF, SAMP_TYPE, SAMP_ID, SPEC_REF, SPEC_D
 required_headings: []
 ags_editions: [4.1]
 repo_refs:
-  dictionary: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=TREL]"
+  absence_test: "repo:rust-packages/laterite-ags4-reference/src/union.rs::dropped_agsl_drafts_are_absent"
 related: [parent-child-graph, key-tuple-pseudo-keys, heading-status-vocabulary, rule-10c-parent-child, TRET]
-sources: []
+sources: [ags-library-xlsx]
 ---
 # TREL — Triaxial Tests - Logged Data
 
@@ -21,11 +21,16 @@ sources: []
 > [!quote] The **TREL** group — Triaxial Tests - Logged Data. It is a **child of [[TRET]]** in the PROJ-rooted hierarchy. See [[parent-child-graph]].
 
 > [!warning] AGS-L draft group — not in the AGS4 4.x spec
-> TREL is part of **AGS-L** (the AGS Library extension, expected publish 2026),
-> scaffolded from `reports/AGSL4_2_*.xlsx`. It is **retained** in the
-> dictionary (never deleted) but is **not** a standard AGS4 4.x group. The
-> AGS-L correction (PR #45) flags its dictionary `contents`
-> `(AGS-L draft, publish 2026)`. See [[ags-4.2]].
+> TREL is part of **AGS-L** (the AGS Library extension, expected publish
+> 2026), hand-authored from the AGS-L draft library workbooks — see
+> [[ags-library-xlsx]]. It is **not** part of the AGS4 4.x standard, so it is
+> **absent from `ags_dictionary.json`**, the union that drives the generated
+> group tier: there is no typed `laterite.groups` class for it and no validator
+> dictionary membership. That absence is asserted, not incidental — see
+> `repo:rust-packages/laterite-ags4-reference/src/union.rs::dropped_agsl_drafts_are_absent`.
+> To carry the group in a file, declare it in the [[effective-dictionary]]
+> (in-file `DICT`, [[rule-18-dict-group]]) or register it dynamically. See
+> [[ags-4.2]].
 
 ## Position in the model
 
@@ -50,7 +55,7 @@ erDiagram
 - See [[parent-child-graph]] · [[key-tuple-pseudo-keys]] · [[heading-status-vocabulary]]
 
 ## Headings
-> [!quote] Rendered from `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=TREL]` (the repo's model authority — AGS edition 4.1). Suggested UNITs + worked examples are in the cited spec PDF, not duplicated here.
+> [!quote] Hand-authored from the AGS-L draft library workbooks (`AGSL4_2_*.xlsx` — not vendored; see [[ags-library-xlsx]]). **Not** rendered from `ags_dictionary.json`, which has no TREL entry. Suggested UNITs + worked examples live in the workbook, not duplicated here.
 
 33 heading(s) — `**KEY**` = pseudo-key tuple, `*REQ*` = REQUIRED (non-null, Rule 10b), OTHER = scope-dependent.
 
@@ -96,7 +101,7 @@ Full cross-edition heading deltas: AGS Change Log (see [[ags4-rules-frozen-dicti
 KEY tuple: `LOCA_ID`, `SAMP_TOP`, `SAMP_REF`, `SAMP_TYPE`, `SAMP_ID`, `SPEC_REF`, `SPEC_DPTH`, `TRET_TESN`, `TREL_MNUM`. No child groups. As a child it **denormalises** its parent's KEY columns into every row; [[rule-10c-parent-child]] re-resolves that repeated tuple upward to [[TRET]]. See [[key-tuple-pseudo-keys]] · [[denormalised-child-rows]].
 
 ## Variations
-No group-level change at 4.2 (present across the in-scope editions). Granular per-heading edition deltas live in the AGS online **Change Log** — the spec's own cited delta source (`spec:AGS4-4.2-2025.pdf` Foreword → ags.org.uk/.../change-log). Heading-level archaeology is deferred to a targeted Ingest if a rule/O-N interaction needs it (per [[ags4-rules-frozen-dictionary-evolves]]).
+**Edition variation does not apply.** The AGS4 editions do not carry this group at all, so there is no per-edition delta to record and the AGS4 Change Log has nothing to say about it — the headings above track the AGS-L draft, which publishes on its own timetable (see [[ags-library-xlsx]] · [[ags-4.2]]). What the shipped rules do here is unchanged by that: they are frozen across editions ([[ags4-rules-frozen-dictionary-evolves]]), and a group outside the dictionary is reached through the [[effective-dictionary]], not through an edition.
 
 ## Related
 [[parent-child-graph]] · [[key-tuple-pseudo-keys]] · [[heading-status-vocabulary]] · [[rule-10c-parent-child]] · [[TRET]]

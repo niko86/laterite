@@ -67,7 +67,7 @@ Rust binary as its execution engine.
 
 > [!todo] **Known gaps — roadmap follow-ups (not in the cleanup pass)**
 > 1. `ags4-to-db --append` is declared but Phase E v1 always writes a
->    fresh dst (`ags5/rust-packages/laterite-ags5-db/src/commands/ags4_to_db.rs:18`).
+>    fresh dst (`laterite-ags5-db`'s `ags4_to_db` command, not in this tree).
 >    Highest priority — Rust is now the only distribution.
 > 2. Stale comment at `…ags4_to_db.rs:19` claims passthrough errors
 >    out; it is in fact implemented (`build_passthrough_descriptors`,
@@ -97,13 +97,13 @@ Rust binary as its execution engine.
 >    F2c-6, and the standalone-install probe this bullet named
 >    (`test_ags5_db_standalone_install_runs_lazy_imports`) was retired
 >    with them — its docstring now records that explicitly. The test
->    file moved to `ags5/tests/test_packaging.py` (dev satellite) with the
+>    file moved out of this tree with the
 >    rest of the dormant AGS5 strand (#177, 2026-06-21) and
 >    today asserts only `test_workspace_packages_declare_their_sibling_imports`
->    — a package-agnostic static check that every `ags5/packages/*`
+>    — a package-agnostic static check that every AGS5-strand package's
 >    sibling import is declared as a dep, unrelated to any shipped-binary
->    or `uv tool install` contract. AGS5 is a dormant concept under
->    `ags5/`, not a shipped package.
+>    or `uv tool install` contract. AGS5 is a dormant concept, not a
+>    shipped package.
 
 ## Related
 laterite-ags5-db · [[build-rust]] · [[design/_README\|AGS5 register]] ·
@@ -113,4 +113,4 @@ Stage F1: msgspec kernel retirement path ·
 [[dec-laterite-ags4-types-leaf|laterite-ags4-types wasm-safe leaf crate]] ·
 [[dec-monorepo-structure|one repo, many artifacts — stay monorepo]] ·
 [[dec-duckdb-extension|laterite-duckdb: AGS4 read surface for the DuckDB host]] ·
-#177: AGS5 decoupled into the dormant ags5/ strand
+#177: AGS5 decoupled into the dormant AGS5 strand

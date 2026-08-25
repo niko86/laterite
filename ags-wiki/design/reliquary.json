@@ -35,7 +35,7 @@
       "axis": "code",
       "status": "removed",
       "removed_in": "misc-deadcode PR",
-      "evidence": "AGS5 DT-precision writer; 0 shipped callers (only ags5/)"
+      "evidence": "AGS5 DT-precision writer; 0 shipped callers (AGS5 strand only)"
     },
     {
       "symbol": "`LineTerminator::as_bytes()`",
@@ -171,7 +171,7 @@
       "axis": "code",
       "status": "removed",
       "removed_in": "ags5-relics PR",
-      "evidence": "`PreVersion65`/`UnknownGroup`/`Predicate`/`UnsupportedFeature`/`Sql`/`Validation` — 0 shipped construction (ags5/ only); `CliError` now `FileNotFound`+`Schema`"
+      "evidence": "`PreVersion65`/`UnknownGroup`/`Predicate`/`UnsupportedFeature`/`Sql`/`Validation` — 0 shipped construction (AGS5 strand only); `CliError` now `FileNotFound`+`Schema`"
     },
     {
       "symbol": "`Registry::extended_with()`",
@@ -179,7 +179,7 @@
       "axis": "code",
       "status": "removed",
       "removed_in": "ags5-relics PR",
-      "evidence": "passthrough-registration; 0 shipped callers (2 in ags5/)"
+      "evidence": "passthrough-registration; 0 shipped callers (2 in the AGS5 strand)"
     },
     {
       "symbol": "`heading_storage_index()`",
@@ -187,7 +187,7 @@
       "axis": "code",
       "status": "removed",
       "removed_in": "ags5-relics PR",
-      "evidence": "ags5 parent-overlap-dedup helper; 0 shipped callers (2 in ags5/)"
+      "evidence": "ags5 parent-overlap-dedup helper; 0 shipped callers (2 in the AGS5 strand)"
     },
     {
       "symbol": "`parse.rs` `pub use` block (6 dead names)",

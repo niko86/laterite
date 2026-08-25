@@ -114,7 +114,7 @@ per group** — no per-cell JS objects, no `TRY_CAST` in the browser.
   and `arrow_ipc(code)` (one typed Arrow IPC stream, built lazily).
 - Casting goes through `laterite-ags4-types::{canonical_type, parse_value,
   parse_datetime}` off the file's TYPE row, exactly as
-  `ags5/rust-packages/laterite-ags5-db/src/convert.rs` does.
+  `laterite-ags5-db`'s converter does (dormant, not in this tree).
 - Arrow mapping: [[DT]] → `Timestamp(µs)` (tz-naive; full datetime,
   date-only → midnight, blank → null), [[0DP]] → `Int64`,
   `2DP/RL/nSF/nSCI` → `Float64`, [[YN]] → `Boolean`, `ID/X/PA/…` →
@@ -230,8 +230,11 @@ In review (open PRs, the "fixes + tests first" sweep before the next features):
   CI `unit` job.
 - **#44** — Rust pad-short-row hardening (trailing-comma + malformed-quote) +
   the cp1252/UTF-8 encoding round-trip tests.
-- **#45** — dictionary: correct the TRIL `(AGS 4.2)` mislabel + flag
-  CONL/TREL/TRIL as **AGS-L** draft, with an auto-sync of the web copy.
+- **#45** — dictionary: relabel the AGS-L draft groups (CONL/TREL/TRIL) and
+  auto-sync the web copy. Note for anyone chasing this: the dictionary it
+  corrected is not this repo's — `ags_dictionary.json` has no entry for any
+  of the three, by design ([[CONL]] · [[TREL]] · [[TRIL]]). The numbering in
+  this section is not this repo's either; see the tracker.
 
 ## Coordinate v2 — OSTN15 sub-metre + GeoJSON
 
