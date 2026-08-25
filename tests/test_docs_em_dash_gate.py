@@ -297,7 +297,7 @@ def test_an_excluded_family_is_counted_and_reported_not_passed_over(
 
 
 def test_a_page_outside_the_excluded_families_still_fails(gate, tmp_path):
-    """The negative control for the test above: the exclusions must be the three
+    """The negative control for the test above: the exclusions must be the two
     named prefixes, not a rule that quietly swallows the whole reference tree."""
     (tmp_path / "reference" / "groups" / "LOCA").mkdir(parents=True)
     (tmp_path / "reference" / "groups" / "LOCA" / "index.html").write_text(
@@ -312,10 +312,10 @@ def test_every_exclusion_carries_a_reason_and_a_blind_spot_is_named(gate):
     assert set(gate.BUILT_SKIP) == {
         "reference/api/",
         "reference/modules/",
-        "reference/cli/",
     }
     assert all(len(r) > 40 for r in gate.BUILT_SKIP.values())
-    assert any("gen_cli.py" in s for s in gate.BUILT_BLIND_SPOTS)
+    assert gate.BUILT_BLIND_SPOTS, "a gate that drops input says what it dropped"
+    assert all(len(s) > 40 for s in gate.BUILT_BLIND_SPOTS)
 
 
 def test_the_meta_description_is_found_when_the_theme_leaves_it_unquoted(gate):
@@ -326,19 +326,34 @@ def test_the_meta_description_is_found_when_the_theme_leaves_it_unquoted(gate):
     assert len(excerpts) == 1
 
 
-def test_the_cli_exclusion_does_not_claim_the_issue_granted_it(gate):
-    """#588 enumerates its carve-outs exhaustively (stylesheets, scripts, and the
-    shipped package's docstrings) and never mentions the CLI guide, so excluding
-    it is a call made in this tool. Citing the issue for it would be a false
-    claim about the issue, and it would read as "criterion met" when what is
-    true is "criterion knowingly unmet on one page"."""
-    reason = gate.BUILT_SKIP["reference/cli/"]
-    assert "NOT BY #588" in reason
-    assert "#681" in reason, (
-        "an unmet criterion has to point somewhere a reader can go; #681 is "
-        "where the shipped guide's punctuation gets decided, and if that is "
-        "settled this whole entry should be gone rather than reworded vaguely"
+def test_the_shipped_cli_guide_is_gated_rather_than_excused(gate, tmp_path):
+    """#681 decided the policy covers what a shipped program prints, so the page
+    that IS `lat --readme` is read like any other.
+
+    The predecessor of this test pinned that the exclusion's reason cited #681,
+    on the reasoning that an unmet criterion has to point somewhere a reader can
+    go. That is now settled, so this asserts the settlement functionally rather
+    than asserting the absence of a string: a dash in that page's prose has to
+    make the gate RED. An exclusion re-added by path would pass a
+    `"reference/cli/" not in BUILT_SKIP` check for exactly as long as someone
+    spelled the prefix differently."""
+    assert "reference/cli/" not in gate.BUILT_SKIP
+    (tmp_path / "reference" / "cli").mkdir(parents=True)
+    (tmp_path / "reference" / "cli" / "index.html").write_text(
+        "<p>Errors decide the verdict — the table answers something else</p>",
+        encoding="utf-8",
     )
+    assert gate.check_built(tmp_path, False) == 1
+
+
+def test_the_gen_cli_note_is_no_longer_a_declared_blind_spot(gate):
+    """The note web/docs-site/scripts/gen_cli.py writes above the shipped guide
+    is OURS, and it has no `.md` for the source half to read — so while the page
+    was excluded by path, nothing held it at all. Gating the page holds the
+    note, and the tuple must stop saying otherwise: a blind spot that has been
+    closed is worse than one that was never listed, because it is a live claim
+    that something is unchecked when it is."""
+    assert not any("gen_cli.py" in s for s in gate.BUILT_BLIND_SPOTS)
 
 
 def test_the_two_halves_are_not_described_as_one_subsuming_the_other(gate):
@@ -357,17 +372,18 @@ def test_the_two_halves_are_not_described_as_one_subsuming_the_other(gate):
         )
 
 
-def test_the_cli_exclusion_describes_the_real_file_topology(gate):
-    """Triage of #681 found this reason asserting the guide was "mirrored
-    byte-identical into four packages". It is one authority plus two generated
-    mirrors; the fourth file merely shares a filename and is an unrelated dev
-    tool's readme. The reason prints on every CI run, so a wrong claim there is
-    published on every run."""
-    reason = gate.BUILT_SKIP["reference/cli/"]
-    assert "four packages" not in reason
-    assert "rust-packages/laterite-cli/README-cli.md" in reason, (
-        "name the authority, so a reader knows which of the copies to edit"
-    )
+def test_every_reason_names_where_the_excluded_prose_actually_lives(gate):
+    """Triage of #681 found a reason asserting a file topology this repo does not
+    have. Reasons print on every CI run, pass or fail, so a wrong one is
+    published on every run — and the specific failure was a reader being sent to
+    the wrong file to edit. The CLI entry that carried it is gone (the page is
+    gated now), and this generalises what it was worth to the two that remain:
+    each has to name the source its prose comes from."""
+    for prefix, reason in gate.BUILT_SKIP.items():
+        assert "docs/reference/" in reason, (
+            f"{prefix} must name the `.md` whose prose the source half reads, "
+            "so a reader knows which file to edit"
+        )
 
 
 def test_an_excluded_page_reports_prose_only_not_its_code(gate, tmp_path):
@@ -375,14 +391,14 @@ def test_an_excluded_page_reports_prose_only_not_its_code(gate, tmp_path):
     excluded page's dashes are counted through the same prose filter as any
     other page, so a guide that is mostly quoted `--help` output does not have
     that output inflating the number a reader is asked to judge."""
-    (tmp_path / "reference" / "cli").mkdir(parents=True)
-    (tmp_path / "reference" / "cli" / "index.html").write_text(
+    (tmp_path / "reference" / "api").mkdir(parents=True)
+    (tmp_path / "reference" / "api" / "index.html").write_text(
         "<p>real — prose</p><pre>lat: a — b — c</pre>", encoding="utf-8"
     )
     (tmp_path / "index.html").write_text("<p>clean</p>", encoding="utf-8")
     assert gate.check_built(tmp_path, False) == 0
     # One prose dash, not three: the two inside <pre> are code on this page too.
-    assert "reference/cli/ — 1 occurrence(s)" in _capture(gate, tmp_path)
+    assert "reference/api/ — 1 occurrence(s)" in _capture(gate, tmp_path)
 
 
 def _capture(gate, site) -> str:
