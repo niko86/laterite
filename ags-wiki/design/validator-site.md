@@ -23,6 +23,17 @@ between work sessions (see cli-cloud-workflow).
 > "done" only when the stated verification actually ran. When you advance
 > a phase, update the table, the verification notes, and `log.md`.
 
+> [!warning] The delivery-history PR numbers below are not this repo's
+> Every `#N` naming a **delivered PR** on this page — the Phase 1–3 series and
+> the follow-up lists — belongs to the **private dev repo** that issued it.
+> This page predates the repo flip. GitHub autolinks a bare `#N` to *this*
+> repo, where those numbers have since been allocated to unrelated work, so
+> following one lands you somewhere real and wrong — the worst failure
+> direction available (#458, which *is* one of ours). They are left as
+> written: they are the accurate record of the work in the repo that did it,
+> there is nothing here for them to point at, and at least one resolves in
+> neither repo. Read them as labels, not links.
+
 ## Phases
 
 | Phase | What | Status |

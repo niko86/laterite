@@ -137,4 +137,4 @@ doesn't use them (it checks each heading's own declared unit/type).
 
 ## Related
 
-[[crate-map]] · [[repo-layout]] · dec-registry-driven-generation · [[effective-dictionary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-ags4-core]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite]] · dec-ags5-decouple · [[data-single-source-audit]] · [[cert-trust-v2]] · [[vendored-authority-faithful]] · [[dec-custom-dict-overlay]]
+[[crate-map]] · [[repo-layout]] · dec-registry-driven-generation · [[effective-dictionary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-ags4-core]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[vendored-authority-faithful]] · [[dec-custom-dict-overlay]]

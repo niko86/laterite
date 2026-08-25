@@ -9,7 +9,7 @@ is_high_volume: true
 varies_between_editions: false
 key_headings: [LOCA_ID, SAMP_TOP, SAMP_REF, SAMP_TYPE, SAMP_ID, SPEC_REF, SPEC_DPTH, CONL_MNUM]
 required_headings: []
-ags_editions: [4.1]
+ags_editions: []
 repo_refs:
   absence_test: "repo:rust-packages/laterite-ags4-reference/src/union.rs::dropped_agsl_drafts_are_absent"
 related: [parent-child-graph, key-tuple-pseudo-keys, heading-status-vocabulary, rule-10c-parent-child, SAMP]

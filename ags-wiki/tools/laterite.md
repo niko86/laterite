@@ -32,7 +32,7 @@ reader/writer/validator — a fast, drop-in replacement for python-ags4 with
 born-typed polars/pandas reads and a lean polars+duckdb base install"*. It is
 the primary external-developer surface of this toolkit and the wheel most
 callers want; the `.ags5db`/AGS5 work was decoupled to a dormant holding
-folder (laterite-ags5, dec-ags5-decouple).
+folder (laterite-ags5).
 
 It exists to **replace [[python-ags4]]**: a faster validator/parser with a
 clean-room engine (so it ships MIT, not LGPL), returning born-typed polars
@@ -75,7 +75,7 @@ entirely.
 > 0.10.0 artifacts on PyPI, not from a local build, so it is what a user actually
 > downloads. The previous figure here said ~10 MB, which overstated it by ~50%.
 > The DuckDB-bundling
-> `.ags5db` companion was decoupled (dec-ags5-decouple) and is no longer
+> `.ags5db` companion was decoupled and is no longer
 > published; `[ags5]` is gone.
 
 Requires Python ≥ 3.12 (`requires-python` in `repo:packages/laterite/pyproject.toml`) — one abi3-py312 wheel per platform, green on 3.12/3.13/3.14.

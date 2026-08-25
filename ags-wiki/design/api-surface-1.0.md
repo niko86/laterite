@@ -36,7 +36,7 @@ sources:
 > a fuller bidirectional XN treatment is future work ([[#Still open / future]]). (c) The
 > dictionary is now the multi-edition **union** (`ags_dictionary.json`, 4.0.3 → 4.2). (d)
 > The experimental AGS5 (`.ags5db`/`.agsx`) surface is **decoupled** from the shipped
-> package — the `[ags5]` extra is gone — see dec-ags5-decouple. (e) The release now
+> package — the `[ags5]` extra is gone. (e) The release now
 > publishes a **source distribution** alongside the wheels.
 
 > **UPDATED 2026-07-20** — `compat.AGS4_to_dataframe`'s common path moved off
@@ -111,7 +111,7 @@ feeds it as IPC.
   proves both isolated shapes (`ci.yml` wheel-smoke: `tools/compat_smoke.py` for
   `[compat]`, `tools/compat_pyarrow_smoke.py` for `[compat,pyarrow]`).
 - **No `[ags5]` extra.** The experimental `.ags5db` companion was decoupled from the
-  shipped package (dec-ags5-decouple, #177); `laterite` is AGS4-only.
+  shipped package (#177); `laterite` is AGS4-only.
 
 ## Key decisions (and why)
 
@@ -139,7 +139,7 @@ feeds it as IPC.
   qualifier token for dual (numeric + faithful) access, bidirectional so a numeric edit
   re-emits valid AGS4, opt-in across read/typed-graph/node/wasm — is future work (#178).
 - **Experimental AGS5 is decoupled, not converging here.** The `.ags5db`/`.agsx` surface
-  moved to a dormant holding folder outside this tree (dec-ags5-decouple, #177) — it no longer
+  moved to a dormant holding folder outside this tree (#177) — it no longer
   ships with `laterite`. A future AGS5 strand re-links it against the shared libs and
   would publish it separately; the planner-split convergence idea lives with that strand.
 - **The DuckDB community extension shipped.** `laterite_ags4` (`read_ags()` across CLI /

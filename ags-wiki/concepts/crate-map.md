@@ -23,7 +23,7 @@ extension** that ships outside the wheel entirely (the
 The experimental AGS5 (`.ags5db` / `.agsx`) crates and wheels —
 `laterite-ags5-db` (the `lat-db` CLI), `laterite-py-ags5`, and the
 `laterite-ags5` / `laterite-ags5x` Python packages — were **decoupled and are no
-longer in this repo** (dec-ags5-decouple, 2026-06-21): preserved intact
+longer in this repo** (2026-06-21): preserved intact
 elsewhere, out of the Cargo workspace and the shipped product, for a future
 AGS5 strand to re-link against the shared libs (`laterite-ags4-types` /
 `laterite-ags4-core` / `laterite-ags4-validator`). A clean side-effect: the
@@ -50,7 +50,7 @@ CLI, a PyO3 cdylib, and a wasm bundle alike — see
 Five questions a cold session re-derives from source unless this map
 exists: **why twenty-five crates** (the engine/CLI/QA/bindings/leaf split);
 **why AGS5 is decoupled** (the shipped product is AGS4-only; `.ags5db`/`.agsx`
-sit dormant outside this repo — dec-ags5-decouple); **the wasm path**
+sit dormant outside this repo); **the wasm path**
 ([[tech-stack-wasm]]); **the PyO3 boundary** ([[pyo3-boundary]]); and **why the
 `laterite_ags4` DuckDB extension lives in its own repo, not this workspace** (the
 loadable-vs-bundled DuckDB clash + the Path-B carve-out — [[dec-duckdb-extension]]).
@@ -61,7 +61,7 @@ This page is the index into those answers.
 **Public contract — the published Python wheel** (external-dev API; treat
 as stable):
 - [[laterite]] — the AGS4 base wheel (python-ags4 drop-in). The only shipped
-  wheel since the AGS5 decouple (dec-ags5-decouple); the `[ags5]` extra is gone.
+  wheel since the AGS5 decouple; the `[ags5]` extra is gone.
 
 **Shipped product — the Rust binary:**
 - [[laterite-ags4-validator]] (lib) + `lat` (its CLI front-end) — the
@@ -369,8 +369,8 @@ as stable):
 - `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), [[laterite-ags4-compliance]] (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface and fails on a regression; deps `laterite-ags4-{parity,validator,core}` only), and [[laterite-ags4-xcheck]] (the separate lean **output-value** gate — `xcheck`/`emit-cases` + the case manifest, kept its own crate so the gate builds without the harness's deps).
 
 **Decoupled AGS5 — dormant, and not in this repo** (preserved elsewhere, out of
-the workspace; not built or shipped; a future AGS5 strand re-links them —
-dec-ags5-decouple). Named here only so the crate roster is complete:
+the workspace; not built or shipped; a future AGS5 strand re-links them). Named
+here only so the crate roster is complete:
 - laterite-ags5-db — the `.ags5db`/`.agsx`/AGS4 engine + the `lat-db` CLI
   (the bundled-DuckDB crate; its `high_volume` is the only reader of the retained
   `ags5_dictionary.json` AGS5 record, co-located in the crate's `data/`).
@@ -506,4 +506,4 @@ generation is dec-registry-driven-generation.
 
 ## Related
 
-[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-ags4-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · dec-ags5-decouple · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[laterite-ags4-corpus-qa]]
+[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-ags4-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[laterite-ags4-corpus-qa]]
