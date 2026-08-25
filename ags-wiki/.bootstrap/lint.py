@@ -836,6 +836,87 @@ HISTORICAL_SPECIFIC = re.compile(r"<!--\s*retired:\s*([A-Za-z0-9_-]+)\s*-->")
 # form (AGS-WIKI.md §1). That blind spot is the whole reason this check
 # exists, so it can't inherit strip_code()'s behaviour.
 # ---------------------------------------------------------------------------
+#: A13 — the SELECTOR half of a citation. `AGS-WIKI.md` §1 permits reproducing
+#: a group's heading table on the condition that it is rendered from the model
+#: authority, cited `repo:…ags_dictionary.json groups[code=…]`. REPO_REF stops at
+#: whitespace, so the selector is not part of the captured ref and A1 never sees
+#: it: the FILE resolves, the half naming WHICH ENTRY does not get checked. #692
+#: is what that costs — three pages reproduced full heading tables for groups the
+#: dictionary has no entry for, carried the mandated citation, and every gate
+#: stayed green. Report-only, like anchor_problem below.
+SELECTOR = re.compile(r"\s+groups\[code=([A-Za-z0-9_*]+)\]")
+
+
+def _dict_group_codes() -> set[str]:
+    """The AGS4 union dictionary's group codes — the resolution target for a
+    `groups[code=…]` selector. Deliberately NOT `_group_codes()`, which also
+    counts any group with a wiki page: that union is right for 'may an erDiagram
+    name this?' and wrong here, where the claim under test is precisely that the
+    DICTIONARY has the entry."""
+    dj = (
+        REPO_ROOT
+        / "rust-packages"
+        / "laterite-ags4-reference"
+        / "data"
+        / "ags_dictionary.json"
+    )
+    return set(json.loads(dj.read_text())["groups"]) if dj.exists() else set()
+
+
+DICT_GROUP_CODES = _dict_group_codes()
+
+#: A14 — a path claim carrying no `repo:` prefix. A12 already settled the
+#: principle for frontmatter `location:`: the field "makes a path claim either
+#: way", so it got its own resolution pass. Prose makes the same claim in
+#: backticks and nothing resolved it, which is how a directory that had moved
+#: out of this tree stayed cited across a dozen pages (#700).
+#:
+#: **This COUNTS; it does not judge, and it is not a gate.** Measured against
+#: this vault, the tokens that resolve nowhere are dominated by two classes a
+#: regex cannot tell from a dead repo path: a path written relative to a crate
+#: rather than the repo root (`src/main.rs`, `rules/mod.rs`), and a path inside
+#: an upstream project this repo cites but does not contain
+#: (`arrow-array/src/ffi.rs`). Both are legitimate and neither is resolvable
+#: here. Promoting this to a finding list would bury the real ones — so what
+#: ships is the number, which is what the convention actually asks for: a gate
+#: that drops input says how much it dropped, on every run. `--full` prints the
+#: tokens for anyone auditing the heuristic itself.
+PROSE_PATH = re.compile(r"`([A-Za-z0-9_.\-][A-Za-z0-9_./\-]*/[A-Za-z0-9_./\-]+)`")
+#: Skipped, and counted so the skip is visible: globs (A1's own grammar owns
+#: those), URLs, and anything already written as a `repo:`/`ext:`/`spec:` ref.
+PROSE_PATH_SKIP = ("http:", "https:", "repo:", "ext:", "spec:", "//")
+
+
+def prose_path_candidate(cand: str) -> bool:
+    """Whether a backticked token is claiming to be a file in this repo.
+
+    Deliberately narrow, because the cost of a loose rule here is a report
+    nobody reads. Three things disqualify a token, and each one was measured
+    against this vault rather than guessed:
+
+      no extension on the last segment -> a vault-relative page reference
+        (`concepts/parent-child-graph`), a directory (`sources/external/`), or
+        not a path at all (`nDP/nSF/nSCI`). 300+ of these.
+      a `--` anywhere              -> a CLI flag list
+        (`--output/--json/--no-color`), which `/` happens to separate.
+      a placeholder segment        -> a template slot (`O-NN.md`, `<CODE>`),
+        which names a shape, not a file.
+    """
+    last = cand.rsplit("/", 1)[-1]
+    if "." not in last or last.startswith("."):
+        return False
+    if "--" in cand or "<" in cand:
+        return False
+    return not any(seg.isupper() and "N" in seg for seg in last.split("."))
+
+
+def prose_path_resolves(cand: str) -> bool:
+    """A prose path may be written relative to the repo root or to the vault —
+    both forms are in use and both are legitimate, so a token resolving under
+    EITHER root is not a dead reference."""
+    return path_exists(cand) or path_exists(f"{WIKI.name}/{cand}")
+
+
 def anchor_problem(raw: str, resolved: str) -> str | None:
     """Tier-3 symbol/line-anchor validation (report-only) — for a `repo:` ref
     whose FILE exists, check its `:NN`/`:NN-MM` line suffix is in range and its
@@ -1029,6 +1110,11 @@ ext_refs: list[str] = []
 bad_ext_refs: list[str] = []
 malformed_markers: list[str] = []
 anchor_issues: list[str] = []  # Tier-3: :line/::symbol suffix on a LIVE ref
+selector_claims = 0  # A13: `groups[code=…]` selectors seen on a LIVE ref
+selector_issues: list[str] = []  # A13: …naming an entry the dictionary lacks
+prose_path_claims = 0  # A14: backticked path-shaped tokens examined
+prose_path_skipped = 0  # A14: …skipped as glob/URL/prefixed ref
+prose_path_issues: list[str] = []  # A14: …that resolve to nothing
 stale_risk_hits: list[str] = []  # verified_against: a cited file moved since as-of
 
 for p in md:
@@ -1047,6 +1133,19 @@ for p in md:
                 anchor_issues.append(
                     f"{rel}:{line_at(txt, m.start())} -> repo:{raw}  ({ap})"
                 )
+            # A13 — the selector trails the ref, past where REPO_REF stopped.
+            if sm := SELECTOR.match(txt, m.end()):
+                selector_claims += 1
+                code = sm.group(1)
+                if (
+                    DICT_GROUP_CODES
+                    and "*" not in code
+                    and code not in DICT_GROUP_CODES
+                ):
+                    selector_issues.append(
+                        f"{rel}:{line_at(txt, m.start())} -> groups[code={code}]"
+                        f"  (no such group in {Path(used).name})"
+                    )
             continue
         cat, detail = categorize_dead_ref(used)
         ln = line_at(txt, m.start())
@@ -1093,6 +1192,20 @@ for p in md:
                     + (f" ({detail})" if detail else ""),
                 }
             )
+
+    # A14 — path-shaped backticked tokens (see the grammar above).
+    for pm in PROSE_PATH.finditer(txt):
+        cand = pm.group(1)
+        if (
+            cand.startswith(PROSE_PATH_SKIP)
+            or any(c in cand for c in "*{")
+            or not prose_path_candidate(cand)
+        ):
+            prose_path_skipped += 1
+            continue
+        prose_path_claims += 1
+        if not prose_path_resolves(cand):
+            prose_path_issues.append(f"{rel}:{line_at(txt, pm.start())} -> `{cand}`")
 
     # verified_against / staleness (Tier-3): a `> [!stale-risk] … as-of DATE`
     # callout promises "these numbers were true as of DATE". If a repo: file
@@ -1478,6 +1591,26 @@ print(
     f"on a LIVE ref): {len(anchor_issues)}"
 )
 info_section("  findings", anchor_issues, limit=A_LIMIT)
+print(
+    f"\nA13 `groups[code=…]` selectors on a live `repo:` ref: {selector_claims} "
+    f"scanned against the dictionary's {len(DICT_GROUP_CODES)} group codes, "
+    f"{len(selector_issues)} naming an entry it lacks"
+)
+info_section("  findings", selector_issues, limit=A_LIMIT)
+print(
+    f"\nA14 backticked path-shaped tokens — the blind spot A1 cannot see, "
+    f"COUNTED not judged (see the grammar note): {prose_path_claims} examined "
+    f"against the repo + vault roots, {prose_path_skipped} skipped as "
+    f"glob/URL/prefixed-ref/not-a-file-claim, {len(prose_path_issues)} "
+    f"unresolvable — mostly crate-relative and upstream-project paths, which "
+    f"is why this is a number and not a gate"
+)
+if FULL:
+    info_section(
+        "  unresolvable (audit the heuristic, not the pages)",
+        prose_path_issues,
+        limit=A_LIMIT,
+    )
 _stale_uniq = sorted(set(stale_risk_hits))
 print(
     f"\nstale-risk freshness (Tier-3, a `[!stale-risk] as-of DATE` page cites a "
