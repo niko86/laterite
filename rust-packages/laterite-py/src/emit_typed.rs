@@ -8,7 +8,8 @@
 //! that capsule zero-copy. Each batch is transposed to typed
 //! `serde_json::Value` rows by `laterite_ags4_emit::group_from_arrow` (the shared
 //! Arrow→Value conversion the wasm host uses too) and fed to the orchestrator,
-//! which formats (via `ags4_str` + dictionary UNIT/TYPE fill) and applies the
+//! which formats (via `ags4_str` for typed non-strings + dictionary UNIT/TYPE
+//! fill) and applies the
 //! chosen validity mode (`AutoFix` / Report / Strict).
 
 use arrow::array::{
@@ -109,12 +110,18 @@ pub fn emit_ags4_from_arrow(
         let u = units.as_ref().and_then(|m| m.get(&code));
         let t = types.as_ref().and_then(|m| m.get(&code));
         // The Arrow→Value transpose is shared with the wasm host in laterite-ags4-emit.
-        groups.push(laterite_ags4_emit::group_from_arrow_with_meta(
+        // The edition goes in so a typed temporal column is rendered at the
+        // precision its heading's declared UNIT asks for, instead of Arrow's
+        // canonical form — otherwise a date-only DT cell read from disk
+        // re-emits as midnight ISO and fails the Rule 8 its own heading
+        // declares (#695).
+        groups.push(laterite_ags4_emit::group_from_arrow_with_meta_at_edition(
             code,
             schema.as_ref(),
             &batches,
             u,
             t,
+            Some(opts.edition),
         ));
     }
 

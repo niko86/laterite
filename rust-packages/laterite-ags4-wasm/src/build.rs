@@ -315,7 +315,11 @@ fn emit_report(
 /// Decode one group's Arrow IPC stream → a [`laterite_ags4_emit::GroupInput`] (the
 /// column names are the AGS headings). Uses the shared Arrow→Value transpose.
 #[cfg(feature = "arrow")]
-fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::GroupInput, String> {
+fn group_from_ipc(
+    code: String,
+    bytes: &[u8],
+    edition: DictVersion,
+) -> Result<laterite_ags4_emit::GroupInput, String> {
     let reader = arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
         .map_err(|e| format!("arrow ipc: {e}"))?;
     let schema = reader.schema();
@@ -340,16 +344,24 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
             .map(|b| b.project(&keep))
             .collect::<Result<_, _>>()
             .map_err(|e| format!("arrow project batch: {e}"))?;
-        return Ok(laterite_ags4_emit::group_from_arrow(
+        return Ok(laterite_ags4_emit::group_from_arrow_with_meta_at_edition::<
+            std::collections::hash_map::RandomState,
+        >(
             code,
             pschema.as_ref(),
             &pbatches,
+            None,
+            None,
+            Some(edition),
         ));
     }
-    Ok(laterite_ags4_emit::group_from_arrow(
-        code,
-        schema.as_ref(),
-        &batches,
+    // The edition rides along so a typed temporal column is rendered at the
+    // precision its heading's declared UNIT asks for, not Arrow's (#695). The
+    // browser must answer like Python and Node.
+    Ok(laterite_ags4_emit::group_from_arrow_with_meta_at_edition::<
+        std::collections::hash_map::RandomState,
+    >(
+        code, schema.as_ref(), &batches, None, None, Some(edition)
     ))
 }
 
@@ -476,6 +488,9 @@ pub fn build_ags4_ipc(
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    // Resolved before the decode loop because the Arrow→Value transpose needs
+    // it: a DT column is rendered at its heading's declared precision there.
+    let ipc_edition = emit_edition(o.dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
     let arr = js_sys::Array::from(&groups);
     let mut inputs: Vec<laterite_ags4_emit::GroupInput> = Vec::with_capacity(arr.length() as usize);
     for item in arr.iter() {
@@ -489,7 +504,7 @@ pub fn build_ags4_ipc(
             .dyn_into::<js_sys::Uint8Array>()
             .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
             .to_vec();
-        inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
+        inputs.push(group_from_ipc(code, &ipc, ipc_edition).map_err(|e| JsError::new(&e))?);
     }
     let report = build_ipc_core(inputs, o).map_err(|e| JsError::new(&e))?;
     to_js(&report)
@@ -698,8 +713,18 @@ mod tests {
         .unwrap();
 
         // Decode each IPC stream via the shared transpose, then emit.
-        let proj = group_from_ipc("PROJ".into(), &ipc_bytes(&proj_schema, &proj_batch)).unwrap();
-        let loca = group_from_ipc("LOCA".into(), &ipc_bytes(&loca_schema, &loca_batch)).unwrap();
+        let proj = group_from_ipc(
+            "PROJ".into(),
+            &ipc_bytes(&proj_schema, &proj_batch),
+            FALLBACK,
+        )
+        .unwrap();
+        let loca = group_from_ipc(
+            "LOCA".into(),
+            &ipc_bytes(&loca_schema, &loca_batch),
+            FALLBACK,
+        )
+        .unwrap();
         let r = emit_report(
             vec![proj, loca],
             Some("4.1.1"),
@@ -860,7 +885,11 @@ mod tests {
     #[cfg(feature = "arrow")]
     #[test]
     fn non_ipc_bytes_are_reported_as_an_arrow_error() {
-        let msg = err(group_from_ipc("LOCA".into(), b"definitely not arrow"));
+        let msg = err(group_from_ipc(
+            "LOCA".into(),
+            b"definitely not arrow",
+            FALLBACK,
+        ));
         assert!(
             msg.contains("arrow ipc"),
             "the caller needs to know it was the IPC decode, got: {msg}"
@@ -878,7 +907,7 @@ mod tests {
             &["_id", "LOCA_ID", "_parent_id", "LOCA_NATE"],
             &[&["u-1", "BH01", "u-0", "100.00"]],
         );
-        let group = group_from_ipc("LOCA".into(), &ipc).expect("decodes");
+        let group = group_from_ipc("LOCA".into(), &ipc, FALLBACK).expect("decodes");
         assert_eq!(
             group.headings,
             vec!["LOCA_ID".to_string(), "LOCA_NATE".to_string()],
@@ -897,7 +926,7 @@ mod tests {
         // The other side of the same branch: when nothing needs dropping the
         // projection is skipped entirely, and the columns must be unchanged.
         let ipc = ipc_of(&["LOCA_ID", "LOCA_NATE"], &[&["BH01", "100.00"]]);
-        let group = group_from_ipc("LOCA".into(), &ipc).expect("decodes");
+        let group = group_from_ipc("LOCA".into(), &ipc, FALLBACK).expect("decodes");
         assert_eq!(
             group.headings,
             vec!["LOCA_ID".to_string(), "LOCA_NATE".to_string()]
@@ -913,7 +942,7 @@ mod tests {
         // door is a second implementation rather than a second door.
         let ipc = ipc_of(&["PROJ_ID", "PROJ_NAME"], &[&["P1", "Test project"]]);
         let from_ipc = build_ipc_core(
-            vec![group_from_ipc("PROJ".into(), &ipc).expect("decodes")],
+            vec![group_from_ipc("PROJ".into(), &ipc, FALLBACK).expect("decodes")],
             BuildOptions::default(),
         )
         .expect("ipc builds");

@@ -406,3 +406,88 @@ def test_typed_graph_custom_group_child_survives_round_trip(tmp_path):
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
     assert "MYGP" in back.groups
     assert back["MYGP"]["MYGP_VAL"].to_list() == ["custom-data-here"]
+
+
+def _data_rows(text: str, code: str) -> list[list[str]]:
+    """The group's DATA rows, reparsed — structural, like `_group_rows`."""
+    from laterite import _laterite_native as _native
+
+    rows = _native.parse_primitives(text=text)["groups"][code]["rows"]
+    return [r["values"] for r in rows]
+
+
+def test_a_dt_cell_is_written_at_its_headings_declared_precision():
+    """#695. A `DT` column declares its precision in its UNIT and Rule 8 judges
+    the cell against it, but a typed datetime carries no precision — a date-only
+    cell read from disk comes back as midnight. Rendering that as Arrow does
+    (`2021-08-09T00:00:00`) fails the `yyyy-mm-dd` unit the heading itself
+    declares.
+
+    All three cases live in one file so the rule is visible as one rule: the
+    DECLARED precision decides, not the value's own zeros.
+    """
+    import datetime as dt
+
+    loca = pl.DataFrame(
+        # LOCA_STAR declares `yyyy-mm-dd`.
+        {"LOCA_ID": ["BH01"], "LOCA_STAR": [dt.datetime(2021, 8, 9, 0, 0)]}
+    )
+    mond = pl.DataFrame(
+        # MOND_DTIM declares `yyyy-mm-ddThh:mm:ss`.
+        {
+            "LOCA_ID": ["BH01", "BH01"],
+            "MOND_DTIM": [
+                dt.datetime(2021, 8, 9, 0, 0),
+                dt.datetime(2021, 8, 9, 14, 30),
+            ],
+        }
+    )
+    res = laterite.build_ags4(
+        {"PROJ": _proj(), "LOCA": loca, "MOND": mond}, dict_version="4.2", mode="report"
+    )
+
+    assert _data_rows(res.text, "LOCA")[0][1] == "2021-08-09", (
+        "midnight under a date-only unit must be written date-only"
+    )
+    dtim = [r[1] for r in _data_rows(res.text, "MOND")]
+    assert dtim[0] == "2021-08-09T00:00:00", (
+        "the SAME instant keeps its time under a unit that declares seconds — "
+        "truncating here would break a file that is Rule 8 clean today"
+    )
+    assert dtim[1] == "2021-08-09T14:30:00", (
+        "a real time is never trimmed to fit; a lossy render is refused so the "
+        "mismatch reaches the caller as a finding instead"
+    )
+    assert not [f for f in res.findings if f["rule"] == "AGS Format Rule 8"], (
+        "no DT cell should contradict its own heading"
+    )
+
+
+def test_read_build_round_trip_of_a_date_only_dt_needs_no_fix(tmp_path):
+    """#695 as reported: a clean file read back and re-emitted was clean only
+    through `autofix`, which repaired what we had just mis-written. `strict`
+    raised. The round trip is now clean in every mode, and byte-identical.
+    """
+    src = tmp_path / "base.ags"
+    res = laterite.build_ags4(
+        {
+            "PROJ": _proj(),
+            "LOCA": pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_STAR": ["2021-08-09"]}),
+        },
+        dict_version="4.2",
+        synthesise_metadata=True,
+        **_TRAN,
+    )
+    src.write_bytes(res.text.encode("utf-8"))
+
+    ags = laterite.read(src)
+    assert ags["LOCA"]["LOCA_STAR"].to_list() == [
+        __import__("datetime").datetime(2021, 8, 9, 0, 0)
+    ], "read() still promotes a date-only DT to midnight — that half is deliberate"
+
+    frames = [(code, ags[code]) for code in ags.groups]
+    for mode in ("strict", "report", "autofix"):
+        out = laterite.build_ags4(frames, dict_version="4.2", mode=mode)
+        assert not [f for f in out.findings if f["rule"] == "AGS Format Rule 8"], mode
+        assert out.fixes_applied == 0, f"{mode}: nothing should need fixing"
+        assert _data_rows(out.text, "LOCA")[0][1] == "2021-08-09"

@@ -19,6 +19,8 @@ use std::collections::HashMap;
 use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
+use laterite_ags4_types::dt_to_unit_precision;
+use laterite_ags4_validator::{DictVersion, Dictionary};
 use serde_json::Value;
 
 use crate::GroupInput;
@@ -28,6 +30,13 @@ use crate::GroupInput;
 /// renders them canonically); strings stay strings (emitted verbatim, the
 /// validity mode owns canonicalisation); temporal/decimal/other types fall
 /// back to Arrow's own canonical display string (e.g. `2023-02-22T10:24:00`).
+///
+/// A temporal cell lands in that last arm as a **string**, which the
+/// orchestrator then emits verbatim — `ags4_str`'s DT handling is unreachable
+/// from here, whatever its own doc comment implies. That is why a DT column
+/// needs its declared precision applied at THIS layer, where the value is
+/// still known to have come from a typed column rather than from the caller's
+/// keyboard: see [`group_from_arrow_with_meta_at_edition`] (#695).
 pub fn cell_value(array: &dyn Array, row: usize) -> Value {
     if array.is_null(row) {
         return Value::Null;
@@ -101,6 +110,24 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
     }
 }
 
+/// Is this column a typed temporal one — a value the caller handed us as an
+/// instant, whose string form is OUR choice rather than theirs?
+///
+/// That distinction is the whole basis for rendering it to the heading's
+/// declared precision: reformatting a caller's own string would take
+/// canonicalisation away from the validity mode, but a temporal column has no
+/// caller-authored string to preserve.
+fn is_temporal(dt: &DataType) -> bool {
+    matches!(
+        dt,
+        DataType::Date32
+            | DataType::Date64
+            | DataType::Timestamp(_, _)
+            | DataType::Time32(_)
+            | DataType::Time64(_)
+    )
+}
+
 /// Build a [`GroupInput`] from Arrow record batches: headings are the schema
 /// field names (the AGS headings); UNIT/TYPE are left to the dictionary; rows
 /// are the transposed cells. `schema` is passed explicitly so a 0-batch group
@@ -129,14 +156,78 @@ pub fn group_from_arrow_with_meta<S: std::hash::BuildHasher>(
     units: Option<&HashMap<String, String, S>>,
     types: Option<&HashMap<String, String, S>>,
 ) -> GroupInput {
+    group_from_arrow_with_meta_at_edition(code, schema, batches, units, types, None)
+}
+
+/// Like [`group_from_arrow_with_meta`], but rendering each **typed temporal**
+/// column at the precision its heading's declared UNIT asks for.
+///
+/// `edition: None` is exactly [`group_from_arrow_with_meta`] — Arrow's own
+/// display string, whatever the heading declares. Existing callers keep that
+/// behaviour; this entry point is additive.
+///
+/// # Why this layer
+///
+/// An AGS4 `DT` column declares its precision in its UNIT, and Rule 8 judges
+/// the cell against it. A typed instant carries no such precision: a date-only
+/// cell read back from disk is a midnight timestamp, and Arrow renders that
+/// `2021-08-09T00:00:00`, which fails the `yyyy-mm-dd` unit its own heading
+/// declares. The orchestrator cannot fix that downstream — it emits strings
+/// verbatim so the validity *mode* owns canonicalisation — so the precision
+/// has to be applied here, at the point where the value is still known to be
+/// a typed instant rather than a string the caller wrote (#695).
+///
+/// The rendering is refused whenever it would lose information (a real time
+/// under a date-only unit), so a genuine mismatch between the data and its
+/// heading still reaches the caller as a Rule 8 finding instead of being
+/// silently trimmed away.
+///
+/// # Scope
+///
+/// Only headings in the **standard** dictionary carry a declared UNIT here.
+/// A heading defined by the file's own `DICT` group is not visible at this
+/// layer, so its temporal columns keep Arrow's rendering — the pre-#695
+/// behaviour — rather than being guessed at.
+#[must_use]
+pub fn group_from_arrow_with_meta_at_edition<S: std::hash::BuildHasher>(
+    code: String,
+    schema: &Schema,
+    batches: &[RecordBatch],
+    units: Option<&HashMap<String, String, S>>,
+    types: Option<&HashMap<String, String, S>>,
+    edition: Option<DictVersion>,
+) -> GroupInput {
     let headings: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+
+    // Per column: the declared UNIT to render against, or None to leave the
+    // cell as Arrow rendered it. Resolved once, not per row.
+    let dict = edition.map(Dictionary::bundled);
+    let dt_units: Vec<Option<String>> = schema
+        .fields()
+        .iter()
+        .map(|f| {
+            let d = dict.as_ref()?;
+            if !is_temporal(f.data_type()) {
+                return None;
+            }
+            let unit = d.heading(&code, f.name()).map(|h| h.unit.to_string())?;
+            (!unit.trim().is_empty()).then_some(unit)
+        })
+        .collect();
+
     let mut rows: Vec<Vec<Value>> = Vec::new();
     for batch in batches {
         let ncols = batch.num_columns();
         for r in 0..batch.num_rows() {
             let mut row = Vec::with_capacity(ncols);
             for c in 0..ncols {
-                row.push(cell_value(batch.column(c).as_ref(), r));
+                let v = cell_value(batch.column(c).as_ref(), r);
+                row.push(match (&v, dt_units.get(c).and_then(Option::as_deref)) {
+                    (Value::String(s), Some(unit)) => {
+                        dt_to_unit_precision(s, unit).map_or(v, Value::String)
+                    }
+                    _ => v,
+                });
             }
             rows.push(row);
         }
@@ -170,6 +261,115 @@ mod tests {
     };
     use arrow::datatypes::{Field, UnionFields};
     use std::sync::Arc;
+
+    /// Build a one-row group from a single named column and read the cell back.
+    fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: Option<DictVersion>) -> Value {
+        let schema = Schema::new(vec![Field::new(heading, col.data_type().clone(), true)]);
+        let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![col]).expect("valid batch");
+        let g = group_from_arrow_with_meta_at_edition::<std::collections::hash_map::RandomState>(
+            code.to_string(),
+            &schema,
+            std::slice::from_ref(&batch),
+            None,
+            None,
+            edition,
+        );
+        g.rows[0][0].clone()
+    }
+
+    /// 2021-08-09T00:00:00 UTC — a date-only cell as `read()` hands it back.
+    const MIDNIGHT_MS: i64 = 1_628_467_200_000;
+    /// 2021-08-09T14:30:00 UTC — a genuine time of day.
+    const AFTERNOON_MS: i64 = 1_628_519_400_000;
+
+    /// #695. A typed temporal column is rendered at the precision its heading's
+    /// declared UNIT asks for — because Arrow's canonical form fails the very
+    /// Rule 8 the heading declares, and the orchestrator downstream emits
+    /// strings verbatim, so this is the last layer that can act.
+    #[test]
+    fn a_temporal_column_is_rendered_at_its_headings_declared_precision() {
+        // TRAN_DATE declares `yyyy-mm-dd` — one of 40 DT headings that do.
+        assert_eq!(
+            cell_for(
+                "TRAN",
+                "TRAN_DATE",
+                Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
+                Some(DictVersion::V4_2),
+            ),
+            Value::from("2021-08-09"),
+            "midnight under a date-only unit should render date-only"
+        );
+        // MOND_DTIM declares `yyyy-mm-ddThh:mm:ss`. The SAME instant must keep
+        // its time here: truncating would break a file that is clean today.
+        assert_eq!(
+            cell_for(
+                "MOND",
+                "MOND_DTIM",
+                Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
+                Some(DictVersion::V4_2),
+            ),
+            Value::from("2021-08-09T00:00:00"),
+            "the declared precision, not the value's zeros, decides"
+        );
+        // A real time under a date-only unit is a genuine mismatch between the
+        // data and its heading: left alone, so Rule 8 reports it rather than
+        // this layer silently discarding the afternoon.
+        assert_eq!(
+            cell_for(
+                "TRAN",
+                "TRAN_DATE",
+                Arc::new(TimestampMillisecondArray::from(vec![AFTERNOON_MS])),
+                Some(DictVersion::V4_2),
+            ),
+            Value::from("2021-08-09T14:30:00"),
+            "a lossy render must be refused, not applied"
+        );
+    }
+
+    /// The behaviour is opt-in at the call site: `edition: None` is exactly the
+    /// pre-#695 rendering, so an existing caller of `group_from_arrow` sees no
+    /// change. Same for a heading the standard dictionary does not carry — a
+    /// DICT-defined one — whose declared UNIT is not visible at this layer.
+    #[test]
+    fn without_an_edition_or_a_dictionary_heading_arrow_s_own_rendering_stands() {
+        assert_eq!(
+            cell_for(
+                "TRAN",
+                "TRAN_DATE",
+                Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
+                None,
+            ),
+            Value::from("2021-08-09T00:00:00"),
+            "no edition: unchanged from before #695"
+        );
+        assert_eq!(
+            cell_for(
+                "ZZZZ",
+                "ZZZZ_WHEN",
+                Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
+                Some(DictVersion::V4_2),
+            ),
+            Value::from("2021-08-09T00:00:00"),
+            "a heading outside the standard dictionary declares no precision here"
+        );
+    }
+
+    /// A STRING column is the caller's own text, even under a DT heading, so it
+    /// is passed through untouched — the "strings verbatim, the validity mode
+    /// owns canonicalisation" contract this fix was designed not to spend.
+    #[test]
+    fn a_string_column_under_a_dt_heading_is_never_reformatted() {
+        assert_eq!(
+            cell_for(
+                "TRAN",
+                "TRAN_DATE",
+                Arc::new(StringArray::from(vec!["2021-08-09T00:00:00"])),
+                Some(DictVersion::V4_2),
+            ),
+            Value::from("2021-08-09T00:00:00"),
+            "a caller-written string stays the caller's"
+        );
+    }
 
     fn one(a: &dyn Array) -> Value {
         cell_value(a, 0)
