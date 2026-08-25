@@ -76,7 +76,9 @@ would drift from it, which is the very failure both rules are about.
 - dictionary entry — `` `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=SAMP]` ``
 - spec PDF — `` `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8` `` (the PDF itself is not
   vendored — the citation names the file, not a path; see `sources/spec-*`)
-- AGS library xlsx — `` `reports/AGSL4_2_TRI.xlsx` ``
+- AGS library xlsx — `` `AGSL4_2_TRI.xlsx` `` (not vendored either, and for
+  the same reason the citation names the file rather than a path; see
+  [[ags-library-xlsx]])
 
 Paths are repo-root-relative, forward-slash, no backslashes.
 
