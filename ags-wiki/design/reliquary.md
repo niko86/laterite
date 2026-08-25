@@ -72,7 +72,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 <!-- BEGIN GENERATED: reliquary-register — from ags-wiki/design/reliquary.json; regenerate with `uv run --no-project python tools/gen_wiki_tables.py` (DO NOT EDIT THE TABLE BY HAND) -->
 | Symbol | Verify | Axis | Status | Removed-in | Evidence |
 |---|---|---|---|---|---|
-| `truncate_dt_to_unit()` | `rust-packages/laterite-ags4-types/src/lib.rs::fn truncate_dt_to_unit` | code | removed | misc-deadcode PR | AGS5 DT-precision writer; 0 shipped callers (AGS5 strand only) |
+| `truncate_dt_to_unit()` | `rust-packages/laterite-ags4-types/src/lib.rs::fn truncate_dt_to_unit` | code | removed | misc-deadcode PR | AGS5 DT-precision writer; 0 shipped callers (AGS5 strand only). The removal was sound — but the CAPABILITY was wanted 6 weeks later by #695, and is back as `dt_to_unit_precision()`, not as this. Deliberately not a revert: the original sliced by byte offset, so a non-ASCII DT cell panicked, and nothing reached it to find that. The replacement validates shape before it indexes and refuses a lossy render. Kept listed because THIS symbol is still gone and the verify still holds. |
 | `LineTerminator::as_bytes()` | `rust-packages/laterite-ags4-parse/src/lib.rs::as_bytes(self)` | code | removed | misc-deadcode PR | unused ergonomic twin of `as_str()`; 0 call sites |
 | `tempfile` (dev-dep) | `rust-packages/laterite-transport/Cargo.toml::tempfile` | dependency | removed | dep-hygiene PR | declared, never used; tests use `env::temp_dir()` |
 | `chrono` (dep) | `rust-packages/laterite-ags4-core/Cargo.toml::chrono` | dependency | removed | dep-hygiene PR | 0 chrono/DateTime uses in core src/tests |

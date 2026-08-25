@@ -207,8 +207,21 @@ deferred) was the owner's, 2026-06-25.
   String` (lib.rs:128) — the **inverse of `parse_value`**: Null→`""`, YN→`Y`/`N`, DT
   date/precision normalization, `0DP`→int, `nDP`→`{:.n}`, `nSF`→sig-figs fixed-point,
   `nSCI`→scientific, else passthrough. Already in the **wasm-safe `laterite-ags4-types`** crate that
-  `laterite-ags4-wasm` already depends on; well-tested. Plus `truncate_dt_to_unit` (lib.rs:234) for
-  DT-vs-UNIT precision (Rule 8).
+  `laterite-ags4-wasm` already depends on; well-tested.
+- **DT precision against the declared UNIT:** `laterite_ags4_types::dt_to_unit_precision(value,
+  unit) -> Option<String>`, applied in `laterite-ags4-emit`'s Arrow transpose
+  (`group_from_arrow_with_meta_at_edition`) — NOT in the orchestrator's `format_cell`, which emits
+  strings verbatim so the validity mode stays the single owner of canonicalisation. A typed
+  temporal column has no caller-authored string to preserve, so its precision is ours to set; a
+  caller's own string is not. `None` means "leave it alone" — a malformed cell, a heading with no
+  declared precision, or a render that would lose information (a real time under a date-only
+  unit), all of which belong to the mode as a Rule 8 finding rather than to this layer as a
+  silent trim (#695).
+
+  > An earlier `truncate_dt_to_unit` was named here as if it did this job. It never had a caller
+  > on the emit path, was removed as dead code in the 2026-07-12 release sync, and this line went
+  > on describing it for six weeks — which is how #695 was reported against behaviour the design
+  > page said was already handled. See the [[reliquary]] row.
 - **UNIT/TYPE source:** `laterite-ags4-core::registry` — standard headings/units/types per group.
 - **Validity:** `validate`, `compute_fixes`, `apply_fixes` — all shipped (native core + wasm
   exports). The "validate-and-fix the *generated* output, not the raw file" approach chains

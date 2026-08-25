@@ -218,6 +218,122 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
     }
 }
 
+// --- DT precision against a declared UNIT -----------------------------
+//
+// An AGS4 DT column declares its precision in its UNIT (`yyyy-mm-dd`,
+// `yyyy-mm-ddThh:mm`, …), and Rule 8 checks the cell against it. A typed
+// datetime carries no such precision — a date-only cell read from disk comes
+// back as midnight — so rendering one without consulting the UNIT produces a
+// value that fails the rule its own heading declares (#695).
+//
+// A predecessor of this lived here and was removed as dead code in the
+// 2026-07-12 release sync: it had no caller outside its own tests, and it
+// sliced by byte offset, so a non-ASCII DT cell panicked. Nothing reached it,
+// so nothing found that. This one validates the shape BEFORE it indexes, which
+// is why it returns an Option rather than a String.
+
+/// The canonical AGS4 DT layout, longest first. A declared UNIT is one of
+/// these prefixes; so is a well-formed value.
+const DT_LAYOUT: &str = "yyyy-mm-ddThh:mm:ss.sss";
+
+/// The zero tail a shorter value is padded with to reach a longer precision.
+/// Positionally aligned to `DT_LAYOUT`, so `ZERO_TAIL[10..16]` is `T00:00`.
+const DT_ZERO_TAIL: &str = "0000-00-00T00:00:00.000";
+
+/// The precisions the layout admits: date, minute, second, millisecond.
+const DT_PRECISIONS: [usize; 4] = [10, 16, 19, 23];
+
+/// The character `n` of a canonical DT string: a separator, or a digit.
+/// `None` for a position the layout does not define.
+fn dt_expected_sep(n: usize) -> Option<char> {
+    match n {
+        4 | 7 => Some('-'),
+        // A DICT-defined heading may declare a space separator where the
+        // standard dictionary always uses `T`; both are accepted on input.
+        10 => Some('T'),
+        13 | 16 => Some(':'),
+        19 => Some('.'),
+        _ => None,
+    }
+}
+
+/// The precision of `s` if it is a well-formed DT value, else `None`.
+///
+/// This is the guard that makes indexing safe below: it accepts only ASCII in
+/// the exact canonical layout, so every later `..n` is on a char boundary by
+/// construction. A value with a non-ASCII character, a missing separator or an
+/// odd length is rejected here and left untouched by the caller — the right
+/// outcome anyway, since a malformed DT cell is a Rule 8 finding to report,
+/// not a value to quietly reformat.
+fn dt_value_precision(value: &str) -> Option<usize> {
+    let n = value.len();
+    if !DT_PRECISIONS.contains(&n) {
+        return None;
+    }
+    // Byte-wise is sound *because* every accepted byte is ASCII: the first
+    // non-ASCII byte fails both arms and returns None before anything indexes.
+    for (i, b) in value.bytes().enumerate() {
+        let ok = match dt_expected_sep(i) {
+            // A DICT-defined heading may write the date/time join as a space
+            // where the standard dictionary always uses `T`; accept both.
+            Some(want) => b == want as u8 || (i == 10 && b == b' '),
+            None => b.is_ascii_digit(),
+        };
+        if !ok {
+            return None;
+        }
+    }
+    Some(n)
+}
+
+/// The precision a declared UNIT asks for, else `None` for a non-DT unit
+/// (`m`, `%`, or an empty one) — telling the caller to leave the value alone.
+fn dt_unit_precision(unit: &str) -> Option<usize> {
+    let u = unit.trim();
+    DT_PRECISIONS
+        .into_iter()
+        .find(|&n| u.len() == n && u == &DT_LAYOUT[..n])
+}
+
+/// Render a canonical DT `value` at the precision `unit` declares, but **only
+/// when doing so loses no information**.
+///
+/// * `("2021-08-09T00:00:00", "yyyy-mm-dd")` → `Some("2021-08-09")` — the
+///   dropped tail is all zeros, so the two spell the same instant.
+/// * `("2021-08-09", "yyyy-mm-ddThh:mm:ss")` → `Some("2021-08-09T00:00:00")` —
+///   padding adds no information either.
+/// * `("2021-08-09T14:30:00", "yyyy-mm-dd")` → `None` — truncating would
+///   discard a real time. The caller leaves the value alone so the validity
+///   mode reports the mismatch rather than silently dropping caller data.
+/// * anything malformed, non-ASCII, or a non-DT unit → `None`.
+///
+/// Returning `None` for both "cannot" and "must not" is deliberate: every
+/// `None` means one thing to a caller — emit what you were given, and let the
+/// validity mode judge it.
+#[must_use]
+pub fn dt_to_unit_precision(value: &str, unit: &str) -> Option<String> {
+    let want = dt_unit_precision(unit)?;
+    let have = dt_value_precision(value)?;
+    if have == want {
+        return Some(value.to_string());
+    }
+    if have > want {
+        // Lossless only if every DIGIT being dropped is a zero; the separators
+        // in the dropped tail (`T`, `:`, `.`) carry no information.
+        if value[want..]
+            .bytes()
+            .any(|b| b.is_ascii_digit() && b != b'0')
+        {
+            return None;
+        }
+        return Some(value[..want].to_string());
+    }
+    // Padding up to a longer declared precision adds only zeros — always
+    // lossless, and it is what makes a date-only cell satisfy a heading that
+    // declares time precision.
+    Some(format!("{}{}", value, &DT_ZERO_TAIL[have..want]))
+}
+
 // --- AGS4 field quoting (the write-side line primitive) ---------------
 //
 // The inverse of the tokenizer's inner-value unescape. Kept here beside
@@ -891,6 +1007,150 @@ mod tests {
         // A non-bool value under YN (shouldn't happen, but the branch
         // falls through to the generic tail).
         assert_eq!(ags4_str(&Value::String("Y".into()), "YN"), "Y");
+    }
+
+    /// The three cases #695 turns on, stated as one table so the symmetry is
+    /// visible: a value is rendered at its heading's declared precision when
+    /// that is free, and left alone when it is not.
+    #[test]
+    fn dt_is_rendered_at_the_declared_precision_only_when_that_is_free() {
+        for (value, unit, want, why) in [
+            // #695: a date-only cell read back as midnight, under the
+            // date-only unit 40 of the dictionary's DT headings declare.
+            (
+                "2021-08-09T00:00:00",
+                "yyyy-mm-dd",
+                Some("2021-08-09"),
+                "midnight under a date unit: the dropped tail is all zeros",
+            ),
+            // The mirror case. Truncating here would take a file that is Rule 8
+            // clean today and break it.
+            (
+                "2021-08-09T00:00:00",
+                "yyyy-mm-ddThh:mm:ss",
+                Some("2021-08-09T00:00:00"),
+                "already at the declared precision: unchanged",
+            ),
+            // The reverse defect, fixed by the same rule: a date-only value
+            // under a heading that declares time fails Rule 8 as-is.
+            (
+                "2021-08-09",
+                "yyyy-mm-ddThh:mm:ss",
+                Some("2021-08-09T00:00:00"),
+                "padding to a longer precision adds only zeros",
+            ),
+            (
+                "2021-08-09",
+                "yyyy-mm-ddThh:mm",
+                Some("2021-08-09T00:00"),
+                "minute precision pads to minutes, not seconds",
+            ),
+            (
+                "2021-08-09T14:30:00",
+                "yyyy-mm-ddThh:mm:ss.sss",
+                Some("2021-08-09T14:30:00.000"),
+                "CPTT_TIME's millisecond unit is a real declared precision",
+            ),
+            // The refusals. Each would discard something the caller supplied.
+            (
+                "2021-08-09T14:30:00",
+                "yyyy-mm-dd",
+                None,
+                "a real time under a date unit: dropping it loses data",
+            ),
+            (
+                "2021-08-09T00:00:30",
+                "yyyy-mm-ddThh:mm",
+                None,
+                "seconds are not zero, so minute precision is lossy",
+            ),
+            (
+                "2021-08-09T00:00:00.500",
+                "yyyy-mm-ddThh:mm:ss",
+                None,
+                "a sub-second component is still information",
+            ),
+            (
+                "2021-08-09T00:00:00",
+                "m",
+                None,
+                "not a DT unit at all — nothing to render against",
+            ),
+            (
+                "2021-08-09T00:00:00",
+                "",
+                None,
+                "a heading outside the dictionary has no declared precision",
+            ),
+        ] {
+            assert_eq!(
+                dt_to_unit_precision(value, unit).as_deref(),
+                want,
+                "{value:?} under {unit:?}: {why}"
+            );
+        }
+    }
+
+    /// The predecessor of this helper sliced by byte offset, so a DT cell with
+    /// a multi-byte character panicked (`end byte index 10 is not a char
+    /// boundary`). Nothing called it, so nothing found that. Shape validation
+    /// runs BEFORE any indexing here, so a malformed cell is declined rather
+    /// than sliced — and declining is the correct answer anyway: a DT cell that
+    /// is not a date is a Rule 8 finding to report, not a value to reformat.
+    #[test]
+    fn a_malformed_or_non_ascii_dt_cell_is_declined_not_sliced() {
+        for bad in [
+            "2021-08-0\u{e9}9T00:00:00", // multi-byte char straddling offset 10
+            "\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}",
+            "2021-8-9T00:00:00", // unpadded month/day — wrong length
+            "2021/08/09",        // right length, wrong separators
+            "not-a-date",        // right length, not digits
+            "",
+            "2021-08-09T00:00:0", // one short of a valid precision
+        ] {
+            assert_eq!(
+                dt_to_unit_precision(bad, "yyyy-mm-dd"),
+                None,
+                "{bad:?} should be declined, not indexed into"
+            );
+        }
+    }
+
+    /// Rendering to a precision is idempotent, and never invents a precision
+    /// the unit did not ask for. The predecessor carried an idempotence
+    /// property too; this keeps it and adds the length check, which is what
+    /// actually pins the output to the declared unit.
+    #[test]
+    fn rendering_is_idempotent_and_lands_on_the_declared_width() {
+        for unit in [
+            "yyyy-mm-dd",
+            "yyyy-mm-ddThh:mm",
+            "yyyy-mm-ddThh:mm:ss",
+            "yyyy-mm-ddThh:mm:ss.sss",
+        ] {
+            for value in ["2021-08-09", "2021-08-09T00:00", "2021-08-09T00:00:00"] {
+                let Some(once) = dt_to_unit_precision(value, unit) else {
+                    continue;
+                };
+                assert_eq!(once.len(), unit.len(), "{value:?} → {unit:?}");
+                assert_eq!(
+                    dt_to_unit_precision(&once, unit).as_deref(),
+                    Some(once.as_str()),
+                    "not idempotent for {value:?} under {unit:?}"
+                );
+            }
+        }
+    }
+
+    /// A space where the standard dictionary writes `T`: accepted on input
+    /// (a DICT-defined heading may use it), and normalised on the way out
+    /// only when the unit's own precision is reached by truncation.
+    #[test]
+    fn a_space_separator_is_accepted_on_input() {
+        assert_eq!(
+            dt_to_unit_precision("2021-08-09 00:00:00", "yyyy-mm-dd").as_deref(),
+            Some("2021-08-09")
+        );
     }
 
     #[test]

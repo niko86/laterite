@@ -1429,7 +1429,7 @@ pub fn emit_ags4_from_ipc(
     for g in groups {
         let u = units.as_ref().and_then(|m| m.get(&g.code));
         let t = types.as_ref().and_then(|m| m.get(&g.code));
-        inputs.push(group_from_ipc(g.code, &g.ipc, u, t)?);
+        inputs.push(group_from_ipc(g.code, &g.ipc, u, t, opts.edition)?);
     }
     let res = laterite_ags4_emit::emit_ags4(&inputs, &opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -1450,6 +1450,7 @@ fn group_from_ipc(
     bytes: &[u8],
     units: Option<&std::collections::HashMap<String, String>>,
     types: Option<&std::collections::HashMap<String, String>>,
+    edition: DictVersion,
 ) -> Result<laterite_ags4_emit::GroupInput> {
     let reader = StreamReader::try_new(Cursor::new(bytes), None)
         .map_err(|e| Error::from_reason(format!("arrow ipc: {e}")))?;
@@ -1458,12 +1459,16 @@ fn group_from_ipc(
     for b in reader {
         batches.push(b.map_err(|e| Error::from_reason(format!("arrow ipc batch: {e}")))?);
     }
-    Ok(laterite_ags4_emit::group_from_arrow_with_meta(
+    // The edition is passed so a typed temporal column is rendered at the
+    // precision its heading's declared UNIT asks for, rather than Arrow's
+    // (#695) — this surface must answer like the others.
+    Ok(laterite_ags4_emit::group_from_arrow_with_meta_at_edition(
         code,
         schema.as_ref(),
         &batches,
         units,
         types,
+        Some(edition),
     ))
 }
 
