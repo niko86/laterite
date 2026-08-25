@@ -125,4 +125,54 @@ mod tests {
             "different seeds must produce different files"
         );
     }
+
+    /// The **type axis**: which AGS TYPEs a scaffold can put in front of
+    /// an injector at all. The design names two search axes — rule and
+    /// placement — and this is a third that nothing recorded, so nothing
+    /// noticed it bounding the search. `catalog` gives the Rule 8
+    /// injector as "a non-date into a DT-typed cell": a clean-room AGREE
+    /// on Rule 8 is therefore earned over the types a scaffold happens to
+    /// emit, never over the dictionary's full set.
+    ///
+    /// Pinned as an **exact set**, not a floor. The reach is a property
+    /// of the scaffold's heading set rather than of the values drawn into
+    /// it, so it is seed-stable and an exact pin costs no flakiness —
+    /// and it makes widening the reach an edit a reviewer sees. Raise the
+    /// pin when a type becomes reachable; never relax it to quiet a
+    /// failure, which would retire the axis instead of measuring it.
+    #[test]
+    fn scaffolds_reach_a_pinned_set_of_ags_types() {
+        fn reached(scaffold: Scaffold, seed: u64) -> std::collections::BTreeSet<String> {
+            synth(scaffold, seed)
+                .lines()
+                .map(laterite_ags4_parse::split_ags_line)
+                .filter(|f| f.first().is_some_and(|h| h.as_str() == "TYPE"))
+                .flat_map(|f| f.into_iter().skip(1))
+                .filter(|t| !t.is_empty())
+                .collect()
+        }
+
+        for (scaffold, pinned) in [
+            (Scaffold::Minimal, ["DT", "ID", "X"].as_slice()),
+            (
+                Scaffold::LocaSamp,
+                ["2DP", "DT", "ID", "PA", "X"].as_slice(),
+            ),
+            (
+                Scaffold::Wide,
+                ["0DP", "2DP", "DT", "ID", "PA", "X"].as_slice(),
+            ),
+        ] {
+            let want: std::collections::BTreeSet<String> =
+                pinned.iter().map(|s| (*s).to_string()).collect();
+            for seed in 0..4 {
+                assert_eq!(
+                    reached(scaffold, seed),
+                    want,
+                    "{scaffold:?} seed {seed}: the reachable AGS type set moved — \
+                     raise the pin if a type became reachable, investigate if one was lost"
+                );
+            }
+        }
+    }
 }

@@ -40,7 +40,18 @@ sources: []
 ## Coverage (honest split)
 - **9 asserted-clean** (regression-guard the clean-room claim — must
   reconcile): Rule 1-invalid-byte (O-32), 2b, 3, 4, 7, 8, 13, 15 — all
-  `AGREE`.
+  `AGREE`. **Rule 8's `AGREE` is scoped to `DT`** — see the note below.
+
+> [!warning] **Rule 8's verdict is narrower than this list implies.** The
+> Rule 8 row mutates a non-date into a `DT` column, and `DT` is the only AGS
+> type it has ever been tested on. [[laterite-ags4-forge]]'s scaffolds reach
+> only a pinned subset of the dictionary's types, so the rest carry **no
+> differential evidence at all** — the row was earned on one type and read as
+> Rule 8 in general, which is [[parity-triage-sampling-bias]] ([[O-36]])
+> arriving on an axis nothing recorded. Read it as **AGREE on `DT`**. The
+> reach is held by `scaffolds_reach_a_pinned_set_of_ags_types`
+> (`repo:rust-packages/laterite-ags4-forge/src/synth/mod.rs`); widening it is
+> [[dec-forge-type-axis-instrument]], tracked by #707.
 - **characterise-only**: Rule 1-valid-extended, 5, 9, 19.
 - **13 differential blind spots** (no faithful single-rule mutator from
   a PROJ/TRAN/UNIT/TYPE base — the "zero parity evidence" by-product):
