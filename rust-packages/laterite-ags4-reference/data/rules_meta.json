@@ -28,6 +28,10 @@
         {
           "id": "O-16",
           "note": "A PROJ or TRAN group with zero data rows is reported twice: once here (general empty-group rule) and once by Rule 13/14 (specific cardinality). This double-report is expected; both validators behave this way."
+        },
+        {
+          "id": "O-41",
+          "note": "A HEADING, UNIT, TYPE or DATA row appearing before any GROUP row belongs to no group, and is reported here, line-located. python-ags4's parser raises on the same row instead, so it produces a traceback and no report at all — you get the whole picture from this file, including the structural fault, rather than stopping at the first one."
         }
       ]
     },
@@ -162,6 +166,14 @@
         {
           "id": "O-38",
           "note": "python-ags4 hard-codes ISO-8601 and rejects non-ISO date UNITs such as dd/mm/yyyy; the spec actually permits the format declared in the UNIT row, so this validator honours the declared format. A date that python-ags4 rejected may validate cleanly here."
+        },
+        {
+          "id": "O-49",
+          "note": "The count in a numeric TYPE — the n in 3DP, 3SF, 3SCI — is read from the file's own TYPE row and used as a width when a value is rendered. It is clamped here before it is used. Real AGS types are single-digit, so nothing legitimate is affected; the clamp exists because a corrupt or crafted count reaches the formatter before any rule has vetted the TYPE, and python-ags4 reads it uncapped."
+        },
+        {
+          "id": "O-50",
+          "note": "Both validators flag an out-of-range or fractional 0DP cell here, identically — this rule is not where the two differ. They differ afterwards, when the string is CONVERTED to a number: a value too large for a 64-bit integer becomes Null here, where python-ags4's conversion keeps full precision. So a cell can be flagged by both and still read back differently."
         }
       ]
     },
@@ -192,6 +204,10 @@
         {
           "id": "O-22",
           "note": "Rules 10a/10b/10c intentionally overlap with Rules 8/13/14; this is deliberate spec layering, not a defect, so some findings appear under more than one rule."
+        },
+        {
+          "id": "O-51",
+          "note": "If you validated with a custom dictionary as an OVERLAY, watch for an override warning alongside any finding here. An overlay that demotes a standard KEY heading changes what uniqueness means for that group, so this rule can start answering differently about rows nobody edited. python-ags4 cannot report this: its custom dictionary replaces the standard one outright, leaving nothing to compare an override against."
         }
       ]
     },
@@ -205,6 +221,10 @@
         {
           "id": "O-15",
           "note": "Rule 12 (null entries) is defined only as a pointer to this rule and emits nothing itself, so all empty-required-field findings land here under Rule 10b."
+        },
+        {
+          "id": "O-53",
+          "note": "A blank TRAN_AGS is reported here, once, and nowhere else. python-ags4 adds a second finding on the same cell saying the edition was not recognised — but only if you asked for the FYI tier, so its default run reports the blank without ever saying which dictionary it then used. That fact is on the report itself here, as the dictionary version and how it was resolved, shown on every run."
         }
       ]
     },
@@ -230,6 +250,14 @@
         {
           "id": "O-52",
           "note": "A row whose parent key fields are ALL empty claims no parent, so the parent check is skipped rather than failed - and you get a warning saying so, because a deliberately standalone record (a lab control, an off-site sample) and a key that was blanked by accident look identical from here. The warning does not fail the file. python-ags4 reports nothing at all for these rows."
+        },
+        {
+          "id": "O-42",
+          "note": "A file declaring TRAN_AGS \"4.0\" is ambiguous — there were two 4.0 releases — and the choice shows up here. This validator resolves it to the newer one, which is a strict superset of the older, so no heading is falsely flagged. python-ags4's table picks the older, where PMTL has a different parent, and reports PMTL rows as orphans that this validator does not."
+        },
+        {
+          "id": "O-51",
+          "note": "If you validated with a custom dictionary as an OVERLAY, watch for an override warning alongside any finding here. An overlay that re-parents a standard group changes which parent this rule looks for, so rows nobody edited can start reporting as orphans, or stop."
         }
       ]
     },
@@ -303,6 +331,10 @@
         {
           "id": "O-30",
           "note": "TRAN_AGS is not checked for agreement with the dictionary edition being validated against - no AGS rule requires that. The value only selects which standard dictionary is used, falling back to 4.1.1 when it is absent or unrecognised; you can also set the edition explicitly, which overrides the file's declaration."
+        },
+        {
+          "id": "O-45",
+          "note": "A TRAN_AGS that is present but not a recognised edition satisfies this rule and still earns a warning, shown by default: the edition could not be matched, so the file was judged against a fallback dictionary its author never declared. python-ags4 reports the same condition only as an FYI you have to opt into. It is a warning and not an error — no rule is broken — so it does not decide the verdict."
         }
       ]
     },
