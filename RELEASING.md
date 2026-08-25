@@ -38,6 +38,51 @@ answers to a different audience and a different registry.
 > and wheel 0.8.1/0.8.2 were never published at all. Re-shipping an unchanged
 > product is the cost of the shared number.
 
+### Start here: is a release owed, and what part?
+
+```bash
+uv run --no-sync python tools/release/release_status.py
+```
+
+Prints both tiers, when each was last stamped, and a **derived** part for each.
+The engine verdict comes from the committed `cargo-public-api` snapshots in
+`tools/release/public-api/` — the only source that can see an addition, since
+`cargo semver-checks` has no `function_added` lint and skips every `minor` lint
+between releases. The product verdict comes from the `changelog.json` sections
+every PR is already forced to fill in.
+
+Read what it says it cannot see. The product's own API surface is **not**
+measured — no committed snapshot exists for the Python or Node surface — so that
+verdict is a suggestion. Neither tier is checked against a registry: *unreleased*
+means *not stamped in this tree*, which will not catch a stamped version whose
+tag was never cut (the 0.8.1/0.8.2 failure above). The same report runs nightly
+and lands in the run's step summary, so drift surfaces without anyone asking.
+
+### Cutting both tiers at one number
+
+```bash
+git switch -c release/0.12.0
+tools/release/cut-release.sh 0.12.0            # prints the plan, then stamps both
+tools/release/cut-release.sh 0.12.0 --plan     # print the plan and stop
+```
+
+One command, one `release: X` commit, both tiers at the same number — which is
+what makes `pip install laterite==X`, `npm i laterite@X` and
+`cargo add laterite-ags4-validator@X` mean the same release. It then prints the
+publish sequence in dependency order, because the order is forced: the engine
+goes to crates.io first (every product is built from those crates), then the
+product tags, then the DuckDB extension, which builds against the engine **from
+the registry** and so cannot move until the crates are on the index.
+
+`--skip engine` is the escape hatch, and it is there for one reason: crates.io is
+append-only, so burning eleven crate versions on a browser-only fix is a cost
+worth being able to decline. That is precisely the 0.8.1/0.8.2 case. The two
+numbers stay two fields for the same reason — `cut-release.sh` defaults them to
+the same value, it does not merge them.
+
+The single-tier `bump-version.sh` below is still there and still correct; reach
+for it when you genuinely mean one tier only.
+
 `tools/release/bump-version.sh <product|engine>` drives the in-repo bump
 (wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/)
 — product config in the root `pyproject.toml` `[tool.bumpversion]`, engine config

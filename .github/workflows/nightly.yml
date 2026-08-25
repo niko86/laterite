@@ -239,6 +239,47 @@ jobs:
         working-directory: rust-packages
         run: cargo deny check
 
+  # Is a release owed? Both tiers only move when someone runs bump-version.sh,
+  # which is right — a release is a decision, not a side effect of merging. But
+  # nothing SAID one was owed, and the two drifted: the product shipped three
+  # times between engine 0.9.0 (#184) and #716 while the engine stayed put, so
+  # crates.io consumers and `laterite-duckdb` sat four figures of public API
+  # behind what every wheel user was running.
+  #
+  # Read-only and never fails the run. A nag that can go red would start being
+  # silenced, and "you have unreleased work" is not a defect — it is a state
+  # somebody has to decide about. It writes to the step summary so the answer is
+  # visible without opening a log.
+  #
+  # It IS in `notify`'s needs even though its verdict never fails the run: the
+  # step can still fail by crashing, and a report that has silently stopped
+  # reporting is the failure most worth hearing about. `TRACKER_EXCLUDED` in
+  # tests/test_nightly_wiring.py stays empty. (#716)
+  release-owed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The API delta is measured from the last version stamp, which is an
+          # arbitrary distance back — a shallow clone would silently measure
+          # from whatever the cutoff happened to be and report a smaller number
+          # with no indication it had been truncated.
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+      - name: release status
+        run: |
+          uv run --no-project python tools/release/release_status.py | tee /tmp/status.txt
+          {
+            echo "### Release status"
+            echo '```'
+            cat /tmp/status.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Link + badge health check. ci.yml's `docs` job runs `mkdocs build --strict`,
   # which only validates INTERNAL links — this catches dead EXTERNAL links + dead
   # badge targets in the README and docs, rot that's otherwise invisible. Runs
@@ -1240,6 +1281,7 @@ jobs:
       - coverage
       - deny
       - links
+      - release-owed
       - wheel-smoke
       - docs-vs-released-wheel
       - docs-example-headers
