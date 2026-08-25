@@ -44,10 +44,15 @@ pass or fail, rather than only when unhappy:
 * **HTML comments**, which mkdocs does not render. The `doc-code: skip — why`
   markers live in them and spell their reason after an em dash, and a policy
   about what a reader sees has nothing to say about text no reader sees.
-* **Three built page families, by decision, listed in `BUILT_SKIP`** with the
+* **Two built page families, by decision, listed in `BUILT_SKIP`** with the
   reason on each and the count printed every run. They are the pages whose prose
-  belongs to something other than this site: the wheel's docstrings, and a guide
-  that ships inside two binaries. Neither is a docs-site edit.
+  belongs to something other than this site: the wheel's own docstrings, where
+  the fix would be an API-surface edit rather than a docs-site one.
+
+  The shipped `lat --readme` guide USED to be a third. #681 decided the policy
+  does cover what a shipped program prints at a terminal, so its prose was
+  rewritten at the authority and the page is gated from here on. Its `lat --help`
+  blocks are still skipped, as code, like any other fence.
 * **CSS and JS under `docs/`.** Comments in the stylesheets and the two small
   scripts are not reader-facing copy, and #588 puts them out of scope
   explicitly. Counted so the number is visible rather than assumed to be zero.
@@ -128,37 +133,18 @@ BUILT_SKIP = {
         "excluded: they live in docs/reference/modules.md, which the source "
         "half reads"
     ),
-    # NOT granted by #588, and saying so is the point. That issue enumerates its
-    # carve-outs exhaustively (the stylesheets, the scripts, and the shipped
-    # package's own docstrings) and never mentions the CLI guide; its in-scope
-    # measurement counted `docs/**.md` only, which this page is not. So this
-    # exclusion is a scope call made HERE, and it leaves an acceptance criterion
-    # ("no U+2014 in rendered docs prose") unmet on one page rather than met.
-    # #588's own rule for a case like this is that it is worth its own ticket,
-    # which is #681: either the guide is rewritten and this entry goes, or the
-    # policy is declared not to cover terminal output and this reason is
-    # rewritten to say so. Until one of those, the count below is not a zero.
-    "reference/cli/": (
-        "EXCLUDED BY A CALL MADE HERE, NOT BY #588. The page is the shipped "
-        "`lat --readme` guide: one authority (rust-packages/laterite-cli/"
-        "README-cli.md) `include_str!`d into the binary, plus two mirrors held "
-        "byte-identical to it by tools/gen_cli_readme.py, so rewriting it "
-        "changes what a shipped program prints rather than what this site says. "
-        "That is a shipped-content change, and #681 is where it gets decided; "
-        "until then these are known-unfixed, not known-absent. The count is "
-        "PROSE only, and smaller than it looks: the guide's `lat --help` blocks "
-        "are skipped as code like anywhere else, and one offending heading is "
-        "counted once per place the theme renders it"
-    ),
 }
 
 #: What this half still cannot see, printed with the exclusions rather than left
-#: for someone to discover. Neither is hypothetical: the first is a string this
-#: repo owns, and the second is how `site_description` escaped the source scan.
+#: for someone to discover. Neither is hypothetical: the first is how
+#: `site_description` escaped the source scan.
+#:
+#: One entry LEFT this tuple at #681. The note scripts/gen_cli.py writes above
+#: the shipped guide is ours and had no `.md` for the other half to read, so
+#: while the page was excluded by path nothing held it at all. Gating the page
+#: holds the note too, which is a blind spot closed by the same decision rather
+#: than by a change aimed at it.
 BUILT_BLIND_SPOTS = (
-    "reference/cli/ also carries the note scripts/gen_cli.py writes above the "
-    "shipped guide, which IS ours; the exclusion is by path, so that note is "
-    "unread by this half, and it has no `.md` for the other half to read",
     "attribute text other than the meta description — an `alt` or a `title` is "
     "read aloud or shown on hover, but tag-stripping drops both",
     "search/search_index.json, which feeds the search dropdown's snippets: it is "

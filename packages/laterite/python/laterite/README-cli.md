@@ -1,7 +1,7 @@
 # lat
 
-A clean-room Rust tool for the **AGS4** geotechnical transfer format —
-validate / read / fix / diff / certify a file, and pack / lock it for transport,
+A clean-room Rust tool for the **AGS4** geotechnical transfer format. It can
+validate, read, fix, diff and certify a file, and pack or lock it for transport,
 with no Python at runtime. The `validate` capability is what `python-ags4`'s
 `AGS4.check_file()` provides. A bare `lat <file.ags>` is shorthand for
 `lat validate <file.ags>`.
@@ -129,7 +129,7 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
 
     --json               emit the raw machine-readable rules_meta.json
 
-## transport — pack / unpack / lock / unlock
+## transport: pack / unpack / lock / unlock
 
     Package any file (`.ags`, anything) for storage or transfer.
     `pack` / `unpack` are zstd; `lock` / `unlock` add an age passphrase envelope
@@ -171,7 +171,7 @@ Progress is on stderr; the report on stdout.
 
 ## Exit codes
 
-Errors decide the verdict. A warning is REPORTED, not fatal — the exit code and
+Errors decide the verdict. A warning is REPORTED, not fatal. The exit code and
 the findings table answer different questions, and `--warnings-as-errors` is what
 joins them.
 
