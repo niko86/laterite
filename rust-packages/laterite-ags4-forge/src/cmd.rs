@@ -893,8 +893,16 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
         print!("{}", crate::edit::Patch::template());
         return Ok(0);
     }
-    if !args.file.exists() {
-        eprintln!("error: file not found: {}", args.file.display());
+    // Unreachable through the CLI — clap's `required_unless_present` has
+    // already refused a run with no <FILE> that is not `--patch-template`.
+    // Handled rather than unwrapped so a library caller gets an error instead
+    // of a panic.
+    let Some(file) = args.file.as_ref() else {
+        eprintln!("error: <FILE> is required unless --patch-template is given");
+        return Ok(2);
+    };
+    if !file.exists() {
+        eprintln!("error: file not found: {}", file.display());
         return Ok(3);
     }
 
@@ -938,7 +946,7 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
         return Ok(5);
     }
 
-    let text = std::fs::read_to_string(&args.file)?;
+    let text = std::fs::read_to_string(file)?;
     let edited = match crate::edit::apply(&text, &ops) {
         Ok(t) => t,
         Err(e) => {
@@ -948,7 +956,7 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
     };
 
     let target = if args.in_place {
-        Some(args.file.clone())
+        Some(file.clone())
     } else {
         args.out.clone()
     };
@@ -976,7 +984,7 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
         + before.len().abs_diff(after.len());
     let doc = serde_json::json!({
         "schema": 1,
-        "file": args.file.display().to_string(),
+        "file": file.display().to_string(),
         "operations": ops,
         "unchanged": edited == text,
         "bytes_in": text.len(), "bytes_out": edited.len(),
@@ -1082,10 +1090,39 @@ pub fn confidence_cmd(args: &ConfidenceArgs, ctx: Ctx) -> Result<i32> {
 /// `forge seed vendor` — clone python-ags4's upstream `tests/` corpus
 /// (GitLab canonical, GitHub mirror fallback), pinned + immutable +
 /// with provenance. Opt-in; degrades cleanly with no network.
-pub fn vendor(args: &VendorArgs, _ctx: Ctx) -> Result<i32> {
+pub fn vendor(args: &VendorArgs, ctx: Ctx) -> Result<i32> {
     let dest = args.dest.clone();
     let gitlab = "https://gitlab.com/ags-data-format-wg/ags-python-library.git";
     let github = "https://github.com/asitha-sena/python-ags4.git";
+
+    // The one subcommand that reaches the network is the one where a probe is
+    // most worth having, so `--dry-run` has to land before the clone rather
+    // than before the copy. Both sources are named: the run falls back from
+    // GitLab to the GitHub mirror, and a plan that showed only the first would
+    // misreport what a real run may do. The file count is knowable only by
+    // fetching, so it is not guessed here.
+    if ctx.dry_run {
+        let plan = Plan::new(
+            "vendor",
+            format!(
+                "would clone python-ags4 @ {} (GitLab canonical, GitHub mirror \
+                 on failure) and copy its .ags corpus → {}",
+                args.r#ref,
+                dest.display(),
+            ),
+        )
+        .with("ref", args.r#ref.clone())
+        .with("source", gitlab)
+        .with("fallback_source", github)
+        .with("dest", dest.display().to_string())
+        .with(
+            "would_write",
+            "PROVENANCE.md + every .ags in tests/test_files",
+        );
+        emit(&plan, &ctx)?;
+        return Ok(0);
+    }
+
     let tmp = std::env::temp_dir().join(format!("pyags4_vendor_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     let clone = |url: &str| {
@@ -1156,6 +1193,92 @@ fn emit_value(v: &serde_json::Value, ctx: Ctx) -> Result<()> {
         _ => laterite_cliutil::write_json_pretty(&mut o, v, ctx.colour())?,
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod cli_contract_tests {
+    use super::*;
+    use crate::ops::Injection;
+    use clap::{CommandFactory, Parser};
+
+    fn probe_ctx(dry_run: bool) -> Ctx {
+        Ctx {
+            mode: laterite_cliutil::OutputMode::Ndjson,
+            quiet: true,
+            dry_run,
+            no_input: true,
+            compact: false,
+            no_color: true,
+        }
+    }
+
+    /// #708 — the one subcommand that reaches the network was the one whose
+    /// `--dry-run` did nothing, because the context was bound as `_ctx`.
+    /// Falsify by restoring that binding: the clone runs and `dest` appears.
+    #[test]
+    fn vendor_dry_run_touches_neither_network_nor_disk() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dest = tmp.path().join("corpus");
+        let args = crate::cli::VendorArgs {
+            r#ref: "v1.2.0".into(),
+            dest: dest.clone(),
+        };
+        let code = vendor(&args, probe_ctx(true)).expect("dry run");
+        assert_eq!(code, 0);
+        assert!(
+            !dest.exists(),
+            "--dry-run created {} — the contract is that it mutates nothing",
+            dest.display()
+        );
+    }
+
+    /// #709 — the help enumerated seven tokens where the binary accepted ten.
+    /// Reached the way a caller reaches it, through clap's RENDERED help: an
+    /// assertion against `inject_help()` alone would be checking that a string
+    /// built from `ALL` mentions `ALL`, which cannot fail. Falsify by pinning
+    /// the old hand-written list back into the doc comment — rule10b/14/16/17
+    /// go missing and this names them.
+    #[test]
+    fn rendered_gen_help_names_every_injector() {
+        let mut cmd = crate::cli::Cli::command();
+        let rendered = cmd
+            .find_subcommand_mut("gen")
+            .expect("gen subcommand")
+            .render_long_help()
+            .to_string();
+        for inj in Injection::ALL {
+            assert!(
+                rendered.contains(inj.token()),
+                "`{}` missing from rendered `gen --help`",
+                inj.token()
+            );
+        }
+    }
+
+    /// #710 — `--patch-template` prints a static template and reads no file,
+    /// but clap refused to run it without a <FILE>. Falsify by making `file`
+    /// a bare required `PathBuf` again: this parse fails.
+    #[test]
+    fn patch_template_runs_without_a_file() {
+        let parsed = crate::cli::Cli::try_parse_from(["forge", "edit", "--patch-template"]);
+        assert!(
+            parsed.is_ok(),
+            "--patch-template is a discovery flag and must not require <FILE>: {:?}",
+            parsed.err().map(|e| e.to_string())
+        );
+    }
+
+    /// The requirement is only lifted for that one flag — every operating mode
+    /// still needs the file it reads.
+    #[test]
+    fn every_other_edit_mode_still_requires_its_file() {
+        let parsed =
+            crate::cli::Cli::try_parse_from(["forge", "edit", "--set", "LOCA:1:LOCA_ID=BH1"]);
+        assert!(
+            parsed.is_err(),
+            "an edit that reads a file must still demand <FILE>"
+        );
+    }
 }
 
 #[cfg(test)]
