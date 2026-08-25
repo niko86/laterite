@@ -288,7 +288,7 @@ test("fine: a refused run never renders as the all-clear", async ({
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
-  const chip = page.locator('[data-scoreboard="floating"]');
+  const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
 
   // An AGS 3.x TRAN_AGS is the value the engine REFUSES (unsupported
@@ -1652,7 +1652,7 @@ test("touch: the floating verdict follows without covering the editor", async ({
   await page
     .getByRole("button", { name: "Edit LOCA_ID on row 1 of LLPL" })
     .click();
-  const floating = page.locator('[data-scoreboard="floating"]');
+  const floating = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(floating).toBeVisible({ timeout: 15_000 });
 
   // …and must NOT sit on the carousel's controls: Playwright refuses a tap
@@ -1676,7 +1676,7 @@ test("fine: the scoreboard follows the reader and lands on the verdict", async (
 
   // The floating chip appears once a table is on screen, carrying the count.
   await page.locator("section#loca").scrollIntoViewIfNeeded();
-  const floating = page.locator('[data-scoreboard="floating"]');
+  const floating = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(floating).toBeVisible({ timeout: 15_000 });
   await expect(floating).toContainText(/error/);
 
@@ -3307,7 +3307,7 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
-  const chip = page.locator('[data-scoreboard="floating"]');
+  const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
   const panel = page.locator("#findings");
 
@@ -3634,4 +3634,80 @@ test("a page dot is a small mark with a full-size target", async ({ page }) => {
   // And it is still a door.
   await dots.nth(2).click();
   await expect(dots.nth(2)).toHaveAttribute("aria-current", "true");
+});
+
+// #691: the verdict chip WAS `fixed right-4 bottom-4`, a clickable overlay on
+// top of whatever the page had in its bottom-right corner. Hit-testing under it
+// found a fix button at 1280, a cell editor at 1024, and three separate controls
+// at 390; only 1440 was clean, and only because the content column stopped short
+// of the corner there.
+//
+// WHAT THIS ASSERTS, AND WHY IT IS NOT A COLLISION SCAN. The first version of
+// this test walked the page in viewport-sized steps and hit-tested under the
+// chip at each stop. It passed against the unfixed code — a sampling walk steps
+// OVER a collision, and at this lane's viewport height its stops landed either
+// side of all three. A test that cannot fail on the defect it was written for is
+// worse than no test, because it reads as coverage.
+//
+// The invariant instead is exact and cheap: a chip inside the masthead's own box
+// cannot be a corner overlay. Content scrolling under a sticky header is what a
+// header is; content scrolling under a chip parked in the middle of the reading
+// area is the defect. Measured as containment, not asserted as a class name, so
+// a restyle that floats it again fails here.
+//
+// Note what the rest of this file could NOT catch, and still cannot: Playwright
+// scrolls a target into view before clicking, which lands it clear of a
+// viewport-fixed chip. The scoreboard test above clicks the very button the chip
+// used to cover, and passed throughout.
+test("the verdict rides the masthead rather than parking over the page", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator("section#loca").scrollIntoViewIfNeeded();
+  const chip = page.locator('[data-scoreboard="verdict"]:visible');
+
+  // Below the breakpoint the masthead is full — the icon nav, the toggle and
+  // the CTA leave single-figure pixels — so the chip is not rendered at all
+  // and cannot overlay anything. The phone carries findings under each table.
+  // WHAT THIS DOES NOT COVER. Below the breakpoint the chip is still the
+  // corner float, and still covers controls — measured at 390: a fix button, a
+  // cell editor and a TRAN cell, at three scroll positions. It is not fixed
+  // here because the phone masthead has single-figure free pixels against a
+  // chip that needs eighty-odd, and #531 recorded the 390 touch reader as this
+  // chip's audience, so hiding it there is a design decision this ticket did
+  // not carry. Asserted as a KNOWN state rather than skipped, so the day the
+  // phone case is solved this test fails and asks to be updated.
+  if (width(page) < 832) {
+    await expect(chip).toBeVisible({ timeout: 15_000 });
+    const box = await chip.boundingBox();
+    expect(box, "the phone chip is still laid out").not.toBeNull();
+    expect(
+      box!.y + box!.height,
+      "still parked at the bottom of the phone viewport (#691, unfixed there)",
+    ).toBeGreaterThan(page.viewportSize()!.height * 0.7);
+    return;
+  }
+
+  await expect(chip).toBeVisible({ timeout: 15_000 });
+  const [chipBox, headerBox] = await Promise.all([
+    chip.boundingBox(),
+    page.locator("header").first().boundingBox(),
+  ]);
+  expect(chipBox, "the chip must be laid out").not.toBeNull();
+  expect(headerBox, "the masthead must be laid out").not.toBeNull();
+
+  const inside =
+    chipBox!.x >= headerBox!.x - 0.5 &&
+    chipBox!.y >= headerBox!.y - 0.5 &&
+    chipBox!.x + chipBox!.width <= headerBox!.x + headerBox!.width + 0.5 &&
+    chipBox!.y + chipBox!.height <= headerBox!.y + headerBox!.height + 0.5;
+  expect(
+    inside,
+    `the verdict chip must sit inside the masthead, not over the page — ` +
+      `chip ${JSON.stringify(chipBox)} vs header ${JSON.stringify(headerBox)}`,
+  ).toBe(true);
+
+  // Still a door, from its new home.
+  await chip.locator("button").click();
+  await expect(page.locator("#findings")).toBeInViewport();
 });

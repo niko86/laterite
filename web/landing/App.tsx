@@ -16,10 +16,10 @@ import { Masthead } from "./components/Masthead";
 import { Hero } from "./components/Hero";
 import { InstallGrid } from "./components/InstallGrid";
 import { Footer } from "./components/Footer";
+import { FloatingScoreboard } from "./demo/Scoreboard";
 import { Rail } from "./components/Rail";
 import { GroupSection } from "./demo/GroupSection";
 import { armWhenIdle, bindUndoShortcuts } from "./demo/store";
-import { FloatingScoreboard } from "./demo/Scoreboard";
 import { FileAndFindings } from "./demo/FileAndFindings";
 import { SECTIONS, bandVar } from "./sections";
 
@@ -99,6 +99,9 @@ export const App: Component = () => {
         </main>
         <Footer />
       </div>
+      {/* The phone verdict (#691). The desktop one rides the masthead; this is
+          the corner float, mounted in the page body so its tab order matches
+          where it draws. Exactly one of the two is ever visible. */}
       <FloatingScoreboard />
     </div>
   );

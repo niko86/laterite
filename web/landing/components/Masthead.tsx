@@ -28,6 +28,7 @@
 import { For, type Component, type JSX } from "solid-js";
 import { Button, Icon, ThemeToggle } from "@shared/components";
 import mark from "../../../assets/laterite-icon-128.png";
+import { DockedScoreboard } from "../demo/Scoreboard";
 
 const NAV = [
   // Demo before Install (#533): the nav promises the order the page keeps.
@@ -129,6 +130,11 @@ export const Masthead: Component = () => (
           )}
         </For>
       </nav>
+
+      {/* The verdict rides the masthead (#691) rather than floating over the
+          page. It renders nothing until the engine's first report lands and
+          a table is on screen, so the header is unchanged everywhere else. */}
+      <DockedScoreboard />
 
       <div class="ml-auto flex items-center gap-2 min-[52rem]:ml-0">
         {/* The mobile nav is these two icons (#597): the text nav is hidden
