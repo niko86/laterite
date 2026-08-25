@@ -48,6 +48,9 @@
     ],
     "changed": [
       {
+        "text": "**`lat --readme` follows the house punctuation, and the page that renders it is gated rather than excused.** The docs-site em dash policy had one page permanently outside it: `reference/cli/` IS the shipped guide, `include_str!`d into the binary and read from inside the wheel, so rewriting it changes what a program prints rather than what a site says. That made it a decision rather than an edit, and the decision is that the policy covers terminal output too. Three prose sentences in the authority (`rust-packages/laterite-cli/README-cli.md`) are rewritten as sentences rather than character-swapped, and the two generated mirrors follow. The `lat --help` blocks are untouched: they reproduce what the tool prints, and the gate skips them as code wherever they appear. Removing the exclusion also closes a blind spot the exclusion had created, and one nothing else could have caught: the note `web/docs-site/scripts/gen_cli.py` writes above the guide is ours, and it has no `.md` for the source half to read, so while the page was skipped by path nothing held that note at all. The gate's own test for the exclusion is replaced rather than deleted, by the thing it stood in for — a dash in that page's prose now has to make the gate red, which an exclusion re-added under a differently-spelled prefix could not satisfy (#681, #588)."
+      },
+      {
         "text": "**`lat validate` now states which dictionary judged the file — on every launcher.** The head line gains `— dictionary 4.1.1 (exact)` on the native binary and the wheel launcher; the npx launcher already said it, which under the launcher contract's fact tier made its absence elsewhere a defect, not a style choice. The `exact`/`guessed`/`fallback`/`forced` token is the same resolution vocabulary the certificate and the `report.resolution` API already use (#542)."
       },
       {
