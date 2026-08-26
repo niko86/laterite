@@ -37,7 +37,10 @@
 //!
 //! Rule 19a follows the prose (≤9, `[A-Z0-9_]`) — there the prose and
 //! the dictionary agree. The prefix==GROUP / valid cross-group borrow
-//! check is dictionary-dependent → deferred to V8 (python's `19b_2/3`).
+//! check is dictionary-dependent, so it is NOT here: it lives in
+//! `rules::references` (python's `19b_2/3`), resolved against standard
+//! dict ∪ the file's own DICT. This module is deliberately
+//! dictionary-free, which is why Rule 19b has two emission sites.
 
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
@@ -141,9 +144,11 @@ fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
 ///
 /// This enforces the convention every standard heading follows
 /// (0 / 4199 deviate across both dictionaries — O-7), which is
-/// stricter than the spec prose. The prefix-equals-GROUP (or valid
-/// cross-group borrow, e.g. `FILE_FSET` inside LOCA) check needs the
-/// dictionary and is deferred to V8 (python's `19b_2/3`).
+/// stricter than the spec prose. This half is deliberately
+/// dictionary-free: the prefix-equals-GROUP check and the valid
+/// cross-group borrow (e.g. `FILE_FSET` inside LOCA) need the
+/// dictionary, so they live in `rules::references` — python's
+/// `19b_2/3` — resolved against standard dict ∪ the file's own DICT.
 // `ci` is bounded the same way as in `rule_19a` above.
 #[allow(clippy::cast_possible_truncation)]
 fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {

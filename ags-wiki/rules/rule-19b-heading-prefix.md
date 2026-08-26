@@ -10,7 +10,7 @@ varies_between_editions: false
 divergences: []
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
-  impl: "repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs"
+  impl: "repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs repo:rust-packages/laterite-ags4-validator/src/rules/references.rs"
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule19b_bad_prefix.ags repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule19b_borrowed_bad.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule19b_bad_prefix_flagged repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule19b_unknown_borrowed_prefix_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 19b"
@@ -26,7 +26,7 @@ sources: [spec-4.2]
 Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by reading §8.1 (4.0.3/4.0.4 prose) and §4.1.1 (4.1/4.1.1/4.2 table) of *all five* PDFs, not by trusting a foreword. The text is *not* byte-identical: 4.1 reorganised prose→table, dropped Section-cross-ref parentheticals (Rules 7/10c/11), and changed Rule 15's example `ERES_RUNI`→`ELRG_RUNI` tracking the dictionary's ERES→ELRG replacement. Cross-edition rule variation is thus a *presentation + interpretation/implementation* axis, not a normative-text axis — see [[ags4-rules-frozen-dictionary-evolves]] and [[rule15-example-tracks-eres-elrg-removal]].
 
 ## Rule family
-`naming` — implemented in `repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs`. See [[rule-families]].
+`naming` — implemented in TWO modules, and both are needed to describe what this rule does: the lexical shape check in `repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs` (`19b_1`, no dictionary) and the dictionary-aware prefix resolution in `repo:rust-packages/laterite-ags4-validator/src/rules/references.rs` (`19b_2`/`19b_3`, against the [[effective-dictionary]]). See [[rule-families]].
 
 ## Implementation (this repo)
 > [!quote] Implemented in `repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs::rule_19b + references.rs`
@@ -39,7 +39,7 @@ Structural AAAA_BBBB, field part 1–4 chars (stricter than prose — O-7). Dict
 
 ```mermaid
 flowchart LR
-  R["Rule 19b"] --> I["naming.rs"] --> F["2 fixture(s)"] --> T["2 test(s)"] --> O["O-N (linked at Ingest)"]
+  R["Rule 19b"] --> I["naming.rs + references.rs"] --> F["2 fixture(s)"] --> T["2 test(s)"] --> O["O-N (linked at Ingest)"]
 ```
 
 - Fixtures: `rule19b_bad_prefix.ags`, `rule19b_borrowed_bad.ags`
