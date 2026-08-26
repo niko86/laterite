@@ -209,6 +209,47 @@ fn last_line(g: &laterite_ags4_parse::ParsedGroup) -> u32 {
         .unwrap_or(g.group_line)
 }
 
+/// A group's headings as this patch has left them so far.
+///
+/// Rows are deliberately strict — every operation resolves a row number
+/// against the file as it arrived, so a patch reads the way its author wrote
+/// it. Headings cannot be that strict for much longer: a patch will be able
+/// to CREATE a column, and an operation later in the same patch has to be
+/// able to name it. Resolving straight off the parse would refuse that
+/// heading as unknown, because the parse happened before the column existed.
+///
+/// Nothing creates a column yet, so `added` is always empty and this returns
+/// exactly what the parse returned — the bytes this module writes are
+/// unchanged. It exists so the operation that does create one registers it in
+/// ONE place, instead of every arm learning to look in two (#723).
+#[derive(Debug, Default)]
+struct Shape {
+    /// Group code -> headings this patch appended, in creation order. They
+    /// sit after the parsed headings because that is where a rebuilt row puts
+    /// their cells.
+    added: BTreeMap<String, Vec<String>>,
+}
+
+impl Shape {
+    /// Column index of `heading`, counting columns this patch created.
+    /// `None` is the caller's `NoSuchHeading`.
+    fn col(&self, g: &laterite_ags4_parse::ParsedGroup, heading: &str) -> Option<usize> {
+        g.col(heading).or_else(|| {
+            let added = self.added.get(&g.code)?;
+            added
+                .iter()
+                .position(|h| h == heading)
+                .map(|i| g.headings.len() + i)
+        })
+    }
+
+    /// How many cells a row of this group should carry: the width a short row
+    /// is padded to, and the width a ragged one is measured against.
+    fn arity(&self, g: &laterite_ags4_parse::ParsedGroup) -> usize {
+        g.headings.len() + self.added.get(&g.code).map_or(0, Vec::len)
+    }
+}
+
 /// Where an operation sits in the canonical order. Operations are applied in
 /// this order regardless of the order they were written, which is what makes
 /// every combination of them mean one thing.
@@ -294,6 +335,10 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
         }
     };
 
+    // Every heading lookup and every arity calculation below goes through
+    // this, never straight to the parse — see `Shape`.
+    let shape = Shape::default();
+
     let mut ordered: Vec<&Op> = ops.iter().collect();
     ordered.sort_by_key(|op| rank(op));
 
@@ -310,10 +355,12 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 value,
                 group,
             } => {
-                let col = g.col(heading).ok_or_else(|| EditError::NoSuchHeading {
-                    group: group.clone(),
-                    heading: heading.clone(),
-                })?;
+                let col = shape
+                    .col(g, heading)
+                    .ok_or_else(|| EditError::NoSuchHeading {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                    })?;
                 let data = g
                     .rows
                     .get(row.wrapping_sub(1))
@@ -333,7 +380,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 // always the larger bound — there is no separate "at least the
                 // target column" case to defend against. `resize` truncates
                 // when it shrinks, so an over-long row is left alone.
-                let want = g.headings.len() + 1;
+                let want = shape.arity(g) + 1;
                 if fields.len() < want {
                     fields.resize(want, String::new());
                 }
@@ -341,12 +388,14 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 plan.insert(data.line, Line::Replace(rebuild(&fields)));
             }
             Op::AddRow { cells, group } => {
-                let mut values = vec![String::new(); g.headings.len()];
+                let mut values = vec![String::new(); shape.arity(g)];
                 for (heading, value) in cells {
-                    let col = g.col(heading).ok_or_else(|| EditError::NoSuchHeading {
-                        group: group.clone(),
-                        heading: heading.clone(),
-                    })?;
+                    let col = shape
+                        .col(g, heading)
+                        .ok_or_else(|| EditError::NoSuchHeading {
+                            group: group.clone(),
+                            heading: heading.clone(),
+                        })?;
                     values[col].clone_from(value);
                 }
                 let mut fields = vec!["DATA".to_string()];
@@ -396,10 +445,12 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 // wrong field or ran off the end and reported the row as too
                 // short. Collecting them and removing right-to-left is what
                 // makes the pair mean the same thing in either order.
-                let col = g.col(heading).ok_or_else(|| EditError::NoSuchHeading {
-                    group: group.clone(),
-                    heading: heading.clone(),
-                })?;
+                let col = shape
+                    .col(g, heading)
+                    .ok_or_else(|| EditError::NoSuchHeading {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                    })?;
                 columns.entry(group.clone()).or_default().insert(col);
             }
         }
@@ -428,7 +479,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                         group: code.clone(),
                         line: *n,
                         fields: fields.len().saturating_sub(1),
-                        headings: g.headings.len(),
+                        headings: shape.arity(g),
                     });
                 }
                 fields.remove(at);
