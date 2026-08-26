@@ -892,7 +892,12 @@ jobs:
         run: python3 tools/check_released_crate_readmes.py
 
   # Does the LIVE docs site work against the extension a reader can actually
-  # INSTALL? The fourth and last artifact in #283's set, and the one furthest from
+  # INSTALL — and does that extension READ THE SAME ROWS as the engine? The
+  # second question was added in #719 and is the load-bearing one; the comment
+  # above its steps has the argument for why the first alone left the DuckDB
+  # surface the least-observed one we ship.
+  #
+  # The fourth and last artifact in #283's set, and the one furthest from
   # this tree: the DuckDB extension ships from a SEPARATE repo
   # (`niko86/laterite-duckdb`) through the community-extensions pipeline, which has
   # its own build, its own toolchain image and its own DuckDB target. Every other
@@ -998,6 +1003,59 @@ jobs:
           "$GITHUB_WORKSPACE/.duckdb-leg/bin/python" -m pytest \
             tests/test_docs_duckdb_examples.py -o addopts="" -q -rs -s
 
+      # --- BEHAVIOUR, not just documentation (#719) --------------------------
+      #
+      # Everything above this line checks that the docs are TRUE: the extension
+      # installs, and the documented examples run. None of it checks that the
+      # ANSWERS are right. An extension that installed cleanly, ran every example
+      # and returned different rows from `lat` on the same file passed this whole
+      # job — which is how the DuckDB surface came to be the least-observed one
+      # we ship.
+      #
+      # The check is a same-engine comparison, so it needs no python-ags4 oracle:
+      # does the extension's `read_ags()` produce the same content-addressed key
+      # set (`_id`/`_parent_id`) as the core reader every other surface wraps?
+      # Those keys are golden-tested byte-identical across surfaces and carry no
+      # float or temporal formatting to drift between a SQL result and a Rust
+      # reference, so "same keys" is exactly "same rows".
+      - name: Clone python-ags4 for its fixture corpus
+        if: steps.under-test.outputs.installable == 'true'
+        run: |
+          set -euo pipefail
+          # The fixtures, not the oracle: this leg never runs python-ags4, it only
+          # reads the .ags files its test suite ships (the wheel does not carry
+          # tests/, hence the clone).
+          #
+          # DERIVED from the declared dev dependency rather than restated. There
+          # are already two hand-written copies of this version and a gate
+          # (tools/check_upstream_pin.py) that knows about exactly those two — a
+          # third here would sit outside it and rot silently, which is the shape
+          # of defect this repo keeps finding. Deriving adds no new claim.
+          PYAGS4="$(grep -oE "python-ags4==[0-9]+\.[0-9]+\.[0-9]+" pyproject.toml \
+            | head -1 | cut -d= -f3)"
+          test -n "$PYAGS4" || { echo "could not derive python-ags4 pin"; exit 1; }
+          echo "python-ags4 fixtures: $PYAGS4 (derived from pyproject.toml)"
+          rm -rf ../ags-python-library
+          # python-ags4's tags carry NO `v` prefix — the tag is `1.2.0`.
+          git clone --depth 1 --branch "$PYAGS4" \
+            https://gitlab.com/ags-data-format-wg/ags-python-library ../ags-python-library
+      - name: Install Rust toolchain
+        if: steps.under-test.outputs.installable == 'true'
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: DuckDB reads the same rows as the core engine
+        if: steps.under-test.outputs.installable == 'true'
+        run: |
+          set -euo pipefail
+          # The producer runs under the duckdb venv (the extension is built for an
+          # exact DuckDB version — the C API is unstable); the checker is Rust and
+          # runs under the toolchain. Two interpreters on purpose.
+          "$GITHUB_WORKSPACE/.duckdb-leg/bin/python" tools/compliance/emit_duckdb.py \
+            --fixtures ../ags-python-library/tests/test_files \
+            --out output/compliance-results
+          cargo run -q --manifest-path rust-packages/Cargo.toml \
+            -p laterite-ags4-compliance --bin duckdb-parse-check -- \
+            ../ags-python-library/tests/test_files output/compliance-results
+
   # Cross-surface OUTPUT-VALUE gate (X1). Every OTHER gate compares knob NAMES;
   # this one pushes a committed list of (op × input) cases through all four
   # surface legs (python / node / wasm / CLI) and compares the observed output
@@ -1010,8 +1068,13 @@ jobs:
   # legs drive built artefacts that can be stale while every case still matches, and
   # a leg that stops reporting would otherwise degrade to a warning above a green
   # run. Lives in laterite-ags4-xcheck
-  # (split out of the dev ags4-compliance crate — its findings half needs the
-  # private ags4-parity oracle; laterite-dev#553 reversal, the public-is-dev-home flip).
+  # (split out of the ags4-compliance crate — its findings half needs the
+  # python-ags4 oracle; laterite-dev#553 reversal, the public-is-dev-home flip).
+  # That oracle was PRIVATE when this was written and is not any more: `PyOracle`
+  # is public here in laterite-ags4-parity, and so is the comparator. Corrected
+  # because the stale word was load-bearing — read as a statement about what
+  # could be checked in this repo at all, it helped keep the DuckDB surface
+  # unchecked for as long as it was (#719).
   # GitHub-hosted: it builds all four surfaces (~50 min cold), so it runs off the
   # 2-lane pool on free public minutes, in parallel with the pool jobs.
   output-values:

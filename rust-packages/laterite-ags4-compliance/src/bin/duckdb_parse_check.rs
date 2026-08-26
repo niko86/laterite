@@ -23,12 +23,26 @@
 //! well-formed fixtures and — unlike the leaf's lossy/lenient profile — matches
 //! duckdb's reject/empty behaviour on the 4 malformed ones.)
 //!
-//! Reads `<results>/duckdb-parse.json`, emitted by the dev satellite's
-//! `tools/compliance/emit_duckdb.py` — the whole compliance harness (emitters,
-//! comparator, workflows) lives there, not in this repo.
-//! Self-skips (exit 0) if that file is absent — the extension isn't built, so
-//! there is nothing to check (that tree's on-demand `compliance-report.yml`
-//! builds it).  cadence: compliance-report
+//! Reads `<results>/duckdb-parse.json`, emitted by `tools/compliance/emit_duckdb.py`
+//! in THIS repo, which installs the extension from the DuckDB community
+//! repository — the artefact a user actually gets, rather than one built beside
+//! the checkout. A local build can agree with the engine while the published one
+//! does not.
+//!
+//! This bin was public and correct for some time and still never ran: its INPUT
+//! producer was not here, so there was nothing for it to read (#719). The comment
+//! above used to say the harness lived in the satellite, which was true of the
+//! producer and not of this file — and it read as a reason the DuckDB surface
+//! could not be checked here at all.
+//!
+//! Self-skips (exit 0) if that file is absent: there is no community build for
+//! this DuckDB version yet, so there is nothing to check. That is a real state
+//! after a DuckDB release, not a defect in either engine.
+//!
+//! Runs in `nightly.yml`'s `docs-vs-released-duckdb` leg — the job that already
+//! checks the documented examples still run, which until now was the only thing
+//! this repo asked of the extension.
+//!
 //! Exit 1 on any disagreement (a missing/extra registry group, an `_id`-set
 //! split, or a read-error disagreement) EXCEPT a documented inherent divergence
 //! (see [`known_divergence`] for a group, [`known_read_error`] for a whole file).

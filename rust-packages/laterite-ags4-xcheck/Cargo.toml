@@ -10,9 +10,16 @@
 # normalisation, JSON value equality), exiting non-zero on any unexplained split.
 #
 # Split out of the dev `ags4-compliance` crate (laterite-dev#553 reversal, the public-is-dev-
-# home flip): that crate's findings/duckdb harness needs the private `ags4-parity`
-# oracle, but this output-value gate needs only the public emit/parse/validator/
-# core leaves — so it ships here on its own, without dragging the oracle public.
+# home flip): that crate's FINDINGS harness needs the python-ags4 oracle, but this
+# output-value gate needs only the emit/parse/validator/core leaves — so it ships
+# here on its own.
+#
+# This said "the PRIVATE `ags4-parity` oracle", and that had stopped being true:
+# `PyOracle` lives in the public `laterite-ags4-parity` in this workspace. The
+# comparator itself is public too, as `laterite-ags4-compliance`. Corrected rather
+# than deleted because the stale word was doing work — read as a statement that
+# the DuckDB surface could not be checked here, it helped keep that surface
+# unchecked for as long as it was (#719).
 [package]
 name = "laterite-ags4-xcheck"
 version.workspace = true
