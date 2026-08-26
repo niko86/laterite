@@ -256,3 +256,83 @@ fn a_run_with_no_operations_says_so() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+/// The operation exists to leave a UNIT undefined, so the empty value has to
+/// survive clap. A unit carrying colons rides along in the same run, because
+/// the grammar splits the locator and never the value.
+#[test]
+fn a_unit_is_rewritten_and_emptied_through_the_flags() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let dst = dir.path().join("edited.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--set-unit",
+        "LOCA:LOCA_NATE=",
+        "--set-unit",
+        "LOCA:LOCA_REM=yyyy-mm-ddThh:mm:ss",
+        "--out",
+        dst.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let edited = std::fs::read_to_string(&dst).expect("written");
+    let p = laterite_ags4_parse::parse_str(&edited).expect("output must re-parse");
+    assert_eq!(p.groups["LOCA"].units, ["", "", "yyyy-mm-ddThh:mm:ss"]);
+
+    // Index 2 is the UNIT row; nothing else may move.
+    let before: Vec<_> = FILE.lines().collect();
+    let after: Vec<_> = edited.lines().collect();
+    assert_eq!(before.len(), after.len());
+    for (i, (b, a)) in before.iter().zip(&after).enumerate() {
+        if i != 2 {
+            assert_eq!(b, a, "line {} must be byte-identical", i + 1);
+        }
+    }
+
+    let doc = json(&out);
+    assert_eq!(doc["operations"][0]["kind"], "set-unit");
+    assert_eq!(doc["unchanged"], false);
+}
+
+/// A preview must preview. The write path is shared, but a flag that reported
+/// a change and then wrote it anyway is one of the three faults #713 found in
+/// this command, so the new mode asserts it rather than inheriting it.
+#[test]
+fn a_dry_run_set_unit_reports_the_change_and_writes_nothing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let dst = dir.path().join("edited.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--set-unit",
+        "LOCA:LOCA_NATE=",
+        "--out",
+        dst.to_str().unwrap(),
+        "--dry-run",
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let doc = json(&out);
+    assert_eq!(doc["written"], false);
+    assert_eq!(
+        doc["unchanged"], false,
+        "the report must still say it would change"
+    );
+    assert!(!dst.exists(), "a dry run must not write the output file");
+    assert_eq!(
+        std::fs::read_to_string(&src).unwrap(),
+        FILE,
+        "a dry run must not touch the input either"
+    );
+}

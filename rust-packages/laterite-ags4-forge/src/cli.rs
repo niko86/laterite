@@ -320,6 +320,12 @@ pub struct EditArgs {
     /// `GROUP:ROW:HEADING` — empty the cell, keeping the field. Repeatable.
     #[arg(long, value_name = "GROUP:ROW:HEADING")]
     pub blank: Vec<String>,
+    /// `GROUP:HEADING=UNIT` — rewrite the UNIT a heading declares. An empty
+    /// value leaves the UNIT present but undefined. Only the locator is split
+    /// on `:`, so the unit itself may contain them (`yyyy-mm-ddThh:mm`).
+    /// Repeatable.
+    #[arg(long, value_name = "GROUP:HEADING=UNIT")]
+    pub set_unit: Vec<String>,
     /// `GROUP:ROW`. Repeatable.
     #[arg(long, value_name = "GROUP:ROW")]
     pub delete_row: Vec<String>,
