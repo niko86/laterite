@@ -83,8 +83,10 @@ export interface MergeOptions {
    *  precision, zero-padding the coarser values. */
   onTypeClash?: "error" | "widen" | "promote";
   /** The transmission the MERGED file represents — it genuinely is a new one.
-   *  Omit it and `TRAN` is reconciled like any other group (newest wins), with
-   *  a warning noting no merge-transmission stamp was supplied.
+   *  Omit it and `TRAN` is reconciled like any other group, with a warning
+   *  noting no merge-transmission stamp was supplied — and because `TRAN_ISNO`
+   *  is a KEY heading, each input's transmission normally survives, leaving
+   *  more TRAN rows than Rule 14 permits.
    *
    *  `remarks` is APPENDED to merge's own provenance note ("Merged from N
    *  deliveries: …") rather than replacing it: both are true of the result. */

@@ -811,8 +811,10 @@ export interface MergeOptions {
   /** Source encoding label for path / bytes inputs (default `"utf-8"`). */
   encoding?: string;
   /** The transmission the merged file represents. Omit it and `TRAN` is
-   *  reconciled like any other group (newest wins), with a warning noting no
-   *  merge-transmission stamp was supplied. */
+   *  reconciled like any other group, with a warning noting no
+   *  merge-transmission stamp was supplied — and because `TRAN_ISNO` is a KEY
+   *  heading, each input's transmission normally survives, leaving more TRAN
+   *  rows than Rule 14 permits. */
   tran?: TranStamp;
 }
 

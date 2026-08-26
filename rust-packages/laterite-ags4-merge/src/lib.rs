@@ -139,8 +139,10 @@ pub struct MergeOpts {
     pub emit_mode: EmitMode,
     /// When `Some`, the merged output carries one synthesised TRAN row from this
     /// stamp (with input ISNOs/dates recorded in `TRAN_REM` for provenance).
-    /// When `None`, TRAN is reconciled like any other group (newest wins) and a
-    /// warning notes no merge-transmission stamp was supplied.
+    /// When `None`, TRAN is reconciled like any other group and a warning notes
+    /// no merge-transmission stamp was supplied. Reconciliation keeps rows with
+    /// distinct KEYs and `TRAN_ISNO` is one, so each input's transmission
+    /// normally survives — leaving more TRAN rows than Rule 14 permits.
     pub tran: Option<TranStamp>,
 }
 
@@ -284,7 +286,9 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
     for code in ordered {
         // TRAN is special: the merged file is a NEW transmission, so synthesise
         // its TRAN rather than reconcile the inputs' (see module note). With no
-        // stamp, fall through to ordinary reconciliation (newest wins) + a warning.
+        // stamp, fall through to ordinary reconciliation + a warning. "Newest wins"
+        // never fires here: TRAN_ISNO is a KEY heading, distinct transmission
+        // numbers do not collide, and so every input's TRAN row survives.
         if code == "TRAN" {
             match &opts.tran {
                 Some(stamp) => {
@@ -295,8 +299,10 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
                     kind: "tran_not_stamped",
                     group: Some("TRAN".into()),
                     heading: None,
-                    message: "no merge TRAN stamp supplied; the merged file kept the \
-                              newest input's TRAN as a fallback"
+                    message: "no merge TRAN stamp supplied; TRAN was reconciled like any \
+                              other group, so each input's TRAN row survives unless another \
+                              input's TRAN_ISNO collides with it — more than one surviving \
+                              row fails Rule 14, which requires exactly one"
                         .into(),
                 }),
             }

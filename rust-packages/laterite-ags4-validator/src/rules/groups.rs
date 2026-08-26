@@ -30,8 +30,11 @@
 //!   for all abbreviations entered in a FIELD where the data TYPE is
 //!   defined as \"PA\" …"
 //! * **Rule 16a** — multi-abbreviation FIELDs are split on the
-//!   `TRAN_RCON` concatenator (default `+`); each part must be defined
-//!   separately in ABBR.
+//!   concatenator declared in `TRAN_RCON`; each part must be defined
+//!   separately in ABBR. The spec names `+` as the default when
+//!   `TRAN_RCON` is absent and this module does NOT apply it — an
+//!   undeclared concatenator leaves the field unsplit and checked
+//!   whole. Deliberate, recorded as O-54; python-ags4 does the same.
 //! * **Rule 17** — "Each data file shall contain the TYPE GROUP to
 //!   define the field TYPEs used within the data file. Every data type
 //!   entered in the TYPE row of a GROUP shall be listed and defined in
