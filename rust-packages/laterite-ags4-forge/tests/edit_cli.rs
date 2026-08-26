@@ -414,3 +414,80 @@ fn the_set_type_spellings_project_or_preserve_and_a_refusal_writes_nothing() {
         "the refusal must name the heading and the row: {stderr}"
     );
 }
+
+/// One patch projects a file: create a column, declare its UNIT and TYPE, and
+/// fill a cell. This is the shape a parity investigation actually uses, and it
+/// only works because operations resolve against what the patch has already
+/// done to the group rather than against the parse alone.
+#[test]
+fn one_patch_creates_a_column_declares_it_and_fills_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+    let patch = dir.path().join("project.toml");
+    std::fs::write(
+        &patch,
+        r#"
+[[op]]
+kind = "set"
+group = "LOCA"
+row = 1
+heading = "LOCA_GL"
+value = "12.34"
+
+[[op]]
+kind = "add-column"
+group = "LOCA"
+heading = "LOCA_GL"
+
+[[op]]
+kind = "set-unit"
+group = "LOCA"
+heading = "LOCA_GL"
+unit = "m"
+
+[[op]]
+kind = "set-type"
+group = "LOCA"
+heading = "LOCA_GL"
+type = "2DP"
+"#,
+    )
+    .expect("patch written");
+
+    let dst = dir.path().join("projected.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--patch",
+        patch.to_str().unwrap(),
+        "--out",
+        dst.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let text = std::fs::read_to_string(&dst).expect("written");
+    let p = laterite_ags4_parse::parse_str(&text).expect("output must re-parse");
+    let g = p.groups.get("LOCA").expect("LOCA");
+    let col = g.col("LOCA_GL").expect("the created heading");
+    assert_eq!(g.units[col], "m");
+    assert_eq!(g.types[col], "2DP");
+    assert_eq!(g.cell(col, 0), Some("12.34"));
+    assert_eq!(g.cell(col, 1), Some(""));
+    for (i, row) in g.rows.iter().enumerate() {
+        assert_eq!(
+            row.values.len(),
+            g.headings.len(),
+            "row {} must not be ragged",
+            i + 1
+        );
+    }
+    // The operations were listed in a deliberately awkward order — the write
+    // before the column it writes into — so this also asserts that canonical
+    // order, not listing order, decides the result.
+    assert_eq!(json(&out)["unchanged"], false);
+}

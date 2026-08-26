@@ -35,6 +35,15 @@ use laterite_ags4_types::quote_field;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Op {
+    /// Add a heading the group does not have. It lands in every descriptor
+    /// row the group actually carries and as an EMPTY cell in every data row,
+    /// so the arity stays consistent and no rule trips by accident. The cells
+    /// start empty on purpose: the caller decides what goes in them rather
+    /// than inheriting a guess.
+    AddColumn {
+        group: String,
+        heading: String,
+    },
     /// Rewrite the UNIT a heading declares. An empty value leaves the UNIT
     /// present but UNDEFINED, which is a file shape nothing else in this
     /// crate can produce and the one the undefined-units rule needs.
@@ -103,7 +112,8 @@ fn reformat_by_default() -> bool {
 impl Op {
     fn group(&self) -> &str {
         match self {
-            Op::SetUnit { group, .. }
+            Op::AddColumn { group, .. }
+            | Op::SetUnit { group, .. }
             | Op::SetType { group, .. }
             | Op::SetCell { group, .. }
             | Op::AddRow { group, .. }
@@ -142,6 +152,13 @@ pub enum EditError {
     MissingDescriptor {
         group: String,
         row: &'static str,
+    },
+    /// The group already has this heading. Adding a second one would make
+    /// every locator naming it mean two columns, which is the ambiguity this
+    /// layer refuses everywhere else (see `DuplicateGroup`).
+    DuplicateHeading {
+        group: String,
+        heading: String,
     },
     /// A TYPE token the AGS type system cannot read at all. Dictionary
     /// membership is deliberately NOT the test — declaring a type the
@@ -203,6 +220,11 @@ impl fmt::Display for EditError {
                 f,
                 "{group} has no {row} row, so there is nothing to edit; add \
                  one before declaring anything on it"
+            ),
+            EditError::DuplicateHeading { group, heading } => write!(
+                f,
+                "{group} already has a heading {heading:?}; adding a second \
+                 would make every locator naming it mean two columns"
             ),
             EditError::UnknownType {
                 group,
@@ -348,13 +370,14 @@ impl Shape {
 /// delete a thing and also to edit it can only mean the delete.
 fn rank(op: &Op) -> u8 {
     match op {
-        Op::SetUnit { .. } => 0,
-        Op::SetType { .. } => 1,
-        Op::SetCell { .. } => 2,
-        Op::AddRow { .. } => 3,
-        Op::DeleteRow { .. } => 4,
-        Op::DeleteColumn { .. } => 5,
-        Op::DeleteGroup { .. } => 6,
+        Op::AddColumn { .. } => 0,
+        Op::SetUnit { .. } => 1,
+        Op::SetType { .. } => 2,
+        Op::SetCell { .. } => 3,
+        Op::AddRow { .. } => 4,
+        Op::DeleteRow { .. } => 5,
+        Op::DeleteColumn { .. } => 6,
+        Op::DeleteGroup { .. } => 7,
     }
 }
 
@@ -423,7 +446,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
 
     // Every heading lookup and every arity calculation below goes through
     // this, never straight to the parse — see `Shape`.
-    let shape = Shape::default();
+    let mut shape = Shape::default();
 
     let mut ordered: Vec<&Op> = ops.iter().collect();
     ordered.sort_by_key(|op| rank(op));
@@ -472,6 +495,64 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 }
                 fields[at].clone_from(value);
                 plan.insert(data.line, Line::Replace(rebuild(&fields)));
+            }
+            Op::AddColumn { group, heading } => {
+                if shape.col(g, heading).is_some() {
+                    return Err(EditError::DuplicateHeading {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                    });
+                }
+                // A group with no HEADING row has nowhere to put a column
+                // name. Refuse rather than invent the row — the same answer
+                // the descriptor edits give.
+                let hl = g.heading_line.ok_or_else(|| EditError::MissingDescriptor {
+                    group: group.clone(),
+                    row: "HEADING",
+                })?;
+                // Registered BEFORE the lines are written, so `arity` already
+                // counts the new column and the padding below reaches it.
+                // This is also what lets a later operation in the same patch
+                // name the heading (#723).
+                shape
+                    .added
+                    .entry(group.clone())
+                    .or_default()
+                    .push(heading.clone());
+                let col = shape
+                    .col(g, heading)
+                    .expect("the column was just registered");
+                let want = shape.arity(g) + 1;
+                let at = col + 1;
+
+                // Every line the group owns, descriptor rows included, so the
+                // arity stays consistent. Pad, then WRITE the cell — a row
+                // that was already over-long has a value sitting where the new
+                // column goes, and leaving it there would make a column that
+                // was asked to start empty start with somebody else's data.
+                let lines: Vec<u32> = [g.heading_line, g.unit_line, g.type_line]
+                    .into_iter()
+                    .flatten()
+                    .chain(g.rows.iter().map(|r| r.line))
+                    .collect();
+                for n in lines {
+                    if matches!(plan.get(&n), Some(Line::Drop)) {
+                        continue; // already gone; a removal outranks a write
+                    }
+                    let mut fields = split_ags_line(&current(&plan, n));
+                    if fields.len() < want {
+                        fields.resize(want, String::new());
+                    }
+                    fields[at] = if n == hl {
+                        heading.clone()
+                    } else {
+                        String::new()
+                    };
+                    plan.insert(n, Line::Replace(rebuild(&fields)));
+                }
+                // Rows this patch appends are built to `shape.arity`, which
+                // now includes this column, so they need nothing here — and
+                // `AddColumn` ranks ahead of `AddRow` precisely so that holds.
             }
             Op::SetUnit {
                 group,
@@ -757,6 +838,11 @@ group = "LOCA"
 cells = { LOCA_ID = "BH2", LOCA_REM = "a value, with a comma" }
 
 # [[op]]
+# kind = "add-column"
+# group = "LOCA"
+# heading = "LOCA_GL"
+
+# [[op]]
 # kind = "set-unit"
 # group = "LOCA"
 # heading = "LOCA_NATE"
@@ -818,6 +904,13 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 row: row(r)?,
                 heading: h.to_string(),
                 value: value.to_string(),
+            })
+        }
+        "add-column" => {
+            let (g, h) = spec.split_once(':').ok_or_else(|| bad("GROUP:HEADING"))?;
+            Ok(Op::AddColumn {
+                group: g.to_string(),
+                heading: h.to_string(),
             })
         }
         "set-unit" => {
@@ -1230,8 +1323,8 @@ mod tests {
         let patch: Patch = toml::from_str(&uncommented).expect("every commented op must load");
         assert_eq!(
             patch.op.len(),
-            7,
-            "set, add-row, set-unit, set-type, delete-row, -column, -group"
+            8,
+            "set, add-row, add-column, set-unit, set-type, delete-row, -column, -group"
         );
     }
 
@@ -1241,6 +1334,7 @@ mod tests {
     fn the_flag_names_and_the_patch_kinds_agree() {
         for kind in [
             "set",
+            "add-column",
             "set-unit",
             // `--set-type-raw` is absent for the same reason `--blank` is:
             // it is a second spelling of a kind already listed, not a kind.
@@ -1252,6 +1346,7 @@ mod tests {
         ] {
             let spec = match kind {
                 "set" => "LOCA:1:LOCA_ID=x",
+                "add-column" => "LOCA:LOCA_NEW",
                 "set-unit" => "LOCA:LOCA_ID=m",
                 "set-type" => "LOCA:LOCA_ID=X",
                 "delete-row" => "LOCA:1",
@@ -1938,5 +2033,193 @@ type = "0DP"
         assert_eq!(ops.op, vec![set_type("LOCA", "LOCA_NATE", "0DP")]);
         let out = apply(FILE, &ops.op).unwrap();
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_NATE"), "100");
+    }
+
+    fn add_column(group: &str, heading: &str) -> Op {
+        Op::AddColumn {
+            group: group.into(),
+            heading: heading.into(),
+        }
+    }
+
+    #[test]
+    fn adding_a_column_reaches_every_row_the_group_owns() {
+        let out = apply(FILE, &[add_column("LOCA", "LOCA_GL")]).unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).expect("output must re-parse");
+        let g = &p.groups["LOCA"];
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE", "LOCA_REM", "LOCA_GL"]);
+        assert_eq!(g.units.len(), 4, "the UNIT row must keep pace: {out}");
+        assert_eq!(g.types.len(), 4, "the TYPE row must keep pace: {out}");
+        for (i, row) in g.rows.iter().enumerate() {
+            assert_eq!(row.values.len(), 4, "row {} must not be ragged", i + 1);
+        }
+        // Empty on purpose: the caller decides what goes in, not the tool.
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "");
+        assert_eq!(cell(&out, "LOCA", 2, "LOCA_GL"), "");
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_GL"), "");
+        assert_eq!(declared_type(&out, "LOCA", "LOCA_GL"), "");
+        // PROJ is a different group and must not have moved at all.
+        let before: Vec<_> = FILE.lines().collect();
+        let after: Vec<_> = out.lines().collect();
+        for i in 0..6 {
+            assert_eq!(before[i], after[i], "line {} must be byte-identical", i + 1);
+        }
+    }
+
+    #[test]
+    fn a_heading_the_group_already_has_is_refused() {
+        assert_eq!(
+            apply(FILE, &[add_column("LOCA", "LOCA_NATE")]),
+            Err(EditError::DuplicateHeading {
+                group: "LOCA".into(),
+                heading: "LOCA_NATE".into(),
+            })
+        );
+    }
+
+    /// A heading the dictionary never heard of is ACCEPTED. Forbidding it
+    /// would remove a class of fault the tool exists to manufacture, and
+    /// judging heading names is the validator's job.
+    #[test]
+    fn a_heading_the_dictionary_does_not_know_is_accepted() {
+        let out = apply(FILE, &[add_column("LOCA", "LOCA_INVENTED")]).unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert!(p.groups["LOCA"].col("LOCA_INVENTED").is_some());
+    }
+
+    #[test]
+    fn a_group_with_no_heading_row_is_refused_by_name() {
+        let headless = concat!(
+            "\"GROUP\",\"PROJ\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"TYPE\",\"ID\"\r\n",
+            "\"DATA\",\"P1\"\r\n",
+        );
+        assert_eq!(
+            apply(headless, &[add_column("PROJ", "PROJ_NAME")]),
+            Err(EditError::MissingDescriptor {
+                group: "PROJ".into(),
+                row: "HEADING",
+            })
+        );
+    }
+
+    /// The payoff of #723: a locator naming a column that did not exist when
+    /// the file was parsed still resolves, because the patch created it.
+    #[test]
+    fn a_column_created_in_the_same_patch_can_be_written() {
+        let out = apply(
+            FILE,
+            &[
+                set("LOCA", 1, "LOCA_GL", "12.34"),
+                add_column("LOCA", "LOCA_GL"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            cell(&out, "LOCA", 1, "LOCA_GL"),
+            "12.34",
+            "creation ranks ahead of the write, whatever order they were listed in"
+        );
+    }
+
+    /// One patch projects a file: create the column, declare its UNIT and
+    /// TYPE, and fill it.
+    #[test]
+    fn a_column_created_in_the_same_patch_can_be_declared_and_filled() {
+        let out = apply(
+            FILE,
+            &[
+                add_column("LOCA", "LOCA_GL"),
+                Op::SetUnit {
+                    group: "LOCA".into(),
+                    heading: "LOCA_GL".into(),
+                    unit: "m".into(),
+                },
+                set_type_raw("LOCA", "LOCA_GL", "2DP"),
+                set("LOCA", 1, "LOCA_GL", "12.34"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_GL"), "m");
+        assert_eq!(declared_type(&out, "LOCA", "LOCA_GL"), "2DP");
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "12.34");
+        assert_eq!(cell(&out, "LOCA", 2, "LOCA_GL"), "");
+    }
+
+    /// A row appended by the same patch is built to the group's arity, which
+    /// by then includes the new column — `AddColumn` ranks ahead of `AddRow`
+    /// exactly so this holds without a second pass.
+    #[test]
+    fn a_row_appended_in_the_same_patch_carries_the_new_column() {
+        let out = apply(
+            FILE,
+            &[
+                Op::AddRow {
+                    group: "LOCA".into(),
+                    cells: BTreeMap::from([("LOCA_ID".to_string(), "BH3".to_string())]),
+                },
+                add_column("LOCA", "LOCA_GL"),
+            ],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        let g = &p.groups["LOCA"];
+        assert_eq!(g.rows.len(), 3);
+        for (i, row) in g.rows.iter().enumerate() {
+            assert_eq!(row.values.len(), 4, "row {} must not be ragged", i + 1);
+        }
+        assert_eq!(cell(&out, "LOCA", 3, "LOCA_ID"), "BH3");
+        assert_eq!(cell(&out, "LOCA", 3, "LOCA_GL"), "");
+    }
+
+    /// The parser does not pad the descriptor rows, so a file may declare
+    /// fewer units than headings. Adding a column has to bring every row up,
+    /// or the new cell lands in a different column on each row.
+    #[test]
+    fn adding_a_column_brings_a_short_descriptor_row_up() {
+        let short = concat!(
+            "\"GROUP\",\"LOCA\"\r\n",
+            "\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"TYPE\",\"ID\",\"2DP\"\r\n",
+            "\"DATA\",\"BH1\",\"100.00\"\r\n",
+        );
+        let out = apply(short, &[add_column("LOCA", "LOCA_GL")]).unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        let g = &p.groups["LOCA"];
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE", "LOCA_GL"]);
+        assert_eq!(g.units, ["", "", ""]);
+        assert_eq!(g.rows[0].values.len(), 3);
+    }
+
+    /// Adding and dropping the same column in one patch is a no-op on the
+    /// group's shape. Removals rank last, so the pair cannot half-apply.
+    #[test]
+    fn adding_then_dropping_a_column_leaves_the_original_shape() {
+        let out = apply(
+            FILE,
+            &[
+                add_column("LOCA", "LOCA_GL"),
+                Op::DeleteColumn {
+                    group: "LOCA".into(),
+                    heading: "LOCA_GL".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        let g = &p.groups["LOCA"];
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE", "LOCA_REM"]);
+        assert!(g.rows.iter().all(|r| r.values.len() == 3), "{out}");
+    }
+
+    #[test]
+    fn the_add_column_flag_takes_a_group_and_a_heading() {
+        assert_eq!(
+            parse_flag("add-column", "LOCA:LOCA_GL").unwrap(),
+            add_column("LOCA", "LOCA_GL")
+        );
+        assert!(parse_flag("add-column", "LOCA").is_err());
     }
 }
