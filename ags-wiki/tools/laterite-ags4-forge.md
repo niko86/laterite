@@ -137,6 +137,10 @@ sources: []
 > position rather than appending it, so a fault can be planted mid-group; a
 > position past the last row is refused rather than quietly appended, because a
 > typo that becomes an append gives a reproducer that does not reproduce.
+> `--patch-template` prints a worked **projection** rather than a pair of
+> unrelated edits: create a column, declare its UNIT and TYPE, fill it, and add
+> the type code to the TYPE group — the combination that dual-validates with no
+> findings on either engine.
 > Seven shapes are refused by name rather
 > than edited into something worse: a group, row or heading that is not there;
 > a file declaring one GROUP code **twice** (every locator would mean two
