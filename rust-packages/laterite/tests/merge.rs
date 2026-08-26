@@ -311,10 +311,8 @@ fn keeping_an_input_tran_unstamped_is_reported() {
     assert_eq!(note.group(), Some("TRAN"));
 
     // What actually survives is BOTH input transmissions, because TRAN_ISNO is a
-    // KEY heading and ordinary reconciliation keeps rows with distinct keys. The
-    // engine's own note says it "kept the newest input's TRAN", which reads as
-    // one row; asserted on the observed outcome instead, because that is what a
-    // caller gets. Either way nothing was invented, which is the promise.
+    // KEY heading and ordinary reconciliation keeps rows with distinct keys.
+    // Nothing was invented, which is the promise.
     let doc = ags4::read_str(merged.text()).run().unwrap();
     let issues: Vec<&str> = doc
         .group("TRAN")
@@ -323,6 +321,37 @@ fn keeping_an_input_tran_unstamped_is_reported() {
         .filter_map(|r| r.cell("TRAN_ISNO"))
         .collect();
     assert_eq!(issues, ["1", "2"], "both inputs' transmissions survive");
+
+    // #729: the note and the file must not disagree. The message used to say it
+    // "kept the newest input's TRAN", which reads as one row, while the file
+    // carried both — the BEHAVIOUR was pinned above and the CLAIM was not, so
+    // the two contradicted each other for months with nothing red. These two
+    // assertions tie the sentence to the outcome, in both directions.
+    let msg = note.message();
+    assert!(
+        !msg.contains("newest input"),
+        "the note promises one surviving row again: {msg}"
+    );
+    // It says the result breaks Rule 14. Verify that against the validator
+    // rather than against the sentence, so a message that stops being true
+    // fails here instead of misleading a caller.
+    assert!(
+        msg.contains("Rule 14"),
+        "the note no longer names the consequence: {msg}"
+    );
+    let report = ags4::validate_str(merged.text()).run().unwrap();
+    assert!(
+        report
+            .findings()
+            .iter()
+            .any(|f| f.rule() == "AGS Format Rule 14"),
+        "the note claims Rule 14 is broken and the validator disagrees: {:?}",
+        report
+            .findings()
+            .iter()
+            .map(laterite::ags4::Finding::rule)
+            .collect::<Vec<_>>()
+    );
 
     // Stamping is what collapses them into the merge's own single transmission,
     // which is the reason the note exists at all.

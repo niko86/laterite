@@ -316,10 +316,13 @@ impl<'a> Merge<'a> {
     /// synthesised `TRAN` row with the inputs' issue numbers and dates recorded
     /// in `TRAN_REM` for provenance.
     ///
-    /// Without it, `TRAN` is reconciled like any other group — newest wins — and
-    /// a [`Note`] records that no merge transmission was supplied. Which is the
-    /// honest outcome: a merged file's transmission is a fact about the merge,
-    /// and only you know it.
+    /// Without it, `TRAN` is reconciled like any other group and a [`Note`]
+    /// records that no merge transmission was supplied. Reconciliation keeps
+    /// rows with distinct KEYs, and `TRAN_ISNO` is one, so each input's
+    /// transmission normally survives and the result carries more TRAN rows
+    /// than Rule 14 permits. Not inventing one is still the honest outcome: a
+    /// merged file's transmission is a fact about the merge, and only you know
+    /// it.
     #[must_use]
     pub fn transmission(
         mut self,
