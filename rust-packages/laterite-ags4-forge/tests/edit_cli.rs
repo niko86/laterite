@@ -336,3 +336,81 @@ fn a_dry_run_set_unit_reports_the_change_and_writes_nothing() {
         "a dry run must not touch the input either"
     );
 }
+
+/// Both spellings through the real binary, and a refusal that writes nothing.
+/// A projection that half-wrote a column would be worse than one that refused,
+/// so the failure path is asserted as hard as the success one.
+#[test]
+fn the_set_type_spellings_project_or_preserve_and_a_refusal_writes_nothing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+
+    let declared = |text: &str, want_type: &str, want_cell: &str| {
+        let p = laterite_ags4_parse::parse_str(text).expect("output must re-parse");
+        let g = p.groups.get("LOCA").expect("LOCA");
+        let col = g.col("LOCA_NATE").expect("heading");
+        assert_eq!(g.types[col], want_type);
+        assert_eq!(g.cell(col, 0), Some(want_cell));
+    };
+
+    let projected = dir.path().join("projected.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--set-type",
+        "LOCA:LOCA_NATE=0DP",
+        "--out",
+        projected.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    declared(
+        &std::fs::read_to_string(&projected).expect("written"),
+        "0DP",
+        "100",
+    );
+
+    let raw = dir.path().join("raw.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--set-type-raw",
+        "LOCA:LOCA_NATE=0DP",
+        "--out",
+        raw.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    declared(
+        &std::fs::read_to_string(&raw).expect("written"),
+        "0DP",
+        "100.00",
+    );
+
+    // LOCA_REM holds text, so 2DP cannot be satisfied by row 1.
+    let refused = dir.path().join("refused.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--set-type",
+        "LOCA:LOCA_REM=2DP",
+        "--out",
+        refused.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(!out.status.success(), "a refusal must not exit 0");
+    assert!(!refused.exists(), "a refusal must write nothing");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("LOCA_REM") && stderr.contains("row 1"),
+        "the refusal must name the heading and the row: {stderr}"
+    );
+}
