@@ -35,6 +35,14 @@ use laterite_ags4_types::quote_field;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Op {
+    /// Rewrite the UNIT a heading declares. An empty value leaves the UNIT
+    /// present but UNDEFINED, which is a file shape nothing else in this
+    /// crate can produce and the one the undefined-units rule needs.
+    SetUnit {
+        group: String,
+        heading: String,
+        unit: String,
+    },
     /// Write `value` into one cell. A blank is this with an empty value —
     /// spelled separately at the CLI because "blank it" is a different
     /// intention from "set it to nothing" and reads better in a patch file.
@@ -75,7 +83,8 @@ pub enum Op {
 impl Op {
     fn group(&self) -> &str {
         match self {
-            Op::SetCell { group, .. }
+            Op::SetUnit { group, .. }
+            | Op::SetCell { group, .. }
             | Op::AddRow { group, .. }
             | Op::DeleteRow { group, .. }
             | Op::DeleteGroup { group }
@@ -104,6 +113,14 @@ pub enum EditError {
     DuplicateGroup {
         group: String,
         lines: Vec<u32>,
+    },
+    /// The group has no UNIT (or, later, TYPE) row at all — a shape forge
+    /// itself can manufacture. Writing one would be a DIFFERENT operation:
+    /// inventing a descriptor row the file never had. Doing that silently is
+    /// how a patch stops meaning what it says.
+    MissingDescriptor {
+        group: String,
+        row: &'static str,
     },
     /// A row too short to carry the column being dropped. Removing the column
     /// from its siblings and not from this row leaves exactly the ragged row
@@ -140,6 +157,11 @@ impl fmt::Display for EditError {
                     .map(u32::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
+            ),
+            EditError::MissingDescriptor { group, row } => write!(
+                f,
+                "{group} has no {row} row, so there is nothing to edit; add \
+                 one before declaring anything on it"
             ),
             EditError::ShortRow {
                 group,
@@ -264,11 +286,12 @@ impl Shape {
 /// delete a thing and also to edit it can only mean the delete.
 fn rank(op: &Op) -> u8 {
     match op {
-        Op::SetCell { .. } => 0,
-        Op::AddRow { .. } => 1,
-        Op::DeleteRow { .. } => 2,
-        Op::DeleteColumn { .. } => 3,
-        Op::DeleteGroup { .. } => 4,
+        Op::SetUnit { .. } => 0,
+        Op::SetCell { .. } => 1,
+        Op::AddRow { .. } => 2,
+        Op::DeleteRow { .. } => 3,
+        Op::DeleteColumn { .. } => 4,
+        Op::DeleteGroup { .. } => 5,
     }
 }
 
@@ -386,6 +409,34 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 }
                 fields[at].clone_from(value);
                 plan.insert(data.line, Line::Replace(rebuild(&fields)));
+            }
+            Op::SetUnit {
+                group,
+                heading,
+                unit,
+            } => {
+                let col = shape
+                    .col(g, heading)
+                    .ok_or_else(|| EditError::NoSuchHeading {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                    })?;
+                let line = g.unit_line.ok_or_else(|| EditError::MissingDescriptor {
+                    group: group.clone(),
+                    row: "UNIT",
+                })?;
+                let mut fields = split_ags_line(&current(&plan, line));
+                // The parser does NOT pad the UNIT row — it carries the raw
+                // fields the file had, which may be fewer than the headings.
+                // Padding to the group's arity is what stops a write to a late
+                // column running off the end, and it is the answer `SetCell`
+                // already gives for a short DATA row.
+                let want = shape.arity(g) + 1;
+                if fields.len() < want {
+                    fields.resize(want, String::new());
+                }
+                fields[col + 1].clone_from(unit);
+                plan.insert(line, Line::Replace(rebuild(&fields)));
             }
             Op::AddRow { cells, group } => {
                 let mut values = vec![String::new(); shape.arity(g)];
@@ -573,6 +624,12 @@ group = "LOCA"
 cells = { LOCA_ID = "BH2", LOCA_REM = "a value, with a comma" }
 
 # [[op]]
+# kind = "set-unit"
+# group = "LOCA"
+# heading = "LOCA_NATE"
+# unit = "mm"          # "" leaves the UNIT present but undefined
+
+# [[op]]
 # kind = "delete-row"
 # group = "LOCA"
 # row = 2
@@ -621,6 +678,24 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 row: row(r)?,
                 heading: h.to_string(),
                 value: value.to_string(),
+            })
+        }
+        "set-unit" => {
+            // The locator is split, never the whole spec: AGS unit strings
+            // routinely carry colons (`yyyy-mm-ddThh:mm`), and a four-part
+            // colon form would be ambiguous for exactly the type this
+            // machinery exists to reach. An empty value is legal and load
+            // bearing — it is what leaves the UNIT undefined.
+            let (locator, unit) = spec
+                .split_once('=')
+                .ok_or_else(|| bad("GROUP:HEADING=UNIT"))?;
+            let (g, h) = locator
+                .split_once(':')
+                .ok_or_else(|| bad("GROUP:HEADING=UNIT"))?;
+            Ok(Op::SetUnit {
+                group: g.to_string(),
+                heading: h.to_string(),
+                unit: unit.to_string(),
             })
         }
         "delete-row" => {
@@ -998,8 +1073,8 @@ mod tests {
         let patch: Patch = toml::from_str(&uncommented).expect("every commented op must load");
         assert_eq!(
             patch.op.len(),
-            5,
-            "set, add-row, delete-row, -column, -group"
+            6,
+            "set, add-row, set-unit, delete-row, -column, -group"
         );
     }
 
@@ -1009,6 +1084,7 @@ mod tests {
     fn the_flag_names_and_the_patch_kinds_agree() {
         for kind in [
             "set",
+            "set-unit",
             "add-row",
             "delete-row",
             "delete-column",
@@ -1016,6 +1092,7 @@ mod tests {
         ] {
             let spec = match kind {
                 "set" => "LOCA:1:LOCA_ID=x",
+                "set-unit" => "LOCA:LOCA_ID=m",
                 "delete-row" => "LOCA:1",
                 "delete-column" => "LOCA:LOCA_ID",
                 _ => "LOCA",
@@ -1330,5 +1407,165 @@ mod tests {
             );
             assert_eq!(cell(&out, "LOCA", 1, "LOCA_ID"), "BH1");
         }
+    }
+
+    fn set_unit(group: &str, heading: &str, unit: &str) -> Op {
+        Op::SetUnit {
+            group: group.into(),
+            heading: heading.into(),
+            unit: unit.into(),
+        }
+    }
+
+    /// Read a declared UNIT back through the parser, for the same reason
+    /// `cell` does: a test that grepped the output would pass on a file the
+    /// parser cannot read.
+    fn unit_of(text: &str, group: &str, heading: &str) -> String {
+        let p = laterite_ags4_parse::parse_str(text).expect("output must re-parse");
+        let g = p.groups.get(group).expect("group");
+        g.units
+            .get(g.col(heading).expect("heading"))
+            .expect("UNIT cell")
+            .clone()
+    }
+
+    #[test]
+    fn setting_a_unit_touches_the_unit_row_and_nothing_else() {
+        let out = apply(FILE, &[set_unit("LOCA", "LOCA_NATE", "mm")]).unwrap();
+        let before: Vec<_> = FILE.lines().collect();
+        let after: Vec<_> = out.lines().collect();
+        assert_eq!(before.len(), after.len());
+        for (i, (b, a)) in before.iter().zip(&after).enumerate() {
+            // Index 8 is LOCA's UNIT row — the only line the operation names.
+            if i == 8 {
+                assert_ne!(b, a, "the UNIT row must change");
+            } else {
+                assert_eq!(b, a, "line {} must be byte-identical", i + 1);
+            }
+        }
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_NATE"), "mm");
+    }
+
+    /// The point of the operation. An empty UNIT is PRESENT and undefined,
+    /// never a removed field: dropping the field would shorten the row and
+    /// silently change what every column after it means.
+    #[test]
+    fn an_empty_unit_leaves_the_field_in_place() {
+        let out = apply(FILE, &[set_unit("LOCA", "LOCA_NATE", "")]).unwrap();
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_NATE"), "");
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert_eq!(
+            p.groups["LOCA"].units.len(),
+            3,
+            "the row must keep its arity: {out}"
+        );
+    }
+
+    /// The grammar decision, pinned. AGS date-time headings declare units that
+    /// carry colons, so a locator that ate the whole spec would be ambiguous
+    /// for exactly the type this machinery exists to reach.
+    #[test]
+    fn a_unit_may_contain_colons() {
+        let out = apply(
+            FILE,
+            &[set_unit("LOCA", "LOCA_NATE", "yyyy-mm-ddThh:mm:ss")],
+        )
+        .unwrap();
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_NATE"), "yyyy-mm-ddThh:mm:ss");
+    }
+
+    #[test]
+    fn setting_a_unit_on_a_heading_that_is_not_there_is_refused() {
+        assert_eq!(
+            apply(FILE, &[set_unit("LOCA", "LOCA_NOPE", "mm")]),
+            Err(EditError::NoSuchHeading {
+                group: "LOCA".into(),
+                heading: "LOCA_NOPE".into(),
+            })
+        );
+    }
+
+    /// A group with no UNIT row is a shape forge itself manufactures. Refusing
+    /// by name is the answer: writing the row would be a different operation,
+    /// and writing it silently would make the patch mean something its author
+    /// never asked for.
+    #[test]
+    fn a_group_with_no_unit_row_is_refused_by_name() {
+        let no_unit = concat!(
+            "\"GROUP\",\"PROJ\"\r\n",
+            "\"HEADING\",\"PROJ_ID\"\r\n",
+            "\"TYPE\",\"ID\"\r\n",
+            "\"DATA\",\"P1\"\r\n",
+        );
+        assert_eq!(
+            apply(no_unit, &[set_unit("PROJ", "PROJ_ID", "m")]),
+            Err(EditError::MissingDescriptor {
+                group: "PROJ".into(),
+                row: "UNIT",
+            })
+        );
+    }
+
+    /// The parser does not pad the UNIT row, so a file may declare fewer units
+    /// than it has headings. A write past the end has to grow the row rather
+    /// than run off it — the alternatives are a panic and a torn row.
+    #[test]
+    fn a_short_unit_row_grows_rather_than_tearing() {
+        let short = concat!(
+            "\"GROUP\",\"LOCA\"\r\n",
+            "\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_REM\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"TYPE\",\"ID\",\"2DP\",\"X\"\r\n",
+            "\"DATA\",\"BH1\",\"100.00\",\"x\"\r\n",
+        );
+        let out = apply(short, &[set_unit("LOCA", "LOCA_REM", "%")]).unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert_eq!(p.groups["LOCA"].units, ["", "", "%"]);
+    }
+
+    /// Listing order must not decide the answer: a UNIT edit and a cell edit
+    /// in one patch mean the same thing whichever way round they are written.
+    #[test]
+    fn a_unit_edit_and_a_cell_edit_commute() {
+        let a = apply(
+            FILE,
+            &[
+                set_unit("LOCA", "LOCA_NATE", "mm"),
+                set("LOCA", 1, "LOCA_NATE", "1.00"),
+            ],
+        )
+        .unwrap();
+        let b = apply(
+            FILE,
+            &[
+                set("LOCA", 1, "LOCA_NATE", "1.00"),
+                set_unit("LOCA", "LOCA_NATE", "mm"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(a, b);
+        assert_eq!(unit_of(&a, "LOCA", "LOCA_NATE"), "mm");
+        assert_eq!(cell(&a, "LOCA", 1, "LOCA_NATE"), "1.00");
+    }
+
+    #[test]
+    fn the_set_unit_flag_splits_the_locator_and_not_the_value() {
+        assert_eq!(
+            parse_flag("set-unit", "LOCA:LOCA_DATE=yyyy-mm-ddThh:mm:ss").unwrap(),
+            set_unit("LOCA", "LOCA_DATE", "yyyy-mm-ddThh:mm:ss")
+        );
+        // Legal, and the whole reason the operation exists.
+        assert_eq!(
+            parse_flag("set-unit", "LOCA:LOCA_NATE=").unwrap(),
+            set_unit("LOCA", "LOCA_NATE", "")
+        );
+        assert!(
+            parse_flag("set-unit", "LOCA:LOCA_NATE").is_err(),
+            "a spec with no `=` names no unit"
+        );
+        assert!(
+            parse_flag("set-unit", "LOCA=mm").is_err(),
+            "a spec with no `:` names no heading"
+        );
     }
 }
