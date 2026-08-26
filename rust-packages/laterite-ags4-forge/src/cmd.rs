@@ -978,6 +978,7 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
     for (kind, specs) in [
         ("set", &args.set),
         ("blank", &args.blank),
+        ("add-column", &args.add_column),
         ("set-unit", &args.set_unit),
         ("set-type", &args.set_type),
         ("set-type-raw", &args.set_type_raw),
@@ -999,8 +1000,9 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
     if ops.is_empty() {
         eprintln!(
             "error: no operations — pass --set/--blank/--set-unit/--set-type/\
-             --set-type-raw/--add-row/--delete-row/--delete-column/\
-             --delete-group or --patch (--patch-template shows one)"
+             --set-type-raw/--add-column/--add-row/--delete-row/\
+             --delete-column/--delete-group or --patch \
+             (--patch-template shows one)"
         );
         return Ok(5);
     }

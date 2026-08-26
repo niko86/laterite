@@ -326,6 +326,11 @@ pub struct EditArgs {
     /// Repeatable.
     #[arg(long, value_name = "GROUP:HEADING=UNIT")]
     pub set_unit: Vec<String>,
+    /// `GROUP:HEADING` — add a heading the group does not have, empty in
+    /// every data row. Combine with `--set-unit`/`--set-type` in one
+    /// `--patch` to give the new column a declaration. Repeatable.
+    #[arg(long, value_name = "GROUP:HEADING")]
+    pub add_column: Vec<String>,
     /// `GROUP:HEADING=TYPE` — declare a heading's TYPE and re-format the
     /// column's values to satisfy it, so the file stays spec-valid. A DT
     /// column is rendered at the precision its UNIT declares. Repeatable.

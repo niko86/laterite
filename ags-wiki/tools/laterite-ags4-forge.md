@@ -91,8 +91,8 @@ sources: []
 > is ~314k Rule-16 findings on a 25 MB file.
 > `edit` is the one command that does not synthesize: it applies **structured
 > edits to a file that already exists** — set/blank a cell, rewrite the UNIT or
-> the TYPE a heading declares, add or delete a row, drop a column or a whole
-> group, several at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
+> the TYPE a heading declares, add a column or a row, delete a row, drop a
+> column or a whole group, several at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
 > **Rule 15** injection at all: the synthesizer scans UNIT from whatever the
 > groups use, so a synthetic file is clean by construction and nothing could
 > introduce a unit the UNIT group never defined. Note that the injection is an
@@ -110,6 +110,15 @@ sources: []
 > Rule 17 finding, so a clean projection is `--set-type` *plus* an `add-row`
 > into TYPE — one `--patch` does both, and the result dual-validates with no
 > findings on either engine.
+> `--add-column` gives a group a heading it does not have, empty in every data
+> row and present in every descriptor row the group carries, so the arity stays
+> consistent. A heading the group already has is refused; one the **dictionary**
+> has never heard of is accepted, because that fault is the tool's job to make.
+> Left undeclared the new column is not neutral — its empty TYPE cell is a Rule
+> 17 finding on python-ags4 and not on laterite, which is [[O-19]] reached
+> directly — so a clean column is `--add-column` with `--set-unit` and
+> `--set-type`, which one `--patch` applies in a single pass whatever order they
+> were written in.
 > It exists because the investigation behind the Rule 10c parentage warning
 > produced three wrong results in a row from hand-manipulating AGS text (a
 > value containing a comma torn in half, line endings converted by a text
@@ -124,7 +133,7 @@ sources: []
 > file **as it arrived** — a row number always counts the original data rows —
 > and then apply in a canonical order rather than the order they were listed,
 > so a patch cannot mean two things: asking to delete a group and also to edit
-> a row in it can only mean the delete. Six shapes are refused by name rather
+> a row in it can only mean the delete. Seven shapes are refused by name rather
 > than edited into something worse: a group, row or heading that is not there;
 > a file declaring one GROUP code **twice** (every locator would mean two
 > things, and the parse leaf resolves the halves inconsistently — rows
@@ -134,7 +143,8 @@ sources: []
 > would make the patch mean something its author never asked for; a TYPE token
 > the type system cannot read at all; and a value that cannot be rendered to
 > satisfy the type being declared, named by group, heading and row, with
-> nothing written, because half a projected column is worse than none of one. The **minimizer's field pass
+> nothing written, because half a projected column is worse than none of one;
+> and a heading a group already has. The **minimizer's field pass
 > runs on this layer too**: it used to split a DATA line on `,` with no quote
 > awareness, so shrinking a value like `"north, then east"` cut it in half and
 > left the quote open — at the same field count, so no arity rule noticed, and
