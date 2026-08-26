@@ -7,8 +7,8 @@
 //! un-validatable inputs (not AGS4, unsupported edition, bad arguments)
 //! populate `report.error` — nothing throws across the wasm boundary.
 //!
-//! Phase 2 adds `read()` → typed Arrow IPC for the DuckDB-wasm data
-//! explorer; this crate began as Phase 1 (validator) only.
+//! `read()` returns typed Arrow IPC for the DuckDB-wasm data explorer; the
+//! crate began as the validator wrapper alone and grew that surface after.
 //!
 //! # What is always here, and what is a feature (#330)
 //!
