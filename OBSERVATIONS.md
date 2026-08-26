@@ -40,6 +40,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 | O-11 | SPEC | python-ags4 folds ID-uniqueness into Rule 8 (it's Rule 10a's job) |
 | O-17 | SPEC | Rule 18 keys off heading membership only, not GROUP names |
 | O-54 | SPEC | Rule 16a — implemented under Rule 16's id, but neither engine applies the spec's default concatenator |
+| O-55 | SPEC | DICT_PGRP is conditionally REQUIRED, merely permitted, and unmentioned — three DICT clauses, three answers |
 | O-21 | SPEC | Rule 10c's parentless-group list is hardcoded, not dict-derived |
 | O-30 | VARIANCE | TRAN_AGS-driven edition selection — deliberate divergences from python |
 | O-31 | VARIANCE | Rule 8 — empty `DT` UNIT now flagged (python parity; closes the O-12 degenerate gap) |
@@ -346,6 +347,44 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Assessment**: 16a's substance is implemented in both engines and neither gives it an id, which is why enumerating catalogue rule ids reads it as a gap — `ags_rules()` and `rules_meta.json` list implemented CHECKS, not spec RULES, the same trap O-18 records for Rule 18a. The one real departure is the default, and the two ways to lack a concatenator do not behave alike. An **empty** `TRAN_RCON` cell raises Rule 11b, so the reader gets the real diagnosis beside the spurious Rule 16. An **absent** `TRAN_RCON` heading raises nothing at all — it is `OTHER` status, so Rule 10b does not ask for it either — and the only finding such a file produces is a Rule 16 naming an abbreviation it never used. The second case is the one worth fixing: ignoring a stated default is defensible when something else names the fault, and misleading when nothing does.
 - **Upstream-reportable**: **[SPEC]** — two independent implementations both ignore a default the prose states outright, which is stronger evidence that the sentence is doing no work than either engine would be alone. AGS-DFWG should either say the default applies when TRAN_RCON is absent, or drop it and let Rule 11b carry the requirement.
 - **Our decision**: keep parity with python-ags4 — split only on a populated `TRAN_RCON` — and record the departure here rather than diverge silently. Rule 16a stays covered under Rule 16's id: a dedicated `16a` id would split one condition across two rule names for no reader benefit, which is the call O-18 makes for 18a.
+
+### O-55 [SPEC] DICT_PGRP is conditionally REQUIRED, merely permitted, and unmentioned — three DICT clauses, three answers
+- **Observed**: both engines treat a blank `DICT_PGRP` on a `DICT_TYPE='GROUP'`
+  row as a Rule 10c error and stop there — laterite "Parent group is left blank
+  in the dictionary." (`rules/relational.rs::rule_10c`), python-ags4 "Parent
+  group left blank in dictionary." (`check.py::rule_10c`). Neither is following
+  the DICT Group Rules bullet, which does not mention `DICT_PGRP` at all.
+- **Spec** (DICT group definition; read separately in 4.0.4, 4.1 and 4.2, and
+  unchanged across all three): three clauses on the same page give three
+  answers. Paraphrased, since the spec copies are not redistributable —
+  (1) the heading table's note column marks `DICT_PGRP` REQUIRED where
+  `DICT_TYPE='GROUP'`, while its status column is blank (OTHER); (2) the Group
+  Notes bullet says it *allows* the parent group name to be included, and that
+  this *permits* data-integrity checking; (3) the Group Rules bullet for
+  `DICT_TYPE='GROUP'` enumerates which headings shall carry data (`DICT_GRP`,
+  `DICT_DESC`) and which shall be NULL (`DICT_HDNG`, `DICT_STAT`, `DICT_DTYP`,
+  `DICT_UNIT`), and puts `DICT_PGRP` in neither list.
+- **Evidence**: the HEADING side of the same group is internally consistent —
+  every heading the table marks REQUIRED where `DICT_TYPE='HEADING'` is also
+  named in the Group Rules bullet for HEADING rows. `DICT_PGRP` is the one
+  conditional-required that the GROUP bullet omits, so this is an omission from
+  one of two parallel lists rather than a drafting style applied evenly.
+- **Assessment**: **[SPEC]**. Not a validator defect. A reader following the
+  table note gets the behaviour both engines implement; a reader following the
+  Group Rules bullet concludes the parent is optional on a declared group and
+  that resolving it is best-effort. The document supports both, so whether a
+  consumer may rely on a file-declared group's parent being present is left
+  undecided — and that is the question a DICT-aware consumer has to answer.
+- **Upstream-reportable**: **yes** — the fix is one line: add `DICT_PGRP` to the
+  Group Rules bullet's "shall contain data" list for `DICT_TYPE='GROUP'`,
+  matching the table note and matching how the HEADING bullet already treats its
+  own conditional-requireds.
+- **Our decision**: honour the table note — `DICT_PGRP` is required on a
+  `GROUP`-type DICT row, and a blank one is reported under Rule 10c. This is
+  what python-ags4 already does, so there is no divergence to publish: the
+  record carries no `user_facing` block and does not reach
+  `web/docs-site/docs/reference/divergences.md`. Two engines agreeing on one of
+  two readings the spec offers is not a difference between them.
 
 ## V7 — relational rules (Rules 10a–10c, 11a–11c)
 
