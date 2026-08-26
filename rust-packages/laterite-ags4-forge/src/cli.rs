@@ -356,6 +356,12 @@ pub struct EditArgs {
     /// count. Repeatable. Use `--patch` to append a row WITH values.
     #[arg(long, value_name = "GROUP")]
     pub add_row: Vec<String>,
+    /// `GROUP:POSITION` — insert an empty data row that BECOMES that
+    /// position, counting the file's original rows. A position past the last
+    /// row is refused; use `--add-row` to append. Use `--patch` to insert a
+    /// row WITH values. Repeatable.
+    #[arg(long, value_name = "GROUP:POSITION")]
+    pub insert_row: Vec<String>,
     /// A patch file (`.toml` or `.json`) of operations — the form that
     /// carries values, survives review, and can be re-run. Combines with
     /// the flags above; `--patch-template` prints a worked example.

@@ -85,6 +85,18 @@ pub enum Op {
         #[serde(default)]
         cells: BTreeMap<String, String>,
     },
+    /// Insert a DATA row at a position rather than appending one, so a fault
+    /// can be planted mid-group. `at` counts the file's ORIGINAL data rows,
+    /// 1-indexed, like every other row locator here: the new row becomes that
+    /// position, and the rows from there on move down.
+    InsertRow {
+        group: String,
+        at: usize,
+        /// Keyed by heading, for the same reason `AddRow` is: a positional
+        /// row is how a hand-built row ends up ragged.
+        #[serde(default)]
+        cells: BTreeMap<String, String>,
+    },
     DeleteRow {
         group: String,
         row: usize,
@@ -117,6 +129,7 @@ impl Op {
             | Op::SetType { group, .. }
             | Op::SetCell { group, .. }
             | Op::AddRow { group, .. }
+            | Op::InsertRow { group, .. }
             | Op::DeleteRow { group, .. }
             | Op::DeleteGroup { group }
             | Op::DeleteColumn { group, .. } => group,
@@ -356,6 +369,19 @@ impl Shape {
     }
 }
 
+/// The last line the group's DESCRIPTOR rows occupy — where a row inserted at
+/// position 1 has to land. Not `last_line`, which counts the data rows too, and
+/// not a first-match chain over HEADING/UNIT/TYPE: a group missing its TYPE row
+/// would then anchor above its UNIT row.
+fn descriptor_end(g: &laterite_ags4_parse::ParsedGroup) -> u32 {
+    [g.heading_line, g.unit_line, g.type_line]
+        .into_iter()
+        .flatten()
+        .chain(std::iter::once(g.group_line))
+        .max()
+        .unwrap_or(g.group_line)
+}
+
 /// Where an operation sits in the canonical order. Operations are applied in
 /// this order regardless of the order they were written, which is what makes
 /// every combination of them mean one thing.
@@ -375,9 +401,10 @@ fn rank(op: &Op) -> u8 {
         Op::SetType { .. } => 2,
         Op::SetCell { .. } => 3,
         Op::AddRow { .. } => 4,
-        Op::DeleteRow { .. } => 5,
-        Op::DeleteColumn { .. } => 6,
-        Op::DeleteGroup { .. } => 7,
+        Op::InsertRow { .. } => 5,
+        Op::DeleteRow { .. } => 6,
+        Op::DeleteColumn { .. } => 7,
+        Op::DeleteGroup { .. } => 8,
     }
 }
 
@@ -677,6 +704,45 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 let after = last_line(g);
                 inserts.entry(after).or_default().push(pending);
             }
+            Op::InsertRow { group, at, cells } => {
+                // Refused rather than silently appended: appending is what
+                // `AddRow` is for, and a typo that quietly becomes an append
+                // gives a reproducer that does not reproduce.
+                if *at == 0 || *at > g.rows.len() {
+                    return Err(EditError::NoSuchRow {
+                        group: group.clone(),
+                        row: *at,
+                        rows: g.rows.len(),
+                    });
+                }
+                // Anchored AFTER the line before the target row, so the new
+                // row takes that position and the rest move down. Position 1
+                // has no earlier row, so it anchors to the descriptors.
+                let anchor = if *at == 1 {
+                    descriptor_end(g)
+                } else {
+                    g.rows[at - 2].line
+                };
+                let mut values = vec![String::new(); shape.arity(g)];
+                for (heading, value) in cells {
+                    let col = shape
+                        .col(g, heading)
+                        .ok_or_else(|| EditError::NoSuchHeading {
+                            group: group.clone(),
+                            heading: heading.clone(),
+                        })?;
+                    values[col].clone_from(value);
+                }
+                let mut fields = vec!["DATA".to_string()];
+                fields.extend(values);
+                // Pushed, not replaced: two insertions at one position keep
+                // the order they were listed in, which `sort_by_key` preserves
+                // because it is stable.
+                inserts.entry(anchor).or_default().push(Pending {
+                    group: group.clone(),
+                    fields,
+                });
+            }
             Op::DeleteRow { row, group } => {
                 let data = g
                     .rows
@@ -856,6 +922,12 @@ cells = { LOCA_ID = "BH2", LOCA_REM = "a value, with a comma" }
 # reformat = true      # false declares the type and leaves the values alone
 
 # [[op]]
+# kind = "insert-row"
+# group = "LOCA"
+# at = 1
+# cells = { LOCA_ID = "BH0" }
+
+# [[op]]
 # kind = "delete-row"
 # group = "LOCA"
 # row = 2
@@ -946,6 +1018,14 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 // `--blank` is a spelling of `set`: one kind in a patch file,
                 // two intentions at the command line.
                 reformat: kind == "set-type",
+            })
+        }
+        "insert-row" => {
+            let (g, at) = spec.split_once(':').ok_or_else(|| bad("GROUP:POSITION"))?;
+            Ok(Op::InsertRow {
+                group: g.to_string(),
+                at: row(at)?,
+                cells: BTreeMap::new(),
             })
         }
         "delete-row" => {
@@ -1323,8 +1403,9 @@ mod tests {
         let patch: Patch = toml::from_str(&uncommented).expect("every commented op must load");
         assert_eq!(
             patch.op.len(),
-            8,
-            "set, add-row, add-column, set-unit, set-type, delete-row, -column, -group"
+            9,
+            "set, add-row, add-column, set-unit, set-type, insert-row, delete-row, \
+             -column, -group"
         );
     }
 
@@ -1340,6 +1421,7 @@ mod tests {
             // it is a second spelling of a kind already listed, not a kind.
             "set-type",
             "add-row",
+            "insert-row",
             "delete-row",
             "delete-column",
             "delete-group",
@@ -1349,7 +1431,7 @@ mod tests {
                 "add-column" => "LOCA:LOCA_NEW",
                 "set-unit" => "LOCA:LOCA_ID=m",
                 "set-type" => "LOCA:LOCA_ID=X",
-                "delete-row" => "LOCA:1",
+                "insert-row" | "delete-row" => "LOCA:1",
                 "delete-column" => "LOCA:LOCA_ID",
                 _ => "LOCA",
             };
@@ -2221,5 +2303,205 @@ type = "0DP"
             add_column("LOCA", "LOCA_GL")
         );
         assert!(parse_flag("add-column", "LOCA").is_err());
+    }
+
+    fn insert_row(group: &str, at: usize, cells: &[(&str, &str)]) -> Op {
+        Op::InsertRow {
+            group: group.into(),
+            at,
+            cells: cells
+                .iter()
+                .map(|(h, v)| ((*h).to_string(), (*v).to_string()))
+                .collect(),
+        }
+    }
+
+    fn ids(text: &str, group: &str, heading: &str) -> Vec<String> {
+        let p = laterite_ags4_parse::parse_str(text).expect("output must re-parse");
+        let g = p.groups.get(group).expect("group");
+        let col = g.col(heading).expect("heading");
+        (0..g.rows.len())
+            .map(|r| g.cell(col, r).unwrap_or_default().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn a_row_inserted_at_a_position_becomes_that_position() {
+        let out = apply(FILE, &[insert_row("LOCA", 2, &[("LOCA_ID", "BH1a")])]).unwrap();
+        assert_eq!(ids(&out, "LOCA", "LOCA_ID"), ["BH1", "BH1a", "BH2"]);
+    }
+
+    /// Position 1 has no earlier row to sit after, so it anchors to the
+    /// group's descriptors — never above them, and never in the group before.
+    #[test]
+    fn a_row_inserted_at_position_one_lands_under_the_descriptors() {
+        let out = apply(FILE, &[insert_row("LOCA", 1, &[("LOCA_ID", "BH0")])]).unwrap();
+        assert_eq!(ids(&out, "LOCA", "LOCA_ID"), ["BH0", "BH1", "BH2"]);
+        // PROJ, which sits ABOVE LOCA in the file, must be untouched.
+        assert_eq!(cell(&out, "PROJ", 1, "PROJ_ID"), "P1");
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert_eq!(
+            p.groups["PROJ"].rows.len(),
+            1,
+            "the row went to LOCA: {out}"
+        );
+    }
+
+    /// A group missing its TYPE row still anchors below the rows it has,
+    /// which a first-match chain over HEADING/UNIT/TYPE would get wrong.
+    #[test]
+    fn position_one_anchors_below_the_descriptor_rows_a_group_actually_has() {
+        let no_type = concat!(
+            "\"GROUP\",\"LOCA\"\r\n",
+            "\"HEADING\",\"LOCA_ID\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"DATA\",\"BH1\"\r\n",
+        );
+        let out = apply(no_type, &[insert_row("LOCA", 1, &[("LOCA_ID", "BH0")])]).unwrap();
+        assert_eq!(ids(&out, "LOCA", "LOCA_ID"), ["BH0", "BH1"]);
+        assert!(
+            out.starts_with("\"GROUP\",\"LOCA\"\r\n\"HEADING\""),
+            "the descriptors must still come first: {out}"
+        );
+    }
+
+    #[test]
+    fn a_position_past_the_last_row_is_refused_rather_than_appended() {
+        assert_eq!(
+            apply(FILE, &[insert_row("LOCA", 3, &[])]),
+            Err(EditError::NoSuchRow {
+                group: "LOCA".into(),
+                row: 3,
+                rows: 2,
+            })
+        );
+        assert_eq!(
+            apply(FILE, &[insert_row("LOCA", 0, &[])]),
+            Err(EditError::NoSuchRow {
+                group: "LOCA".into(),
+                row: 0,
+                rows: 2,
+            })
+        );
+    }
+
+    /// A group with no data rows has no position to insert at. `--add-row` is
+    /// the operation for that, and saying so beats guessing.
+    #[test]
+    fn a_group_with_no_rows_refuses_every_position() {
+        let empty = concat!(
+            "\"GROUP\",\"LOCA\"\r\n",
+            "\"HEADING\",\"LOCA_ID\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"TYPE\",\"ID\"\r\n",
+        );
+        assert!(matches!(
+            apply(empty, &[insert_row("LOCA", 1, &[])]),
+            Err(EditError::NoSuchRow { rows: 0, .. })
+        ));
+    }
+
+    /// Row numbers keep counting the ORIGINAL file, so an insertion does not
+    /// renumber the rows a later operation names.
+    #[test]
+    fn an_insertion_does_not_renumber_the_rows_a_later_operation_names() {
+        let out = apply(
+            FILE,
+            &[
+                insert_row("LOCA", 1, &[("LOCA_ID", "BH0")]),
+                set("LOCA", 2, "LOCA_ID", "renamed"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            ids(&out, "LOCA", "LOCA_ID"),
+            ["BH0", "BH1", "renamed"],
+            "row 2 must still mean the ORIGINAL row 2"
+        );
+    }
+
+    #[test]
+    fn two_insertions_at_one_position_keep_the_order_they_were_listed_in() {
+        let out = apply(
+            FILE,
+            &[
+                insert_row("LOCA", 1, &[("LOCA_ID", "first")]),
+                insert_row("LOCA", 1, &[("LOCA_ID", "second")]),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            ids(&out, "LOCA", "LOCA_ID"),
+            ["first", "second", "BH1", "BH2"]
+        );
+    }
+
+    /// The shape this whole layer exists to prevent: an inserted row and a
+    /// dropped column in one patch must not leave a row of the wrong width.
+    #[test]
+    fn an_insertion_and_a_column_drop_leave_no_ragged_row() {
+        let out = apply(
+            FILE,
+            &[
+                insert_row("LOCA", 1, &[("LOCA_ID", "BH0")]),
+                Op::DeleteColumn {
+                    group: "LOCA".into(),
+                    heading: "LOCA_REM".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        let g = &p.groups["LOCA"];
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE"]);
+        assert!(g.rows.iter().all(|r| r.values.len() == 2), "{out}");
+    }
+
+    /// Deleting the group wins over inserting into it — the same reading the
+    /// canonical order gives every other write.
+    #[test]
+    fn an_insertion_into_a_deleted_group_does_not_resurrect_it() {
+        let out = apply(
+            FILE,
+            &[
+                insert_row("LOCA", 1, &[("LOCA_ID", "BH0")]),
+                Op::DeleteGroup {
+                    group: "LOCA".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert!(!p.groups.contains_key("LOCA"), "LOCA must be gone: {out}");
+        assert!(
+            !out.contains("BH0"),
+            "the inserted row must go with it: {out}"
+        );
+    }
+
+    /// A column created by the same patch reaches an inserted row too.
+    #[test]
+    fn a_row_inserted_in_the_same_patch_carries_a_created_column() {
+        let out = apply(
+            FILE,
+            &[
+                add_column("LOCA", "LOCA_GL"),
+                insert_row("LOCA", 1, &[("LOCA_GL", "9.99")]),
+            ],
+        )
+        .unwrap();
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "9.99");
+        let p = laterite_ags4_parse::parse_str(&out).unwrap();
+        assert!(p.groups["LOCA"].rows.iter().all(|r| r.values.len() == 4));
+    }
+
+    #[test]
+    fn the_insert_row_flag_takes_a_group_and_a_position() {
+        assert_eq!(
+            parse_flag("insert-row", "LOCA:2").unwrap(),
+            insert_row("LOCA", 2, &[])
+        );
+        assert!(parse_flag("insert-row", "LOCA").is_err());
+        assert!(parse_flag("insert-row", "LOCA:x").is_err());
     }
 }

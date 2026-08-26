@@ -491,3 +491,57 @@ type = "2DP"
     // order, not listing order, decides the result.
     assert_eq!(json(&out)["unchanged"], false);
 }
+
+/// Inserting through the flag, and a position past the last row refused with a
+/// non-zero exit and nothing written. A typo that quietly appended would give a
+/// reproducer that does not reproduce.
+#[test]
+fn a_row_is_inserted_at_a_position_and_a_bad_position_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let src = write_fixture(dir.path());
+
+    let dst = dir.path().join("inserted.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--insert-row",
+        "LOCA:1",
+        "--out",
+        dst.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = std::fs::read_to_string(&dst).expect("written");
+    let p = laterite_ags4_parse::parse_str(&text).expect("output must re-parse");
+    let g = p.groups.get("LOCA").expect("LOCA");
+    let col = g.col("LOCA_ID").expect("heading");
+    assert_eq!(g.rows.len(), 3);
+    assert_eq!(g.cell(col, 0), Some(""), "the new row takes position 1");
+    assert_eq!(g.cell(col, 1), Some("BH1"));
+    assert!(
+        g.rows.iter().all(|r| r.values.len() == g.headings.len()),
+        "no row may be ragged: {text}"
+    );
+
+    let refused = dir.path().join("refused.ags");
+    let out = forge(&[
+        "edit",
+        src.to_str().unwrap(),
+        "--insert-row",
+        "LOCA:9",
+        "--out",
+        refused.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(!out.status.success(), "a bad position must not exit 0");
+    assert!(!refused.exists(), "a refusal must write nothing");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("LOCA") && stderr.contains("row 9"),
+        "the refusal must name the group and the position: {stderr}"
+    );
+}
