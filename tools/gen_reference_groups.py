@@ -19,7 +19,15 @@ Scope = every group in ags_dictionary.json (the AGS4 union, 174). "Current in
 by dropping groups — a removed group keeps its page + its place in the parent's
 children list (so no orphans, and observation pages that cite e.g. ERES keep
 resolving). The 3 AGS-L draft groups (CONL/TREL/TRIL) are NOT in the dictionary
-and stay hand-authored (see AGS_L_EXCEPTIONS in the faithfulness test).
+and stay hand-authored, so nothing here reads them: the render loop walks the
+dictionary, not the directory. `--check` now NAMES them on every run, pass or
+fail, which is the only place that exception is recorded — this line used to
+point at an `AGS_L_EXCEPTIONS` constant "in the faithfulness test", and neither
+the constant nor a test containing it has ever existed in either tree. That is
+the same fault the paragraph above corrects four lines earlier, in the same
+docstring, uncorrected. #757 is what surfaced it: those three pages are the only
+ones whose `parent:` has ever been wrong, so "recorded in a pointer to nothing"
+was doing real work as a reason not to look.
 
 A few facts aren't in the dictionary and are carried here as small, spec-cited
 constants: the deprecation/removal successors (spec Foreword / §3.6), the
@@ -279,6 +287,25 @@ def _dict() -> dict:
     return json.loads(DICT.read_text(encoding="utf-8"))["groups"]
 
 
+def _ungenerated() -> list[str]:
+    """Pages under `groups/` this generator does not produce, and so never reads.
+
+    The render loop below walks the DICTIONARY, not the directory, so a page for
+    a group the dictionary has never heard of is not stale, not fresh, and not
+    mentioned — it is simply absent from the gate. Three such pages exist (the
+    AGS-L drafts CONL/TREL/TRIL), and #757 found that they are exactly the pages
+    whose `parent:` has ever been wrong: the field is correct everywhere a
+    machine could check it and wrong everywhere it could not.
+
+    So this is the blind spot with the defects in it, and CLAUDE.md's rule
+    applies literally — a gate that drops input says what it dropped. Printed on
+    every run, pass or fail, because a bare "OK: 174 pages" over a directory of
+    177 is a green tick on three rows nothing looked at.
+    """
+    dic = _dict()
+    return sorted(p.stem for p in GROUPS_DIR.glob("*.md") if p.stem not in dic)
+
+
 def main(argv: list[str]) -> int:
     dic = _dict()
     check = "--check" in argv
@@ -291,6 +318,15 @@ def main(argv: list[str]) -> int:
                 stale.append(code)
         else:
             path.write_text(rendered, encoding="utf-8")
+    outside = _ungenerated()
+
+    def report_scope() -> None:
+        if outside:
+            print(
+                f"  not generated, so not checked ({len(outside)}): "
+                f"{', '.join(outside)} — outside {DICT.name}, held by no gate"
+            )
+
     if check:
         if stale:
             print(
@@ -298,14 +334,17 @@ def main(argv: list[str]) -> int:
                 + (" …" if len(stale) > 20 else ""),
                 file=sys.stderr,
             )
+            report_scope()
             print(
                 "run `uv run --no-sync python tools/gen_reference_groups.py`",
                 file=sys.stderr,
             )
             return 1
         print(f"group reference tier OK: {len(dic)} pages match render()")
+        report_scope()
         return 0
     print(f"wrote {len(dic)} group pages from {DICT.name}")
+    report_scope()
     return 0
 
 
