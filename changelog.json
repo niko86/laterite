@@ -194,6 +194,9 @@
       },
       {
         "text": "**An unstamped merge now says what it actually did to `TRAN`.** Merging without a transmission stamp emits a `tran_not_stamped` warning, and that warning claimed the merged file *\"kept the newest input's TRAN as a fallback\"* — which reads as one surviving row. It keeps all of them. `TRAN_ISNO` is a `KEY` heading, so reconciliation has a key to work with and simply never sees a collision: two deliveries carry two different transmission numbers and both rows survive, leaving a file that fails Rule 14, which requires exactly one. A caller who read the old wording and moved on shipped an invalid file believing the fallback had handled it. The warning now describes the reconciliation and names the consequence, and the same correction is applied to the Rust, Python, Node and wasm docs and to the merge decision page, all of which restated the old claim. Behaviour is unchanged; whether an unstamped merge should refuse rather than warn is a separate question."
+      },
+      {
+        "text": "**The Rule 16 explainer described a concatenator default the validator does not apply.** The rule catalogue's own text — what the web app shows beside a failing file, and what `lat rules --json` emits — said multi-abbreviation fields are \"split on the TRAN_RCON concatenator (default +)\". The specification does name `+` as the default when `TRAN_RCON` is absent, and neither laterite nor python-ags4 applies it: an undeclared concatenator leaves the field unsplit and checked whole, so a file concatenating on `+` without declaring it gets one finding naming an abbreviation it never used, and nothing reports the missing `TRAN_RCON`. A reader looking for why was told the opposite of what happened to them. The explainer now describes the behaviour and carries a note saying what to do about it (declare the separator); the divergence itself is recorded as O-54, unchanged."
       }
     ],
     "security": []
