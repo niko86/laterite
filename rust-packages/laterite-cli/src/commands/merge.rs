@@ -74,6 +74,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
 
     let merge_opts = MergeOpts {
         on_type_clash: args.on_type_clash,
+        on_missing_tran: args.on_missing_tran,
         edition: dv,
         tran,
         ..Default::default()
@@ -152,6 +153,25 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
                 "hint: merge will not convert units, and no mode can absorb this — picking one \
                  would silently mislabel the other file's values. Reconcile the UNIT row in the \
                  source files, then merge."
+            );
+            exit(6);
+        }
+        Err(MergeError::MissingTran) => {
+            eprintln!(
+                "error: no transmission stamp supplied and --on-missing-tran error: the merged \
+                 file is a new transmission and needs its own TRAN row"
+            );
+            // The remedy first, the escape hatch second — same order as the type
+            // clash above, and for the same reason: the mode that keeps the file
+            // valid should be the one a reader reaches for.
+            eprintln!(
+                "hint: --tran-issue/--tran-date/--tran-producer/--tran-recipient/--tran-status  \
+                 write one merge TRAN describing this transmission (the inputs' ISNOs and dates \
+                 are recorded in TRAN_REM)"
+            );
+            eprintln!(
+                "hint: --on-missing-tran reconcile  merge TRAN like any other group and warn — \
+                 each delivery's TRAN row survives, which is more than Rule 14 permits"
             );
             exit(6);
         }

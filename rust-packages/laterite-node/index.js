@@ -716,6 +716,7 @@ module.exports.fallbackEdition = nativeBinding.fallbackEdition
 module.exports.fixFile = nativeBinding.fixFile
 module.exports.listRules = nativeBinding.listRules
 module.exports.merge = nativeBinding.merge
+module.exports.missingTranModes = nativeBinding.missingTranModes
 module.exports.parseArrow = nativeBinding.parseArrow
 module.exports.parseValue = nativeBinding.parseValue
 module.exports.readGroupsRaw = nativeBinding.readGroupsRaw

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use laterite_ags4_merge::{MergeError, MergeOpts, TypeClashMode, merge_parsed};
+use laterite_ags4_merge::{MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
 
 use super::{Document, WriteMode, resolve_edition, validator_kind};
 use crate::{Error, ErrorKind};
@@ -37,6 +37,38 @@ impl TypeClash {
             TypeClash::Refuse => TypeClashMode::Error,
             TypeClash::Widen => TypeClashMode::Widen,
             TypeClash::Promote => TypeClashMode::Promote,
+        }
+    }
+}
+
+/// What to do when no transmission stamp is supplied and the sources carry
+/// TRAN rows of their own.
+///
+/// Only consulted when you did not call [`Merge::transmission`]; supplying a
+/// stamp makes this irrelevant.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MissingTran {
+    /// Fold TRAN like any other group and leave a [`Note`]. `TRAN_ISNO` is a KEY
+    /// heading and two deliveries carry different issue numbers, so both
+    /// transmissions survive — and Rule 14 allows exactly one row.
+    ///
+    /// The default, so that adding this option changed nothing for anyone.
+    #[default]
+    Reconcile,
+    /// Refuse the merge before any bytes are produced.
+    ///
+    /// Named [`Refuse`](Self::Refuse) rather than `Error` for the same reason
+    /// [`TypeClash::Refuse`] is: at this level it reads as the thing merge does,
+    /// not as an error category.
+    Refuse,
+}
+
+impl MissingTran {
+    fn to_engine(self) -> MissingTranMode {
+        match self {
+            MissingTran::Reconcile => MissingTranMode::Reconcile,
+            MissingTran::Refuse => MissingTranMode::Error,
         }
     }
 }
@@ -214,6 +246,7 @@ impl Source<'_> {
 pub struct Merge<'a> {
     sources: Vec<Source<'a>>,
     on_type_clash: TypeClash,
+    on_missing_tran: MissingTran,
     edition: Option<String>,
     encoding: Option<String>,
     mode: WriteMode,
@@ -224,6 +257,7 @@ fn pending(sources: Vec<Source<'_>>) -> Merge<'_> {
     Merge {
         sources,
         on_type_clash: TypeClash::default(),
+        on_missing_tran: MissingTran::default(),
         edition: None,
         encoding: None,
         mode: WriteMode::default(),
@@ -288,6 +322,14 @@ impl<'a> Merge<'a> {
     #[must_use]
     pub fn on_type_clash(mut self, mode: TypeClash) -> Merge<'a> {
         self.on_type_clash = mode;
+        self
+    }
+
+    /// What to do when no [`transmission`](Merge::transmission) stamp is
+    /// supplied — see [`MissingTran`].
+    #[must_use]
+    pub fn on_missing_tran(mut self, mode: MissingTran) -> Merge<'a> {
+        self.on_missing_tran = mode;
         self
     }
 
@@ -375,6 +417,7 @@ impl<'a> Merge<'a> {
 
         let opts = MergeOpts {
             on_type_clash: self.on_type_clash.to_engine(),
+            on_missing_tran: self.on_missing_tran.to_engine(),
             edition: match &self.edition {
                 Some(label) => resolve_edition(label)?,
                 None => laterite_ags4_reference::dict::FALLBACK,
@@ -395,6 +438,7 @@ impl<'a> Merge<'a> {
             let kind = match &e {
                 MergeError::TypeConflict { .. } => ErrorKind::TypeConflict,
                 MergeError::UnitConflict { .. } => ErrorKind::UnitConflict,
+                MergeError::MissingTran => ErrorKind::MissingTran,
                 MergeError::Emit(_) => ErrorKind::Emit,
             };
             // The engine's own message carries the remedy — which mode settles a
@@ -455,6 +499,7 @@ impl std::fmt::Debug for Merge<'_> {
                     .collect::<Vec<_>>(),
             )
             .field("on_type_clash", &self.on_type_clash)
+            .field("on_missing_tran", &self.on_missing_tran)
             .field("edition", &self.edition)
             .field("encoding", &self.encoding)
             .field("mode", &self.mode)

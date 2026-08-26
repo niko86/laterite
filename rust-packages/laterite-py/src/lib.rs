@@ -717,6 +717,7 @@ fn diff_files(
 fn merge_core(
     files: &[Vec<u8>],
     on_type_clash: &str,
+    on_missing_tran: &str,
     dvr: Option<&str>,
     encoding: Option<&str>,
     tran: (
@@ -729,7 +730,9 @@ fn merge_core(
         Option<&str>,
     ),
 ) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
-    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{
+        MergeError, MergeOpts, MissingTranMode, TranStamp, TypeClashMode, merge_parsed,
+    };
 
     if files.len() < 2 {
         return Err((
@@ -741,6 +744,11 @@ fn merge_core(
     // One vocabulary for every surface: the mode strings and this message come from
     // the merge crate's FromStr, so Python cannot accept a token the CLI rejects.
     let clash: TypeClashMode = on_type_clash
+        .parse()
+        .map_err(|m: String| (5, "bad_args".to_string(), m))?;
+    // Same discipline: the tokens and the message are the merge crate's FromStr,
+    // so Python cannot accept a value the CLI rejects, or reject one it accepts.
+    let missing_tran: MissingTranMode = on_missing_tran
         .parse()
         .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
@@ -787,6 +795,7 @@ fn merge_core(
 
     let opts = MergeOpts {
         on_type_clash: clash,
+        on_missing_tran: missing_tran,
         edition: dv,
         tran,
         ..Default::default()
@@ -814,6 +823,10 @@ fn merge_core(
         Err(e @ MergeError::UnitConflict { .. }) => {
             Err((6, "unit_conflict".to_string(), e.to_string()))
         }
+        // Its own kind at the same exit code, matching the two above: all three are
+        // merge refusals a caller may want to route on separately, because the three
+        // need different fixes (settle the type, reconcile the UNIT, supply a stamp).
+        Err(e @ MergeError::MissingTran) => Err((6, "missing_tran".to_string(), e.to_string())),
         Err(e @ MergeError::Emit(_)) => Err((6, "emit_error".to_string(), e.to_string())),
     }
 }
@@ -822,7 +835,7 @@ fn merge_core(
 /// warnings_json, revisions_json}` — the Python layer parses the two JSON
 /// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
-#[pyo3(signature = (files, on_type_clash="error", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None))]
+#[pyo3(signature = (files, on_type_clash="error", on_missing_tran="reconcile", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -830,6 +843,7 @@ fn merge_files<'py>(
     py: Python<'py>,
     files: Vec<Vec<u8>>,
     on_type_clash: &str,
+    on_missing_tran: &str,
     dict_version: Option<String>,
     encoding: Option<String>,
     tran_issue: Option<String>,
@@ -852,6 +866,7 @@ fn merge_files<'py>(
     match merge_core(
         &files,
         on_type_clash,
+        on_missing_tran,
         dict_version.as_deref(),
         encoding.as_deref(),
         tran,

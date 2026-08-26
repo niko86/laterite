@@ -69,6 +69,7 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -125,6 +126,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --on-missing-tran": [
+          "error",
+          "reconcile"
+        ],
         "merge --on-type-clash": [
           "error",
           "promote",
@@ -219,6 +224,7 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -276,6 +282,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --on-missing-tran": [
+          "error",
+          "reconcile"
+        ],
         "merge --on-type-clash": [
           "error",
           "promote",
@@ -370,6 +380,7 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -427,6 +438,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --on-missing-tran": [
+          "error",
+          "reconcile"
+        ],
         "merge --on-type-clash": [
           "error",
           "promote",

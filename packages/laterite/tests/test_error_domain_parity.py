@@ -63,10 +63,18 @@ _PRODUCER = {
 #   which raises the same exception from Python for the same assertion.
 _CONSUMER_ONLY = {"not_utf8": 4, "bad_args": 5, "stale_cert": 4}
 # The merge leaf (`laterite-ags4-merge::MergeError`) is a SECOND Rust producer,
-# distinct from `ValidatorError`: a strict TYPE conflict or a failed emit is a
-# schema-level rejection (exit 6). laterite-py's `merge_core` emits these two
-# kinds and `_errors.py` maps both to `MergeConflictError`.
-_MERGE = {"type_conflict": 6, "unit_conflict": 6, "emit_error": 6}
+# distinct from `ValidatorError`: every refusal it makes is a schema-level
+# rejection (exit 6). laterite-py's `merge_core` emits these four kinds and
+# `_errors.py` maps all of them to `MergeConflictError`. They share the code
+# and differ only in token, because a caller routing on the token needs to tell
+# them apart — settle the TYPE, reconcile the UNIT, supply a transmission stamp
+# — while a shell caller only needs the one exit code.
+_MERGE = {
+    "type_conflict": 6,
+    "unit_conflict": 6,
+    "missing_tran": 6,
+    "emit_error": 6,
+}
 _ALL = {**_PRODUCER, **_CONSUMER_ONLY, **_MERGE}
 
 

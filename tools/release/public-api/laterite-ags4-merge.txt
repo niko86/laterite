@@ -2,6 +2,7 @@ pub mod laterite_ags4_merge
 pub use laterite_ags4_merge::TranStamp
 pub enum laterite_ags4_merge::MergeError
 pub laterite_ags4_merge::MergeError::Emit(alloc::string::String)
+pub laterite_ags4_merge::MergeError::MissingTran
 pub laterite_ags4_merge::MergeError::TypeConflict
 pub laterite_ags4_merge::MergeError::TypeConflict::group: alloc::string::String
 pub laterite_ags4_merge::MergeError::TypeConflict::heading: alloc::string::String
@@ -22,6 +23,33 @@ impl core::marker::Unpin for laterite_ags4_merge::MergeError
 impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeError
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeError
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeError
+pub enum laterite_ags4_merge::MissingTranMode
+pub laterite_ags4_merge::MissingTranMode::Error
+pub laterite_ags4_merge::MissingTranMode::Reconcile
+impl laterite_ags4_merge::MissingTranMode
+pub const laterite_ags4_merge::MissingTranMode::ALL: [laterite_ags4_merge::MissingTranMode; 2]
+pub fn laterite_ags4_merge::MissingTranMode::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::clone(&self) -> laterite_ags4_merge::MissingTranMode
+impl core::cmp::Eq for laterite_ags4_merge::MissingTranMode
+impl core::cmp::PartialEq for laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::eq(&self, &laterite_ags4_merge::MissingTranMode) -> bool
+impl core::default::Default for laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::default() -> laterite_ags4_merge::MissingTranMode
+impl core::fmt::Debug for laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_merge::MissingTranMode
+impl core::marker::StructuralPartialEq for laterite_ags4_merge::MissingTranMode
+impl core::str::traits::FromStr for laterite_ags4_merge::MissingTranMode
+pub type laterite_ags4_merge::MissingTranMode::Err = alloc::string::String
+pub fn laterite_ags4_merge::MissingTranMode::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for laterite_ags4_merge::MissingTranMode
+impl core::marker::Send for laterite_ags4_merge::MissingTranMode
+impl core::marker::Sync for laterite_ags4_merge::MissingTranMode
+impl core::marker::Unpin for laterite_ags4_merge::MissingTranMode
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::MissingTranMode
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MissingTranMode
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MissingTranMode
 pub enum laterite_ags4_merge::TypeClashMode
 pub laterite_ags4_merge::TypeClashMode::Error
 pub laterite_ags4_merge::TypeClashMode::Promote
@@ -53,6 +81,7 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::TypeClashMode
 pub struct laterite_ags4_merge::MergeOpts
 pub laterite_ags4_merge::MergeOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
 pub laterite_ags4_merge::MergeOpts::emit_mode: laterite_ags4_emit::emit::EmitMode
+pub laterite_ags4_merge::MergeOpts::on_missing_tran: laterite_ags4_merge::MissingTranMode
 pub laterite_ags4_merge::MergeOpts::on_type_clash: laterite_ags4_merge::TypeClashMode
 pub laterite_ags4_merge::MergeOpts::tran: core::option::Option<laterite_ags4_emit::emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_merge::MergeOpts

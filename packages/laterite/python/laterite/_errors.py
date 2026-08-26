@@ -101,6 +101,11 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     "type_conflict": MergeConflictError,
     # Fatal in EVERY merge mode — no `on_type_clash` value absorbs a unit clash (laterite-dev#501).
     "unit_conflict": MergeConflictError,
+    # `on_missing_tran="error"`: no stamp was supplied and the caller asked to be
+    # refused. A merge refusal like the two either side, sharing their exit code —
+    # its own token only so a caller can tell the three apart, because the three
+    # need different fixes.
+    "missing_tran": MergeConflictError,
     "emit_error": MergeConflictError,
 }
 

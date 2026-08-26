@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use clap::builder::TypedValueParser; // for `.map()` on PossibleValuesParser
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use laterite_ags4_merge::TypeClashMode;
+use laterite_ags4_merge::{MissingTranMode, TypeClashMode};
 
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
@@ -314,6 +314,24 @@ pub struct MergeArgs {
             .map(|s| s.parse::<TypeClashMode>().expect("clap restricted the value")),
     )]
     pub on_type_clash: TypeClashMode,
+    /// What to do when none of the --tran-* flags is given and the deliveries
+    /// carry TRAN rows of their own:
+    ///
+    ///   reconcile — merge TRAN like any other group and warn (default). Each
+    ///               delivery's TRAN row survives, because `TRAN_ISNO` is a KEY
+    ///               heading and issue numbers differ — and Rule 14 allows one.
+    ///   error     — refuse, before anything is written to --out
+    ///
+    /// The allowed values are projected from `MissingTranMode::ALL`, so the CLI
+    /// cannot drift from the library's vocabulary.
+    #[arg(
+        long,
+        value_name = "MODE",
+        default_value = "reconcile",
+        value_parser = clap::builder::PossibleValuesParser::new(MissingTranMode::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<MissingTranMode>().expect("clap restricted the value")),
+    )]
+    pub on_missing_tran: MissingTranMode,
     /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
     /// With the other four --tran-* flags, a fresh merge-transmission TRAN is
     /// written (recording the inputs' ISNOs/dates in `TRAN_REM`); with none of

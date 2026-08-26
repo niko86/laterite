@@ -130,6 +130,14 @@ Edition = Literal["4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"]
 #: changed). Matches the engine's `TypeClashMode`.
 TypeClashMode = Literal["error", "widen", "promote"]
 
+#: What [`merge`][laterite.merge] does when no `tran=` stamp is supplied and the
+#: sources carry `TRAN` rows of their own: `"reconcile"` (the default — fold `TRAN`
+#: like any other group and warn; because `TRAN_ISNO` is a KEY heading, every
+#: input's transmission survives, which is more rows than Rule 14 permits) or
+#: `"error"` (refuse before any bytes are produced). Irrelevant when a stamp is
+#: given. Matches the engine's `MissingTranMode`.
+MissingTranMode = Literal["reconcile", "error"]
+
 
 def _looks_like_ags_text(s: str) -> bool:
     """Does this str look like AGS4 *content* rather than a path? A real AGS4
@@ -2715,6 +2723,7 @@ class MergeResult:
 def merge(
     *sources: Any,
     on_type_clash: TypeClashMode = "error",
+    on_missing_tran: MissingTranMode = "reconcile",
     dict_version: Edition | None = None,
     encoding: str | None = None,
     tran: TranStamp | None = None,
@@ -2775,6 +2784,12 @@ def merge(
             ``"error"`` (default, refuse), ``"widen"`` (fall back to ``X``) or
             ``"promote"`` (keep the greatest ``nDP`` precision, zero-padding the
             coarser values).
+        on_missing_tran: What to do when no ``tran`` is given and the sources carry
+            ``TRAN`` rows of their own — ``"reconcile"`` (default) folds ``TRAN``
+            like any other group and warns, leaving a merged file with one ``TRAN``
+            row per input, which Rule 14 refuses; ``"error"`` raises
+            [`MergeConflictError`][laterite.MergeConflictError] before any bytes are
+            produced. Has no effect when ``tran`` is given.
         dict_version: Dictionary edition used to resolve each group's KEY headings.
             Defaults to ``None`` (taken from the newest file's ``TRAN_AGS``).
         encoding: Source text encoding for every input. Defaults to ``None`` (sniffed).
@@ -2794,8 +2809,9 @@ def merge(
     Raises:
         MergeConflictError: A heading was typed differently by two files and
             ``on_type_clash="error"`` (the default) refused to settle it; two files
-            declared conflicting UNITs (fatal in every mode); or the merged output
-            failed to emit.
+            declared conflicting UNITs (fatal in every mode); no ``tran`` was given
+            and ``on_missing_tran="error"`` refused rather than warned; or the merged
+            output failed to emit.
         ValueError: Fewer than two sources were given.
     """
     if len(sources) < 2:
@@ -2805,6 +2821,7 @@ def merge(
     r = _native.merge_files(
         [_source_bytes(s) for s in sources],
         on_type_clash=on_type_clash,
+        on_missing_tran=on_missing_tran,
         dict_version=dict_version,
         encoding=encoding,
         tran_issue=tran.issue if tran else None,

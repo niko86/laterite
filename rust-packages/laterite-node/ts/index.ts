@@ -817,6 +817,19 @@ export interface MergeOptions {
    *  heading, each input's transmission normally survives, leaving more TRAN
    *  rows than Rule 14 permits. */
   tran?: TranStamp;
+  /** What to do when no `tran` is supplied and the sources carry `TRAN` rows of
+   *  their own:
+   *
+   * - `"reconcile"` — fold `TRAN` like any other group and warn (the default,
+   *                   so this option changed nothing for anyone). The merged
+   *                   file keeps every input's transmission, which is more rows
+   *                   than Rule 14 permits.
+   * - `"error"`     — throw {@link MergeConflictError} before any bytes are
+   *                   produced.
+   *
+   * Irrelevant when `tran` is supplied: a stamp synthesises the one `TRAN` row
+   * the merged file needs, and this is never read. */
+  onMissingTran?: "reconcile" | "error";
 }
 
 /** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
@@ -857,6 +870,7 @@ export function merge(
     const out = nativeMerge(
       files,
       opts.onTypeClash,
+      opts.onMissingTran,
       opts.dictVersion,
       opts.encoding,
       opts.tran,

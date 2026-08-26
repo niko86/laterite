@@ -121,6 +121,66 @@ impl std::str::FromStr for TypeClashMode {
     }
 }
 
+/// What to do when no merge-transmission stamp is supplied and the inputs carry
+/// TRAN rows of their own.
+///
+/// Only consulted on the no-stamp path: supplying a [`TranStamp`] synthesises one
+/// TRAN and this is never read. The sibling of [`TypeClashMode`], and deliberately
+/// the same shape — "merge found something it will not resolve unilaterally, and
+/// the caller may settle it" is one pattern, not two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MissingTranMode {
+    /// Fold TRAN like any other group and warn. `TRAN_ISNO` is a KEY heading and
+    /// distinct issue numbers do not collide, so each input's transmission
+    /// normally survives — which is more rows than Rule 14 permits.
+    ///
+    /// The default, and it stays the default: flipping it is a breaking change on
+    /// every surface, and the engine half publishes to an append-only registry
+    /// where a version can never be withdrawn.
+    #[default]
+    Reconcile,
+    /// Refuse, before any bytes are emitted. Merge's posture elsewhere is to
+    /// refuse rather than guess — a type clash refuses by default, a UNIT conflict
+    /// is fatal in every mode, and [`TranStamp::from_parts`] makes a half-stated
+    /// stamp unconstructible rather than leaving a rule to report it afterwards.
+    /// This makes the same refusal available one level up, opt-in.
+    Error,
+}
+
+impl MissingTranMode {
+    /// The wire name — the exact token every surface accepts and reports.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MissingTranMode::Reconcile => "reconcile",
+            MissingTranMode::Error => "error",
+        }
+    }
+
+    /// Every accepted token, default first. The single source for the CLI's value
+    /// enum, the `.pyi` `Literal` and the TS union — a fourth mode reaching some
+    /// surfaces and not others is exactly what `TypeClashMode` was hand-copied
+    /// into risking, so nothing downstream may retype these.
+    pub const ALL: [MissingTranMode; 2] = [MissingTranMode::Reconcile, MissingTranMode::Error];
+}
+
+impl std::str::FromStr for MissingTranMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        MissingTranMode::ALL
+            .into_iter()
+            .find(|m| m.as_str() == s.trim().to_ascii_lowercase())
+            .ok_or_else(|| {
+                let allowed: Vec<&str> = MissingTranMode::ALL.iter().map(|m| m.as_str()).collect();
+                format!(
+                    "unknown on_missing_tran {s:?}; expected one of {}",
+                    allowed.join(", ")
+                )
+            })
+    }
+}
+
 /// Caller-supplied metadata for the merged file's own TRAN row. The merged file
 /// genuinely *is* a new transmission, so it gets a fresh TRAN describing that
 /// transmission (not a copy of any input's) — see the module note on TRAN.
@@ -144,6 +204,9 @@ pub struct MergeOpts {
     /// distinct KEYs and `TRAN_ISNO` is one, so each input's transmission
     /// normally survives — leaving more TRAN rows than Rule 14 permits.
     pub tran: Option<TranStamp>,
+    /// Whether that no-stamp path warns (the default) or refuses. Read ONLY when
+    /// `tran` is `None`; a supplied stamp makes it irrelevant.
+    pub on_missing_tran: MissingTranMode,
 }
 
 impl Default for MergeOpts {
@@ -153,6 +216,7 @@ impl Default for MergeOpts {
             edition: DictVersion::V4_1_1,
             emit_mode: EmitMode::AutoFix,
             tran: None,
+            on_missing_tran: MissingTranMode::Reconcile,
         }
     }
 }
@@ -189,6 +253,10 @@ pub enum MergeError {
         heading: String,
         units: Vec<String>,
     },
+    /// No merge-transmission stamp was supplied, the inputs carry TRAN rows of
+    /// their own, and the caller asked to be refused rather than warned
+    /// ([`MissingTranMode::Error`]). Raised before emit, so nothing is written.
+    MissingTran,
     /// The byte-emission stage failed.
     Emit(String),
 }
@@ -216,6 +284,16 @@ impl std::fmt::Display for MergeError {
                 "unit conflict in {group}.{heading}: files declared {units:?}. Merge will not \
                  convert units, and no mode can absorb this — picking one would silently mislabel \
                  the other file's values. Reconcile the UNIT row in the source files."
+            ),
+            MergeError::MissingTran => write!(
+                f,
+                "no merge TRAN stamp supplied and on_missing_tran=error: the merged file is a new \
+                 transmission and needs its own TRAN row. Reconciling instead keeps each input's \
+                 TRAN — TRAN_ISNO is a KEY heading, so distinct issue numbers do not collide — \
+                 and more than one row fails Rule 14, which requires exactly one. Supply a \
+                 transmission stamp to synthesise that single row, or pass \
+                 on_missing_tran=reconcile to merge TRAN like any other group and be warned \
+                 instead of refused."
             ),
             MergeError::Emit(e) => write!(f, "emit failed: {e}"),
         }
@@ -294,6 +372,13 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
                 Some(stamp) => {
                     inputs.push(synthesise_tran(files, stamp, opts.edition));
                     continue;
+                }
+                // Refuse where the warning would have fired, not merely where a
+                // stamp is absent: with no input TRAN either, emit injects one
+                // placeholder row and the merged file satisfies Rule 14 anyway.
+                // Same trigger as the warning, stricter response.
+                None if opts.on_missing_tran == MissingTranMode::Error => {
+                    return Err(MergeError::MissingTran);
                 }
                 None => warnings.push(MergeWarning {
                     kind: "tran_not_stamped",

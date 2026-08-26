@@ -11,7 +11,7 @@
 //! side as an overlay merged with this base — see D4a in the plan.
 
 use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
-use laterite_ags4_merge::TypeClashMode;
+use laterite_ags4_merge::{MissingTranMode, TypeClashMode};
 use laterite_ags4_validator::dict::DictVersion;
 
 use pyo3::exceptions::PyValueError;
@@ -132,6 +132,22 @@ fn registry_type_clash_modes() -> Vec<String> {
         .collect()
 }
 
+/// The `--on-missing-tran` modes merge accepts, in declaration order —
+/// `["reconcile", "error"]`.
+///
+/// Exposed for the same reason as [`registry_type_clash_modes`], and taught by
+/// that enum's history: its set was hand-copied into `_cli.py` and nothing
+/// compared the copies back. This one starts with an authority rather than
+/// acquiring one after a drift. Ordered because `ALL` is (default first), and
+/// `--help` prints it.
+#[pyfunction]
+fn registry_missing_tran_modes() -> Vec<String> {
+    MissingTranMode::ALL
+        .iter()
+        .map(|m| m.as_str().into())
+        .collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
@@ -141,5 +157,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resolve_encoding_label, m)?)?;
     m.add_function(wrap_pyfunction!(registry_fallback_edition, m)?)?;
     m.add_function(wrap_pyfunction!(registry_type_clash_modes, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_missing_tran_modes, m)?)?;
     Ok(())
 }

@@ -59,12 +59,23 @@ pub(crate) struct MergeOptions {
     dict_version: Option<String>,
     encoding: Option<String>,
     on_type_clash: Option<String>,
+    /// What to do when no `tran` is supplied and both inputs carry TRAN rows —
+    /// `"reconcile"` (default, today's behaviour) or `"error"` (refuse before
+    /// emitting). Parsed through the engine's `FromStr`, so an unknown token is
+    /// rejected with the same enumerated message every other surface gives.
+    on_missing_tran: Option<String>,
     tran: Option<TranInput>,
 }
 
 #[cfg(feature = "merge")]
 impl WasmOptions for MergeOptions {
-    const KEYS: &'static [&'static str] = &["dictVersion", "encoding", "onTypeClash", "tran"];
+    const KEYS: &'static [&'static str] = &[
+        "dictVersion",
+        "encoding",
+        "onTypeClash",
+        "onMissingTran",
+        "tran",
+    ];
     const WHAT: &'static str = "merge options";
 }
 
@@ -82,6 +93,12 @@ export interface MergeOptions {
    *  values but discarding the type; `"promote"` keeps the greatest `nDP`
    *  precision, zero-padding the coarser values. */
   onTypeClash?: "error" | "widen" | "promote";
+  /** What to do when no `tran` is supplied and both inputs carry `TRAN` rows.
+   *  `"reconcile"` (default) folds `TRAN` like any other group and warns — every
+   *  input's transmission survives, which is more rows than Rule 14 permits.
+   *  `"error"` refuses before any bytes are produced. Irrelevant when `tran` is
+   *  supplied. */
+  onMissingTran?: "reconcile" | "error";
   /** The transmission the MERGED file represents — it genuinely is a new one.
    *  Omit it and `TRAN` is reconciled like any other group, with a warning
    *  noting no merge-transmission stamp was supplied — and because `TRAN_ISNO`
@@ -136,7 +153,7 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 /// differently.
 #[cfg(feature = "merge")]
 fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
-    use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
 
     let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
     let encoding = resolve_encoding(o.encoding.as_deref())?;
@@ -152,9 +169,15 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
     // One vocabulary for every surface: accepted tokens + rejection message come
     // from the merge crate's FromStr, so the browser cannot drift from the CLI.
     let clash: TypeClashMode = o.on_type_clash.as_deref().unwrap_or("error").parse()?;
+    let missing_tran: MissingTranMode = o
+        .on_missing_tran
+        .as_deref()
+        .unwrap_or("reconcile")
+        .parse()?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
+        on_missing_tran: missing_tran,
         edition: dv,
         tran,
         ..Default::default()
