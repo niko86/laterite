@@ -427,6 +427,18 @@ filename = "rust-packages/laterite-ags4-wasm/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+# The wasm README's usage example PRINTS the version — `version(); // "0.11.0"`
+# — which makes it a version stamp in all but name, and it ships to npm where
+# the page is permanent. Exactly the class `laterite-cli`'s doc-output step
+# above exists for (`examples/wasm/ex01_init.mjs`, #243); this was the second
+# instance and was not stamped, so `test_shipped_readmes_carry_no_superseded
+# _version` failed the FIRST time a bump was attempted after it was written.
+# Found by running `cut-release.sh` for real rather than by reading (#716).
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-ags4-wasm/README.md"
+search = 'version();                          // "{current_version}"'
+replace = 'version();                          // "{new_version}"'
+
 # Node / npm (`laterite`): unified onto the single version (#372) — only the
 # package `version` is stamped now.
 #
