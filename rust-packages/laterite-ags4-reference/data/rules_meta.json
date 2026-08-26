@@ -349,13 +349,17 @@
     {
       "rule": "16",
       "title": "Abbreviation Definitions",
-      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the TRAN_RCON concatenator (default +) and each part must be defined separately. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group.",
+      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the concatenator declared in TRAN_RCON and each part must be defined separately; with no TRAN_RCON declared the field is not split at all. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group.",
       "severity": "mixed",
       "fixable": false,
       "observations": [
         {
           "id": "O-43",
           "note": "laterite adds an FYI when a PA value is self-declared in the ABBR group but is not a standard abbreviation for its heading (a typo or invented code); python-ags4 has no equivalent check."
+        },
+        {
+          "id": "O-54",
+          "note": "If your file concatenates abbreviations in one field (a PA cell such as \"CP+RC\") and has no TRAN_RCON heading, the cell is checked whole instead of being split — you get one finding naming an abbreviation your file never used, and nothing reports the missing TRAN_RCON itself. The specification names \"+\" as the default separator when TRAN_RCON is absent; neither this validator nor python-ags4 applies it. Declare your separator in TRAN_RCON and each part is checked on its own."
         }
       ]
     },

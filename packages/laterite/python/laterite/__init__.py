@@ -2774,8 +2774,10 @@ def merge(
         encoding: Source text encoding for every input. Defaults to ``None`` (sniffed).
         tran: The transmission the merged file represents, as a
             [`TranStamp`][laterite.TranStamp]. Omit it and ``TRAN`` is reconciled
-            like any other group (newest wins), with a warning noting no
-            merge-transmission stamp was supplied. ``remarks`` is *appended* to
+            like any other group, with a warning noting no merge-transmission
+            stamp was supplied — and because ``TRAN_ISNO`` is a KEY heading, each
+            input's transmission normally survives, leaving more ``TRAN`` rows
+            than Rule 14 permits. ``remarks`` is *appended* to
             merge's own provenance note (``"Merged from N deliveries: …"``)
             rather than replacing it — both are true of the merged file.
 

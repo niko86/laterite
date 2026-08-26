@@ -5,7 +5,7 @@ laterite is an **independent** implementation of the AGS4 rules, calibrated agai
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
 
-**20 of them change what you see.** They are not all the same kind of thing, which is why this
+**21 of them change what you see.** They are not all the same kind of thing, which is why this
 page is grouped by what actually happened rather than filed under one heading: some are deliberate
 differences from python-ags4, some are places the two agree and the *spec* is the outlier, and some are
 laterite's own false negatives that the comparison caught and closed.
@@ -36,6 +36,7 @@ same source, so a record cannot be resolved there and stay live here.
 | # | What you see |
 |---|---|
 | **O-1** | Rule 1 downgrades extended ASCII (128–255) to an **FYI** rather than a hard error, matching python-ags4's relaxation of the spec's "entirely ASCII". |
+| **O-54** | A field holding concatenated abbreviations is only split when TRAN_RCON is populated. The specification names "+" as the default when it is absent; neither laterite nor python-ags4 applies it, so such a field is reported as one undefined abbreviation instead of being split into its parts. |
 | **O-32** | Non-UTF-8 input is decoded **lossily** (python's `errors="replace"`), not refused. |
 
 ## Where laterite changed to match python-ags4

@@ -32,8 +32,10 @@ sources: []
 
 8. **Rule 10c merges the UNIT/TYPE pseudo-rows** ([[O-52]]): `rule_10c` left-merges the child table onto the parent including the HEADING/UNIT/TYPE rows, so an all-empty child key matches the parent's UNIT row and goes unreported — which is where python-ags4's permissive answer to [[O-39]] actually comes from. Legal input breaks the coincidence: give the parent's UNIT row a value under a KEY column and the child's own UNIT row is reported as an orphan. **Propose (python-ags4): exclude the pseudo-rows from the merge**, then decide the empty-key case deliberately — either reading is defensible, inheriting one from a merge artifact is not.
 
+9. **Rule 16a names a default concatenator that nobody applies** ([[O-54]] — *probe-confirmed on both engines*): 16a says the concatenation character *"shall be defined in TRAN_RCON"* with *"The default being \"+\""*. Neither laterite nor python-ags4 falls back to it — both split only when `TRAN_RCON` is populated — so a `PA` field of `"CP+RC"` in a file without that heading is reported as one undefined abbreviation rather than split into `CP` and `RC`, which are defined. Two independent implementations ignoring a stated default is better evidence the sentence is inert than either alone. **Propose: say the default applies when TRAN_RCON is absent, or drop it and let Rule 11b carry the requirement.**
+
 ## Tier 2 — attribution / inference ambiguities
-9. Missing HEADING filed under Rule 4 not 2b ([[O-04]]); ID-uniqueness folded into Rule 8 not 10a ([[O-11]]); non-standard GROUP-name not keyed off ([[O-17]]); no-duplicate-HEADING inferred ([[O-09]]); Rule 10c parentless hardcoded not data-driven ([[O-21]]).
+10. Missing HEADING filed under Rule 4 not 2b ([[O-04]]); ID-uniqueness folded into Rule 8 not 10a ([[O-11]]); non-standard GROUP-name not keyed off ([[O-17]]); no-duplicate-HEADING inferred ([[O-09]]); Rule 10c parentless hardcoded not data-driven ([[O-21]]).
 10. **Rule 10c and empty KEY cells** ([[O-39]]): the spec never says whether an empty parent KEY *participates* in the link requirement. We read it as "no entry" rather than a missing link; the other reading is equally defensible, which is the problem. **Propose: say which.**
 
 ## Tier 3 — edition resolution (spec-silent, so both readings are legal)

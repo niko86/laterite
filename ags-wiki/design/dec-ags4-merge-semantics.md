@@ -197,8 +197,16 @@ delete/supersede primitive (see Options #4) — documented, not silently
 `TranStamp` (`tran_issue` + `tran_date`, both required together) to write a
 freshly synthesised `TRAN` row recording every input's `ISNO`/`DATE` in
 `TRAN_REM` for provenance. Without a stamp, `TRAN` is reconciled like any
-other group (newest wins) and a warning (`tran_not_stamped`) notes no
-merge-transmission stamp was supplied.
+other group and a warning (`tran_not_stamped`) notes no merge-transmission
+stamp was supplied.
+
+**"Newest wins" is the right rule and it never fires on TRAN**, which is worth
+stating because the obvious diagnosis is the wrong one. `TRAN_ISNO` is
+`KEY+REQUIRED`, so reconciliation has a key to work with — it simply never sees
+a collision, because two deliveries carry two different transmission numbers.
+Every input's TRAN row therefore survives, and Rule 14 wants exactly one. The
+fallback detects the situation and cannot repair it: only the caller knows what
+transmission the merged file is.
 
 **A per-row TYPED revision report.** `RevisionNote` records the group, KEY
 tuple, changed headings, and winning file index — but only when the *typed*
