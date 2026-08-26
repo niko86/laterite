@@ -43,6 +43,19 @@ pub enum Op {
         heading: String,
         unit: String,
     },
+    /// Declare a heading's TYPE, and by default re-format the column's values
+    /// to satisfy it, so the projected file is still spec-valid and any fault
+    /// injected afterwards is the only one in it. With `reformat` off the
+    /// declaration moves and the values do not — which is how a type-invalid
+    /// cell gets made on purpose.
+    SetType {
+        group: String,
+        heading: String,
+        #[serde(rename = "type")]
+        ags_type: String,
+        #[serde(default = "reformat_by_default")]
+        reformat: bool,
+    },
     /// Write `value` into one cell. A blank is this with an empty value —
     /// spelled separately at the CLI because "blank it" is a different
     /// intention from "set it to nothing" and reads better in a patch file.
@@ -80,10 +93,18 @@ pub enum Op {
     },
 }
 
+/// Re-formatting is the default because it is the safe half: a patch that
+/// declares a type without saying what to do about the values means "make the
+/// column that type", not "leave a contradiction behind".
+fn reformat_by_default() -> bool {
+    true
+}
+
 impl Op {
     fn group(&self) -> &str {
         match self {
             Op::SetUnit { group, .. }
+            | Op::SetType { group, .. }
             | Op::SetCell { group, .. }
             | Op::AddRow { group, .. }
             | Op::DeleteRow { group, .. }
@@ -121,6 +142,26 @@ pub enum EditError {
     MissingDescriptor {
         group: String,
         row: &'static str,
+    },
+    /// A TYPE token the AGS type system cannot read at all. Dictionary
+    /// membership is deliberately NOT the test — declaring a type the
+    /// dictionary never pairs with a heading is a fault forge exists to
+    /// manufacture — but a token nothing can read produces a file whose
+    /// invalidity the caller did not choose.
+    UnknownType {
+        group: String,
+        heading: String,
+        ags_type: String,
+    },
+    /// A value that cannot be rendered to satisfy the type being declared.
+    /// Refused rather than mangled, and refused before the file is written at
+    /// all: half a projected column is worse than none of one.
+    Unprojectable {
+        group: String,
+        heading: String,
+        row: usize,
+        value: String,
+        ags_type: String,
     },
     /// A row too short to carry the column being dropped. Removing the column
     /// from its siblings and not from this row leaves exactly the ragged row
@@ -162,6 +203,27 @@ impl fmt::Display for EditError {
                 f,
                 "{group} has no {row} row, so there is nothing to edit; add \
                  one before declaring anything on it"
+            ),
+            EditError::UnknownType {
+                group,
+                heading,
+                ags_type,
+            } => write!(
+                f,
+                "{ags_type:?} is not a type the AGS type system can read, so \
+                 {group}/{heading} cannot be declared as one"
+            ),
+            EditError::Unprojectable {
+                group,
+                heading,
+                row,
+                value,
+                ags_type,
+            } => write!(
+                f,
+                "{group}/{heading} row {row}: {value:?} cannot be written as \
+                 {ags_type}; blank the cell, correct it, or declare the type \
+                 without re-formatting"
             ),
             EditError::ShortRow {
                 group,
@@ -287,11 +349,12 @@ impl Shape {
 fn rank(op: &Op) -> u8 {
     match op {
         Op::SetUnit { .. } => 0,
-        Op::SetCell { .. } => 1,
-        Op::AddRow { .. } => 2,
-        Op::DeleteRow { .. } => 3,
-        Op::DeleteColumn { .. } => 4,
-        Op::DeleteGroup { .. } => 5,
+        Op::SetType { .. } => 1,
+        Op::SetCell { .. } => 2,
+        Op::AddRow { .. } => 3,
+        Op::DeleteRow { .. } => 4,
+        Op::DeleteColumn { .. } => 5,
+        Op::DeleteGroup { .. } => 6,
     }
 }
 
@@ -437,6 +500,76 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 }
                 fields[col + 1].clone_from(unit);
                 plan.insert(line, Line::Replace(rebuild(&fields)));
+            }
+            Op::SetType {
+                group,
+                heading,
+                ags_type,
+                reformat,
+            } => {
+                // Before anything is planned: a token nothing can read would
+                // otherwise rewrite the declaration and then fail on the first
+                // value, which is the half-written column this refuses.
+                if !crate::project::is_known_type(ags_type) {
+                    return Err(EditError::UnknownType {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                        ags_type: ags_type.clone(),
+                    });
+                }
+                let col = shape
+                    .col(g, heading)
+                    .ok_or_else(|| EditError::NoSuchHeading {
+                        group: group.clone(),
+                        heading: heading.clone(),
+                    })?;
+                let line = g.type_line.ok_or_else(|| EditError::MissingDescriptor {
+                    group: group.clone(),
+                    row: "TYPE",
+                })?;
+                let want = shape.arity(g) + 1;
+                let mut fields = split_ags_line(&current(&plan, line));
+                if fields.len() < want {
+                    fields.resize(want, String::new());
+                }
+                fields[col + 1].clone_from(ags_type);
+                plan.insert(line, Line::Replace(rebuild(&fields)));
+
+                if *reformat {
+                    // The unit as THIS PATCH has left it, not as the file
+                    // arrived. A `--set-unit` on the same heading is what an
+                    // author means to project a DT column against, and
+                    // descriptor edits rank ahead of this one precisely so it
+                    // has already landed by now.
+                    let unit = g
+                        .unit_line
+                        .map(|ul| {
+                            split_ags_line(&current(&plan, ul))
+                                .get(col + 1)
+                                .cloned()
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                    for (i, data) in g.rows.iter().enumerate() {
+                        let mut fields = split_ags_line(&current(&plan, data.line));
+                        if fields.len() < want {
+                            fields.resize(want, String::new());
+                        }
+                        let before = fields[col + 1].clone();
+                        let after =
+                            crate::project::project(&before, ags_type, &unit).ok_or_else(|| {
+                                EditError::Unprojectable {
+                                    group: group.clone(),
+                                    heading: heading.clone(),
+                                    row: i + 1,
+                                    value: before.clone(),
+                                    ags_type: ags_type.clone(),
+                                }
+                            })?;
+                        fields[col + 1] = after;
+                        plan.insert(data.line, Line::Replace(rebuild(&fields)));
+                    }
+                }
             }
             Op::AddRow { cells, group } => {
                 let mut values = vec![String::new(); shape.arity(g)];
@@ -630,6 +763,13 @@ cells = { LOCA_ID = "BH2", LOCA_REM = "a value, with a comma" }
 # unit = "mm"          # "" leaves the UNIT present but undefined
 
 # [[op]]
+# kind = "set-type"
+# group = "LOCA"
+# heading = "LOCA_NATE"
+# type = "3DP"
+# reformat = true      # false declares the type and leaves the values alone
+
+# [[op]]
 # kind = "delete-row"
 # group = "LOCA"
 # row = 2
@@ -696,6 +836,23 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 group: g.to_string(),
                 heading: h.to_string(),
                 unit: unit.to_string(),
+            })
+        }
+        "set-type" | "set-type-raw" => {
+            let (locator, ags_type) = spec
+                .split_once('=')
+                .ok_or_else(|| bad("GROUP:HEADING=TYPE"))?;
+            let (grp, h) = locator
+                .split_once(':')
+                .ok_or_else(|| bad("GROUP:HEADING=TYPE"))?;
+            Ok(Op::SetType {
+                group: grp.to_string(),
+                heading: h.to_string(),
+                ags_type: ags_type.to_string(),
+                // `--set-type-raw` is a SPELLING of this operation, the way
+                // `--blank` is a spelling of `set`: one kind in a patch file,
+                // two intentions at the command line.
+                reformat: kind == "set-type",
             })
         }
         "delete-row" => {
@@ -1073,8 +1230,8 @@ mod tests {
         let patch: Patch = toml::from_str(&uncommented).expect("every commented op must load");
         assert_eq!(
             patch.op.len(),
-            6,
-            "set, add-row, set-unit, delete-row, -column, -group"
+            7,
+            "set, add-row, set-unit, set-type, delete-row, -column, -group"
         );
     }
 
@@ -1085,6 +1242,9 @@ mod tests {
         for kind in [
             "set",
             "set-unit",
+            // `--set-type-raw` is absent for the same reason `--blank` is:
+            // it is a second spelling of a kind already listed, not a kind.
+            "set-type",
             "add-row",
             "delete-row",
             "delete-column",
@@ -1093,6 +1253,7 @@ mod tests {
             let spec = match kind {
                 "set" => "LOCA:1:LOCA_ID=x",
                 "set-unit" => "LOCA:LOCA_ID=m",
+                "set-type" => "LOCA:LOCA_ID=X",
                 "delete-row" => "LOCA:1",
                 "delete-column" => "LOCA:LOCA_ID",
                 _ => "LOCA",
@@ -1567,5 +1728,215 @@ mod tests {
             parse_flag("set-unit", "LOCA=mm").is_err(),
             "a spec with no `:` names no heading"
         );
+    }
+
+    fn set_type(group: &str, heading: &str, ags_type: &str) -> Op {
+        Op::SetType {
+            group: group.into(),
+            heading: heading.into(),
+            ags_type: ags_type.into(),
+            reformat: true,
+        }
+    }
+
+    fn set_type_raw(group: &str, heading: &str, ags_type: &str) -> Op {
+        Op::SetType {
+            group: group.into(),
+            heading: heading.into(),
+            ags_type: ags_type.into(),
+            reformat: false,
+        }
+    }
+
+    /// A DT column at full precision, so a projection down to a date has
+    /// something real to do.
+    const DATED: &str = concat!(
+        "\"GROUP\",\"LOCA\"\r\n",
+        "\"HEADING\",\"LOCA_ID\",\"LOCA_DATE\"\r\n",
+        "\"UNIT\",\"\",\"yyyy-mm-ddThh:mm:ss\"\r\n",
+        "\"TYPE\",\"ID\",\"DT\"\r\n",
+        "\"DATA\",\"BH1\",\"2026-08-26T00:00:00\"\r\n",
+    );
+
+    fn declared_type(text: &str, group: &str, heading: &str) -> String {
+        let p = laterite_ags4_parse::parse_str(text).expect("output must re-parse");
+        let g = p.groups.get(group).expect("group");
+        g.types
+            .get(g.col(heading).expect("heading"))
+            .expect("TYPE cell")
+            .clone()
+    }
+
+    #[test]
+    fn retyping_reformats_the_column_and_touches_nothing_else() {
+        let out = apply(FILE, &[set_type("LOCA", "LOCA_NATE", "3DP")]).unwrap();
+        assert_eq!(declared_type(&out, "LOCA", "LOCA_NATE"), "3DP");
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_NATE"), "100.000");
+        assert_eq!(cell(&out, "LOCA", 2, "LOCA_NATE"), "200.000");
+        // The other columns keep their values, quoting and all.
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_REM"), "the \"good\" one");
+        // PROJ is untouched entirely.
+        let before: Vec<_> = FILE.lines().collect();
+        let after: Vec<_> = out.lines().collect();
+        for i in 0..6 {
+            assert_eq!(before[i], after[i], "line {} must be byte-identical", i + 1);
+        }
+    }
+
+    /// The fault-injection path: the declaration moves and the values do not,
+    /// which is the only way to get a cell that contradicts its own type.
+    #[test]
+    fn the_raw_spelling_declares_the_type_and_leaves_the_values() {
+        let out = apply(FILE, &[set_type_raw("LOCA", "LOCA_NATE", "DT")]).unwrap();
+        assert_eq!(declared_type(&out, "LOCA", "LOCA_NATE"), "DT");
+        assert_eq!(
+            cell(&out, "LOCA", 1, "LOCA_NATE"),
+            "100.00",
+            "the value must survive a retype it cannot satisfy"
+        );
+    }
+
+    /// Projecting to a text type keeps the text exactly, including the digits
+    /// a numeric projection would have re-rendered.
+    #[test]
+    fn projecting_into_a_text_type_passes_the_value_through() {
+        let out = apply(FILE, &[set_type("LOCA", "LOCA_NATE", "X")]).unwrap();
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_NATE"), "100.00");
+    }
+
+    #[test]
+    fn an_unreadable_type_token_is_refused() {
+        assert_eq!(
+            apply(FILE, &[set_type("LOCA", "LOCA_NATE", "NOPE")]),
+            Err(EditError::UnknownType {
+                group: "LOCA".into(),
+                heading: "LOCA_NATE".into(),
+                ags_type: "NOPE".into(),
+            })
+        );
+    }
+
+    /// A type the dictionary never pairs with this heading is NOT refused —
+    /// manufacturing that mismatch is the tool's job. Only a token the type
+    /// system cannot read at all is.
+    #[test]
+    fn a_type_the_dictionary_would_not_pair_is_still_allowed() {
+        let out = apply(FILE, &[set_type("LOCA", "LOCA_REM", "YN")]);
+        // LOCA_REM's text cannot be projected to YN, so this refuses on the
+        // VALUE — proving it got past the type check rather than failing it.
+        assert!(
+            matches!(out, Err(EditError::Unprojectable { .. })),
+            "must fail on the value, not the token: {out:?}"
+        );
+    }
+
+    #[test]
+    fn a_value_that_cannot_be_projected_is_refused_naming_its_row() {
+        assert_eq!(
+            apply(FILE, &[set_type("LOCA", "LOCA_REM", "2DP")]),
+            Err(EditError::Unprojectable {
+                group: "LOCA".into(),
+                heading: "LOCA_REM".into(),
+                row: 1,
+                value: "the \"good\" one".into(),
+                ags_type: "2DP".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn a_group_with_no_type_row_is_refused_by_name() {
+        let no_type = concat!(
+            "\"GROUP\",\"PROJ\"\r\n",
+            "\"HEADING\",\"PROJ_ID\"\r\n",
+            "\"UNIT\",\"\"\r\n",
+            "\"DATA\",\"P1\"\r\n",
+        );
+        assert_eq!(
+            apply(no_type, &[set_type("PROJ", "PROJ_ID", "X")]),
+            Err(EditError::MissingDescriptor {
+                group: "PROJ".into(),
+                row: "TYPE",
+            })
+        );
+    }
+
+    /// The interaction that makes descriptor edits rank ahead of everything
+    /// else: a UNIT set in the SAME patch is what the DT projection reads. If
+    /// it read the file's original unit the value would come back unchanged,
+    /// because at full precision there is nothing to drop.
+    #[test]
+    fn a_unit_set_in_the_same_patch_decides_the_dt_projection() {
+        let out = apply(
+            DATED,
+            &[
+                set_type("LOCA", "LOCA_DATE", "DT"),
+                Op::SetUnit {
+                    group: "LOCA".into(),
+                    heading: "LOCA_DATE".into(),
+                    unit: "yyyy-mm-dd".into(),
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_DATE"), "yyyy-mm-dd");
+        assert_eq!(
+            cell(&out, "LOCA", 1, "LOCA_DATE"),
+            "2026-08-26",
+            "the projection must read the unit this patch declared"
+        );
+    }
+
+    /// A DT value carrying a real time is refused rather than truncated. The
+    /// asymmetry with the numeric families is deliberate and documented where
+    /// the projection lives.
+    #[test]
+    fn a_dt_projection_that_would_discard_a_real_time_is_refused() {
+        let timed = DATED.replace("2026-08-26T00:00:00", "2026-08-26T09:15:00");
+        let out = apply(
+            &timed,
+            &[
+                Op::SetUnit {
+                    group: "LOCA".into(),
+                    heading: "LOCA_DATE".into(),
+                    unit: "yyyy-mm-dd".into(),
+                },
+                set_type("LOCA", "LOCA_DATE", "DT"),
+            ],
+        );
+        assert!(
+            matches!(out, Err(EditError::Unprojectable { row: 1, .. })),
+            "{out:?}"
+        );
+    }
+
+    #[test]
+    fn the_two_set_type_spellings_differ_only_in_reformatting() {
+        assert_eq!(
+            parse_flag("set-type", "LOCA:LOCA_NATE=3DP").unwrap(),
+            set_type("LOCA", "LOCA_NATE", "3DP")
+        );
+        assert_eq!(
+            parse_flag("set-type-raw", "LOCA:LOCA_NATE=3DP").unwrap(),
+            set_type_raw("LOCA", "LOCA_NATE", "3DP")
+        );
+        assert!(parse_flag("set-type", "LOCA:LOCA_NATE").is_err());
+        assert!(parse_flag("set-type", "LOCA=3DP").is_err());
+    }
+
+    /// A patch file that omits `reformat` means re-format: the safe half.
+    #[test]
+    fn a_patch_omitting_reformat_still_reformats() {
+        let patch = r#"
+[[op]]
+kind = "set-type"
+group = "LOCA"
+heading = "LOCA_NATE"
+type = "0DP"
+"#;
+        let ops: Patch = toml::from_str(patch).expect("patch loads");
+        assert_eq!(ops.op, vec![set_type("LOCA", "LOCA_NATE", "0DP")]);
+        let out = apply(FILE, &ops.op).unwrap();
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_NATE"), "100");
     }
 }

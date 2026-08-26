@@ -90,14 +90,26 @@ sources: []
 > error-emission path at scale (T5) — e.g. `--inject rule16 --density 1.0`
 > is ~314k Rule-16 findings on a 25 MB file.
 > `edit` is the one command that does not synthesize: it applies **structured
-> edits to a file that already exists** — set/blank a cell, rewrite the UNIT a
-> heading declares, add or delete a row, drop a column or a whole group, several
-> at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
+> edits to a file that already exists** — set/blank a cell, rewrite the UNIT or
+> the TYPE a heading declares, add or delete a row, drop a column or a whole
+> group, several at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
 > **Rule 15** injection at all: the synthesizer scans UNIT from whatever the
 > groups use, so a synthetic file is clean by construction and nothing could
 > introduce a unit the UNIT group never defined. Note that the injection is an
 > *undeclared* unit, not an absent one — both engines skip an empty unit, so
 > emptying one leaves a file that still dual-validates clean.
+> Rewriting a TYPE is how the **type axis** gets closed: the scaffolds reach a
+> handful of the AGS types (pinned by a test in `synth`), so a question like
+> *do the two engines agree on a `3SF` column?* had no file to ask it with.
+> `--set-type` re-formats the column to satisfy the new declaration, delegating
+> the numeric families and the precision-aware `DT` renderer to
+> [[laterite-ags4-types]] rather than reimplementing them; `--set-type-raw`
+> moves the declaration and leaves every value alone, which is how a cell that
+> contradicts its own type is made on purpose. **Re-formatting alone does not
+> leave a spec-valid file**: a type code absent from the file's TYPE group is a
+> Rule 17 finding, so a clean projection is `--set-type` *plus* an `add-row`
+> into TYPE — one `--patch` does both, and the result dual-validates with no
+> findings on either engine.
 > It exists because the investigation behind the Rule 10c parentage warning
 > produced three wrong results in a row from hand-manipulating AGS text (a
 > value containing a comma torn in half, line endings converted by a text
@@ -112,14 +124,17 @@ sources: []
 > file **as it arrived** — a row number always counts the original data rows —
 > and then apply in a canonical order rather than the order they were listed,
 > so a patch cannot mean two things: asking to delete a group and also to edit
-> a row in it can only mean the delete. Four shapes are refused by name rather
+> a row in it can only mean the delete. Six shapes are refused by name rather
 > than edited into something worse: a group, row or heading that is not there;
 > a file declaring one GROUP code **twice** (every locator would mean two
 > things, and the parse leaf resolves the halves inconsistently — rows
 > first-seen-wins, headings last-seen-wins); a row too short to carry a
 > column being dropped; and a group with no descriptor row to declare anything
 > on — writing the row would be a different operation, and writing it silently
-> would make the patch mean something its author never asked for. The **minimizer's field pass
+> would make the patch mean something its author never asked for; a TYPE token
+> the type system cannot read at all; and a value that cannot be rendered to
+> satisfy the type being declared, named by group, heading and row, with
+> nothing written, because half a projected column is worse than none of one. The **minimizer's field pass
 > runs on this layer too**: it used to split a DATA line on `,` with no quote
 > awareness, so shrinking a value like `"north, then east"` cut it in half and
 > left the quote open — at the same field count, so no arity rule noticed, and

@@ -33,6 +33,7 @@ mod mine;
 mod minimize;
 mod ops;
 mod pipeline;
+mod project;
 mod report;
 mod scale;
 mod strategy;

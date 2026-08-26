@@ -326,6 +326,16 @@ pub struct EditArgs {
     /// Repeatable.
     #[arg(long, value_name = "GROUP:HEADING=UNIT")]
     pub set_unit: Vec<String>,
+    /// `GROUP:HEADING=TYPE` — declare a heading's TYPE and re-format the
+    /// column's values to satisfy it, so the file stays spec-valid. A DT
+    /// column is rendered at the precision its UNIT declares. Repeatable.
+    #[arg(long, value_name = "GROUP:HEADING=TYPE")]
+    pub set_type: Vec<String>,
+    /// `GROUP:HEADING=TYPE` — declare the TYPE and leave every value exactly
+    /// as it is. This is how a cell that contradicts its own declaration gets
+    /// made on purpose. Repeatable.
+    #[arg(long, value_name = "GROUP:HEADING=TYPE")]
+    pub set_type_raw: Vec<String>,
     /// `GROUP:ROW`. Repeatable.
     #[arg(long, value_name = "GROUP:ROW")]
     pub delete_row: Vec<String>,
