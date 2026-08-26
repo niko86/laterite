@@ -133,3 +133,10 @@ web/docs-site/examples/wasm/node_modules/
 # names the account and `git add -A` is this repo's normal staging step — the
 # same way #225 swept CLI scratch output into the root.
 .wrangler/
+
+# Local copies of the published AGS4 specification PDFs, converted to text for
+# checking claims against (see CLAUDE.local.md). Copyright AGS, not
+# redistributable, and the validator is clean-room — these are for VERIFYING a
+# wiki page or an O-N record, never for writing rule code. Ignored so they
+# cannot be committed by the `git add -A` this repo stages with.
+ags-spec/
