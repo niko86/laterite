@@ -91,8 +91,8 @@ sources: []
 > is ~314k Rule-16 findings on a 25 MB file.
 > `edit` is the one command that does not synthesize: it applies **structured
 > edits to a file that already exists** — set/blank a cell, rewrite the UNIT or
-> the TYPE a heading declares, add a column or a row, delete a row, drop a
-> column or a whole group, several at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
+> the TYPE a heading declares, add a column, add or insert a row, delete a row,
+> drop a column or a whole group, several at once from a `--patch` file. Rewriting a UNIT is what gives the tool a
 > **Rule 15** injection at all: the synthesizer scans UNIT from whatever the
 > groups use, so a synthetic file is clean by construction and nothing could
 > introduce a unit the UNIT group never defined. Note that the injection is an
@@ -133,7 +133,11 @@ sources: []
 > file **as it arrived** — a row number always counts the original data rows —
 > and then apply in a canonical order rather than the order they were listed,
 > so a patch cannot mean two things: asking to delete a group and also to edit
-> a row in it can only mean the delete. Seven shapes are refused by name rather
+> a row in it can only mean the delete. `--insert-row` places a row AT a
+> position rather than appending it, so a fault can be planted mid-group; a
+> position past the last row is refused rather than quietly appended, because a
+> typo that becomes an append gives a reproducer that does not reproduce.
+> Seven shapes are refused by name rather
 > than edited into something worse: a group, row or heading that is not there;
 > a file declaring one GROUP code **twice** (every locator would mean two
 > things, and the parse leaf resolves the halves inconsistently — rows

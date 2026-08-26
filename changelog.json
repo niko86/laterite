@@ -65,6 +65,9 @@
       },
       {
         "text": "**`forge edit --add-column` — give a group a heading it does not have.** It lands in every descriptor row the group carries and as an empty cell in every data row, so the arity stays consistent and nothing trips on a ragged row. Cells start empty on purpose: the caller decides what goes in them. A heading the group already has is refused — a locator that meant two columns is the ambiguity this layer refuses everywhere else — but a heading the dictionary has never heard of is accepted, because manufacturing that is the tool's job and judging heading names is the validator's. Combined with `--set-unit` and `--set-type` in one `--patch`, this creates a column, declares it and fills it in a single pass, in whatever order the operations were listed. Note that an added column left undeclared is not neutral: its empty TYPE cell is a Rule 17 finding on python-ags4 and not on laterite, which is the divergence O-19 already records — declare the column's TYPE and both engines return no findings at all."
+      },
+      {
+        "text": "**`forge edit --insert-row` — put a data row at a position, not only at the end.** A fault could previously be planted only in a row that already existed or in an appended one, so \"what happens when this row is in the middle of the group?\" was not a question the tool could ask. Positions count the file's original data rows, the way every other locator here does, so an insertion does not renumber the rows a later operation names, and two insertions at one position keep the order they were listed in. A position past the last row is refused rather than quietly appended — appending is what `--add-row` is for, and a typo that silently becomes an append gives a reproducer that does not reproduce. A row inserted at position 1 lands under whichever descriptor rows the group actually carries, which matters for the malformed files forge makes on purpose."
       }
     ],
     "changed": [
