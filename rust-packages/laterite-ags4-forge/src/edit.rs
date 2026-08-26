@@ -889,37 +889,45 @@ impl Patch {
     #[must_use]
     pub fn template() -> String {
         r#"# forge edit --patch — operations apply to the file as it arrived,
-# so `row` always counts the ORIGINAL data rows, 1-indexed.
+# so `row` always counts the ORIGINAL data rows, 1-indexed. They also apply in
+# a canonical order rather than the order written here, so a patch means one
+# thing however it is arranged: columns are created, then declarations are
+# written, then cells, then rows, and removals last.
+#
+# The worked example PROJECTS a column into a type the scaffolds never emit:
+# create it, declare its UNIT and TYPE, put a value in it. Add the type code to
+# the file's TYPE group as well (an add-row below) and both engines return no
+# findings — without that, an undeclared type code is a Rule 17.
+
+[[op]]
+kind = "add-column"
+group = "LOCA"
+heading = "LOCA_GL"
+
+[[op]]
+kind = "set-unit"
+group = "LOCA"
+heading = "LOCA_GL"
+unit = "m"
+
+[[op]]
+kind = "set-type"
+group = "LOCA"
+heading = "LOCA_GL"
+type = "3SF"
+# reformat = false     # declare the type and leave every value alone
 
 [[op]]
 kind = "set"
 group = "LOCA"
 row = 1
-heading = "LOCA_ID"
-value = "BH1"
-
-[[op]]
-kind = "add-row"
-group = "LOCA"
-cells = { LOCA_ID = "BH2", LOCA_REM = "a value, with a comma" }
+heading = "LOCA_GL"
+value = "21.5"
 
 # [[op]]
-# kind = "add-column"
-# group = "LOCA"
-# heading = "LOCA_GL"
-
-# [[op]]
-# kind = "set-unit"
-# group = "LOCA"
-# heading = "LOCA_NATE"
-# unit = "mm"          # "" leaves the UNIT present but undefined
-
-# [[op]]
-# kind = "set-type"
-# group = "LOCA"
-# heading = "LOCA_NATE"
-# type = "3DP"
-# reformat = true      # false declares the type and leaves the values alone
+# kind = "add-row"
+# group = "TYPE"
+# cells = { TYPE_TYPE = "3SF", TYPE_DESC = "3 significant figures, rounded" }
 
 # [[op]]
 # kind = "insert-row"
@@ -1385,26 +1393,32 @@ mod tests {
     #[test]
     fn the_patch_template_parses_as_a_patch() {
         let patch: Patch = toml::from_str(&Patch::template()).expect("template must load");
-        assert_eq!(patch.op.len(), 2, "the uncommented ops");
-        assert!(matches!(patch.op[0], Op::SetCell { .. }));
-        assert!(matches!(patch.op[1], Op::AddRow { .. }));
+        assert_eq!(patch.op.len(), 4, "the uncommented ops");
+        assert!(matches!(patch.op[0], Op::AddColumn { .. }));
+        assert!(matches!(patch.op[1], Op::SetUnit { .. }));
+        assert!(matches!(patch.op[2], Op::SetType { .. }));
+        assert!(matches!(patch.op[3], Op::SetCell { .. }));
     }
 
     /// Every operation the template shows, commented or not, has to name a
     /// `kind` the loader accepts — a commented example is still copied.
     #[test]
     fn every_kind_the_template_shows_is_a_kind_that_loads() {
+        // Everything before the first `[[op]]` is prose. Dropping it by
+        // POSITION rather than by matching its opening words removes a hidden
+        // coupling: the old filter named two specific sentences, so rewording
+        // the header would have fed English to the TOML parser.
         let uncommented: String = Patch::template()
             .lines()
+            .skip_while(|l| !l.contains("[[op]]"))
             .map(|l| l.trim_start_matches("# ").trim_start_matches('#'))
-            .filter(|l| !l.starts_with("forge edit") && !l.starts_with("so `row`"))
             .collect::<Vec<_>>()
             .join("\n");
         let patch: Patch = toml::from_str(&uncommented).expect("every commented op must load");
         assert_eq!(
             patch.op.len(),
             9,
-            "set, add-row, add-column, set-unit, set-type, insert-row, delete-row, \
+            "add-column, set-unit, set-type, set, add-row, insert-row, delete-row, \
              -column, -group"
         );
     }
@@ -2503,5 +2517,115 @@ type = "0DP"
         );
         assert!(parse_flag("insert-row", "LOCA").is_err());
         assert!(parse_flag("insert-row", "LOCA:x").is_err());
+    }
+
+    /// The whole projection, listed four ways. Canonical order — not listing
+    /// order — decides the result, and the strongest statement of that is
+    /// byte-identity rather than "the cells came out right".
+    #[test]
+    fn a_projection_means_the_same_thing_in_any_order() {
+        let create = add_column("LOCA", "LOCA_GL");
+        let unit = Op::SetUnit {
+            group: "LOCA".into(),
+            heading: "LOCA_GL".into(),
+            unit: "m".into(),
+        };
+        let ty = set_type_raw("LOCA", "LOCA_GL", "3SF");
+        let fill = set("LOCA", 1, "LOCA_GL", "21.5");
+        let insert = insert_row("LOCA", 1, &[("LOCA_ID", "BH0")]);
+
+        let orders: [Vec<Op>; 4] = [
+            vec![
+                create.clone(),
+                unit.clone(),
+                ty.clone(),
+                fill.clone(),
+                insert.clone(),
+            ],
+            vec![
+                insert.clone(),
+                fill.clone(),
+                ty.clone(),
+                unit.clone(),
+                create.clone(),
+            ],
+            vec![
+                fill.clone(),
+                create.clone(),
+                insert.clone(),
+                ty.clone(),
+                unit.clone(),
+            ],
+            vec![
+                ty.clone(),
+                insert.clone(),
+                unit.clone(),
+                create.clone(),
+                fill.clone(),
+            ],
+        ];
+        let first = apply(FILE, &orders[0]).unwrap();
+        for (i, ops) in orders.iter().enumerate().skip(1) {
+            assert_eq!(
+                apply(FILE, ops).unwrap(),
+                first,
+                "order {i} must give the same bytes"
+            );
+        }
+
+        // And the result is the one that was asked for, not merely a stable
+        // wrong answer — an ordering test passes just as readily on both.
+        assert_eq!(unit_of(&first, "LOCA", "LOCA_GL"), "m");
+        assert_eq!(declared_type(&first, "LOCA", "LOCA_GL"), "3SF");
+        // Row 1 of the OUTPUT is the inserted row. The fill named row 1 of the
+        // INPUT, which the insertion pushed down to row 2. Both readings are
+        // correct, and the difference between them is precisely what original
+        // numbering keeps out of a patch: inside the patch there is only ever
+        // one answer to "row 1".
+        assert_eq!(cell(&first, "LOCA", 1, "LOCA_ID"), "BH0");
+        assert_eq!(cell(&first, "LOCA", 1, "LOCA_GL"), "");
+        assert_eq!(cell(&first, "LOCA", 2, "LOCA_GL"), "21.5");
+        let p = laterite_ags4_parse::parse_str(&first).unwrap();
+        assert!(p.groups["LOCA"].rows.iter().all(|r| r.values.len() == 4));
+    }
+
+    /// A projection does not care whether the file it is given came out of an
+    /// earlier run: two passes and one patch agree, because every operation
+    /// resolves against the file it actually received.
+    #[test]
+    fn two_passes_and_one_patch_agree() {
+        let edit = set("LOCA", 1, "LOCA_NATE", "111.00");
+        let projection = [
+            add_column("LOCA", "LOCA_GL"),
+            Op::SetUnit {
+                group: "LOCA".into(),
+                heading: "LOCA_GL".into(),
+                unit: "m".into(),
+            },
+            set_type_raw("LOCA", "LOCA_GL", "3SF"),
+            set("LOCA", 2, "LOCA_GL", "21.5"),
+        ];
+
+        let after_first = apply(FILE, std::slice::from_ref(&edit)).unwrap();
+        let two_passes = apply(&after_first, &projection).unwrap();
+
+        let mut both = vec![edit];
+        both.extend(projection);
+        let one_patch = apply(FILE, &both).unwrap();
+
+        assert_eq!(two_passes, one_patch);
+        assert_eq!(cell(&two_passes, "LOCA", 1, "LOCA_NATE"), "111.00");
+        assert_eq!(cell(&two_passes, "LOCA", 2, "LOCA_GL"), "21.5");
+    }
+
+    /// The template is the worked example a reader copies, so it has to BE a
+    /// projection that works — not merely one that parses.
+    #[test]
+    fn the_templates_worked_example_projects_a_column() {
+        let patch: Patch = toml::from_str(&Patch::template()).expect("template loads");
+        let out = apply(FILE, &patch.op).expect("the template must apply to a LOCA file");
+        assert_eq!(unit_of(&out, "LOCA", "LOCA_GL"), "m");
+        assert_eq!(declared_type(&out, "LOCA", "LOCA_GL"), "3SF");
+        assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "21.5");
     }
 }
