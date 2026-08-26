@@ -402,6 +402,13 @@ jobs:
       - name: modality drift gate (modality-register.md == modality.json render)
         run: uv run --no-project python tools/gen_modality.py --check
 
+      # Not a drift gate over a render: the two sides are modality.json's duckdb
+      # cells and a PINNED copy of the extension's own function manifest, which
+      # nothing compared. A function renamed upstream leaves a cell naming a
+      # verb that is gone; one added upstream appears in no cell at all.
+      - name: duckdb cells and the pinned function manifest cover each other
+        run: uv run --no-project python tools/check_duckdb_manifest.py
+
       - name: crate cards match the manifests
         run: uv run --no-project python tools/gen_crate_graph.py --check
 
