@@ -170,7 +170,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Evidence** (bundled dicts): of ~4199 real headings, 0 have a field part > 4 chars and 0 lack an underscore — the dictionary silently obeys an informal rule the prose doesn't state (as in O-6).
 - **Assessment**: python-ags4's ≤ 4 field clause never misfires on real data — an undocumented but accurate encoding of the convention. The prefix==GROUP deferral is reasonable (it needs the dict + the borrowed-heading exception, e.g. `FILE_FSET` inside non-FILE groups).
 - **Upstream-reportable**: **[SPEC]** — same recommendation as O-6: AGS-DFWG should state the field-part ≤ 4 convention explicitly in Rule 19b.
-- **Our decision**: 19b_1 enforces the convention the dictionary follows — a 4-uppercase-letter prefix + `_` + a 1–4 char `[A-Z0-9]` field part (4199/4199 real headings obey it); the prose's silence is recorded above. The prefix==GROUP / cross-group-borrow semantic remains deferred to the dict-aware V8 layer, matching python's 19b_2/3.
+- **Our decision**: 19b_1 enforces the convention the dictionary follows — a 4-uppercase-letter prefix + `_` + a 1–4 char `[A-Z0-9]` field part (4199/4199 real headings obey it); the prose's silence is recorded above. The prefix==GROUP / cross-group-borrow semantic is not 19b_1's: it is handled by the dict-aware `19b_2`/`19b_3` checks in `rules/references.rs`, matching python's split.
 
 ## V4 — dictionary-aware rules (Rules 7, 9)
 
