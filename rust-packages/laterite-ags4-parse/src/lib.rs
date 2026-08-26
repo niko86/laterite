@@ -11,14 +11,15 @@
 //! 1-indexed **line** number, and (via [`field_span`]) **char** spans —
 //! none back-derived from another.
 //!
-//! Phase 1 of the convergence: the crate stands alone — no consumer
-//! reaches it yet. The validator adopts it in Phase 2 (`pub use`), core
-//! in Phase 5; the legacy [`parse_bytes`] / [`parse_str`] signatures are
-//! preserved verbatim so that adoption is import-only.
+//! Both consumers adopted it: the validator re-exports the leaf's types from
+//! its own `parse` module, and core's `ags4_codec` builds its lean projection
+//! on the same walk. The legacy [`parse_bytes`] / [`parse_str`] signatures are
+//! preserved verbatim, which is what made each adoption a change of imports
+//! rather than of behaviour.
 //!
 //! **Trim policy:** values/units/types/headings are RAW (untrimmed) — the
 //! validator's behaviour. Core's lean projection re-applies `.trim()` in
-//! its own `from_shared` (Phase 5), keeping its byte-identical conveniences.
+//! its own `from_shared`, keeping its byte-identical conveniences.
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
