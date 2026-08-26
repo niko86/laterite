@@ -59,6 +59,8 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         args.tran_producer.clone(),
         args.tran_recipient.clone(),
         args.tran_status.clone(),
+        args.tran_description.clone(),
+        args.tran_remarks.clone(),
     ) {
         Ok(t) => t,
         Err(e) => {

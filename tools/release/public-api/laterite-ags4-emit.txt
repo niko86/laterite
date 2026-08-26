@@ -107,7 +107,7 @@ pub laterite_ags4_emit::TranStamp::recv: alloc::string::String
 pub laterite_ags4_emit::TranStamp::rem: core::option::Option<alloc::string::String>
 pub laterite_ags4_emit::TranStamp::stat: alloc::string::String
 impl laterite_ags4_emit::TranStamp
-pub fn laterite_ags4_emit::TranStamp::from_parts(core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> core::result::Result<core::option::Option<laterite_ags4_emit::TranStamp>, laterite_ags4_emit::TranStampError>
+pub fn laterite_ags4_emit::TranStamp::from_parts(core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> core::result::Result<core::option::Option<laterite_ags4_emit::TranStamp>, laterite_ags4_emit::TranStampError>
 pub fn laterite_ags4_emit::TranStamp::new(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite_ags4_emit::TranStamp
 pub fn laterite_ags4_emit::TranStamp::with_description(self, impl core::convert::Into<alloc::string::String>) -> laterite_ags4_emit::TranStamp
 pub fn laterite_ags4_emit::TranStamp::with_remarks(self, impl core::convert::Into<alloc::string::String>) -> laterite_ags4_emit::TranStamp

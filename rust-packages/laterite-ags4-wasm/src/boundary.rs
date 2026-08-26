@@ -51,18 +51,11 @@ impl TranInput {
             self.producer,
             self.recipient,
             self.status,
+            self.description,
+            self.remarks,
         )
         .map_err(|e| e.to_string())?;
-        Ok(stamp.map(|s| {
-            let s = match self.description {
-                Some(d) => s.with_description(d),
-                None => s,
-            };
-            match self.remarks {
-                Some(r) => s.with_remarks(r),
-                None => s,
-            }
-        }))
+        Ok(stamp)
     }
 }
 

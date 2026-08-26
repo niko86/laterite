@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-censor"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2124,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-compliance"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-parity",
@@ -2135,7 +2135,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
@@ -2152,7 +2152,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-corpus-qa"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "arrow",
  "criterion",
@@ -2200,7 +2200,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-excel"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
@@ -2213,7 +2213,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-forge"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2232,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-merge"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
@@ -2245,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-validator",
  "serde",
@@ -2254,7 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parse"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-perf"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-types",
@@ -2275,7 +2275,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-reference"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2291,7 +2291,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-tokenizer-wasm"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-types",
@@ -2302,7 +2302,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-types"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2327,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "chrono",
  "criterion",
@@ -2376,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-xcheck"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-emit",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cliutil"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "comfy-table 8.0.0",
@@ -2468,7 +2468,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-transport"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "age",
  "thiserror 2.0.20",

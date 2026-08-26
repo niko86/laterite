@@ -315,21 +315,32 @@ pub struct MergeArgs {
     )]
     pub on_type_clash: TypeClashMode,
     /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
-    /// With --tran-date, a fresh merge-transmission TRAN is written (recording
-    /// the inputs' ISNOs/dates in `TRAN_REM`); without it, TRAN is reconciled and
-    /// a warning notes no stamp was supplied.
+    /// With the other four --tran-* flags, a fresh merge-transmission TRAN is
+    /// written (recording the inputs' ISNOs/dates in `TRAN_REM`); with none of
+    /// them, TRAN is reconciled and a warning notes no stamp was supplied.
     #[arg(long, value_name = "ISNO")]
     pub tran_issue: Option<String>,
     /// Production date (`TRAN_DATE`, yyyy-mm-dd) for the merged file's TRAN.
     #[arg(long, value_name = "DATE")]
     pub tran_date: Option<String>,
-    /// Producer / recipient / status for the merged TRAN (optional).
+    /// Producer / recipient / status for the merged TRAN. REQUIRED with the
+    /// other two: all five are REQUIRED headings, so it is all five or none.
+    /// (This line used to say "optional", which was true of an older
+    /// issue-plus-date rule and has not been since.)
     #[arg(long, value_name = "NAME")]
     pub tran_producer: Option<String>,
     #[arg(long, value_name = "NAME")]
     pub tran_recipient: Option<String>,
     #[arg(long, value_name = "STATUS")]
     pub tran_status: Option<String>,
+    /// What was transferred (`TRAN_DESC`). Genuinely optional — an OTHER
+    /// heading, so it stands outside the all-five rule.
+    #[arg(long, value_name = "TEXT")]
+    pub tran_description: Option<String>,
+    /// Free remarks (`TRAN_REM`). Optional, and APPENDED to merge's own
+    /// provenance note rather than replacing it — both are true of the result.
+    #[arg(long, value_name = "TEXT")]
+    pub tran_remarks: Option<String>,
     #[command(flatten)]
     pub dict: DictArgs,
     /// Machine-readable merge report (JSON).

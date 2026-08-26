@@ -8776,6 +8776,8 @@ def emit_ags4_from_arrow(
     tran_producer: Any = ...,
     tran_recipient: Any = ...,
     tran_status: Any = ...,
+    tran_description: Any = ...,
+    tran_remarks: Any = ...,
 ) -> Any: ...
 def engine_fingerprint() -> Any: ...
 def engine_version() -> Any: ...
@@ -8806,6 +8808,8 @@ def merge_files(
     tran_producer: Any = ...,
     tran_recipient: Any = ...,
     tran_status: Any = ...,
+    tran_description: Any = ...,
+    tran_remarks: Any = ...,
 ) -> Any: ...
 def parse_arrow(
     path: Any = ..., text: Any = ..., data: Any = ..., encoding: Any = ...
