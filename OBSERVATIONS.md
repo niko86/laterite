@@ -39,6 +39,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 | O-8 | BUG | python-ags4 rule_7_2 can raise IndexError on duplicate headings |
 | O-11 | SPEC | python-ags4 folds ID-uniqueness into Rule 8 (it's Rule 10a's job) |
 | O-17 | SPEC | Rule 18 keys off heading membership only, not GROUP names |
+| O-54 | SPEC | Rule 16a — implemented under Rule 16's id, but neither engine applies the spec's default concatenator |
 | O-21 | SPEC | Rule 10c's parentless-group list is hardcoded, not dict-derived |
 | O-30 | VARIANCE | TRAN_AGS-driven edition selection — deliberate divergences from python |
 | O-31 | VARIANCE | Rule 8 — empty `DT` UNIT now flagged (python parity; closes the O-12 degenerate gap) |
@@ -336,6 +337,15 @@ O-N below is an internal decision or behavioural note, not for external circulat
   closed as "not a rule".
 
 ---
+
+### O-54 [SPEC] Rule 16a — implemented under Rule 16's id, but neither engine applies the spec's default concatenator
+- **Spec** (§4.1.1 Rule 16a): *"Where multiple abbreviations are required to fully codify a FIELD, the abbreviations shall be separated by a defined concatenation character. This single concatenation character shall be defined in TRAN_RCON.  The default being \"+\" (ASCII character 43)"*, and *"Each abbreviation used in such combinations shall be listed separately in the ABBR GROUP."*
+- **Us** (`rules/groups.rs::rule_16`): implemented, and deliberately without an id of its own — a 16a violation is reported as **Rule 16**. The concatenator comes from the TRAN group's first DATA row; every `PA` value is split on it and each part must be defined in ABBR under that heading. An absent or empty `TRAN_RCON` is filtered to `None`, so the value is **not** split: the `"+"` default the prose names is never applied.
+- **python-ags4** (`check.py` `rule_16`): the same split and the same omission. A missing TRAN or TRAN_RCON raises `KeyError`, an empty one `ValueError`; both are caught and passed over, leaving the entries unsplit. Its own comments hand the condition to Rules 14 and 11b.
+- **Evidence**: one file, a `PA` cell of `"CP+RC"`, ABBR defining `CP` and `RC` separately. With `TRAN_RCON` populated as `"+"` neither engine reports a Rule 16 finding. With the heading removed both report one — ours *"Abbreviation \"CP+RC\" under SAMP_TYPE is not defined in the ABBR group."*, python-ags4 1.2.0's *"\"CP+RC\" under SAMP_TYPE in SAMP not found in ABBR group."* Under the stated default both would split and find each part defined. That extra Rule 16 finding is the SOLE difference between the two runs on our side: nothing else changes, and in particular nothing reports the missing `TRAN_RCON` itself, so the only diagnostic the reader gets names an abbreviation their file never used.
+- **Assessment**: 16a's substance is implemented in both engines and neither gives it an id, which is why enumerating catalogue rule ids reads it as a gap — `ags_rules()` and `rules_meta.json` list implemented CHECKS, not spec RULES, the same trap O-18 records for Rule 18a. The one real departure is the default, and the two ways to lack a concatenator do not behave alike. An **empty** `TRAN_RCON` cell raises Rule 11b, so the reader gets the real diagnosis beside the spurious Rule 16. An **absent** `TRAN_RCON` heading raises nothing at all — it is `OTHER` status, so Rule 10b does not ask for it either — and the only finding such a file produces is a Rule 16 naming an abbreviation it never used. The second case is the one worth fixing: ignoring a stated default is defensible when something else names the fault, and misleading when nothing does.
+- **Upstream-reportable**: **[SPEC]** — two independent implementations both ignore a default the prose states outright, which is stronger evidence that the sentence is doing no work than either engine would be alone. AGS-DFWG should either say the default applies when TRAN_RCON is absent, or drop it and let Rule 11b carry the requirement.
+- **Our decision**: keep parity with python-ags4 — split only on a populated `TRAN_RCON` — and record the departure here rather than diverge silently. Rule 16a stays covered under Rule 16's id: a dedicated `16a` id would split one condition across two rule names for no reader benefit, which is the call O-18 makes for 18a.
 
 ## V7 — relational rules (Rules 10a–10c, 11a–11c)
 
