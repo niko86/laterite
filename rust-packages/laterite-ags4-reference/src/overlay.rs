@@ -6,11 +6,12 @@
 //! bundled base edition detected from the dictionary itself. `Dictionary::Layered`
 //! borrows an `&OwnedDelta` that lives on the caller's stack for one validation.
 //!
-//! **Phase 1 (this file): the owned types + their lookup helpers only.** Nothing
-//! constructs an `OwnedDelta` yet — `CustomDict::build_delta` (Phase 2) parses a
-//! `.ags`/JSON dictionary, detects the base, and diffs it into this shape. The
-//! `Layered` arm of every `Dictionary` method is written and compiles now so the
-//! wiring in Phase 2/3 is a construction site, not a type change.
+//! [`CustomDict::build_delta`] is what builds one: it parses a `.ags`/JSON
+//! dictionary, detects the base edition from the dictionary itself, and diffs
+//! it into this shape. The rest of this file is the owned types and their
+//! lookup helpers, keyed exactly like the bundled `phf` tables so the `Layered`
+//! arm of every `Dictionary` method can miss here and fall through to the base
+//! without a second lookup path.
 
 use std::collections::HashMap;
 
