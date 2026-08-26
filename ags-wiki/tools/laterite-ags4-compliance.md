@@ -44,6 +44,19 @@ Three bins:
   set as the core reference (it compares a pre-computed JSON against the core
   reader — it does **not** link the duckdb crate).
 
+  This bin was public and correct for a long time and **never ran**: its input
+  producer lived only in the dev satellite, so there was nothing here for it to
+  read (#719). The producer is now `repo:tools/compliance/emit_duckdb.py`, which
+  installs the extension from the DuckDB **community repository** rather than
+  building one beside the checkout — a local build can agree with the engine
+  while the published artefact does not. Both halves run in
+  `repo:.github/workflows/nightly.yml`'s `docs-vs-released-duckdb` job, the leg
+  that already checked the documented SQL examples still execute; what it could
+  not check before was whether the answers were right.
+
+  It self-skips (exit 0) when there is no community build for the current DuckDB
+  version — a real state after a DuckDB release, not a failure of either engine.
+
 ## Relationship to laterite-ags4-xcheck
 Distinct concern, deliberately a **separate** crate. The **output-value gate**
 (`xcheck` / `emit-cases` + the case manifest) lives in the lean
@@ -64,6 +77,9 @@ flowchart LR
   core[laterite-ags4-core] --> comp
   parity[laterite-ags4-parity] --> comp
   comp -->|agreement report| ci[compliance CI gate]
+  emit[tools/compliance/emit_duckdb.py] -->|duckdb-parse.json| dpc[duckdb-parse-check]
+  core --> dpc
+  dpc -->|key-set agreement| nightly[nightly.yml docs-vs-released-duckdb]
 ```
 
 See [[parity-model]] for the verdict semantics the reference comparison carries.
