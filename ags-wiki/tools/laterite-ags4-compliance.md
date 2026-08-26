@@ -54,6 +54,16 @@ Three bins:
   that already checked the documented SQL examples still execute; what it could
   not check before was whether the answers were right.
 
+  **Its scope, which is the interesting part (#742):** it key-checks groups the
+  bundled registry knows and skips the rest. That skip is not incidental — it is
+  the extension's own premise. Both sides equate "dictionary group" with
+  "registry group", and AGS4 Rule 18 does not: a group declared in a file's own
+  `DICT` is a dictionary group, with its parent and KEY status in `DICT_PGRP`
+  and `DICT_STAT`. A check sharing the premise that produces a bug cannot fail
+  on that bug, so full agreement and a live read defect can hold at once. The
+  run therefore names every skipped group and says which of them the file
+  declared, rather than printing a count.
+
   It self-skips (exit 0) when there is no community build for the current DuckDB
   version — a real state after a DuckDB release, not a failure of either engine.
 

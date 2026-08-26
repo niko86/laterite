@@ -43,11 +43,22 @@
 //! checks the documented examples still run, which until now was the only thing
 //! this repo asked of the extension.
 //!
+//! **This leg is blind to a read defect in any group the bundled registry does
+//! not know — and that blindness is the extension's own premise, not merely a
+//! gap in coverage** (#742). Both sides equate "dictionary group" with "registry
+//! group"; AGS4 Rule 18 does not, because a group declared in a file's own DICT
+//! is a dictionary group whose parent and KEY status come from `DICT_PGRP` and
+//! `DICT_STAT`. A check that shares the premise which produces a bug cannot fail
+//! on that bug, which is how full agreement and a live read defect sit together
+//! without contradiction. So the skip line below NAMES the groups it dropped and
+//! says which of them the file declared, rather than reporting a bare count: the
+//! dropped set is not incidental, it is where a defect is most likely to be.
+//!
 //! Exit 1 on any disagreement (a missing/extra registry group, an `_id`-set
 //! split, or a read-error disagreement) EXCEPT a documented inherent divergence
 //! (see [`known_divergence`] for a group, [`known_read_error`] for a whole file).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -88,14 +99,28 @@ struct GroupParse {
 /// no-GROUP file is read as an empty table (`read_ags4_bytes` maps `NotAgs4` to
 /// an empty parse), matching duckdb. Custom/passthrough groups (not in the
 /// registry) have no spec keys, so they're omitted here and left un-key-checked.
+fn file_declared_groups(pa: &laterite_ags4_core::ags4_codec::ParsedAgs4) -> BTreeSet<String> {
+    pa.get("DICT")
+        .map(|d| {
+            d.rows
+                .iter()
+                .filter_map(|r| r.get("DICT_GRP"))
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
     let pa = read_ags4_bytes(bytes).map_err(|e| format!("{e:?}"))?;
+    let file_declared = file_declared_groups(&pa);
     let mut groups: BTreeMap<String, Vec<(String, Option<String>)>> = BTreeMap::new();
-    let mut non_registry = 0usize;
+    let mut non_registry = Vec::new();
     for code in &pa.order {
         let g = &pa.groups[code]; // `pa.order` holds trimmed codes; `groups` is keyed by them
         if reg.get(code).is_none() {
-            non_registry += 1;
+            non_registry.push((code.clone(), file_declared.contains(code)));
             continue;
         }
         let mut ids = group_row_ids(reg, code, &g.headings, g.rows.len(), |col, row| {
@@ -162,7 +187,12 @@ fn known_read_error(fixture: &str, err: &str) -> Option<&'static str> {
 
 struct Reference {
     groups: BTreeMap<String, Vec<(String, Option<String>)>>,
-    non_registry: usize,
+    /// The groups this leg could not key-check, each flagged with whether the
+    /// file's own DICT declares it. The flag carries the meaning: a declared
+    /// group IS a dictionary group (Rule 18), so "absent from the registry" and
+    /// "absent from the dictionary" are different claims and only the first
+    /// holds. An undeclared one is a different case and is reported apart.
+    non_registry: Vec<(String, bool)>,
 }
 
 #[derive(Default)]
@@ -170,6 +200,13 @@ struct Report {
     groups_agree: usize,
     groups_checked: usize,
     non_registry_skipped: usize,
+    /// `fixture/GROUP` for each skipped group the file's own DICT declares —
+    /// dictionary groups under Rule 18, and the ones a read defect is most
+    /// likely to hide in.
+    non_registry_declared: BTreeSet<String>,
+    /// `fixture/GROUP` for each skipped group nothing declares. A different
+    /// case, kept apart so the two cannot be read as one number.
+    non_registry_undeclared: BTreeSet<String>,
     /// Documented inherent divergences (see [`known_divergence`]) — reported,
     /// not failed.
     known: Vec<String>,
@@ -228,7 +265,15 @@ fn compare(
                 continue;
             }
         };
-        r.non_registry_skipped += refr.non_registry;
+        r.non_registry_skipped += refr.non_registry.len();
+        for (code, declared) in &refr.non_registry {
+            let entry = format!("{}/{code}", fp.fixture);
+            if *declared {
+                r.non_registry_declared.insert(entry);
+            } else {
+                r.non_registry_undeclared.insert(entry);
+            }
+        }
 
         // duckdb's registry groups keyed by trimmed code (non-registry groups
         // aren't in the reference, so they're ignored here, not failed).
@@ -319,9 +364,28 @@ fn main() {
     );
     if report.non_registry_skipped > 0 {
         println!(
-            "non-standard groups not key-checked: {}",
-            report.non_registry_skipped
+            "non-standard groups not key-checked: {} ({} declared in the file's own \
+             DICT, {} declared nowhere)",
+            report.non_registry_skipped,
+            report.non_registry_declared.len(),
+            report.non_registry_undeclared.len()
         );
+        if !report.non_registry_declared.is_empty() {
+            println!(
+                "  declared in the file's DICT — dictionary groups under Rule 18, whose \
+                 parent and KEY status come from DICT_PGRP/DICT_STAT rather than the \
+                 registry, so this leg is blind to a read defect in exactly them:"
+            );
+            for g in &report.non_registry_declared {
+                println!("    · {g}");
+            }
+        }
+        if !report.non_registry_undeclared.is_empty() {
+            println!("  present but declared nowhere (not a dictionary group):");
+            for g in &report.non_registry_undeclared {
+                println!("    · {g}");
+            }
+        }
     }
     if !report.known.is_empty() {
         println!(
@@ -543,5 +607,79 @@ mod tests {
         let r = compare(registry(), &duck, |_| Ok(AGS_SAMP.to_vec()));
         assert_eq!(r.mismatches.len(), 1, "an unlisted missing group must fail");
         assert!(r.known.is_empty());
+    }
+
+    // `AGS` plus a DICT group that declares XLOG — a group the bundled registry
+    // has never seen, whose parent (PROJ) and KEY heading (XLOG_ID) exist only
+    // in DICT_PGRP/DICT_STAT. This is the AGS4 Rule 18 case the leg cannot
+    // key-check, and the one the extension's binder refuses outright (#742).
+    const AGS_FILE_DICT: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"P1\",\"Test\"\r\n\
+\"GROUP\",\"DICT\"\r\n\
+\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_DTYP\",\"DICT_DESC\",\"DICT_PGRP\"\r\n\
+\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\r\n\
+\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"PA\",\"X\",\"X\"\r\n\
+\"DATA\",\"GROUP\",\"XLOG\",\"\",\"\",\"\",\"Custom log\",\"PROJ\"\r\n\
+\"DATA\",\"HEADING\",\"XLOG\",\"XLOG_ID\",\"KEY\",\"ID\",\"Custom id\",\"\"\r\n\
+\"GROUP\",\"XLOG\"\r\n\
+\"HEADING\",\"XLOG_ID\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"ID\"\r\n\
+\"DATA\",\"X1\",\"P1\"\r\n";
+
+    // The same shape WITHOUT the declaration: PQRS is present and nothing in
+    // the file says what it is. Genuinely un-key-checkable, and a different
+    // statement from the one above — which is why the report keeps them apart.
+    const AGS_UNDECLARED: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"P1\",\"Test\"\r\n\
+\"GROUP\",\"PQRS\"\r\n\
+\"HEADING\",\"PQRS_ID\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"ID\"\r\n\
+\"DATA\",\"Q1\",\"P1\"\r\n";
+
+    #[test]
+    fn a_file_declared_group_is_named_and_marked_declared() {
+        let duck = duck_for("dict.ags", AGS_FILE_DICT, None);
+        let r = compare(registry(), &duck, |_| Ok(AGS_FILE_DICT.to_vec()));
+        assert!(r.mismatches.is_empty(), "{:?}", r.mismatches);
+        assert_eq!(r.non_registry_skipped, 1);
+        assert!(
+            r.non_registry_declared.contains("dict.ags/XLOG"),
+            "the skip must NAME the group and say the file declared it: {:?}",
+            r.non_registry_declared
+        );
+        assert!(
+            r.non_registry_undeclared.is_empty(),
+            "a DICT-declared group is not an undeclared one: {:?}",
+            r.non_registry_undeclared
+        );
+    }
+
+    #[test]
+    fn an_undeclared_group_is_reported_apart_from_a_declared_one() {
+        let duck = duck_for("undeclared.ags", AGS_UNDECLARED, None);
+        let r = compare(registry(), &duck, |_| Ok(AGS_UNDECLARED.to_vec()));
+        assert!(r.mismatches.is_empty(), "{:?}", r.mismatches);
+        assert_eq!(r.non_registry_skipped, 1);
+        assert!(
+            r.non_registry_undeclared.contains("undeclared.ags/PQRS"),
+            "{:?}",
+            r.non_registry_undeclared
+        );
+        // The pair of assertions is what makes the classification falsifiable:
+        // hardcode the flag either way and exactly one of these two tests goes
+        // red. A single test would pass against a constant.
+        assert!(
+            r.non_registry_declared.is_empty(),
+            "nothing declares PQRS: {:?}",
+            r.non_registry_declared
+        );
     }
 }
