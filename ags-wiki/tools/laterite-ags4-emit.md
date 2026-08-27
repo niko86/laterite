@@ -18,7 +18,7 @@ sources: []
 # laterite-ags4-emit
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite-ags4-emit` v0.10.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> [!note] **Cleared for crates.io** — `laterite-ags4-emit` v0.11.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
 > **Used by** — [[laterite]], [[laterite-ags4-excel]], [[laterite-ags4-merge]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 

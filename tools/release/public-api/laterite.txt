@@ -56,6 +56,27 @@ impl core::marker::Unpin for laterite::ags4::Change
 impl core::marker::UnsafeUnpin for laterite::ags4::Change
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Change
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Change
+#[non_exhaustive] pub enum laterite::ags4::MissingTran
+pub laterite::ags4::MissingTran::Reconcile
+pub laterite::ags4::MissingTran::Refuse
+impl core::clone::Clone for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::clone(&self) -> laterite::ags4::MissingTran
+impl core::cmp::Eq for laterite::ags4::MissingTran
+impl core::cmp::PartialEq for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::eq(&self, &laterite::ags4::MissingTran) -> bool
+impl core::default::Default for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::default() -> laterite::ags4::MissingTran
+impl core::fmt::Debug for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite::ags4::MissingTran
+impl core::marker::StructuralPartialEq for laterite::ags4::MissingTran
+impl core::marker::Freeze for laterite::ags4::MissingTran
+impl core::marker::Send for laterite::ags4::MissingTran
+impl core::marker::Sync for laterite::ags4::MissingTran
+impl core::marker::Unpin for laterite::ags4::MissingTran
+impl core::marker::UnsafeUnpin for laterite::ags4::MissingTran
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::MissingTran
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::MissingTran
 #[non_exhaustive] pub enum laterite::ags4::Severity
 pub laterite::ags4::Severity::Error
 pub laterite::ags4::Severity::Fyi
@@ -357,6 +378,7 @@ impl<'a> laterite::ags4::Merge<'a>
 pub fn laterite::ags4::Merge<'a>::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
 pub fn laterite::ags4::Merge<'a>::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
 pub fn laterite::ags4::Merge<'a>::mode(self, laterite::ags4::WriteMode) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::on_missing_tran(self, laterite::ags4::MissingTran) -> laterite::ags4::Merge<'a>
 pub fn laterite::ags4::Merge<'a>::on_type_clash(self, laterite::ags4::TypeClash) -> laterite::ags4::Merge<'a>
 pub fn laterite::ags4::Merge<'a>::run(self) -> core::result::Result<laterite::ags4::Merged, laterite::Error>
 pub fn laterite::ags4::Merge<'a>::transmission(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
@@ -691,6 +713,7 @@ pub laterite::ErrorKind::BadDictionary
 pub laterite::ErrorKind::Emit
 pub laterite::ErrorKind::InvalidArgument
 pub laterite::ErrorKind::Io
+pub laterite::ErrorKind::MissingTran
 pub laterite::ErrorKind::NotAgs4
 pub laterite::ErrorKind::Other
 pub laterite::ErrorKind::TypeConflict

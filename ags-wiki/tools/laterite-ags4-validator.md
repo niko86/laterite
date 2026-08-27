@@ -17,7 +17,7 @@ sources: []
 # laterite-ags4-validator
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite-ags4-validator` v0.10.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> [!note] **Cleared for crates.io** — `laterite-ags4-validator` v0.11.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
 > **Used by** — [[laterite]], [[laterite-ags4-compliance]], [[laterite-ags4-corpus-qa]], [[laterite-ags4-emit]], [[laterite-ags4-forge]], [[laterite-ags4-parity]], [[laterite-ags4-perf]], [[laterite-ags4-trust]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 

@@ -26,7 +26,9 @@ pub use diff::{
 };
 pub use document::{Document, Group, Row, Rows};
 pub use fix::{Fix, Fixed, Repair, fix, fix_bytes, fix_str, fixable_rules};
-pub use merge::{Merge, Merged, Note, Revision, TypeClash, merge, merge_bytes, merge_documents};
+pub use merge::{
+    Merge, Merged, MissingTran, Note, Revision, TypeClash, merge, merge_bytes, merge_documents,
+};
 pub use report::{Finding, Report, Severity};
 
 use crate::{Error, ErrorKind};

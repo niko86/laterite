@@ -194,9 +194,10 @@ delete/supersede primitive (see Options #4) — documented, not silently
 "fixed" by guessing intent.
 
 **The merged file IS a new transmission.** Callers may supply a
-`TranStamp` (`tran_issue` + `tran_date`, both required together) to write a
-freshly synthesised `TRAN` row recording every input's `ISNO`/`DATE` in
-`TRAN_REM` for provenance. Without a stamp, `TRAN` is reconciled like any
+`TranStamp` — all five REQUIRED headings together, which
+`repo:rust-packages/laterite-ags4-emit/src/emit.rs::from_parts` is the one place
+that decides — to write a freshly synthesised `TRAN` row recording every input's
+`ISNO`/`DATE` in `TRAN_REM` for provenance. Without a stamp, `TRAN` is reconciled like any
 other group and a warning (`tran_not_stamped`) notes no merge-transmission
 stamp was supplied.
 
@@ -207,6 +208,31 @@ a collision, because two deliveries carry two different transmission numbers.
 Every input's TRAN row therefore survives, and Rule 14 wants exactly one. The
 fallback detects the situation and cannot repair it: only the caller knows what
 transmission the merged file is.
+
+**The caller may ask to be refused instead of warned.** `on_missing_tran`
+(`MissingTranMode`) takes `reconcile` — the default, and exactly the behaviour
+above — or `error`, which refuses before any bytes are emitted. It is read only
+on the no-stamp path; supplying a stamp makes it irrelevant.
+
+The argument for it is the one `from_parts` already makes one level down: the
+type layer refuses to guess at a half-stated transmission rather than leaving a
+rule to report it afterwards, and merge's posture elsewhere is the same — a TYPE
+clash refuses by default, a UNIT conflict is fatal in every mode. Emitting a file
+merge has already determined will fail Rule 14 was the one place merge did the
+opposite, and a caller who wanted the refusal had no way to ask for it.
+
+`reconcile` stays the default and that is a decision, not an omission. Flipping
+it is a breaking change on every surface at once, and the engine half publishes
+to an append-only registry where a version can never be withdrawn — so the cost
+of being wrong is unbounded and the benefit is available opt-in. Whoever revisits
+this should weigh those separately: "error is the better default" and "error can
+become the default" are different claims.
+
+An `omit` mode — drop `TRAN` entirely and let Rule 14 report the absence — was
+considered and declined. It discards every input's provenance to produce a file
+that still fails Rule 14, just differently. `MissingTranMode::ALL` is the single
+vocabulary authority every surface derives from or is pinned to, so adding a
+third value later costs one enum edit and the tests that go red with it.
 
 **A per-row TYPED revision report.** `RevisionNote` records the group, KEY
 tuple, changed headings, and winning file index — but only when the *typed*
@@ -266,7 +292,13 @@ not a capability gap in the underlying leaf (which is N-ary).
   (`packages/laterite/tests/test_merge.py`), 14 Node
   (`rust-packages/laterite-node/test/p3-merge.test.ts`), CLI integration
   tests (`rust-packages/laterite-cli/tests/cli_merge.rs`), and a
-  browser e2e (`web/e2e/merge.spec.ts`).
+  browser e2e (`web/e2e/merge.spec.ts`). `on_missing_tran` adds two seams and no
+  others: behaviour at the Rust facade
+  (`repo:rust-packages/laterite/tests/merge.rs`, beside the unstamped-merge test
+  it changes) and vocabulary beside the sibling option's drift gate
+  (`repo:packages/laterite/tests/test_missing_tran_modes_single_source.py`). The
+  counts above are prose, so nothing fails when they drift; treat them as an
+  inventory of WHERE, not of how many.
 
 ## Related
 

@@ -834,7 +834,8 @@ pub struct MergeOutput {
 /// unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
 /// `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
 /// A complete `tran` stamps a synthesised merge-TRAN; omit it and TRAN is
-/// reconciled like any other group. The edition is the newest file's `TRAN_AGS`
+/// reconciled like any other group — or, with `onMissingTran: "error"`, the
+/// merge is refused before any bytes are produced. The edition is the newest file's `TRAN_AGS`
 /// unless `dictVersion` forces it. Parse failure throws the mapped error.
 #[napi]
 #[allow(clippy::too_many_arguments)]
@@ -842,11 +843,14 @@ pub struct MergeOutput {
 pub fn merge(
     files: Vec<Uint8Array>,
     on_type_clash: Option<String>,
+    on_missing_tran: Option<String>,
     dict_version: Option<String>,
     encoding: Option<String>,
     tran: Option<TranInput>,
 ) -> Result<MergeOutput> {
-    use laterite_ags4_merge::{MergeError, MergeOpts, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{
+        MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed,
+    };
 
     if files.len() < 2 {
         return Err(Error::from_reason(format!(
@@ -889,8 +893,18 @@ pub fn merge(
         .parse()
         .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
 
+    // Same vocabulary discipline as the clash mode above: the tokens and the
+    // rejection message come from the merge crate's FromStr, never retyped here.
+    let missing_tran: MissingTranMode =
+        on_missing_tran
+            .as_deref()
+            .unwrap_or("reconcile")
+            .parse()
+            .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+
     let opts = MergeOpts {
         on_type_clash: clash,
+        on_missing_tran: missing_tran,
         edition: dv,
         tran,
         ..Default::default()
@@ -919,6 +933,7 @@ pub fn merge(
         Err(
             e @ (MergeError::TypeConflict { .. }
             | MergeError::UnitConflict { .. }
+            | MergeError::MissingTran
             | MergeError::Emit(_)),
         ) => Err(Error::from_reason(format!("merge_conflict{SEP}6{SEP}{e}"))),
     }
@@ -1688,6 +1703,22 @@ pub fn editions() -> Vec<String> {
 #[must_use]
 pub fn type_clash_modes() -> Vec<String> {
     laterite_ags4_merge::TypeClashMode::ALL
+        .iter()
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
+/// The `--on-missing-tran` modes merge accepts, in declaration order —
+/// `["reconcile", "error"]`.
+///
+/// GENERATED for the same reason as [`type_clash_modes`], and the reason is that
+/// enum's own history: it was hand-copied into the census values and the CLI's
+/// error message, and a fourth mode would have reached neither. The sibling
+/// option starts with one authority rather than acquiring one after the fact.
+#[napi]
+#[must_use]
+pub fn missing_tran_modes() -> Vec<String> {
+    laterite_ags4_merge::MissingTranMode::ALL
         .iter()
         .map(|m| m.as_str().to_string())
         .collect()

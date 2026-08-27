@@ -329,16 +329,28 @@ export declare function listRules(): string
  * unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
  * `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
  * A complete `tran` stamps a synthesised merge-TRAN; omit it and TRAN is
- * reconciled like any other group. The edition is the newest file's `TRAN_AGS`
+ * reconciled like any other group — or, with `onMissingTran: "error"`, the
+ * merge is refused before any bytes are produced. The edition is the newest file's `TRAN_AGS`
  * unless `dictVersion` forces it. Parse failure throws the mapped error.
  */
-export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null): MergeOutput
+export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, onMissingTran?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null): MergeOutput
 
 export interface MergeOutput {
   bytes: Buffer
   warningsJson: string
   revisionsJson: string
 }
+
+/**
+ * The `--on-missing-tran` modes merge accepts, in declaration order —
+ * `["reconcile", "error"]`.
+ *
+ * GENERATED for the same reason as [`type_clash_modes`], and the reason is that
+ * enum's own history: it was hand-copied into the census values and the CLI's
+ * error message, and a fourth mode would have reached neither. The sibling
+ * option starts with one authority rather than acquiring one after the fact.
+ */
+export declare function missingTranModes(): Array<string>
 
 /**
  * Result of `transportPack` / `transportLock`: output size, ratio vs source,

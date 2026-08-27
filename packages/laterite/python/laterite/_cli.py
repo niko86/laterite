@@ -47,6 +47,10 @@ _DICT_CHOICES = ("auto", *_native.registry_editions())
 #: was a hand-typed `("error", "widen", "promote")`, one of four copies of a set the
 #: Rust enum already owns (laterite-dev#555); a fourth mode would have reached none of them.
 _CLASH_CHOICES = tuple(_native.registry_type_clash_modes())
+#: The `--on-missing-tran` modes, from `MissingTranMode::ALL` in the same crate.
+#: Derived from the start rather than hand-typed and later reconciled — which is
+#: the whole lesson of the line above.
+_MISSING_TRAN_CHOICES = tuple(_native.registry_missing_tran_modes())
 
 #: Encoding labels the surface census resolves on every launcher. Mirrors
 #: `ENCODING_PROBES` in `commands/census.rs`; `test_census_probe_lists_agree` pins
@@ -565,6 +569,7 @@ def _run_merge(args: argparse.Namespace) -> int:
         res = laterite.merge(
             *args.files,
             on_type_clash=args.on_type_clash,
+            on_missing_tran=args.on_missing_tran,
             dict_version=dv,
             encoding=args.encoding,
             tran=_tran_from_args(args),
@@ -1015,6 +1020,12 @@ def _build_parser() -> argparse.ArgumentParser:
     pm.add_argument("--out", required=True)
     pm.add_argument(
         "--on-type-clash", dest="on_type_clash", choices=_CLASH_CHOICES, default="error"
+    )
+    pm.add_argument(
+        "--on-missing-tran",
+        dest="on_missing_tran",
+        choices=_MISSING_TRAN_CHOICES,
+        default="reconcile",
     )
     pm.add_argument("--tran-issue", dest="tran_issue")
     pm.add_argument("--tran-date", dest="tran_date")

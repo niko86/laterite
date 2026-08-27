@@ -59,6 +59,15 @@ pub enum ErrorKind {
     /// disagreement, since picking one would silently mislabel the other file's
     /// values. Reconcile the `UNIT` row in the sources.
     UnitConflict,
+    /// A merge was asked to refuse when no transmission stamp is supplied
+    /// ([`ags4::MissingTran::Refuse`](crate::ags4::MissingTran::Refuse)) and
+    /// none was.
+    ///
+    /// Its own kind rather than [`ErrorKind::InvalidArgument`] for the same
+    /// reason the two above are: it is a merge refusal, it shares their exit
+    /// code, and a caller routing on `kind_str()` should be able to tell which
+    /// of merge's three refusals it hit — they need three different fixes.
+    MissingTran,
 }
 
 impl ErrorKind {
@@ -78,6 +87,7 @@ impl ErrorKind {
             ErrorKind::InvalidArgument => "invalid_argument",
             ErrorKind::TypeConflict => "type_conflict",
             ErrorKind::UnitConflict => "unit_conflict",
+            ErrorKind::MissingTran => "missing_tran",
             ErrorKind::Other => "error",
         }
     }
@@ -93,7 +103,7 @@ impl ErrorKind {
             // 6, not 4: `lat merge` reports an unresolved schema conflict with
             // its own code, and this domain is shared verbatim with the other
             // surfaces — a wrapper routing on it must get the same number here.
-            ErrorKind::TypeConflict | ErrorKind::UnitConflict => 6,
+            ErrorKind::TypeConflict | ErrorKind::UnitConflict | ErrorKind::MissingTran => 6,
             ErrorKind::Other => 1,
         }
     }

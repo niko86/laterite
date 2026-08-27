@@ -113,6 +113,13 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                                   nDP (2DP + 5DP -> 5DP), zero-padding the coarser
                                   values (10.00 -> 10.00000). Never rounds, never
                                   demotes; nSF/nSCI fall back to widen
+    --on-missing-tran <MODE>  what to do when no --tran-* stamp is given and the
+                          deliveries carry TRAN rows of their own:
+                          reconcile  merge TRAN like any other group and warn
+                                     (default). Every delivery's TRAN row survives
+                                     — TRAN_ISNO is a KEY heading and issue numbers
+                                     differ — and Rule 14 allows exactly one
+                          error      refuse, before anything is written to --out
     --tran-issue <ISNO>   stamp a synthesised merge-TRAN (needs all five --tran-*
                           below; records the inputs' ISNOs/dates in TRAN_REM for
                           provenance)

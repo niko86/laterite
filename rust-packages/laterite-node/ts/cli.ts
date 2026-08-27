@@ -32,6 +32,7 @@ import {
   renderReadJson,
   resolveEncodingLabel,
   typeClashModes,
+  missingTranModes,
 } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
@@ -85,7 +86,10 @@ interface Spec {
  *  its set is the editions table, compared there, and represented differently by
  *  each parser framework (a per-arg copy would be double-reported false drift). */
 function flagValueSets(): Record<string, readonly string[]> {
-  return { "on-type-clash": typeClashModes() };
+  return {
+    "on-type-clash": typeClashModes(),
+    "on-missing-tran": missingTranModes(),
+  };
 }
 
 /** Accepted on every verb (a boolean). Mirrors clap's one remaining global arg —
@@ -143,6 +147,7 @@ const SPECS: Record<string, Spec> = {
     flags: [
       ...DICT_FLAGS,
       "json",
+      "on-missing-tran",
       "on-type-clash",
       "out",
       "tran-date",
@@ -157,6 +162,7 @@ const SPECS: Record<string, Spec> = {
       "dict",
       "dict-version",
       "encoding",
+      "on-missing-tran",
       "on-type-clash",
       "out",
       "tran-date",
@@ -818,10 +824,22 @@ function runMerge(p: Parsed, json: boolean): number {
   // this change removes.
   const onTypeClash = clash as NonNullable<MergeOptions["onTypeClash"]>;
 
+  // Same shape, same authority, for the same reason — see the note above.
+  const missing = str(p.flags["on-missing-tran"]) ?? "reconcile";
+  const missingModes = missingTranModes();
+  if (!missingModes.includes(missing)) {
+    fail(
+      `--on-missing-tran: unknown mode '${missing}' (${missingModes.join(", ")})`,
+      5,
+    );
+  }
+  const onMissingTran = missing as NonNullable<MergeOptions["onMissingTran"]>;
+
   let res;
   try {
     res = merge(files, {
       onTypeClash,
+      onMissingTran,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
       tran: tranFromFlags(p.flags),

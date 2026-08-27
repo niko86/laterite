@@ -373,6 +373,113 @@ fn keeping_an_input_tran_unstamped_is_reported() {
     assert_eq!(tran.row(0).unwrap().cell("TRAN_ISNO"), Some("3"));
 }
 
+/// `on_missing_tran` — the five behaviour cases, at the highest seam that drives
+/// the engine through a public API.
+///
+/// The fixture is deliberately the one above's: two valid deliveries each carrying
+/// their own TRAN, which is the only situation the option is about.
+#[test]
+fn on_missing_tran_refuses_only_when_asked_and_only_without_a_stamp() {
+    let tran = |isno: &str, date: &str| {
+        format!(
+            concat!(
+                "\"GROUP\",\"TRAN\"\r\n",
+                "\"HEADING\",\"TRAN_ISNO\",\"TRAN_DATE\",\"TRAN_PROD\",\"TRAN_STAT\",\"TRAN_AGS\",\"TRAN_RECV\"\r\n",
+                "\"UNIT\",\"\",\"yyyy-mm-dd\",\"\",\"\",\"\",\"\"\r\n",
+                "\"TYPE\",\"X\",\"DT\",\"X\",\"X\",\"X\",\"X\"\r\n",
+                "\"DATA\",\"{}\",\"{}\",\"Producer\",\"Draft\",\"4.1.1\",\"Recipient\"\r\n",
+            ),
+            isno, date
+        )
+    };
+    let first = format!("{FIRST}{}", tran("1", "2026-08-01"));
+    let second = format!("{SECOND}{}", tran("2", "2026-08-05"));
+    let sources = || [first.as_bytes(), second.as_bytes()];
+
+    let issues = |text: &str| -> Vec<String> {
+        ags4::read_str(text)
+            .run()
+            .unwrap()
+            .group("TRAN")
+            .unwrap()
+            .rows()
+            .filter_map(|r| r.cell("TRAN_ISNO").map(str::to_string))
+            .collect()
+    };
+
+    // 1. The default is untouched. A REGRESSION GUARD, not a proof: it passes
+    //    before this option existed and after, by construction — which is exactly
+    //    the claim being made ("purely additive"), so it is worth pinning and not
+    //    worth dressing up as evidence the option works.
+    let default = ags4::merge_bytes(sources()).run().unwrap();
+    assert_eq!(issues(default.text()), ["1", "2"]);
+    assert!(
+        default
+            .notes()
+            .iter()
+            .any(|n| n.kind() == "tran_not_stamped")
+    );
+
+    // 2. Stating `Reconcile` is the default, not merely similar to it — same
+    //    surviving rows, same note.
+    let stated = ags4::merge_bytes(sources())
+        .on_missing_tran(ags4::MissingTran::Reconcile)
+        .run()
+        .unwrap();
+    assert_eq!(issues(stated.text()), issues(default.text()));
+    assert_eq!(
+        stated.text(),
+        default.text(),
+        "byte-identical to the default"
+    );
+
+    // 3. `Refuse` refuses, and nothing comes back to write. `run()` returns the
+    //    bytes, so an Err IS "nothing was emitted" at this seam — the CLI's
+    //    "nothing reached --out" rides on the same Err.
+    let refused = ags4::merge_bytes(sources())
+        .on_missing_tran(ags4::MissingTran::Refuse)
+        .run();
+    let err = refused.expect_err("Refuse must not produce a merged file");
+
+    // 4. The message names the situation and the remedy, so the fix does not
+    //    require reading the source.
+    let msg = err.to_string();
+    assert!(msg.contains("TRAN"), "names the situation: {msg}");
+    assert!(
+        msg.contains("Rule 14"),
+        "names why one row is not enough: {msg}"
+    );
+    assert!(
+        msg.contains("on_missing_tran=reconcile"),
+        "names the way back: {msg}"
+    );
+    assert_eq!(err.kind_str(), "missing_tran", "its own routable token");
+
+    // 5. A complete stamp makes the option irrelevant — Refuse must NOT fire on
+    //    the stamped path, which is the interaction a caller should not have to
+    //    reason about.
+    let stamped = ags4::merge_bytes(sources())
+        .on_missing_tran(ags4::MissingTran::Refuse)
+        .transmission("3", "2026-08-06", "Merger", "Recipient", "Final")
+        .run()
+        .expect("a supplied stamp is what Refuse asks for");
+    assert_eq!(issues(stamped.text()), ["3"], "one merge transmission");
+}
+
+/// `Refuse` fires where the WARNING fires, not merely where a stamp is absent.
+///
+/// With no input TRAN either, emit injects one placeholder row and the merged file
+/// satisfies Rule 14 anyway — so there is nothing to refuse, and refusing would
+/// make the option reject merges it has no complaint about.
+#[test]
+fn on_missing_tran_refuse_is_silent_when_no_input_carries_a_transmission() {
+    let merged = ags4::merge_bytes([FIRST.as_bytes(), SECOND.as_bytes()])
+        .on_missing_tran(ags4::MissingTran::Refuse)
+        .run()
+        .expect("no input TRAN means nothing to reconcile and nothing to refuse");
+    assert!(!merged.text().contains("\"TRAN\""), "{}", merged.text());
+}
+
 /// With no `TRAN` on either side and no stamp, none is invented — and there is
 /// nothing to report, because nothing was kept or discarded.
 #[test]
