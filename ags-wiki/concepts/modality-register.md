@@ -19,7 +19,7 @@ sources: []
 
 ## Definition
 
-Every laterite capability is one engine behind several doors. A 'modality' is the I/O *form* a capability is offered in — an input door (path / text / bytes / file-like / handle / stdin / cert) or an output door (file / bytes / text / handle / value / table / stdout). The behavioural-knob parity gates (test_free_chained_parity, test_cross_surface_parity) compare pairs that exist on BOTH sides and STRIP the modality-bearing params before comparing, so nothing there detects a capability offered in fewer forms on one surface — an *absence*, not a *drift*. This register is that missing axis: one cell per (capability, surface, spelling), each form tri-stated present|absent|divergent, each absence verdicted gap|by-design with a reason. It is the find-only deliverable AND the by-design allowlist the standing gate (test_modality_parity) checks reflected reality against. A second gate, gen_modality.py --check, holds the rendered page against this SSOT — the two guard different axes. The sibling baseline (which surface offers the richest form-set for a capability) is COMPUTED by the generator, never stored — a stored baseline is the multi-source-of-truth class #181 exists to kill.
+Every laterite capability is one engine behind several doors. A 'modality' is the I/O *form* a capability is offered in — an input door (path / text / bytes / file-like / handle / stdin / cert) or an output door (file / bytes / text / handle / value / table / stdout). The behavioural-knob parity gates (test_free_chained_parity, test_cross_surface_parity) compare pairs that exist on BOTH sides and STRIP the modality-bearing params before comparing, so nothing there detects a capability offered in fewer forms on one surface — an *absence*, not a *drift*. This register is that missing axis: one cell per (capability, surface, spelling), each form tri-stated present|absent|divergent, each absence verdicted gap|by-design with a reason. It is the find-only deliverable AND the by-design allowlist the standing gate (test_modality_parity) checks reflected reality against. A second gate, gen_modality.py --check, holds the rendered page against this SSOT — the two guard different axes. A third, check_duckdb_manifest.py, covers the one surface reflection cannot reach: duckdb is a separate extension, so its cells are hand-authored, and that gate cross-checks the verbs they name against a pinned copy of the extension's own function manifest in both directions — a function renamed upstream leaves a cell naming nothing, one added upstream appears in no cell. The sibling baseline (which surface offers the richest form-set for a capability) is COMPUTED by the generator, never stored — a stored baseline is the multi-source-of-truth class #181 exists to kill.
 
 This register is the **I/O-form** axis of cross-surface parity — does a capability exist in this SHAPE on this surface. [[surface-census]] is the **verb/table** axis of the same problem — does it exist AT ALL on this surface. Both share the reflect-don't-hand-list discipline (a form or verb list authored by hand is just a fourth thing to drift), and both exist because a *value*-comparison gate structurally cannot see an absence: feed identical input through every surface and diff the outputs, and a door that was never built produces no output to diff.
 
@@ -87,6 +87,7 @@ _Notes:_
 | rust (chained) | ✓ | ✓ | ✓ | — |   |
 | cli (free) | ✓ |   |   |   | — |
 | browser (free) | — |   | ✓ |   |   |
+| duckdb (n/a) | — | — | — | — | — |
 
 **Output**
 
@@ -97,6 +98,7 @@ _Notes:_
 | rust (chained) | ✓ |   |
 | cli (free) |   | ✓ |
 | browser (free) | ✓ |   |
+| duckdb (n/a) | — | — |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — same as read — no universal Node file-like; pass bytes.
@@ -107,6 +109,7 @@ _Findings:_
 _Notes:_
 - _python_: validate exposes only the positional source sniff + text= keyword — no explicit path=/data= keyword doors like read/fix. All input FORMS are still reachable via the sniff (_resolve_source accepts path/bytes/file-like), so this is a keyword-ergonomics inconsistency, NOT a lost modality — recorded here, deliberately not a gap.
 - _rust_: Partial. `text` is the same trivial door as read's.
+- _duckdb_: **by-design.** A read-only reader. `reference/duckdb-functions.md` states it: there is no `validate_ags` in SQL. Removed deliberately in laterite-dev#446. <!-- retired: validate_ags -->
 
 ### fix — Mechanically repair AGS4.
 
@@ -120,6 +123,7 @@ _Notes:_
 | node (free) | ✓ | ✓ | ✓ |   |
 | browser (free) |   |   | ✓ |   |
 | rust (chained) | ✓ | ✓ | ✓ |   |
+| duckdb (n/a) | — | — | — | — |
 
 **Output**
 
@@ -129,11 +133,13 @@ _Notes:_
 | node (free) | ✓ |   | ✓ |
 | browser (free) |   | ✓ | ✓ |
 | rust (chained) | ✓ |   | ✓ |
+| duckdb (n/a) | — | — | — |
 
 _Notes:_
 - _node_: #394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices).
 - _browser_: the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect.
 - _rust_: Added 2026-08-05 (phase 4c of dec-facade-parity). One builder over the three source doors, ending at `Fixed` — the value form. The file form is `to_path`, and in-place is the source path named as the destination rather than a separate flag: there is nothing a flag would express that the path does not. Rule selection (`only`/`exclude`) speaks the same short labels as python and node, read from the engine via `fixable_rules()` so a new fix cannot leave the list behind.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
@@ -147,6 +153,7 @@ _Notes:_
 | node (free) |   |   | ✓ | ✓ |
 | browser (free) | ≈ | ✓ |   |   |
 | rust (chained) |   |   | ✓ | ✓ |
+| duckdb (n/a) | — | — | — | — |
 
 **Output**
 
@@ -156,12 +163,14 @@ _Notes:_
 | node (free) |   | ✓ |
 | browser (free) | ✓ |   |
 | rust (chained) |   | ✓ |
+| duckdb (n/a) | — | — |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
 _Notes:_
 - _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### diff — Compare two AGS4 revisions.
 
@@ -204,6 +213,7 @@ _Notes:_
 | rust (chained) | ✓ |   | ✓ |   | ✓ |
 | cli (free) | ✓ |   |   |   |   |
 | browser (free) |   |   | ✓ |   |   |
+| duckdb (n/a) | — | — | — | — | — |
 
 **Output**
 
@@ -214,6 +224,7 @@ _Notes:_
 | rust (chained) |   | ✓ |   |
 | cli (free) | ✓ |   | ✓ |
 | browser (free) | ✓ | ✓ |   |
+| duckdb (n/a) | — | — | — |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; MergeSource is string|Uint8Array|Ags4File.
@@ -221,6 +232,7 @@ _Findings:_
 
 _Notes:_
 - _rust_: Added 2026-08-06 (phase 4d). Wraps `merge_parsed`'s `&[ParsedFile]` door — the shape dec-ags4-merge-semantics and laterite#162 endorse — so no provenance typestate reaches the facade. `Merged::save` writes, but the door's own out-form is the value: node offers no file form, so the floor does not ask for one. Two new `ErrorKind` variants (`TypeConflict`, `UnitConflict`) carry the siblings' exact wire tokens rather than collapsing onto `Other`, because the engine draws that distinction deliberately — widen/promote settles the first and nothing settles the second.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### censor — Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private laterite-ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.
 
@@ -232,6 +244,7 @@ _Notes:_
 |---|---|
 | browser (free) | ✓ |
 | rust (absent) |   |
+| duckdb (n/a) | — |
 
 **Output**
 
@@ -239,9 +252,11 @@ _Notes:_
 |---|---|---|
 | browser (free) | ✓ | ✓ |
 | rust (absent) |   |   |
+| duckdb (n/a) | — | — |
 
 _Notes:_
 - _rust_: Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### certify — Mint an .ags.idx validity certificate (cert as OUTPUT).
 
@@ -256,6 +271,7 @@ _Notes:_
 | rust (chained) |   |   | ✓ |
 | cli (free) | ✓ |   |   |
 | browser (free) |   | ✓ |   |
+| duckdb (n/a) | — | — | — |
 
 **Output**
 
@@ -266,6 +282,7 @@ _Notes:_
 | rust (chained) | ✓ | ✓ |   |
 | cli (free) | ✓ |   |   |
 | browser (free) | — |   | ✓ |
+| duckdb (n/a) | — | — | — |
 
 _Findings:_
 - ⚪ by-design · **browser** out.file `certify-bytes-output` — certify returns the cert as a String because the browser has no filesystem — a PRESENT capability, not a shape gap. It proved the in-memory shape that Python/Node now match via certify_bytes/certifyBytes (#390).
@@ -274,6 +291,7 @@ _Notes:_
 - _python_: certify_bytes() (#390) returns the .ags.idx bytes in memory — the certify analog of transport.lock_bytes; same cert as certify() (bar the mint timestamp), so it interops with read(index=)/--index/the browser.
 - _node_: certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form.
 - _rust_: Added 2026-08-05 (phase 4b). Mints over the ORIGINAL source bytes, before any transcode, with the encoding recorded alongside — the same rule laterite-py follows. Note the engine limit this exposes: bytes that are not UTF-8 validate but cannot be certified at all, because a certificate carries byte offsets the engine will not record into bytes it cannot address. That holds on every surface.
+- _duckdb_: **by-design.** A read-only reader. `reference/duckdb-functions.md` states it: there is no `certify_ags` in SQL. Removed deliberately in laterite-dev#446. <!-- retired: certify_ags -->
 
 ### cert-input — Consume an .ags.idx certificate to skip revalidation (cert as INPUT).
 
@@ -323,6 +341,7 @@ _Notes:_
 | node (chained) | ✓ |
 | browser (chained) | ✓ |
 | rust (chained) | ✓ |
+| duckdb (n/a) | — |
 
 **Output**
 
@@ -332,12 +351,14 @@ _Notes:_
 | node (chained) | ✓ | ✓ | ✓ |   |
 | browser (chained) |   | — | — | ✓ |
 | rust (chained) | ✓ | ✓ | ✓ |   |
+| duckdb (n/a) | — | — | — | — |
 
 _Findings:_
 - 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/rows_json — and arrow_ipc where the `arrow` feature is built (#330; the published package is the slim build, which has rows_json only). All are typed table-out: no .text/.bytes AGS4 re-emit on the handle itself, so there is no round-trip AGS4 out of a browser read the way Python/Node Ags4File have .text/.bytes/.save. Assemblable rather than absent since #330 — meta() + rows_json() together ARE build_ags4's input shape, so read -> edit -> write composes through the separate build verb (held by `rows_json_feeds_build_ags4_straight_back` in the crate's tests); the gap is that the handle does not do it for you.
 
 _Notes:_
 - _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### to_excel — Convert AGS4 to an .xlsx workbook.
 
@@ -353,6 +374,7 @@ _Notes:_
 | node (free) | ✓ |   | ✓ |   |
 | browser (free) |   |   | ✓ |   |
 | rust (absent) |   |   |   |   |
+| duckdb (n/a) | — | — | — | — |
 
 **Output**
 
@@ -362,11 +384,13 @@ _Notes:_
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
 | rust (absent) |   |   |
+| duckdb (n/a) | — | — |
 
 _Notes:_
 - _python_: to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered.
 - _node_: #391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel.
 - _rust_: Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.
+- _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
 ### from_excel — Convert an AGS4-shaped .xlsx back to AGS4.
 
@@ -382,6 +406,7 @@ _Notes:_
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
 | rust (absent) |   |   |
+| duckdb (n/a) | — | — |
 
 **Output**
 
@@ -391,6 +416,7 @@ _Notes:_
 | node (free) | ✓ | ✓ | — |
 | browser (free) |   | ✓ |   |
 | rust (absent) |   |   |   |
+| duckdb (n/a) | — | — | — |
 
 _Findings:_
 - ⚪ by-design · **node** out.handle — Node fromExcel(bytes) returns the AGS4 Buffer, not an Ags4File; the handle is one read() away (read(fromExcel(bytes))) — the Node idiom, where read IS the handle constructor. Python returns the handle directly as a convenience.
@@ -398,6 +424,7 @@ _Findings:_
 _Notes:_
 - _python_: from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first.
 - _rust_: Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.
+- _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
 ### transport-pack — zstd-only compress/decompress (pack/unpack).
 
@@ -410,6 +437,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | rust (chained) | ✓ | ✓ |
+| duckdb (n/a) | — | — |
 
 **Output**
 
@@ -418,10 +446,12 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | rust (chained) | ✓ | ✓ |
+| duckdb (n/a) | — | — |
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
 - _rust_: Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
 
@@ -436,6 +466,7 @@ _Notes:_
 | browser (free) | — | ✓ |
 | rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ | — |
+| duckdb (n/a) | — | — |
 
 **Output**
 
@@ -446,6 +477,7 @@ _Notes:_
 | browser (free) | — | ✓ |
 | rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ |   |
+| duckdb (n/a) | — | — |
 
 _Findings:_
 - ⚪ by-design · **browser** in.path — no filesystem in the browser — bytes-in/bytes-out is the only form. This surface (web/src/lib/transportClient.ts, JS zstd/age) is where the motivating bug lived; the wasm CRATE has zero transport code.
@@ -455,6 +487,7 @@ _Notes:_
 - _python_: the *_bytes forms were added in 0.6.2-dev to close the exact path-only-vs-browser-bytes-only gap this whole audit is named after.
 - _node_: the *Bytes forms (#389) close the remaining leg of the motivating gap — lockBytes never writes plaintext to disk; same shared-leaf envelope as the Python/browser forms.
 - _rust_: Added 2026-08-05 (phase 4a). Same shared-leaf envelope as every other surface, so a Rust-sealed blob opens with `lat unlock`, Python, Node, the browser and stock age. The password-carrying builders redact in `Debug` — a derived one would put the passphrase in any log line that renders the builder.
+- _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes. `lock` is additionally passphrase crypto, which a SQL function signature is a poor place to take.
 
 ### read_typed — Read AGS4 into the typed-graph object model.
 
@@ -467,6 +500,7 @@ _Notes:_
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) |   |   |   |   |
 | rust (absent) |   |   |   |   |
+| duckdb (n/a) | — | — | — | — |
 
 **Output**
 
@@ -475,12 +509,14 @@ _Notes:_
 | python (free) | ✓ |
 | node (free) | — |
 | rust (absent) |   |
+| duckdb (n/a) | — |
 
 _Findings:_
 - 🟡 P3 · **node** out.handle `node-read-typed` — Node has the 174 typed-graph classes (for buildAgs4) but no read_typed to populate them FROM a file — the biggest port lift, a real typed-graph reader. Last in the backlog.
 
 _Notes:_
 - _rust_: Absent. The 0.2 milestone this cell used to cite was RETIRED by dec-facade-parity on 2026-08-04 — the facade goes to parity once and then joins the product line, so there is no waypoint release left to hold this for. It is also outside the floor: `read_typed` has no Node sibling to take the intersection with, so parity never owes it. A Rust-native typed-graph reader stays an open question rather than a scheduled one.
+- _duckdb_: **by-design.** This capability is defined as reading into the typed-graph object model — the generated group classes. `read_ags` returns a typed RELATION, which is a different thing and is already recorded under `read`. A SQL surface has no object model to return.
 
 ### read-output-view — Output-shaping of a read (xn numeric coercion).
 
@@ -492,6 +528,7 @@ _Notes:_
 |---|---|
 | python (free) | ✓ |
 | rust (absent) |   |
+| duckdb (n/a) | — |
 
 **Output**
 
@@ -499,12 +536,14 @@ _Notes:_
 |---|---|
 | python (free) | ≈ |
 | rust (absent) |   |
+| duckdb (n/a) | — |
 
 _Findings:_
 - 🟡 P3 · **python** out.table `xn-numeric-view` — read(xn=) casts XN columns to Float64 — a Python-only output-shaping view with no sibling and (unlike keys/backend) no knob-parity gate. An open port-or-document decision, so it is a P3 gap/divergence, not a settled by-design.
 
 _Notes:_
 - _rust_: Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types.
+- _duckdb_: **gap.** Defined as output-shaping of a read (`xn` numeric coercion). `XN` canonicalises to `string`, so the extension emits it VARCHAR with no opt-in to coerce, where Python offers `read(xn='numeric')`. Nothing prevents an `xn=` named parameter on `read_ags` — it already takes `encoding` — so this reads as not-yet rather than declined. The weakest verdict on this surface, and the only one here that is not `by-design`.
 
 ## Legend
 

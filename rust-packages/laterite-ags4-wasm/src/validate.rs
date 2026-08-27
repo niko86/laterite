@@ -313,7 +313,7 @@ extern "C" {
 /// Validate AGS4 bytes in the browser.
 ///
 /// * `data` — the file bytes (from a `FileReader`/textarea, never uploaded).
-/// * `opts` — a [`ValidateOptions`] object; every field optional, so
+/// * `opts` — a `ValidateOptions` object; every field optional, so
 ///   `validate(bytes)` is a complete call. An unrecognised key is REFUSED by
 ///   name rather than silently taking its default (see the options module
 ///   comment for why serde cannot do that itself).
@@ -331,7 +331,7 @@ extern "C" {
 /// the caller already handles, rather than as a thrown exception that the UI
 /// would have to catch somewhere else.
 ///
-/// Returns a [`ValidationReport`] as a plain JS object (json-compatible:
+/// Returns a `ValidationReport` as a plain JS object (json-compatible:
 /// `None` → `null`, matching the CLI's `--json`).
 #[wasm_bindgen]
 pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> ValidationReportJs {

@@ -1,7 +1,7 @@
 {
   "format_version": "1.0.0",
   "title": "Cross-surface I/O-form (modality) register",
-  "preamble": "Every laterite capability is one engine behind several doors. A 'modality' is the I/O *form* a capability is offered in — an input door (path / text / bytes / file-like / handle / stdin / cert) or an output door (file / bytes / text / handle / value / table / stdout). The behavioural-knob parity gates (test_free_chained_parity, test_cross_surface_parity) compare pairs that exist on BOTH sides and STRIP the modality-bearing params before comparing, so nothing there detects a capability offered in fewer forms on one surface — an *absence*, not a *drift*. This register is that missing axis: one cell per (capability, surface, spelling), each form tri-stated present|absent|divergent, each absence verdicted gap|by-design with a reason. It is the find-only deliverable AND the by-design allowlist the standing gate (test_modality_parity) checks reflected reality against. A second gate, gen_modality.py --check, holds the rendered page against this SSOT — the two guard different axes. The sibling baseline (which surface offers the richest form-set for a capability) is COMPUTED by the generator, never stored — a stored baseline is the multi-source-of-truth class #181 exists to kill.\n\nThis register is the **I/O-form** axis of cross-surface parity — does a capability exist in this SHAPE on this surface. [[surface-census]] is the **verb/table** axis of the same problem — does it exist AT ALL on this surface. Both share the reflect-don't-hand-list discipline (a form or verb list authored by hand is just a fourth thing to drift), and both exist because a *value*-comparison gate structurally cannot see an absence: feed identical input through every surface and diff the outputs, and a door that was never built produces no output to diff.",
+  "preamble": "Every laterite capability is one engine behind several doors. A 'modality' is the I/O *form* a capability is offered in — an input door (path / text / bytes / file-like / handle / stdin / cert) or an output door (file / bytes / text / handle / value / table / stdout). The behavioural-knob parity gates (test_free_chained_parity, test_cross_surface_parity) compare pairs that exist on BOTH sides and STRIP the modality-bearing params before comparing, so nothing there detects a capability offered in fewer forms on one surface — an *absence*, not a *drift*. This register is that missing axis: one cell per (capability, surface, spelling), each form tri-stated present|absent|divergent, each absence verdicted gap|by-design with a reason. It is the find-only deliverable AND the by-design allowlist the standing gate (test_modality_parity) checks reflected reality against. A second gate, gen_modality.py --check, holds the rendered page against this SSOT — the two guard different axes. A third, check_duckdb_manifest.py, covers the one surface reflection cannot reach: duckdb is a separate extension, so its cells are hand-authored, and that gate cross-checks the verbs they name against a pinned copy of the extension's own function manifest in both directions — a function renamed upstream leaves a cell naming nothing, one added upstream appears in no cell. The sibling baseline (which surface offers the richest form-set for a capability) is COMPUTED by the generator, never stored — a stored baseline is the multi-source-of-truth class #181 exists to kill.\n\nThis register is the **I/O-form** axis of cross-surface parity — does a capability exist in this SHAPE on this surface. [[surface-census]] is the **verb/table** axis of the same problem — does it exist AT ALL on this surface. Both share the reflect-don't-hand-list discipline (a form or verb list authored by hand is just a fourth thing to drift), and both exist because a *value*-comparison gate structurally cannot see an absence: feed identical input through every surface and diff the outputs, and a door that was never built produces no output to diff.",
   "forms": {
     "input": [
       "path",
@@ -71,7 +71,7 @@
     {
       "id": "duckdb",
       "label": "DuckDB extension",
-      "source": "output/laterite-duckdb-ext/src/*.rs (separate gitignored repo — absent from CI)",
+      "source": "../laterite-duckdb/src/*.rs (a separate repo, checked out as a sibling — exercised in CI as the PUBLISHED artefact, never built there)",
       "reflection": "documentation"
     }
   ],
@@ -481,6 +481,24 @@
               "priority": "by-design"
             }
           ]
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "file-like": "absent",
+            "path": "absent",
+            "stdin": "absent",
+            "text": "absent"
+          },
+          "output": {
+            "stdout": "absent",
+            "value": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** A read-only reader. `reference/duckdb-functions.md` states it: there is no `validate_ags` in SQL. Removed deliberately in laterite-dev#446. <!-- retired: validate_ags -->"
         }
       ]
     },
@@ -616,6 +634,24 @@
           },
           "note": "Added 2026-08-05 (phase 4c of dec-facade-parity). One builder over the three source doors, ending at `Fixed` — the value form. The file form is `to_path`, and in-place is the source path named as the destination rather than a separate flag: there is nothing a flag would express that the path does not. Rule selection (`only`/`exclude`) speaks the same short labels as python and node, read from the engine via `fixable_rules()` so a new fix cannot leave the list behind.",
           "gaps": []
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "file-like": "absent",
+            "path": "absent",
+            "text": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent",
+            "value": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -745,6 +781,23 @@
           },
           "note": "Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.",
           "gaps": []
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "handle": "absent",
+            "text": "absent",
+            "value": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "value": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -1037,6 +1090,25 @@
             "file": "present"
           },
           "gaps": []
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "file-like": "absent",
+            "handle": "absent",
+            "path": "absent",
+            "text": "absent"
+          },
+          "output": {
+            "file": "absent",
+            "stdout": "absent",
+            "value": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -1076,6 +1148,20 @@
           "output": {},
           "note": "Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of.",
           "facade_verdict": "no-floor"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent"
+          },
+          "output": {
+            "file": "absent",
+            "value": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -1235,6 +1321,23 @@
               "related": "certify-bytes-output"
             }
           ]
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "handle": "absent",
+            "path": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent",
+            "text": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** A read-only reader. `reference/duckdb-functions.md` states it: there is no `certify_ags` in SQL. Removed deliberately in laterite-dev#446. <!-- retired: certify_ags -->"
         }
       ]
     },
@@ -1493,6 +1596,22 @@
           "gaps": [],
           "facade_verdict": "planned",
           "note": "Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding."
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "handle": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent",
+            "table": "absent",
+            "text": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -1598,6 +1717,23 @@
           "output": {},
           "note": "Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.",
           "facade_verdict": "planned"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "file-like": "absent",
+            "path": "absent",
+            "text": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that."
         }
       ]
     },
@@ -1697,6 +1833,22 @@
           "output": {},
           "note": "Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.",
           "facade_verdict": "planned"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "path": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent",
+            "handle": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that."
         }
       ]
     },
@@ -1804,6 +1956,21 @@
           },
           "note": "Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.",
           "gaps": []
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "path": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
         }
       ]
     },
@@ -1975,6 +2142,21 @@
               "priority": "by-design"
             }
           ]
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "path": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes. `lock` is additionally passphrase crypto, which a SQL function signature is a poor place to take."
         }
       ]
     },
@@ -2037,6 +2219,22 @@
           "output": {},
           "note": "Absent. The 0.2 milestone this cell used to cite was RETIRED by dec-facade-parity on 2026-08-04 — the facade goes to parity once and then joins the product line, so there is no waypoint release left to hold this for. It is also outside the floor: `read_typed` has no Node sibling to take the intersection with, so parity never owes it. A Rust-native typed-graph reader stays an open question rather than a scheduled one.",
           "facade_verdict": "planned"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "bytes": "absent",
+            "file-like": "absent",
+            "path": "absent",
+            "text": "absent"
+          },
+          "output": {
+            "handle": "absent"
+          },
+          "gaps": [],
+          "note": "**by-design.** This capability is defined as reading into the typed-graph object model — the generated group classes. `read_ags` returns a typed RELATION, which is a different thing and is already recorded under `read`. A SQL surface has no object model to return."
         }
       ]
     },
@@ -2084,6 +2282,19 @@
           "output": {},
           "note": "Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types.",
           "facade_verdict": "no-floor"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {
+            "path": "absent"
+          },
+          "output": {
+            "table": "absent"
+          },
+          "gaps": [],
+          "note": "**gap.** Defined as output-shaping of a read (`xn` numeric coercion). `XN` canonicalises to `string`, so the extension emits it VARCHAR with no opt-in to coerce, where Python offers `read(xn='numeric')`. Nothing prevents an `xn=` named parameter on `read_ags` — it already takes `encoding` — so this reads as not-yet rather than declined. The weakest verdict on this surface, and the only one here that is not `by-design`."
         }
       ]
     }

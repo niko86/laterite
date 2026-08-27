@@ -1,11 +1,11 @@
 //! Report dispatch — the CLI output contract, in crate form.
 //!
-//! Each subcommand builds a *report document* and hands it to [`emit`]:
+//! Each subcommand builds a *report document* and hands it to [`emit()`](crate::report::emit):
 //! it goes to **stdout** in the resolved [`OutputMode`] (`table` = the
 //! styled human summary; `json`/`ndjson` = the serialized doc, `ndjson`
 //! automatically when piped). The live progress spinner/bar stays on
 //! **stderr** (the rest of this crate), and one-line location/
-//! diagnostic hints go to stderr via [`note`]. `--compact` swaps in a
+//! diagnostic hints go to stderr via [`note()`](crate::report::note). `--compact` swaps in a
 //! trimmed value (drops the heavy per-file arrays) for token-lean
 //! machine consumption.
 //!

@@ -21,7 +21,7 @@ sources: [spec-4.2]
 
 ## Statement
 > [!quote] AGS4 Rule 04 — `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 04`
-> Within each GROUP, the DATA items are contained in data FIELDs. Each data FIELD contains a single data VARIABLE in each row. Each DATA row will contain one or more data FIELDs. The GROUP row contains only one DATA item, the GROUP name, in addition to the Data Descriptor (Rule 3). All other rows in the GROUP have a number of DATA items defined by the HEADING row.
+> Within each GROUP, the DATA items are contained in data FIELDs. Each data FIELD contains a single data VARIABLE in each row. Each DATA row of a data file will contain one or more data FIELDs. The GROUP row contains only one DATA item, the GROUP name, in addition to the Data Descriptor (Rule 3). All other rows in the GROUP have a number of DATA items defined by the HEADING row.
 
 Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by reading §8.1 (4.0.3/4.0.4 prose) and §4.1.1 (4.1/4.1.1/4.2 table) of *all five* PDFs, not by trusting a foreword. The text is *not* byte-identical: 4.1 reorganised prose→table, dropped Section-cross-ref parentheticals (Rules 7/10c/11), and changed Rule 15's example `ERES_RUNI`→`ELRG_RUNI` tracking the dictionary's ERES→ELRG replacement. Cross-edition rule variation is thus a *presentation + interpretation/implementation* axis, not a normative-text axis — see [[ags4-rules-frozen-dictionary-evolves]] and [[rule15-example-tracks-eres-elrg-removal]].
 

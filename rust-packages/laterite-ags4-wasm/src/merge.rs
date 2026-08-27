@@ -121,7 +121,7 @@ extern "C" {
 /// Merge two AGS4 deliveries of one project into one file (`a` then `b` — `b`
 /// wins a KEY conflict). Rows are matched by their dictionary KEY headings.
 ///
-/// * `opts` — a [`MergeOptions`] object; every field optional, so
+/// * `opts` — a `MergeOptions` object; every field optional, so
 ///   `merge(a, b)` is a complete call. An unrecognised key is refused by name.
 ///
 /// A heading the two files typed differently is a `JsError` unless

@@ -4,14 +4,16 @@
 //!
 //! Writes a sequence of group sections to AGS4 plaintext:
 //!
-//!   "GROUP","<CODE>"
-//!   "HEADING","<H1>","<H2>",...
-//!   "UNIT","<u1>","<u2>",...
-//!   "TYPE","<t1>","<t2>",...
-//!   "DATA","<v1>","<v2>",...
-//!   <blank line>
-//!   "GROUP","<`NEXT_CODE`>"
-//!   ...
+//! ```text
+//! "GROUP","<CODE>"
+//! "HEADING","<H1>","<H2>",...
+//! "UNIT","<u1>","<u2>",...
+//! "TYPE","<t1>","<t2>",...
+//! "DATA","<v1>","<v2>",...
+//! <blank line>
+//! "GROUP","<NEXT_CODE>"
+//! ...
+//! ```
 //!
 //! Each cell is double-quote-wrapped (Rule 5); embedded `"` becomes
 //! `""`. Lines end CRLF per Rule 2a. Sections separated by a blank line
@@ -74,7 +76,7 @@ pub fn write_ags4<W: Write>(out: &mut W, groups: &[EmitGroup<'_>]) -> Result<(),
 ///
 /// It exists so the `laterite.compat` drop-in can stay **byte-faithful to python-ags4**
 /// (which serializes its dataframe with no structural interpretation and no `X` default),
-/// while still going through the ONE guarded [`write_row`] — the reason this was moved out
+/// while still going through the ONE guarded `write_row` — the reason this was moved out
 /// of `laterite-py`'s own private emitter, which lacked the embedded-CR/LF guard and so
 /// could split a DATA row across two physical lines (#423). Every consumer now shares that
 /// guard; there is no unguarded emitter left.

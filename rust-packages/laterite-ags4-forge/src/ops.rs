@@ -114,7 +114,7 @@ pub enum Injection {
     /// a field whose status contains REQUIRED but *not* KEY (a KEY+REQUIRED
     /// blank would additionally trip Rule 10a).
     ///
-    /// A **multi-rule** injector at volume, like [`UnquotedField`]. On a
+    /// A **multi-rule** injector at volume, like [`Injection::UnquotedField`]. On a
     /// realistic scaffold the only REQUIRED-non-KEY fields are *structural* —
     /// `TRAN_AGS` (drives dictionary-edition detection → Rule 7/9/18 when
     /// blanked) and the `ABBR/UNIT/TYPE` `*_DESC` definitions — so a fileful of
@@ -437,7 +437,7 @@ impl Injection {
     /// site. The structural singletons (`DupSampKeyTuple`, `FiveLetterGroup`,
     /// `DropProjData`, `DropTranData`, `UndefinedType`) corrupt a single
     /// place, so `forge scale --density` rejects them at the CLI. The true-set
-    /// here MUST match the arms of [`apply_dense`].
+    /// here MUST match the arms of [`Injection::apply_dense`].
     #[must_use]
     pub fn supports_density(self) -> bool {
         matches!(
@@ -463,7 +463,7 @@ impl Injection {
     /// *distinct* site, so the emitted bytes are independent of the reservoir's
     /// internal selection order: same `(seed, density)` → byte-identical file.
     ///
-    /// Only the density-capable injectors have an arm ([`supports_density`]);
+    /// Only the density-capable injectors have an arm ([`Injection::supports_density`]);
     /// the CLI rejects the rest, so the fallback is unreachable in practice.
     #[must_use]
     pub fn apply_dense(self, model: &mut ProjectModel, seed: u64, density: f64) -> usize {
