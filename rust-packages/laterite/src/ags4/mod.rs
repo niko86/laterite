@@ -415,7 +415,7 @@ pub fn validate(path: impl AsRef<Path>) -> Validate {
 }
 
 /// Validate AGS4 already in memory — an upload, a queue message, a database
-/// blob, a document you just wrote with [`write`].
+/// blob, a document you just wrote with [`write()`].
 ///
 /// **Every rule runs except Rule 20's on-disk half**, which asks whether the
 /// sibling `FILE/` tree really holds the attachments the file references. Bytes

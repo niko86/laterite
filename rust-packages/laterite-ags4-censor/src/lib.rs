@@ -84,7 +84,7 @@ pub struct Policy {
 impl Policy {
     /// Resolve the SSOT `sensitive_headings.json` text into a policy. Each
     /// heading's `category` is looked up in `scrub_policy`; unmapped →
-    /// [`Action::Skip`]. `include_freetext` promotes the kept-text actions
+    /// `Action::Skip`. `include_freetext` promotes the kept-text actions
     /// (`skip`/`brackets`) to a full `token`, tokenising descriptions.
     pub fn from_sensitive_json(
         json: &str,

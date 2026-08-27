@@ -1,7 +1,7 @@
 //! Geotech numeric generators — type-correct AGS4 field strings sampled
 //! from curated *continuous* ranges (sourced from
 //! `examples/benchmark_scale.py`) through the shared deterministic
-//! [`Rng`](laterite_ags4_parity::Rng), so a seed → byte-identical output and the
+//! [`Rng`], so a seed → byte-identical output and the
 //! variety is generated (a real range), never a small fixed list.
 
 use laterite_ags4_parity::Rng;

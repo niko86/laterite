@@ -112,7 +112,7 @@ extern "C" {
 /// * `sensitive_json` — the classification SSOT (`sensitive_headings.json`).
 ///   Required: without it there is no policy and nothing would be scrubbed,
 ///   which is the one outcome a caller must never get by accident.
-/// * `opts` — a [`CensorOptions`] object; every field optional, so
+/// * `opts` — a `CensorOptions` object; every field optional, so
 ///   `censor(data, json)` is a complete call. An unrecognised key is refused
 ///   by name.
 ///

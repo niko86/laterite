@@ -128,7 +128,7 @@ extern "C" {
 
 /// Compare two AGS4 files.
 ///
-/// * `opts` — a [`DiffOptions`] object; every field optional, so `diff(a, b)`
+/// * `opts` — a `DiffOptions` object; every field optional, so `diff(a, b)`
 ///   is a complete call. An unrecognised key is refused by name.
 ///
 /// Behind the `diff` feature (#330).

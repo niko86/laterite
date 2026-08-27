@@ -353,7 +353,7 @@ pub fn check_file_with_dict(
 ///
 /// It exists because "resolve the edition, then run the rules" is not two steps a
 /// caller can be trusted to assemble. It is four: resolve `TRAN_AGS`, apply the
-/// 4.0.3→4.0.4 content guard ([`guard_4_0_4`], O-42), run the rules, and emit the
+/// 4.0.3→4.0.4 content guard (`guard_4_0_4`, O-42), run the rules, and emit the
 /// transparency FYI that says the file's declared edition and its actual vocabulary
 /// disagree. Every caller that hand-assembled it got the same two right and the same
 /// two wrong: `laterite-py`, `laterite-node` and the wasm surface each resolved and
