@@ -227,6 +227,15 @@ fn reconcile(
     if ro.remove("Warning (Related to Rule 10c)") {
         ids.push("O-52");
     }
+    // O-56: the same shape one tier down and one cause over — laterite REPORTS a
+    // Rule 10c link it could never ask about (a KEY heading owned off the
+    // declared parent chain). python-ags4 asks the same single question this
+    // rule asks and so has no equivalent either. Rust-only by construction on
+    // any file carrying such a group, and forge validates with `include_fyi:
+    // true`, so it lands here rather than in an ACTION list.
+    if ro.remove("FYI (Related to Rule 10c)") {
+        ids.push("O-56");
+    }
     // O-26: python triple-reports Rule 19b for a malformed heading the
     // Rust validator reports once → python uniquely has extra 19b.
     if po.remove("AGS Format Rule 19b") {
@@ -457,6 +466,32 @@ mod tests {
         // Negative guard: it reconciles ITSELF, never a real Rule 10c
         // difference standing beside it.
         let both = rules(&["Warning (Related to Rule 10c)", "AGS Format Rule 10c"]);
+        assert!(matches!(
+            classify(&both, &Ok(BTreeSet::new())),
+            Parity::RustOnlyRules { .. }
+        ));
+    }
+
+    #[test]
+    fn o56_rust_only_unchecked_link_fyi_is_known_divergence() {
+        // The advisory laterite adds (#759) is rust-only on every file carrying
+        // a group whose KEY tuple reaches outside its declared parent chain —
+        // LBST is standard, so real corpora have them — and forge validates
+        // with `include_fyi` ON, so it reaches this classifier.
+        let r = rules(&["FYI (Related to Rule 10c)"]);
+        let p = Ok(BTreeSet::new());
+        match classify(&r, &p) {
+            Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-56"),
+            other => panic!("expected KnownDivergence O-56, got {other:?}"),
+        }
+        assert!(!classify(&r, &p).is_action());
+        // Both 10c labels at once still reconciles — they are two records, and
+        // a file with a standalone row AND an unchecked link has both.
+        let pair = rules(&["FYI (Related to Rule 10c)", "Warning (Related to Rule 10c)"]);
+        assert!(!classify(&pair, &Ok(BTreeSet::new())).is_action());
+        // Negative guard: it reconciles ITSELF, never a real Rule 10c
+        // difference standing beside it.
+        let both = rules(&["FYI (Related to Rule 10c)", "AGS Format Rule 10c"]);
         assert!(matches!(
             classify(&both, &Ok(BTreeSet::new())),
             Parity::RustOnlyRules { .. }

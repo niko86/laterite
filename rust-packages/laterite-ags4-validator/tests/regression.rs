@@ -394,6 +394,52 @@ fn rule10c_standalone_child_is_warned_about_not_silently_skipped() {
 }
 
 #[test]
+fn rule10c_reports_the_link_it_cannot_ask_about() {
+    // #759 / O-56: LBST declares LBSG and keys on the whole SAMP tuple, so its
+    // SAMP link is real and 10c never looks at it — the child could name a SAMP
+    // row that does not exist and the file would still pass. AGS4 gives a group
+    // one parent, so this is the format's limit, not a defect in the file: the
+    // advisory names what went unchecked and changes no verdict.
+    let f = check_file(
+        &fixture("rule10c_foreign_key_link.ags"),
+        &CheckOptions {
+            include_fyi: true,
+            ..CheckOptions::default()
+        },
+    )
+    .expect("the fixture checks");
+    let fyi = f
+        .get("FYI (Related to Rule 10c)")
+        .expect("the unchecked-link advisory");
+    assert_eq!(fyi.len(), 1, "LOCA is subsumed by SAMP: {fyi:?}");
+    assert!(
+        fyi[0].group == "LBST" && fyi[0].desc.contains("SAMP"),
+        "must name the group that could have been the parent: {fyi:?}"
+    );
+    assert_eq!(fyi[0].severity, findings::Severity::Fyi);
+    // The declared LBSG link is satisfied, so the verdict does not move.
+    assert!(
+        !f.contains_key("AGS Format Rule 10c"),
+        "the declared parentage is intact: {:?}",
+        f.get("AGS Format Rule 10c")
+    );
+}
+
+#[test]
+fn the_unchecked_link_advisory_obeys_the_fyi_tier() {
+    // Same trap as the declined-parentage warning below: this label contains
+    // the word "Rule", `laterite.compat` runs with `include_fyi` ON, and
+    // python-ags4's suite asserts on the exact key set of a clean file's report.
+    // An ungated advisory would break the drop-in contract by identity.
+    let f = findings_for("rule10c_foreign_key_link.ags");
+    assert!(
+        !f.contains_key("FYI (Related to Rule 10c)"),
+        "CheckOptions::default() is errors-only: {:?}",
+        f.keys().collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn the_declined_parentage_warning_obeys_the_warning_tier() {
     // The tier flags are honoured at each emission site — there is no
     // downstream severity filter — so a warning that ignores `include_warnings`
@@ -622,6 +668,7 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
         "FYI",
         "FYI (Related to Rule 1)",
         "FYI (Related to Rule 16)",
+        "FYI (Related to Rule 10c)",
         "Warning (Related to Rule 10c)",
         "Warning (Related to Rule 18)",
         // The custom-overlay buckets (laterite-dev#568, tiered by #321). No fixture in this

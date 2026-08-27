@@ -23,16 +23,27 @@ pub use laterite_ags4_reference::catalogue::{RULE_LABELS, rule_metadata_json};
 
 /// The numbered rules that can also emit a related FYI (`"FYI (Related to Rule
 /// N)"`). Tied to the FYI emitters in `rules/line_format.rs` (Rule 1 — BOM /
-/// extended-ASCII) and `rules/groups.rs` (Rule 16 — description drift /
-/// non-standard abbreviation).
+/// extended-ASCII), `rules/groups.rs` (Rule 16 — description drift /
+/// non-standard abbreviation) and `rules/relational.rs` (Rule 10c — a KEY
+/// heading owned off the declared parent chain, #759).
 #[cfg(test)]
-const FYI_BEARING_RULES: &[&str] = &["1", "16"];
+const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 
 /// The numbered rules that can also emit a related WARNING (`"Warning (Related
 /// to Rule N)"`). Tied to `rules/groups.rs::rule_18_structure` (Rule 18 —
-/// malformed DICT, the first WARNING-tier producer).
+/// malformed DICT, the first WARNING-tier producer) and
+/// `rules/relational.rs::rule_10c` (Rule 10c — a declined parentage check,
+/// #656). 10c is redundant for the set-equality gate below, which already has
+/// it from the FYI list — it is here because this const's job is to name the
+/// WARNING emitters, and #656's went unnamed for a release.
+///
+/// Rule 14 is knowingly ABSENT and should be here: `rules/groups.rs` emits
+/// `Warning (Related to Rule 14)` for an unrecognised `TRAN_AGS` (O-44). Adding
+/// it means moving Rule 14 to `severity: "mixed"` in `rules_meta.json`, which
+/// changes what `lat rules` prints — a separate change, so it is #769 rather
+/// than something smuggled in beside 10c's.
 #[cfg(test)]
-const WARN_BEARING_RULES: &[&str] = &["18"];
+const WARN_BEARING_RULES: &[&str] = &["10c", "18"];
 
 #[cfg(test)]
 mod tests {

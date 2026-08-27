@@ -5,7 +5,7 @@ laterite is an **independent** implementation of the AGS4 rules, calibrated agai
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
 
-**21 of them change what you see.** They are not all the same kind of thing, which is why this
+**22 of them change what you see.** They are not all the same kind of thing, which is why this
 page is grouped by what actually happened rather than filed under one heading: some are deliberate
 differences from python-ags4, some are places the two agree and the *spec* is the outlier, and some are
 laterite's own false negatives that the comparison caught and closed.
@@ -54,6 +54,7 @@ same source, so a record cannot be resolved there and stay live here.
 | **O-44** | Structural validation of a file-level `DICT` group → a laterite **WARNING** (Related to Rule 18). |
 | **O-51** | A custom-dictionary **overlay** that redefines the standard schema is reported as a **WARNING** when it changes row identity (re-parent, KEY demotion) and an **FYI** otherwise. |
 | **O-52** | A child row whose parent-KEY cells are all empty gets a **WARNING** saying the parentage check was declined, rather than silently producing nothing. |
+| **O-56** | A group that keys on a heading owned outside its declared parent chain gets an **FYI** naming the group that could have been its parent. Rule 10c is structurally unable to check that link, so a reference through it can be an orphan on a file that validates clean. |
 
 !!! tip "Reading the tiers"
     Whether a difference surfaces as an **error**, **warning** or **FYI** follows

@@ -45,7 +45,7 @@
 //! implicitly-linked groups exactly as python-ags4 does — see
 //! OBSERVATIONS O-21/O-22/O-23/O-24.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::CheckOptions;
 use crate::dict::Dictionary;
@@ -59,6 +59,11 @@ const RULE_10C: &str = "AGS Format Rule 10c";
 /// is not) for the parentage check this rule DECLINES to make — see the
 /// all-empty-key arm below.
 const RULE_10C_WARN: &str = "Warning (Related to Rule 10c)";
+/// The advisory tier for a link 10c cannot ask about at all — a KEY heading
+/// owned by a group off the declared parent chain (#759). Separate from the
+/// warning above because that one is a row that DECLINED a check this rule
+/// could have made; this one is a check the rule was never able to make.
+const RULE_10C_FYI: &str = "FYI (Related to Rule 10c)";
 const RULE_11A: &str = "AGS Format Rule 11a";
 const RULE_11B: &str = "AGS Format Rule 11b";
 const RULE_11C: &str = "AGS Format Rule 11c";
@@ -170,6 +175,23 @@ impl<'a> EffectiveDict<'a> {
             .get(group)
             .map(|p| if p == "-" { String::new() } else { p.clone() })
     }
+
+    /// `group` plus every group above it on the declared `DICT_PGRP` chain.
+    ///
+    /// Cycle-guarded, because half this chain is file-authored: a DICT that
+    /// declares A's parent B and B's parent A is malformed but parses, and an
+    /// unguarded walk would spin on it forever.
+    fn ancestry(&self, group: &str) -> HashSet<String> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut cur = group.to_string();
+        while seen.insert(cur.clone()) {
+            match self.parent(&cur) {
+                Some(p) if !p.is_empty() => cur = p,
+                _ => break,
+            }
+        }
+        seen
+    }
 }
 
 /// The published 3-argument entry point, kept because `rules` is public API
@@ -208,6 +230,7 @@ pub fn check_with(
         rule_10a(g, code, &eff, found);
         rule_10b(g, code, &eff, found);
         rule_10c(parsed, g, code, &eff, opts, found, &mut parent_tuples);
+        rule_10c_unchecked_link(g, code, &eff, opts, found);
     }
 
     rule_11(parsed, found);
@@ -543,6 +566,116 @@ fn rule_10c<'p>(
     }
 }
 
+/// Rule 10c FYI — a KEY heading owned by a group that is NOT on the declared
+/// parent chain, where that group could have been the declared parent.
+///
+/// 10c asks exactly one question per group: does this row's copy of the
+/// PARENT's KEY tuple exist in the parent? A KEY heading belonging to any other
+/// group is not in that tuple, so the link it stands for is never asked about —
+/// a child can name a row that does not exist and the file validates clean
+/// (#759). AGS4 gives a group one `DICT_PGRP`, so this is not a defect in the
+/// file or in the rule: it is a link the format cannot express and the
+/// validator therefore cannot check. Hence the advisory tier — it never moves
+/// the verdict, and it is off unless the caller asks for FYI.
+///
+/// Reported ONLY where the child's KEY tuple contains the owner's WHOLE KEY
+/// tuple. Without that test the finding is a false positive, because a group
+/// that could not have been the parent is not a missed parent: `DISC` is the
+/// shipped counter-example — it keys on `FRAC_SET` but not on FRAC's
+/// `FRAC_FROM`/`FRAC_TO`, so FRAC was never a candidate and DISC stays silent.
+///
+/// Two classes are dropped, both on purpose:
+///
+/// * the [`PARENTLESS`] groups, where 10c checks NO link at all (O-21) — an
+///   advisory naming one of them would imply the rest were checked;
+/// * a KEY heading whose prefix names no group holding a KEY tuple of its own.
+///   The containment test does this one on its way past — a group with no
+///   tuple has nothing to be contained in the child's — rather than any check
+///   on the prefix itself. It is not an edge case: `SPEC_REF`/`SPEC_DPTH` are
+///   KEY across the whole lab-test family and there has never been a SPEC
+///   group, specimen identity living on the test groups themselves. Every one
+///   of those groups would otherwise carry a permanent advisory about a parent
+///   that does not exist.
+fn rule_10c_unchecked_link(
+    g: &ParsedGroup,
+    code: &str,
+    eff: &EffectiveDict<'_>,
+    opts: &CheckOptions,
+    found: &mut Findings,
+) {
+    if !opts.include_fyi || PARENTLESS.contains(&code) {
+        return;
+    }
+    // A missing or blank parent is 10c's own error to report, and leaves no
+    // declared chain for a heading to be outside of.
+    let Some(parent) = eff.parent(code).filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let ckeys = eff.key_fields(code);
+    if ckeys.is_empty() {
+        return;
+    }
+    let chain = eff.ancestry(code);
+
+    // A heading names its owner in the prefix Rule 19b's naming law gives it, so
+    // that is where the owner is read from. Whether the prefix is WELL-formed is
+    // not asked here: 19b reports a malformed one already, and the containment
+    // filter below needs the owner to be a group carrying a KEY tuple, which no
+    // malformed prefix is. A length test here would only be 19b's rule restated
+    // in bytes where 19b counts chars, and would disagree with it on both sides.
+    let mut by_owner: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for k in &ckeys {
+        let Some((owner, _)) = k.split_once('_') else {
+            continue;
+        };
+        if !chain.contains(owner) {
+            by_owner.entry(owner).or_default().push(k.as_str());
+        }
+    }
+
+    let ckeyset: HashSet<&str> = ckeys.iter().map(String::as_str).collect();
+    let candidates: Vec<(&str, Vec<&str>)> = by_owner
+        .into_iter()
+        .filter(|(owner, _)| {
+            let okeys = eff.key_fields(owner);
+            !okeys.is_empty() && okeys.iter().all(|o| ckeyset.contains(o.as_str()))
+        })
+        .collect();
+    let ancestries: Vec<HashSet<String>> =
+        candidates.iter().map(|(o, _)| eff.ancestry(o)).collect();
+
+    for (i, (owner, hdngs)) in candidates.iter().enumerate() {
+        // A candidate that is an ANCESTOR of another candidate says nothing the
+        // more specific one doesn't: LBST's unchecked LOCA link is a consequence
+        // of its unchecked SAMP link, and naming both reports one gap twice.
+        if ancestries
+            .iter()
+            .enumerate()
+            .any(|(j, a)| j != i && a.contains(*owner))
+        {
+            continue;
+        }
+        add_at(
+            found,
+            RULE_10C_FYI,
+            g.heading_line,
+            code,
+            format!(
+                "{code} keys on {}, owned by {owner}, while declaring {parent} as its \
+                 parent. Every KEY field of {owner} is present in {code}, so those \
+                 cells identify an {owner} row too — and Rule 10c checks the declared \
+                 {parent} link only, so nothing verifies that row exists.",
+                hdngs.join(", ")
+            ),
+            Location {
+                target: Target::Group,
+                ..Default::default()
+            },
+            Severity::Fyi,
+        );
+    }
+}
+
 /// Rule 11 — read `TRAN_DLIM` / `TRAN_RCON`, dispatch 11a/11b/11c.
 fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
     let Some(tran) = parsed.groups.get("TRAN") else {
@@ -774,6 +907,159 @@ mod tests {
             0,
             "4.2 keeps the 4.0.4 PMTL→PMTG parent"
         );
+    }
+
+    fn run_fyi(src: &str, v: DictVersion) -> Findings {
+        run_opts(
+            src,
+            v,
+            &CheckOptions {
+                include_fyi: true,
+                ..CheckOptions::default()
+            },
+        )
+    }
+
+    /// The AGS-L working group's TRIL shape (#759), rebuilt from its published
+    /// parentage and KEY list — no corpus data. TRIL declares TRIG, and keys on
+    /// `TRIT_TESN`, which TRIG's KEY tuple does not contain: the test-number
+    /// link is one Rule 10c can never ask about. TRIL is not a standard group,
+    /// so the file's own DICT is what defines it — the path a user-defined
+    /// group actually arrives by.
+    const TRIL_FOREIGN_KEY_FIXTURE: &str = "\"GROUP\",\"DICT\"\r\n\
+        \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+        \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+        \"DATA\",\"GROUP\",\"TRIL\",\"\",\"\",\"TRIG\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"LOCA_ID\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SAMP_TOP\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SAMP_REF\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SAMP_TYPE\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SAMP_ID\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SPEC_REF\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"SPEC_DPTH\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"TRIT_TESN\",\"KEY\",\"\"\r\n\
+        \"DATA\",\"HEADING\",\"TRIL\",\"TRIL_MNUM\",\"KEY\",\"\"\r\n\r\n\
+        \"GROUP\",\"TRIL\"\r\n\
+        \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\
+\"SPEC_REF\",\"SPEC_DPTH\",\"TRIT_TESN\",\"TRIL_MNUM\"\r\n\
+        \"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"\",\"\"\r\n\
+        \"TYPE\",\"ID\",\"2DP\",\"ID\",\"PA\",\"ID\",\"ID\",\"2DP\",\"ID\",\"ID\"\r\n\
+        \"DATA\",\"BH1\",\"1.00\",\"S1\",\"B\",\"1\",\"SP1\",\"1.00\",\"T1\",\"1\"\r\n";
+
+    #[test]
+    fn rule_10c_fyi_names_the_owner_that_could_have_been_the_parent() {
+        let f = run_fyi(TRIL_FOREIGN_KEY_FIXTURE, DictVersion::V4_2);
+        let fyi = f.get(RULE_10C_FYI).expect("the unchecked-link FYI");
+        assert_eq!(fyi.len(), 1, "one owner, one finding: {fyi:?}");
+        assert_eq!(fyi[0].group, "TRIL");
+        assert_eq!(fyi[0].severity, Severity::Fyi);
+        assert_eq!(fyi[0].location.target, Target::Group);
+        assert!(
+            fyi[0].desc.contains("TRIT_TESN") && fyi[0].desc.contains("TRIG"),
+            "must name both the foreign KEY and the declared parent: {}",
+            fyi[0].desc
+        );
+        // SPEC_REF/SPEC_DPTH are KEY here and SPEC is not a group in any
+        // edition, so the prefix filter has to swallow them — otherwise every
+        // lab-test group in the dictionary carries this finding forever.
+        assert!(!fyi[0].desc.contains("SPEC"), "{}", fyi[0].desc);
+    }
+
+    #[test]
+    fn rule_10c_fyi_is_silent_at_the_default_tier() {
+        // Advisory means advisory: `CheckOptions::default()` is errors-only, and
+        // this must not reach a caller who never asked for the FYI tier.
+        assert!(
+            !run(TRIL_FOREIGN_KEY_FIXTURE).contains_key(RULE_10C_FYI),
+            "the FYI fired without include_fyi"
+        );
+    }
+
+    #[test]
+    fn rule_10c_fyi_needs_the_whole_owner_tuple_to_be_contained() {
+        // DISC keys on FRAC_SET but not on FRAC's FRAC_FROM/FRAC_TO, so FRAC
+        // could NOT have been DISC's parent — the containment test is the whole
+        // difference between an advisory and a false positive.
+        let src = "\"GROUP\",\"DISC\"\r\n\
+            \"HEADING\",\"LOCA_ID\",\"DISC_TOP\",\"DISC_BASE\",\"FRAC_SET\",\"DISC_NUMB\"\r\n\
+            \"UNIT\",\"\",\"m\",\"m\",\"\",\"\"\r\n\
+            \"TYPE\",\"ID\",\"2DP\",\"2DP\",\"ID\",\"ID\"\r\n\
+            \"DATA\",\"BH1\",\"1.00\",\"2.00\",\"S1\",\"1\"\r\n";
+        let f = run_fyi(src, DictVersion::V4_2);
+        assert!(
+            !f.contains_key(RULE_10C_FYI),
+            "FRAC is not a candidate parent for DISC: {:?}",
+            f.get(RULE_10C_FYI)
+        );
+    }
+
+    #[test]
+    fn rule_10c_fyi_names_only_the_most_specific_owner() {
+        // LBST keys on LOCA_ID and the whole SAMP tuple while declaring LBSG,
+        // so BOTH LOCA and SAMP pass containment. LOCA is SAMP's ancestor, so
+        // reporting it too would report one gap twice.
+        let src = "\"GROUP\",\"LBST\"\r\n\
+            \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\
+\"LBSG_REF\",\"LBST_TEST\"\r\n\
+            \"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"\"\r\n\
+            \"TYPE\",\"ID\",\"2DP\",\"ID\",\"PA\",\"ID\",\"ID\",\"PA\"\r\n\
+            \"DATA\",\"BH1\",\"1.00\",\"S1\",\"B\",\"1\",\"SCH1\",\"MC\"\r\n";
+        let fyi = run_fyi(src, DictVersion::V4_2)
+            .get(RULE_10C_FYI)
+            .cloned()
+            .expect("LBST's unchecked SAMP link");
+        assert_eq!(fyi.len(), 1, "LOCA is subsumed by SAMP: {fyi:?}");
+        assert!(fyi[0].desc.contains("SAMP"), "{}", fyi[0].desc);
+        assert!(
+            !fyi[0].desc.starts_with("LBST keys on LOCA_ID,"),
+            "the LOCA finding survived: {}",
+            fyi[0].desc
+        );
+    }
+
+    #[test]
+    fn rule_10c_fyi_follows_the_edition_that_moved_pmtl() {
+        // The same three editions O-42 splits PMTL across, seen from this rule:
+        // 4.0.3 declares PMTD, so PMTD_SEQ is ON the chain and there is nothing
+        // to say; 4.1 keeps PMTD_SEQ as KEY but moves the parent to PMTG, which
+        // is exactly the shape this advisory exists for; 4.1.1 drops PMTD_SEQ
+        // from PMTL's KEY tuple, and the shape goes away with it.
+        let pmtd_advisories = |v| {
+            run_fyi(PMTL_EDITION_FIXTURE, v)
+                .get(RULE_10C_FYI)
+                .map_or(0, |f| {
+                    f.iter()
+                        .filter(|x| x.group == "PMTL" && x.desc.contains("PMTD"))
+                        .count()
+                })
+        };
+        assert_eq!(
+            pmtd_advisories(DictVersion::V4_0_3),
+            0,
+            "4.0.3 declares PMTD"
+        );
+        assert_eq!(pmtd_advisories(DictVersion::V4_1), 1, "4.1 declares PMTG");
+        assert_eq!(
+            pmtd_advisories(DictVersion::V4_2),
+            0,
+            "4.2 dropped PMTD_SEQ from PMTL's KEY tuple"
+        );
+    }
+
+    #[test]
+    fn rule_10c_fyi_survives_a_dict_declaring_a_parent_cycle() {
+        // The parent chain is half file-authored, so it can be a cycle. The walk
+        // must terminate rather than hang the validator on a malformed DICT.
+        let src = "\"GROUP\",\"DICT\"\r\n\
+            \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+            \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+            \"DATA\",\"GROUP\",\"ZZZA\",\"\",\"\",\"ZZZB\"\r\n\
+            \"DATA\",\"GROUP\",\"ZZZB\",\"\",\"\",\"ZZZA\"\r\n\
+            \"DATA\",\"HEADING\",\"ZZZA\",\"ZZZA_ID\",\"KEY\",\"\"\r\n\r\n\
+            \"GROUP\",\"ZZZA\"\r\n\"HEADING\",\"ZZZA_ID\"\r\n\"UNIT\",\"\"\r\n\
+            \"TYPE\",\"ID\"\r\n\"DATA\",\"1\"\r\n";
+        // Reaching this assertion at all is the test: an unguarded walk spins.
+        assert!(!run_fyi(src, DictVersion::V4_2).contains_key(RULE_10C_FYI));
     }
 
     #[test]
