@@ -16,7 +16,7 @@ sources: []
 # laterite-transport
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite-transport` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> [!note] **Cleared for crates.io** — `laterite-transport` v0.10.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
 > **Used by** — [[laterite-ags4-core]], [[laterite-node]].
 <!-- END GENERATED: crate-card -->
 

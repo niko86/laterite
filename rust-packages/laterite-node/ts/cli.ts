@@ -146,9 +146,11 @@ const SPECS: Record<string, Spec> = {
       "on-type-clash",
       "out",
       "tran-date",
+      "tran-description",
       "tran-issue",
       "tran-producer",
       "tran-recipient",
+      "tran-remarks",
       "tran-status",
     ],
     valued: [
@@ -158,9 +160,11 @@ const SPECS: Record<string, Spec> = {
       "on-type-clash",
       "out",
       "tran-date",
+      "tran-description",
       "tran-issue",
       "tran-producer",
       "tran-recipient",
+      "tran-remarks",
       "tran-status",
     ],
     positionals: ["<files>"],
@@ -760,11 +764,33 @@ function tranFromFlags(
   const producer = str(flags["tran-producer"]);
   const recipient = str(flags["tran-recipient"]);
   const status = str(flags["tran-status"]);
-  if (!issue && !date && !producer && !recipient && !status) return undefined;
+  // OTHER headings, so outside the all-five-or-none rule: stating one alone is
+  // not a partial stamp, it is a stamp with no ISNO — which the library still
+  // refuses, in its own words.
+  const description = str(flags["tran-description"]);
+  const remarks = str(flags["tran-remarks"]);
+  if (
+    !issue &&
+    !date &&
+    !producer &&
+    !recipient &&
+    !status &&
+    !description &&
+    !remarks
+  )
+    return undefined;
   // Deliberately NOT validated here: passing the partial object through means
   // the error text comes from the one place that owns the rule, so the CLI can
   // never disagree with the library about what a complete stamp is.
-  return { issue, date, producer, recipient, status } as TranStamp;
+  return {
+    issue,
+    date,
+    producer,
+    recipient,
+    status,
+    description,
+    remarks,
+  } as TranStamp;
 }
 
 function runMerge(p: Parsed, json: boolean): number {

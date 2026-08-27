@@ -412,3 +412,70 @@ def test_cli_merge_rejects_a_typod_mode(tmp_path, capsys):
     )
     assert code == 5
     capsys.readouterr()
+
+
+def test_a_stamp_description_and_remarks_reach_the_emitted_tran():
+    """`TranStamp.description`/`.remarks` are emitted, and remarks APPEND on merge.
+
+    Both were accepted by the dataclass and dropped on the way down: the Python
+    layer marshalled five fields, and `TranStamp::from_parts` — the one seam
+    every surface funnels through — had no parameter for either, so the engine's
+    correct `synthesise_tran` was unreachable from here (#730). `remarks`
+    contradicted its own documented behaviour outright.
+
+    The append is the part worth pinning rather than the presence: merge's
+    provenance note and the caller's remark are both true of the result, so
+    dropping either would be wrong, and *replacing* the note is the failure that
+    reads as success.
+    """
+    stamp = laterite.TranStamp(
+        "3",
+        "2026-03-05",
+        "Consultant",
+        "Client",
+        "Final",
+        description="WHAT-WAS-SENT",
+        remarks="CALLER-REMARK",
+    )
+    text = laterite.merge(_A, _B, on_type_clash="widen", tran=stamp).text
+
+    assert "WHAT-WAS-SENT" in text, "TRAN_DESC never reached the emitter"
+    assert "CALLER-REMARK" in text, "TRAN_REM never reached the emitter"
+    assert "Merged from" in text, (
+        "the caller's remark REPLACED merge's provenance note instead of being "
+        "appended to it — both are true of the merged file"
+    )
+    # Order matters: provenance first, then the caller's, in one cell.
+    tran_row = next(
+        ln
+        for ln in text.splitlines()
+        if ln.startswith('"DATA"') and "CALLER-REMARK" in ln
+    )
+    assert tran_row.index("Merged from") < tran_row.index("CALLER-REMARK")
+
+
+def test_on_build_remarks_are_verbatim_because_there_is_no_provenance_note():
+    """The append is merge-specific; `build_ags4` has nothing to append to.
+
+    Same field, same stamp, deliberately different behaviour — recorded because
+    the docstring used to state the merge rule as though it were universal.
+    """
+    import polars as pl
+
+    res = laterite.build_ags4(
+        {"PROJ": pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["Demo"]})},
+        synthesise_metadata=True,
+        tran=laterite.TranStamp(
+            "1",
+            "2026-03-05",
+            "Producer",
+            "Client",
+            "Final",
+            description="BUILD-DESC",
+            remarks="BUILD-REM",
+        ),
+    )
+    text = res.bytes.decode()
+    assert "BUILD-DESC" in text
+    assert "BUILD-REM" in text
+    assert "Merged from" not in text, "a build has no inputs to have provenance about"

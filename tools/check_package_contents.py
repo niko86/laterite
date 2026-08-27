@@ -164,6 +164,28 @@ NOT_YET_PUBLISHABLE = (
         "no matching package named `laterite",
         "depends on a sibling not yet on crates.io",
     ),
+    # The needle the FIRST post-publish version bump needed. The two above are
+    # both first-publish states: no version requirement yet, or the sibling
+    # absent from the registry entirely. Once every crate IS published, a bump
+    # produces a THIRD state — the sibling is on crates.io, just not at the
+    # version this workspace now requires — and cargo words it differently, so
+    # neither needle caught it and eight of eleven crates failed instead of
+    # skipping.
+    #
+    # That made two required gates mutually exclusive: `check_semver.py` needs
+    # the version ABOVE main's to accept a break, and this one needed it EQUAL to
+    # what is published. Between them no breaking change was landable at all.
+    #
+    # It is the same class as the two above — the wave beneath this crate is not
+    # on the registry at this version YET — so it skips, loudly, like they do.
+    # What it does NOT mask is the defect this check exists for: an `include`
+    # that drops a build-time input fails during the verification BUILD, with a
+    # compiler error, long after dependency resolution has succeeded. This needle
+    # only matches a resolution failure, which happens first and instead.
+    (
+        "candidate versions found which didn't match",
+        "the workspace is ahead of crates.io — this version's siblings publish together",
+    ),
 )
 
 

@@ -189,6 +189,46 @@ def test_merge_two_files(capsys: Any, tmp_path: Any) -> None:
     assert out_ags.exists() and out_ags.stat().st_size > 0
 
 
+def test_merge_tran_description_and_remarks_reach_the_merged_file(
+    capsys: Any, tmp_path: Any
+) -> None:
+    """``--tran-description`` / ``--tran-remarks`` on THIS launcher, not just the
+    binary.
+
+    The two are OTHER headings, so they sit outside ``_tran_from_args``'s
+    all-five-or-none rule and travel a different arm of it. The census now pins
+    that all three launchers DECLARE the flags; this pins that this one acts on
+    them, by reading the bytes it wrote.
+    """
+    out_ags = tmp_path / "stamped.ags"
+    code, _, _ = _run(
+        capsys,
+        "merge",
+        str(_CLEAN),
+        str(_CLEAN),
+        "--out",
+        str(out_ags),
+        "--tran-issue",
+        "9",
+        "--tran-date",
+        "2024-06-01",
+        "--tran-producer",
+        "Merger",
+        "--tran-recipient",
+        "Client",
+        "--tran-status",
+        "Merged",
+        "--tran-description",
+        "Combined ground investigation",
+        "--tran-remarks",
+        "Supersedes the first issue",
+    )
+    assert code == 0
+    merged = out_ags.read_text(encoding="utf-8")
+    assert "Combined ground investigation" in merged
+    assert "Supersedes the first issue" in merged
+
+
 def test_merge_revision_audit_renders_like_the_rust_binary(
     capsys: Any, tmp_path: Any
 ) -> None:

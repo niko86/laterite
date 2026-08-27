@@ -218,3 +218,62 @@ fn merge_rejects_a_partial_tran_stamp_naming_the_missing_flags() {
     );
     assert!(!out.exists(), "nothing should be written on a usage error");
 }
+
+/// `--tran-description` / `--tran-remarks` reach the emitted TRAN row.
+///
+/// The five REQUIRED flags were already end-to-end; these two are OTHER, arrive
+/// through a different arm of the stamp seam, and nothing spawned the binary with
+/// them. The assertion is on the merged BYTES — the only thing a CLI user gets —
+/// not on any intermediate the binary happens to build.
+#[test]
+fn merge_carries_description_and_remarks_into_the_emitted_tran() {
+    let d = scratch();
+    let (a, b, out) = (d.join("a4.ags"), d.join("b4.ags"), d.join("stamped.ags"));
+    std::fs::write(&a, A).unwrap();
+    std::fs::write(&b, B).unwrap();
+    let o = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(["merge"])
+        .args([&a, &b])
+        .arg("--out")
+        .arg(&out)
+        .args([
+            "--on-type-clash",
+            "widen",
+            "--tran-issue",
+            "7",
+            "--tran-date",
+            "2024-05-01",
+            "--tran-producer",
+            "Merger",
+            "--tran-recipient",
+            "Client",
+            "--tran-status",
+            "Merged",
+            "--tran-description",
+            "Combined ground investigation",
+            "--tran-remarks",
+            "Second issue supersedes the first",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        o.status.success(),
+        "stamped merge succeeds: {}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let merged = String::from_utf8(std::fs::read(&out).unwrap()).unwrap();
+    assert!(
+        merged.contains("Combined ground investigation"),
+        "TRAN_DESC reached the file: {merged}"
+    );
+    // On a merge, remarks are APPENDED to the provenance note rather than
+    // replacing it — so both the caller's text and the inputs' ISNOs survive.
+    assert!(
+        merged.contains("Second issue supersedes the first"),
+        "TRAN_REM reached the file: {merged}"
+    );
+    assert!(
+        merged.contains("TRAN_DESC") && merged.contains("TRAN_REM"),
+        "both headings are declared: {merged}"
+    );
+}

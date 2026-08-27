@@ -1969,8 +1969,12 @@ class TranStamp:
     description: str | None = None
     """``TRAN_DESC`` — what was transferred. Optional."""
     remarks: str | None = None
-    """``TRAN_REM`` — free remarks. Optional. On a merge these are appended to
-    the provenance note rather than replacing it."""
+    """``TRAN_REM`` — free remarks. Optional.
+
+    On a **merge** these are appended to the provenance note rather than
+    replacing it — both are true of the result, so both are written. On
+    **build** there is no provenance note to append to (that concept only
+    exists where inputs were reconciled), so this is ``TRAN_REM`` verbatim."""
 
 
 class BuildResult:
@@ -2386,6 +2390,8 @@ def build_ags4(
         tran.producer if tran else None,
         tran.recipient if tran else None,
         tran.status if tran else None,
+        tran.description if tran else None,
+        tran.remarks if tran else None,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
@@ -2806,6 +2812,8 @@ def merge(
         tran_producer=tran.producer if tran else None,
         tran_recipient=tran.recipient if tran else None,
         tran_status=tran.status if tran else None,
+        tran_description=tran.description if tran else None,
+        tran_remarks=tran.remarks if tran else None,
     )
     r = raise_for(r)
     return MergeResult(

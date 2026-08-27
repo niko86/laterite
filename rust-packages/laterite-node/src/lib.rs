@@ -799,8 +799,11 @@ pub struct TranInput {
 
 impl TranInput {
     /// Fold to the shared type. Policy lives in `TranStamp::from_parts` — all
-    /// five or none — so Node cannot answer "is this enough" differently from
-    /// the CLI, Python or the browser.
+    /// five or none, with `description`/`remarks` outside that rule — so Node
+    /// cannot answer "is this enough" differently from the CLI, Python or the
+    /// browser. The two optionals used to be applied HERE, after the fold, which
+    /// worked and meant the seam was not the single owner it claims to be: the
+    /// surfaces that did not repeat the trick silently dropped them (#730).
     fn fold(self) -> Result<Option<laterite_ags4_emit::TranStamp>> {
         let stamp = laterite_ags4_emit::TranStamp::from_parts(
             self.issue,
@@ -808,18 +811,11 @@ impl TranInput {
             self.producer,
             self.recipient,
             self.status,
+            self.description,
+            self.remarks,
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
-        Ok(stamp.map(|s| {
-            let s = match self.description {
-                Some(d) => s.with_description(d),
-                None => s,
-            };
-            match self.remarks {
-                Some(r) => s.with_remarks(r),
-                None => s,
-            }
-        }))
+        Ok(stamp)
     }
 }
 

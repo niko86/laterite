@@ -583,6 +583,40 @@ describe("cli (in-process): merge", () => {
     }
   });
 
+  it("--tran-description / --tran-remarks reach the merged bytes", () => {
+    // OTHER headings, so outside tranFromFlags' all-five-or-none rule and down a
+    // different arm of it. The census pins that this launcher DECLARES the two
+    // flags; this pins that it acts on them, by reading what it wrote.
+    const out = join(tmp(), "stamped.ags");
+    const { code } = runCli([
+      "merge",
+      MERGE_A,
+      MERGE_B,
+      "--out",
+      out,
+      "--on-type-clash",
+      "promote",
+      "--tran-issue",
+      "9",
+      "--tran-date",
+      "2024-06-01",
+      "--tran-producer",
+      "Merger",
+      "--tran-recipient",
+      "Client",
+      "--tran-status",
+      "Merged",
+      "--tran-description",
+      "Combined ground investigation",
+      "--tran-remarks",
+      "Supersedes the first issue",
+    ]);
+    expect(code).toBe(0);
+    const merged = readFileSync(out, "utf8");
+    expect(merged).toContain("Combined ground investigation");
+    expect(merged).toContain("Supersedes the first issue");
+  });
+
   it("a TYPE clash under the default (error) mode → exit 6", () => {
     const out = join(tmp(), "merged.ags");
     expect(runCli(["merge", MERGE_A, MERGE_B, "--out", out]).code).toBe(6);

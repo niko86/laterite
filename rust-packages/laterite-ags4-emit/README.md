@@ -37,7 +37,7 @@ bytes rather than each having its own writer that drifts.
 cargo add laterite-ags4-emit
 ```
 
-Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+Currently v0.10.0 — the engine crates move in lockstep on the workspace version.
 <!-- END GENERATED: availability -->
 
 ## What it takes care of

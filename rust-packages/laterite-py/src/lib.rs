@@ -725,6 +725,8 @@ fn merge_core(
         Option<&str>,
         Option<&str>,
         Option<&str>,
+        Option<&str>,
+        Option<&str>,
     ),
 ) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
     use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
@@ -771,13 +773,15 @@ fn merge_core(
 
     // All five or none — the shared rule. `ags` is merge's to fill from the
     // edition it resolved; a caller-stated value could only contradict it.
-    let (isno, date, prod, recv, stat) = tran;
+    let (isno, date, prod, recv, stat, desc, rem) = tran;
     let tran = TranStamp::from_parts(
         isno.map(str::to_string),
         date.map(str::to_string),
         prod.map(str::to_string),
         recv.map(str::to_string),
         stat.map(str::to_string),
+        desc.map(str::to_string),
+        rem.map(str::to_string),
     )
     .map_err(|e| (5, "bad_args".to_string(), e.to_string()))?;
 
@@ -818,7 +822,7 @@ fn merge_core(
 /// warnings_json, revisions_json}` — the Python layer parses the two JSON
 /// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
-#[pyo3(signature = (files, on_type_clash="error", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
+#[pyo3(signature = (files, on_type_clash="error", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -833,6 +837,8 @@ fn merge_files<'py>(
     tran_producer: Option<String>,
     tran_recipient: Option<String>,
     tran_status: Option<String>,
+    tran_description: Option<String>,
+    tran_remarks: Option<String>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let tran = (
         tran_issue.as_deref(),
@@ -840,6 +846,8 @@ fn merge_files<'py>(
         tran_producer.as_deref(),
         tran_recipient.as_deref(),
         tran_status.as_deref(),
+        tran_description.as_deref(),
+        tran_remarks.as_deref(),
     );
     match merge_core(
         &files,

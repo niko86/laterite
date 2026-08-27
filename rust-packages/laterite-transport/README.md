@@ -33,7 +33,7 @@ that never touch the filesystem.
 cargo add laterite-transport
 ```
 
-Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+Currently v0.10.0 — the engine crates move in lockstep on the workspace version.
 <!-- END GENERATED: availability -->
 
 ## Content-agnostic on purpose

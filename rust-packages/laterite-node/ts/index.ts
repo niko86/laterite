@@ -278,8 +278,9 @@ export interface TranStamp {
   status: string;
   /** `TRAN_DESC` — what was transferred. Optional. */
   description?: string;
-  /** `TRAN_REM` — free remarks. Optional. On a merge these are appended to the
-   *  provenance note, not substituted for it. */
+  /** `TRAN_REM` — free remarks. Optional. On a MERGE these are appended to the
+   *  provenance note, not substituted for it. On a BUILD there is no provenance
+   *  note to append to, so this is `TRAN_REM` verbatim. */
   remarks?: string;
 }
 

@@ -153,12 +153,23 @@ impl TranStamp {
     /// `Err` carries the names of the missing fields: a caller who supplied four
     /// of five made a mistake and should be told which, not handed a silent
     /// `None` that reads identically to "I meant not to stamp one".
+    ///
+    /// `desc` and `rem` are deliberately OUTSIDE the all-five-or-none rule.
+    /// That rule exists because `TRAN_ISNO`/`DATE`/`PROD`/`RECV`/`STAT` are
+    /// REQUIRED headings; `TRAN_DESC` and `TRAN_REM` are OTHER, so a stamp with
+    /// five parts and no description is complete, and folding them in would
+    /// make the optional mandatory. They do not get to be silent either: a
+    /// caller who states only a description has stated a partial transmission,
+    /// and gets the same `Err` naming the five it lacks rather than a `None`
+    /// that discards what they wrote.
     pub fn from_parts(
         isno: Option<String>,
         date: Option<String>,
         prod: Option<String>,
         recv: Option<String>,
         stat: Option<String>,
+        desc: Option<String>,
+        rem: Option<String>,
     ) -> Result<Option<TranStamp>, TranStampError> {
         let parts = [
             ("issue", &isno),
@@ -172,15 +183,30 @@ impl TranStamp {
             .filter(|(_, v)| v.as_ref().is_none_or(|s| s.trim().is_empty()))
             .map(|(n, _)| *n)
             .collect();
+        let stated = |v: &Option<String>| v.as_ref().is_some_and(|s| !s.trim().is_empty());
+        let optionals_stated = stated(&desc) || stated(&rem);
         match missing.len() {
-            5 => Ok(None), // nothing stated: no TRAN, and Rule 14 reports the gap
-            0 => Ok(Some(TranStamp::new(
-                isno.unwrap(),
-                date.unwrap(),
-                prod.unwrap(),
-                recv.unwrap(),
-                stat.unwrap(),
-            ))),
+            // Nothing stated at all: no TRAN, and Rule 14 reports the gap. But a
+            // description or remark with no transmission behind it is a partial
+            // stamp, not an absent one — returning `None` there would drop what
+            // the caller wrote and look identical to not asking.
+            5 if !optionals_stated => Ok(None),
+            0 => {
+                let mut stamp = TranStamp::new(
+                    isno.unwrap(),
+                    date.unwrap(),
+                    prod.unwrap(),
+                    recv.unwrap(),
+                    stat.unwrap(),
+                );
+                if stated(&desc) {
+                    stamp = stamp.with_description(desc.unwrap());
+                }
+                if stated(&rem) {
+                    stamp = stamp.with_remarks(rem.unwrap());
+                }
+                Ok(Some(stamp))
+            }
             _ => Err(TranStampError {
                 missing: missing.iter().map(|s| (*s).to_string()).collect(),
             }),
@@ -892,12 +918,14 @@ mod tests {
     /// stamp a TRAN" both produced a file, one of them silently wrong.
     #[test]
     fn a_partial_stamp_is_an_error_but_an_empty_one_is_simply_no_tran() {
-        let none = TranStamp::from_parts(None, None, None, None, None).unwrap();
+        let none = TranStamp::from_parts(None, None, None, None, None, None, None).unwrap();
         assert!(none.is_none(), "nothing stated means no TRAN, not an error");
 
         let err = TranStamp::from_parts(
             Some("1".into()),
             Some("2026-07-30".into()),
+            None,
+            None,
             None,
             None,
             None,
@@ -919,9 +947,72 @@ mod tests {
             Some("   ".into()),
             Some("r".into()),
             Some("s".into()),
+            None,
+            None,
         )
         .unwrap_err();
         assert_eq!(blank.missing, ["producer"]);
+    }
+
+    /// `desc`/`rem` reach the stamp through the boundary adapter, stay outside
+    /// the all-five rule, and cannot be stated on their own.
+    ///
+    /// They had no parameter here at all, so every surface that did not repeat
+    /// the `with_description`/`with_remarks` trick after the fold dropped them
+    /// silently — which was Python on both merge and build, and the CLI, which
+    /// had no flags for them either (#730). The seam claimed to be the single
+    /// owner of stamp policy; it now is.
+    #[test]
+    fn description_and_remarks_cross_the_boundary_without_joining_the_five() {
+        let five = || {
+            (
+                Some("1".to_string()),
+                Some("2026-07-30".to_string()),
+                Some("p".to_string()),
+                Some("r".to_string()),
+                Some("s".to_string()),
+            )
+        };
+        let (i, d, p, r, st) = five();
+        let stamp = TranStamp::from_parts(i, d, p, r, st, Some("DESC".into()), Some("REM".into()))
+            .unwrap()
+            .expect("five parts is a stamp");
+        assert_eq!(stamp.desc.as_deref(), Some("DESC"));
+        assert_eq!(stamp.rem.as_deref(), Some("REM"));
+
+        // Optional means optional: five parts and neither of these is complete.
+        let (i, d, p, r, st) = five();
+        let bare = TranStamp::from_parts(i, d, p, r, st, None, None)
+            .unwrap()
+            .expect("five parts is still a stamp without them");
+        assert_eq!(bare.desc, None);
+        assert_eq!(bare.rem, None);
+
+        // Whitespace is not a value here either — consistent with the five.
+        let (i, d, p, r, st) = five();
+        let blankish =
+            TranStamp::from_parts(i, d, p, r, st, Some("  ".into()), Some(String::new()))
+                .unwrap()
+                .unwrap();
+        assert_eq!(blankish.desc, None, "whitespace is not a description");
+        assert_eq!(blankish.rem, None, "empty is not a remark");
+
+        // A description with no transmission behind it is a PARTIAL stamp, not
+        // an absent one. Returning None would discard what the caller wrote and
+        // read identically to not asking for a TRAN at all.
+        let err = TranStamp::from_parts(None, None, None, None, None, Some("DESC".into()), None)
+            .unwrap_err();
+        assert_eq!(
+            err.missing,
+            ["issue", "date", "producer", "recipient", "status"]
+        );
+
+        // ...but nothing stated anywhere is still simply no TRAN.
+        assert!(
+            TranStamp::from_parts(None, None, None, None, None, None, None)
+                .unwrap()
+                .is_none()
+        );
     }
 
     /// Every distinct value lands in its own heading, and the three derivable

@@ -40,7 +40,7 @@ rejects them is a parser nobody can use to find out *why* they are wrong.
 cargo add laterite-ags4-parse
 ```
 
-Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+Currently v0.10.0 — the engine crates move in lockstep on the workspace version.
 <!-- END GENERATED: availability -->
 
 ## What is source-true about it

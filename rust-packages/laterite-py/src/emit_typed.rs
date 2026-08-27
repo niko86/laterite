@@ -65,7 +65,7 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// returns) `AutoFix` made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
+#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 pub fn emit_ags4_from_arrow(
@@ -89,6 +89,8 @@ pub fn emit_ags4_from_arrow(
     tran_producer: Option<String>,
     tran_recipient: Option<String>,
     tran_status: Option<String>,
+    tran_description: Option<String>,
+    tran_remarks: Option<String>,
 ) -> PyResult<(Py<PyBytes>, String, Bound<'_, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
@@ -99,6 +101,8 @@ pub fn emit_ags4_from_arrow(
             tran_producer,
             tran_recipient,
             tran_status,
+            tran_description,
+            tran_remarks,
         )
         .map_err(|e| PyValueError::new_err(e.to_string()))?,
         synthesise_metadata,

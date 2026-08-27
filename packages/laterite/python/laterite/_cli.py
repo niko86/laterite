@@ -500,6 +500,11 @@ def _tran_from_args(args: argparse.Namespace) -> TranStamp | None:
     CLI flags are irreducibly five independent optionals, so the flattening has
     to happen somewhere. Doing it here — and refusing a partial set with the
     library's own vocabulary — keeps "all five or none" answered in one place.
+
+    ``description``/``remarks`` are OTHER, not REQUIRED, so they sit outside that
+    rule: they do not count toward the five, and stating one on its own is not a
+    partial stamp — it is a stamp with no ISNO, which the five-way check below
+    still refuses.
     """
     parts = {
         "issue": args.tran_issue,
@@ -508,8 +513,13 @@ def _tran_from_args(args: argparse.Namespace) -> TranStamp | None:
         "recipient": args.tran_recipient,
         "status": args.tran_status,
     }
+    optional = {
+        "description": args.tran_description,
+        "remarks": args.tran_remarks,
+    }
+    stated_optional = any((v or "").strip() for v in optional.values())
     missing = [k for k, v in parts.items() if not (v or "").strip()]
-    if len(missing) == 5:
+    if len(missing) == 5 and not stated_optional:
         return None  # nothing stated: no merge-TRAN, and that is reported
     if missing:
         raise SystemExit(
@@ -522,6 +532,7 @@ def _tran_from_args(args: argparse.Namespace) -> TranStamp | None:
         )
     from . import TranStamp as _TranStamp
 
+    parts.update({k: v for k, v in optional.items() if (v or "").strip()})
     return _TranStamp(**parts)
 
 
@@ -1010,6 +1021,8 @@ def _build_parser() -> argparse.ArgumentParser:
     pm.add_argument("--tran-producer", dest="tran_producer")
     pm.add_argument("--tran-recipient", dest="tran_recipient")
     pm.add_argument("--tran-status", dest="tran_status")
+    pm.add_argument("--tran-description", dest="tran_description")
+    pm.add_argument("--tran-remarks", dest="tran_remarks")
 
     pc = sub.add_parser("certify", add_help=False, parents=[gp, dp])
     pc.add_argument("file")

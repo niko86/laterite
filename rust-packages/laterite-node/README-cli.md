@@ -113,12 +113,16 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                                   nDP (2DP + 5DP -> 5DP), zero-padding the coarser
                                   values (10.00 -> 10.00000). Never rounds, never
                                   demotes; nSF/nSCI fall back to widen
-    --tran-issue <ISNO>   stamp a synthesised merge-TRAN (with --tran-date; records
-                          the inputs' ISNOs/dates in TRAN_REM for provenance)
+    --tran-issue <ISNO>   stamp a synthesised merge-TRAN (needs all five --tran-*
+                          below; records the inputs' ISNOs/dates in TRAN_REM for
+                          provenance)
     --tran-date <DATE>    the merge-TRAN production date (yyyy-mm-dd)
     --tran-producer <NAME>    TRAN_PROD for the merge-TRAN
     --tran-recipient <NAME>   TRAN_RECV for the merge-TRAN
     --tran-status <STATUS>    TRAN_STAT for the merge-TRAN
+    --tran-description <TEXT> TRAN_DESC — what was transferred (optional)
+    --tran-remarks <TEXT>     TRAN_REM — appended to the provenance note, not
+                              substituted for it (optional)
 
 ## certify <file>
 

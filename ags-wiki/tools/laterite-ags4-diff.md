@@ -16,7 +16,7 @@ sources: []
 # laterite-ags4-diff
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite-ags4-diff` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> [!note] **Cleared for crates.io** — `laterite-ags4-diff` v0.10.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
 > **Used by** — [[laterite]], [[laterite-ags4-wasm]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 
