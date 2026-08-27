@@ -324,8 +324,8 @@
     {
       "rule": "14",
       "title": "TRAN Group Presence and Row Count",
-      "checks": "Checks that the file contains a TRAN (transaction) group with exactly one DATA row. A finding means TRAN is missing or has zero/multiple data rows. To fix: add a TRAN group with a single transaction record, or reduce it to one row.",
-      "severity": "error",
+      "checks": "Checks that the file contains a TRAN (transaction) group with exactly one DATA row. A finding means TRAN is missing or has zero/multiple data rows. To fix: add a TRAN group with a single transaction record, or reduce it to one row. With --show-warnings, also flags a TRAN_AGS that is present but not a recognised dictionary edition — the rule is satisfied, but the file was judged against a fallback dictionary its author never declared.",
+      "severity": "mixed",
       "fixable": false,
       "observations": [
         {
