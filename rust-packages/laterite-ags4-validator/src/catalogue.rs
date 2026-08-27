@@ -31,19 +31,22 @@ const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 
 /// The numbered rules that can also emit a related WARNING (`"Warning (Related
 /// to Rule N)"`). Tied to `rules/groups.rs::rule_18_structure` (Rule 18 —
-/// malformed DICT, the first WARNING-tier producer) and
+/// malformed DICT, the first WARNING-tier producer),
 /// `rules/relational.rs::rule_10c` (Rule 10c — a declined parentage check,
-/// #656). 10c is redundant for the set-equality gate below, which already has
-/// it from the FYI list — it is here because this const's job is to name the
-/// WARNING emitters, and #656's went unnamed for a release.
+/// #656), and `rules/groups.rs::tran_ags_unrecognised` (Rule 14 — a `TRAN_AGS`
+/// that is present but not a recognised edition, so the file was judged against
+/// a fallback dictionary its author never declared; O-45). 10c is redundant for
+/// the set-equality gate below, which already has it from the FYI list — it is
+/// here because this const's job is to name the WARNING emitters, and #656's
+/// went unnamed for a release.
 ///
-/// Rule 14 is knowingly ABSENT and should be here: `rules/groups.rs` emits
-/// `Warning (Related to Rule 14)` for an unrecognised `TRAN_AGS` (O-44). Adding
-/// it means moving Rule 14 to `severity: "mixed"` in `rules_meta.json`, which
-/// changes what `lat rules` prints — a separate change, so it is #769 rather
-/// than something smuggled in beside 10c's.
+/// That gate compares this list to `rules_meta.json` and cannot see a rule
+/// missing from BOTH sides: Rule 14 emitted its warning for a release while
+/// declared `severity: "error"`, and the two hand-written lists agreed with each
+/// other throughout (#769). `tests/regression.rs::rule_labels_inventory_is_grounded_against_real_emissions`
+/// is the shape that would ground these against what the engine actually emits.
 #[cfg(test)]
-const WARN_BEARING_RULES: &[&str] = &["10c", "18"];
+const WARN_BEARING_RULES: &[&str] = &["10c", "14", "18"];
 
 #[cfg(test)]
 mod tests {
