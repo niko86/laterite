@@ -724,7 +724,11 @@ O-N below is an internal decision or behavioural note, not for external circulat
   whole tuple and named the grandparent), and where it does not — `LBST`, whose
   SAMP link is as real as its LBSG one — the format needs a way to say so.
 - **Our decision** (#759): emit `FYI (Related to Rule 10c)`, once per group per
-  candidate owner, naming the group that could have been declared. Gated on
+  candidate owner, naming the group whose link goes unchecked. It does not
+  say the declared parent is the wrong one: for `PMTL` the tighter
+  parentage was available and 4.0.3 used it, but `LBST`'s LBSG link is as
+  real as its SAMP one, and calling either a mistake would be the finding
+  overreaching what it can see. Gated on
   `include_fyi`, never an error, never a verdict. Two classes are dropped
   deliberately: the PARENTLESS groups, where 10c checks NO link ([[O-21]]) and
   an advisory naming one of them would imply the rest were checked; and a

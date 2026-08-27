@@ -588,12 +588,14 @@ fn rule_10c<'p>(
 ///
 /// * the [`PARENTLESS`] groups, where 10c checks NO link at all (O-21) — an
 ///   advisory naming one of them would imply the rest were checked;
-/// * a heading whose 4-letter prefix names no group in the effective
-///   dictionary. Not an edge case: `SPEC_REF`/`SPEC_DPTH` are KEY across the
-///   whole lab-test family and there has never been a SPEC group — specimen
-///   identity lives on the test groups themselves. Without this filter every
-///   one of those groups would carry a permanent advisory about a parent that
-///   does not exist.
+/// * a KEY heading whose prefix names no group holding a KEY tuple of its own.
+///   The containment test does this one on its way past — a group with no
+///   tuple has nothing to be contained in the child's — rather than any check
+///   on the prefix itself. It is not an edge case: `SPEC_REF`/`SPEC_DPTH` are
+///   KEY across the whole lab-test family and there has never been a SPEC
+///   group, specimen identity living on the test groups themselves. Every one
+///   of those groups would otherwise carry a permanent advisory about a parent
+///   that does not exist.
 fn rule_10c_unchecked_link(
     g: &ParsedGroup,
     code: &str,
@@ -615,15 +617,18 @@ fn rule_10c_unchecked_link(
     }
     let chain = eff.ancestry(code);
 
-    // A heading's owner is its 4-letter prefix — Rule 19b's naming law, which
-    // 19b itself enforces, so a heading that isn't that shape is already
-    // someone else's finding and not this rule's to guess at.
+    // A heading names its owner in the prefix Rule 19b's naming law gives it, so
+    // that is where the owner is read from. Whether the prefix is WELL-formed is
+    // not asked here: 19b reports a malformed one already, and the containment
+    // filter below needs the owner to be a group carrying a KEY tuple, which no
+    // malformed prefix is. A length test here would only be 19b's rule restated
+    // in bytes where 19b counts chars, and would disagree with it on both sides.
     let mut by_owner: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for k in &ckeys {
         let Some((owner, _)) = k.split_once('_') else {
             continue;
         };
-        if owner.len() == 4 && !chain.contains(owner) {
+        if !chain.contains(owner) {
             by_owner.entry(owner).or_default().push(k.as_str());
         }
     }
@@ -656,10 +661,10 @@ fn rule_10c_unchecked_link(
             g.heading_line,
             code,
             format!(
-                "{code} keys on {} but declares {parent} as its parent. Every KEY \
-                 field of {owner} is present in {code}, so {owner} could have been \
-                 declared instead; Rule 10c checks the {parent} link only, and the \
-                 {owner} link is never checked.",
+                "{code} keys on {}, owned by {owner}, while declaring {parent} as its \
+                 parent. Every KEY field of {owner} is present in {code}, so those \
+                 cells identify an {owner} row too — and Rule 10c checks the declared \
+                 {parent} link only, so nothing verifies that row exists.",
                 hdngs.join(", ")
             ),
             Location {
@@ -1006,7 +1011,7 @@ mod tests {
         assert_eq!(fyi.len(), 1, "LOCA is subsumed by SAMP: {fyi:?}");
         assert!(fyi[0].desc.contains("SAMP"), "{}", fyi[0].desc);
         assert!(
-            !fyi[0].desc.starts_with("LBST keys on LOCA_ID but"),
+            !fyi[0].desc.starts_with("LBST keys on LOCA_ID,"),
             "the LOCA finding survived: {}",
             fyi[0].desc
         );

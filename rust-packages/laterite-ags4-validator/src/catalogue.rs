@@ -33,7 +33,9 @@ const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 /// to Rule N)"`). Tied to `rules/groups.rs::rule_18_structure` (Rule 18 —
 /// malformed DICT, the first WARNING-tier producer) and
 /// `rules/relational.rs::rule_10c` (Rule 10c — a declined parentage check,
-/// #656).
+/// #656). 10c is redundant for the set-equality gate below, which already has
+/// it from the FYI list — it is here because this const's job is to name the
+/// WARNING emitters, and #656's went unnamed for a release.
 ///
 /// Rule 14 is knowingly ABSENT and should be here: `rules/groups.rs` emits
 /// `Warning (Related to Rule 14)` for an unrecognised `TRAN_AGS` (O-44). Adding
@@ -41,7 +43,7 @@ const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 /// changes what `lat rules` prints — a separate change, so it is #769 rather
 /// than something smuggled in beside 10c's.
 #[cfg(test)]
-const WARN_BEARING_RULES: &[&str] = &["18", "10c"];
+const WARN_BEARING_RULES: &[&str] = &["10c", "18"];
 
 #[cfg(test)]
 mod tests {

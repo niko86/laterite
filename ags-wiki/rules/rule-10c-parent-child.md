@@ -11,7 +11,7 @@ divergences: [O-21, O-24, O-39, O-42, O-51, O-52, O-56]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs"
-  fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule10c_foreign_key_link.ags"
+  fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule10c_orphan_child.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule10c_orphan_child_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 10c"
 related: [rule-families, traceability-chain, parity-model, O-52, O-56]
@@ -49,8 +49,13 @@ flowchart LR
   R["Rule 10c"] --> I["relational.rs"] --> F["tests/fixtures/rule10c_*.ags"] --> T["tests/regression.rs::rule10c_*"] --> O["O-21 · O-39 · O-52 · O-56"]
 ```
 
-- Fixtures: `rule10c_orphan_child.ags` · `rule10c_standalone_child.ags` · `rule10c_foreign_key_link.ags`
-- Regression: `rule10c_orphan_child_flagged` · `rule10c_standalone_child_is_warned_about_not_silently_skipped` · `rule10c_reports_the_link_it_cannot_ask_about`, each paired with a tier test asserting the non-error label stays off at `CheckOptions::default()`
+- Fixtures: `repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule10c_orphan_child.ags` ·
+  `repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule10c_standalone_child.ags` ·
+  `repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule10c_foreign_key_link.ags`
+- Regression: `repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule10c_orphan_child_flagged` ·
+  `repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule10c_standalone_child_is_warned_about_not_silently_skipped` ·
+  `repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule10c_reports_the_link_it_cannot_ask_about`
+- Each non-error label also has a tier test asserting it stays off at `CheckOptions::default()`.
 
 ## Variations
 > [!note] **Rule prose is frozen across editions.** The 4.2 Foreword states the AGS 4 Rules are unchanged and live in §4.1.1 (`spec:AGS4-4.2-2025.pdf §4.1.1`). So a rule's *spec text* does not vary 4.0.3→4.2 — cross-edition variation enters via the **Data Dictionary** (groups/types this rule operates over) and via **implementation/interpretation** (the Rust↔python axis, wired from Phase B/C as `[[O-NN]]`).
