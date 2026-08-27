@@ -156,9 +156,25 @@ mod tests {
         rust_check(&p).0
     }
 
-    /// THE SAFETY NET: the un-injected synthetic base must be
-    /// `RustResult::Clean` for **every seed** — the generator is varied,
-    /// so this asserts variety never breaks clean-by-construction. A
+    /// The one label a clean synthetic base cannot avoid: `Wide` carries the
+    /// standard LBST group, whose KEY tuple contains SAMP's while it declares
+    /// LBSG, so `FYI (Related to Rule 10c)` fires on the DICTIONARY's shape
+    /// rather than on anything the generator did (#759 / O-56). Named here
+    /// rather than relaxing the net to "no errors", because the net's job is
+    /// that EVERY other finding is a generator bug.
+    const DICTIONARY_SHAPE_ADVISORY: &str = "FYI (Related to Rule 10c)";
+
+    fn clean_by_construction(r: &RustResult) -> bool {
+        match r {
+            RustResult::Clean => true,
+            RustResult::Rules(s) => s.iter().all(|k| k == DICTIONARY_SHAPE_ADVISORY),
+            _ => false,
+        }
+    }
+
+    /// THE SAFETY NET: the un-injected synthetic base must carry nothing but
+    /// the dictionary-shape advisory above, for **every seed** — the generator
+    /// is varied, so this asserts variety never breaks clean-by-construction. A
     /// generator bug fails *here*, never as a reported "finding".
     #[test]
     fn varied_baseline_is_rust_clean_across_seeds() {
@@ -166,11 +182,30 @@ mod tests {
             for sc in [Scaffold::Minimal, Scaffold::LocaSamp, Scaffold::Wide] {
                 let r = rust_on(&synth(sc, seed));
                 assert!(
-                    matches!(r, RustResult::Clean),
+                    clean_by_construction(&r),
                     "{sc:?} seed {seed} not clean in Rust: {r:?}"
                 );
             }
         }
+    }
+
+    /// The carve-out above is a hole in the net, so it is held to its exact
+    /// size: `Wide` must ACTUALLY carry the advisory (otherwise the allowance
+    /// is dead and hiding a future finding), and `Minimal` — which has no LBST
+    /// — must still be `Clean` outright.
+    #[test]
+    fn the_dictionary_shape_advisory_is_the_only_hole_in_the_net() {
+        let wide = rust_on(&synth(Scaffold::Wide, 0));
+        assert_eq!(
+            wide,
+            RustResult::Rules(
+                [DICTIONARY_SHAPE_ADVISORY.to_string()]
+                    .into_iter()
+                    .collect()
+            ),
+            "Wide should carry the LBST advisory and nothing else"
+        );
+        assert_eq!(rust_on(&synth(Scaffold::Minimal, 0)), RustResult::Clean);
     }
 
     /// A single-rule injection yields exactly the targeted rule (the

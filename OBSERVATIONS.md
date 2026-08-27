@@ -51,6 +51,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 | O-39 | SPEC | Rule 10c — empty parent KEYs are "no entry", not a missing link |
 | O-42 | VARIANCE | TRAN_AGS="4.0" resolves to 4.0.4 (superset-safe), with a content guard; python's static "4.0"→4.0.3 over-reports Rule 10c |
 | O-52 | VARIANCE | A DECLINED Rule 10c parentage check is reported — an all-empty parent-KEY child row produces a WARNING naming what could not be checked; python-ags4's silence there is a coincidence of its UNIT/TYPE pseudo-rows, not a decision |
+| O-56 | SPEC | A KEY heading owned outside the declared parent chain is a link Rule 10c cannot ask about — reported as an FYI where the owner could have been the parent |
 | O-49 | VARIANCE | A numeric TYPE's count (the n in nDP/nSF/nSCI) is read uncapped from the file and fed into a format width — a crafted "9999999999SF" OOMs python-ags4 (~10 GB string); laterite now clamps to 30 |
 
 ## V1 — line-level rules (Rules 1, 3, 5, 6)
@@ -678,6 +679,63 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Assessment**: declining to check and checking-and-finding-nothing are different answers, and a report that renders them identically is answering a question it did not ask. This is a laterite-originated check: python-ags4 cannot have an equivalent, because it never knows it declined anything.
 - **Upstream-reportable**: **[BUG]** — python-ags4's Rule 10c merge includes the UNIT/TYPE pseudo-rows on both sides. That is benign for a well-formed file, where the coincidence lines up, but a parent group whose UNIT row carries a value in a KEY column — legal, and no other rule objects — turns the child's own UNIT row into a reported orphan. Worth filing: the merge should exclude the pseudo-rows and decide the empty-key case deliberately, whichever way they choose.
 - **Our decision** (#656): emit the warning; leave the skip and the verdict untouched. It is a new laterite-only rule key, so it shows as a rust-only label wherever dual validation runs with warnings on — forge does, corpus-qa's default validate stage does not — and `classify` reconciles it to this record rather than filing it as an action — expected, and [[O-39]] is the record of why the two engines agree on the verdict there anyway.
+
+### O-56 [SPEC] A KEY heading owned outside the declared parent chain is a link Rule 10c cannot ask about — reported as an FYI where the owner could have been the parent
+- **Observed** (#759): Rule 10c builds its lookup key from the **declared**
+  parent's KEY tuple, so a KEY heading owned by any other group is not part of
+  the question it asks. A child can carry a reference through such a heading to
+  a row that does not exist and the file validates clean. Demonstrated on the
+  AGS-L working group's `TRIL`, which declares `DICT_PGRP = TRIG` and keys on
+  `TRIT_TESN`: orphan one row's test number and the file passes as issued,
+  reports Rule 10c if `TRIT` is declared instead, and passes again with `TRIT`
+  declared and the number un-orphaned — the third arm being the control, since
+  the same data satisfies the tighter parentage and so does not force the looser
+  declaration. The shipped dictionary has the shape too, and it moves between
+  editions: `LBST` declares `LBSG` while keying on the whole `SAMP` tuple in
+  every edition, and `PMTL` declares `PMTG` while keying on `PMTD_SEQ` in 4.0.4
+  and 4.1 — 4.0.3 declared `PMTD` (see [[O-42]]) and 4.1.1 dropped `PMTD_SEQ`
+  from PMTL's KEY tuple.
+- **Spec** (`spec:AGS4-4.2-2025.pdf §4.1.1 Rule 10c`): *"Every entry made in the
+  KEY fields in any GROUP must have an equivalent entry in its PARENT GROUP."*
+  Singular, and a group carries one `DICT_PGRP` ([[O-55]]) — the rule is written
+  against that one link. The spec does not address a KEY heading whose owning
+  group is not that parent; Rule 11's Record Link is the mechanism it offers for
+  a link *"outside of the defined hierarchy"*, and it is a heading TYPE, not
+  something a KEY heading acquires by being present.
+- **python-ags4** (`check.py::rule_10c`): asks the identical single-parent
+  question — it merges the child onto its declared parent on that parent's KEY
+  fields — and agrees with laterite on all three arms of the `TRIL`
+  demonstration. Nothing there has this condition as its subject.
+- **Assessment**: not a validator defect on either side; both apply 10c as
+  written. It is a class of mistake the FORMAT cannot express, and since the
+  shipped dictionary contains instances of the shape, any check has to be
+  advisory rather than an error — the same footing [[O-18]] put Rule 18a on,
+  catalogued and unapplied by decision. What keeps it from being a
+  false-positive generator is a containment test: a foreign KEY heading only
+  makes its owner a candidate parent where the child's KEY tuple contains the
+  owner's WHOLE tuple. `DISC` is the counter-example that forces it — it keys on
+  `FRAC_SET` but not on FRAC's `FRAC_FROM`/`FRAC_TO`, so FRAC could not have
+  been its parent and DISC stays silent.
+- **Upstream-reportable**: **[SPEC]** — the AGS dictionary itself ships groups
+  whose KEY tuple carries a heading owned outside their declared parent chain,
+  and AGS4 gives a group one parent, so no validator can check the second link.
+  Worth putting to the DFWG both ways round: where the KEY tuple allows the
+  tighter parentage the dictionary could declare it (`PMTL` contained PMTD's
+  whole tuple and named the grandparent), and where it does not — `LBST`, whose
+  SAMP link is as real as its LBSG one — the format needs a way to say so.
+- **Our decision** (#759): emit `FYI (Related to Rule 10c)`, once per group per
+  candidate owner, naming the group that could have been declared. Gated on
+  `include_fyi`, never an error, never a verdict. Two classes are dropped
+  deliberately: the PARENTLESS groups, where 10c checks NO link ([[O-21]]) and
+  an advisory naming one of them would imply the rest were checked; and a
+  heading whose 4-letter prefix names no group in the effective dictionary —
+  `SPEC_REF`/`SPEC_DPTH` are KEY across the lab-test family and there has never
+  been a SPEC group behind them. A candidate that is an ancestor of another
+  candidate is dropped too, so LBST's unchecked SAMP link is reported once
+  rather than once per generation. It is a new laterite-only rule key, so it
+  shows as a rust-only label wherever dual validation runs with FYI on — forge
+  does, and so does `laterite.compat` — and `classify` reconciles it to this
+  record rather than filing it as an action.
 
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 

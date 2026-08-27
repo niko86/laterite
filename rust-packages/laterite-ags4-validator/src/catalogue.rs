@@ -23,16 +23,25 @@ pub use laterite_ags4_reference::catalogue::{RULE_LABELS, rule_metadata_json};
 
 /// The numbered rules that can also emit a related FYI (`"FYI (Related to Rule
 /// N)"`). Tied to the FYI emitters in `rules/line_format.rs` (Rule 1 — BOM /
-/// extended-ASCII) and `rules/groups.rs` (Rule 16 — description drift /
-/// non-standard abbreviation).
+/// extended-ASCII), `rules/groups.rs` (Rule 16 — description drift /
+/// non-standard abbreviation) and `rules/relational.rs` (Rule 10c — a KEY
+/// heading owned off the declared parent chain, #759).
 #[cfg(test)]
-const FYI_BEARING_RULES: &[&str] = &["1", "16"];
+const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 
 /// The numbered rules that can also emit a related WARNING (`"Warning (Related
 /// to Rule N)"`). Tied to `rules/groups.rs::rule_18_structure` (Rule 18 —
-/// malformed DICT, the first WARNING-tier producer).
+/// malformed DICT, the first WARNING-tier producer) and
+/// `rules/relational.rs::rule_10c` (Rule 10c — a declined parentage check,
+/// #656).
+///
+/// Rule 14 is knowingly ABSENT and should be here: `rules/groups.rs` emits
+/// `Warning (Related to Rule 14)` for an unrecognised `TRAN_AGS` (O-44). Adding
+/// it means moving Rule 14 to `severity: "mixed"` in `rules_meta.json`, which
+/// changes what `lat rules` prints — a separate change, tracked as its own
+/// issue rather than smuggled in beside 10c's.
 #[cfg(test)]
-const WARN_BEARING_RULES: &[&str] = &["18"];
+const WARN_BEARING_RULES: &[&str] = &["18", "10c"];
 
 #[cfg(test)]
 mod tests {
