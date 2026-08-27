@@ -38,8 +38,8 @@ const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
 /// Rule 14 is knowingly ABSENT and should be here: `rules/groups.rs` emits
 /// `Warning (Related to Rule 14)` for an unrecognised `TRAN_AGS` (O-44). Adding
 /// it means moving Rule 14 to `severity: "mixed"` in `rules_meta.json`, which
-/// changes what `lat rules` prints — a separate change, tracked as its own
-/// issue rather than smuggled in beside 10c's.
+/// changes what `lat rules` prints — a separate change, so it is #769 rather
+/// than something smuggled in beside 10c's.
 #[cfg(test)]
 const WARN_BEARING_RULES: &[&str] = &["18", "10c"];
 
