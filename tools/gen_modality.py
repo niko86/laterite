@@ -348,6 +348,29 @@ def summary(doc: dict) -> str:
     return "\n".join(lines)
 
 
+def uncovered(doc: dict) -> list[str]:
+    """(capability, surface) pairs with NO cell at all — the register's blind spot.
+
+    Every guard over this register reads the cells that exist. `--check` holds the
+    page against the JSON, and a missing cell renders faithfully as nothing, so
+    both agree while both omit the same row; `test_register_well_formed` iterates
+    `cap["cells"]`, so an absent one is never visited. Ten cells were missing when
+    #771 found them by reading, not by any run going red.
+
+    This is a REPORT, not the assertion. The assertion — every capability has a
+    cell for every surface — cannot land while `build`, `censor`, `emit`,
+    `read_typed` and `read-output-view` have no settled CLI verdict; it belongs in
+    the change that records those. Until then the absences are at least counted
+    on every run, rather than being a blind spot with a green tick on it.
+    """
+    surfaces = [s["id"] for s in doc["surfaces"]]
+    out: list[str] = []
+    for cap in doc["capabilities"]:
+        have = {c["surface"] for c in cap["cells"]}
+        out.extend(f"{cap['capability']}/{sid}" for sid in surfaces if sid not in have)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -372,6 +395,7 @@ def main() -> None:
                 f"`uv run --no-sync python tools/gen_modality.py`."
             )
         print(f"gen_modality: {PAGE.relative_to(REPO)} matches {JSON.name}")
+        _report_uncovered(doc)
         return
 
     PAGE.write_text(out, encoding="utf-8")
@@ -380,6 +404,21 @@ def main() -> None:
     )
     print(
         f"rendered {len(doc['capabilities'])} capabilities / {n_gaps} findings -> {PAGE.relative_to(REPO)}"
+    )
+    _report_uncovered(doc)
+
+
+def _report_uncovered(doc: dict) -> None:
+    """Say what this generator does not look at, on every run, pass or fail."""
+    missing = uncovered(doc)
+    total = len(doc["capabilities"]) * len(doc["surfaces"])
+    if not missing:
+        print(f"gen_modality: all {total} (capability, surface) pairs carry a cell")
+        return
+    print(
+        f"gen_modality: {len(missing)} of {total} (capability, surface) pairs have NO "
+        f"cell, so nothing here or in test_register_well_formed reads them: "
+        + ", ".join(missing)
     )
 
 

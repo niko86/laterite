@@ -28,7 +28,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 - **🔴 P1** (0): —
 - **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
 - **🟡 P3** (4): read/rust (in.file-like); validate/rust (in.file-like); read_typed/node (out.handle); read-output-view/python (out.table)
-- **⚪ by-design** (12): intentional absences, rationale in each cell below.
+- **⚪ by-design** (17): intentional absences, rationale in each cell below.
 
 ## Excluded axes
 
@@ -113,7 +113,7 @@ _Notes:_
 
 ### fix — Mechanically repair AGS4.
 
-*Offered anywhere — in: bytes, file-like, path, text · out: bytes, file, value*
+*Offered anywhere — in: bytes, file-like, path, text · out: bytes, file, stdout, value*
 
 **Input**
 
@@ -123,22 +123,28 @@ _Notes:_
 | node (free) | ✓ | ✓ | ✓ |   |
 | browser (free) |   |   | ✓ |   |
 | rust (chained) | ✓ | ✓ | ✓ |   |
+| cli (free) | ✓ |   | — |   |
 | duckdb (n/a) | — | — | — | — |
 
 **Output**
 
-| surface (spelling) | file | bytes | value |
-|---|---|---|---|
-| python (free) | ✓ |   | ✓ |
-| node (free) | ✓ |   | ✓ |
-| browser (free) |   | ✓ | ✓ |
-| rust (chained) | ✓ |   | ✓ |
-| duckdb (n/a) | — | — | — |
+| surface (spelling) | file | bytes | value | stdout |
+|---|---|---|---|---|
+| python (free) | ✓ |   | ✓ |   |
+| node (free) | ✓ |   | ✓ |   |
+| browser (free) |   | ✓ | ✓ |   |
+| rust (chained) | ✓ |   | ✓ |   |
+| cli (free) | ✓ |   | ✓ | ✓ |
+| duckdb (n/a) | — | — | — |   |
+
+_Findings:_
+- ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat fix takes an input path and writes an output file; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
 
 _Notes:_
 - _node_: #394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices).
 - _browser_: the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect.
 - _rust_: Added 2026-08-05 (phase 4c of dec-facade-parity). One builder over the three source doors, ending at `Fixed` — the value form. The file form is `to_path`, and in-place is the source path named as the destination rather than a separate flag: there is nothing a flag would express that the path does not. Rule selection (`only`/`exclude`) speaks the same short labels as python and node, read from the engine via `fixable_rules()` so a new fix cannot leave the list behind.
+- _cli_: writes a sibling by default; `--in-place` overwrites the source and `--fix-out <path>` names the destination, so the destructive form is opt-in rather than the default. `--json` puts the machine-readable report of what was repaired on stdout.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
@@ -174,7 +180,7 @@ _Notes:_
 
 ### diff — Compare two AGS4 revisions.
 
-*Offered anywhere — in: bytes, file-like, handle, path, text · out: value*
+*Offered anywhere — in: bytes, file-like, handle, path, text · out: stdout, value*
 
 **Input**
 
@@ -184,21 +190,25 @@ _Notes:_
 | node (free) | ✓ |   | ✓ | — | ✓ |
 | browser (free) |   |   | ✓ |   |   |
 | rust (chained) | ✓ |   | ✓ |   | ✓ |
+| cli (free) | ✓ |   | — |   |   |
 
 **Output**
 
-| surface (spelling) | value |
-|---|---|
-| python (free) | ✓ |
-| node (free) | ✓ |
-| browser (free) | ✓ |
-| rust (chained) | ✓ |
+| surface (spelling) | value | stdout |
+|---|---|---|
+| python (free) | ✓ |   |
+| node (free) | ✓ |   |
+| browser (free) | ✓ |   |
+| rust (chained) | ✓ |   |
+| cli (free) | ✓ | ✓ |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; DiffSource is string|Uint8Array|Ags4File.
+- ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat diff takes an input path and writes its delta to stdout; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
 
 _Notes:_
 - _rust_: Added 2026-08-06 (phase 4d of dec-facade-parity). The value form is a typed `Delta` of first-party handles, not the engine's `Serialize` structs — the same rule that made `Cell` its own enum. NOTE the handle door compares each document AS IT STANDS, edits included, by re-emitting it: python's handle form resolves to `Ags4File.bytes` (the re-emit) for the same reason, and diffing the file on disk instead would silently ignore an edit. One asymmetry worth knowing about the shared engine: a group present on only one side is reported whole via `groups_added`/`groups_removed` and its rows do NOT reach the totals, so summing them is the wrong way to ask whether anything changed.
+- _cli_: both sides are paths and the delta goes to stdout — there is no file output form here, unlike the other four CLI verbs in this table.
 
 ### merge — Reconcile N AGS4 deliveries of one project into one file.
 
@@ -374,6 +384,7 @@ _Notes:_
 | node (free) | ✓ |   | ✓ |   |
 | browser (free) |   |   | ✓ |   |
 | rust (absent) |   |   |   |   |
+| cli (free) | ✓ |   | — |   |
 | duckdb (n/a) | — | — | — | — |
 
 **Output**
@@ -384,12 +395,17 @@ _Notes:_
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
 | rust (absent) |   |   |
+| cli (free) | ✓ |   |
 | duckdb (n/a) | — | — |
+
+_Findings:_
+- ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat excel takes an input path and writes an output file; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
 
 _Notes:_
 - _python_: to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered.
 - _node_: #391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel.
 - _rust_: Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.
+- _cli_: one subcommand carries both directions: the direction is inferred from the OUTPUT extension (`.xlsx` ⇒ export), overridable with `--export`. So this cell and from_excel/cli describe the same `lat excel` verb read two ways, not two subcommands.
 - _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
 ### from_excel — Convert an AGS4-shaped .xlsx back to AGS4.
@@ -406,6 +422,7 @@ _Notes:_
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
 | rust (absent) |   |   |
+| cli (free) | ✓ | — |
 | duckdb (n/a) | — | — |
 
 **Output**
@@ -416,14 +433,17 @@ _Notes:_
 | node (free) | ✓ | ✓ | — |
 | browser (free) |   | ✓ |   |
 | rust (absent) |   |   |   |
+| cli (free) | ✓ |   |   |
 | duckdb (n/a) | — | — | — |
 
 _Findings:_
 - ⚪ by-design · **node** out.handle — Node fromExcel(bytes) returns the AGS4 Buffer, not an Ags4File; the handle is one read() away (read(fromExcel(bytes))) — the Node idiom, where read IS the handle constructor. Python returns the handle directly as a convenience.
+- ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat excel takes an input path and writes an output file; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
 
 _Notes:_
 - _python_: from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first.
 - _rust_: Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.
+- _cli_: the import half of the same `lat excel` verb — `.ags` output ⇒ import, overridable with `--import`. `--no-format-numeric` leaves numeric-looking columns as text.
 - _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
 ### transport-pack — zstd-only compress/decompress (pack/unpack).
@@ -437,6 +457,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | rust (chained) | ✓ | ✓ |
+| cli (free) | ✓ | — |
 | duckdb (n/a) | — | — |
 
 **Output**
@@ -446,11 +467,16 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | rust (chained) | ✓ | ✓ |
+| cli (free) | ✓ |   |
 | duckdb (n/a) | — | — |
+
+_Findings:_
+- ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat pack/unpack takes an input path and writes an output file; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
 - _rust_: Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.
+- _cli_: declared four lines from `lock`/`unlock` in the same `#[cfg(feature = "transport")]` block and identical in posture — which is why this cell being absent while transport-lock's was present was an omission rather than a judgement (#771).
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
