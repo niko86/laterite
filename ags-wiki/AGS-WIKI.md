@@ -82,6 +82,25 @@ would drift from it, which is the very failure both rules are about.
 
 Paths are repo-root-relative, forward-slash, no backslashes.
 
+**A `spec:` citation on a `> [!quote]` block asserts the words are the spec's,
+and no gate here can check that.** The check needs the published PDFs, which are
+copyright AGS, not redistributable, and deliberately absent from this tree — so
+nothing in CI reads them and nothing ever will. A wrong quotation therefore looks
+exactly like a right one, indefinitely, and the callout that means "these are the
+spec's words" is visually identical to the ones that mean "here is where this is
+implemented".
+
+The check itself is cheap for anyone holding local copies: normalise both sides
+to alphanumerics, lowercased, and ask whether the quoted text is a **substring**
+of the clause. Verbatim passes; a compression cannot. Run it against every
+edition, not just the newest — a page may legitimately quote an older one.
+
+The consequence to state plainly, because a green wiki-lint does not: **quoted
+spec text is only ever as good as the last manual pass.** #756 is what this note
+is for — five pages had silently compressed their clause, three of them dropping
+a normative "shall", and the convention had been honoured on every other page for
+months while those five sat unread.
+
 ## 2. Directory & naming
 
 ```
