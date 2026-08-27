@@ -90,11 +90,44 @@ jobs:
       # index.md. The `generated:` date stamp is normalised out, so it can't
       # redden merely for running on a later calendar day.
       #
-      # These four `--check` steps ARE the faithfulness enforcement on this
-      # repo. There is no root `tests/` here (the wheel's suite lives under
-      # packages/laterite/tests), so nothing else compares a generated page to
-      # its SSOT: if a step is dropped, that generator silently stops being
-      # generated and the page freezes at whatever it last said.
+      # WHY THE NEXT FOUR STEPS RUN HERE is the paragraph above and nothing else:
+      # they are stdlib-only, so a wiki-only PR — which skips ci.yml's
+      # wheel-building python job — still gets them. (The gates further down carry
+      # their own rationale; this block covers reindex, gen_wiki_cli,
+      # gen_reference_groups and gen_crate_graph.)
+      #
+      # This used to add "there is no root `tests/` here … so nothing else
+      # compares a generated page to its SSOT". Both halves were false (#760).
+      # There IS a root `tests/`, and `repo-gates` runs it on every PR — that job
+      # has no paths filter at all, which ci.yml states three times — so its
+      # `repo-truth gates (buildless subset)` step fires on wiki-only PRs too.
+      # ci.yml even narrates correcting this exact belief once already, in a
+      # comment about the same directory: the correction was made where it was
+      # noticed and not where else the belief lived.
+      #
+      # An editor weighing "is this step redundant?" needs the per-generator
+      # answer rather than a blanket claim in either direction, so:
+      #
+      #   reindex.py            index.md == render(vault)      no second reader
+      #   gen_wiki_cli.py       verb table == README-cli.md    no second reader
+      #       — tests/test_wiki_cli_verbs.py pins a DIFFERENT link in that chain,
+      #         README-cli.md against cli::SUBCOMMANDS, not the table against
+      #         README-cli.md, so it does not stand in for this splice
+      #   gen_reference_groups  groups/*.md == the dictionary  no second reader
+      #       — its docstring once named one that has never existed in this repo;
+      #         tests/test_self_named_gates.py exists because of that line
+      #   gen_crate_graph       page + cards + README blocks   PARTLY covered
+      #       — tests/test_crate_graph_faithful.py re-checks the card regions and
+      #         the README availability blocks, but NOT crate-dependency-graph.md
+      #         itself, which this step alone reads
+      #
+      # So reindex, gen_wiki_cli and gen_reference_groups are each the only thing
+      # between their generator and a frozen page, and gen_crate_graph still is
+      # for one of its three targets. Drop any of them and something freezes
+      # silently; the crate-graph one just freezes less. The overlap on the cards
+      # and READMEs is two readers with two failure modes rather than a mistake,
+      # and is recorded here rather than resolved — removing either is a decision,
+      # not a tidy-up.
       - name: reindex --check (index.md == render(the vault))
         run: uv run --no-project python ags-wiki/.bootstrap/reindex.py --check
 
