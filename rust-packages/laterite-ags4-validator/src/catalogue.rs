@@ -10,7 +10,7 @@
 //! The metadata is embedded with `include_str!`, so the `--list-rules --json`
 //! passthrough pays **zero runtime parse**; only the human table parses it once
 //! on that one-shot informational command. The faithfulness gate
-//! ([`tests`]) asserts the metadata covers EXACTLY [`RULE_LABELS`] (so no
+//! (`tests`) asserts the metadata covers EXACTLY [`RULE_LABELS`] (so no
 //! phantom rules like a no-op "12" or a non-existent "16a" can creep in) and
 //! that `fixable` matches the fix engine ([`crate::fixes::FIXABLE_RULE_LABELS`]).
 //!

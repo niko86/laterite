@@ -200,7 +200,7 @@ pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGr
 ///   cert recorded only a redeclared group's first section.
 /// * the [`ValidationStamp`] records, per severity tier, whether the tier was
 ///   actually **measured** ([`TierCoverage`]) — v1 wrote `warnings: 0` whether it had
-///   looked or not — carries the [`EngineFingerprint`] of the engine that produced the
+///   looked or not — carries the `EngineFingerprint` of the engine that produced the
 ///   verdict rather than a hand-bumped semver, and has **no `check_files` field at
 ///   all**, because the on-disk `FILE/` tree is not a property of the certified bytes
 ///   and no certificate may speak for it.
@@ -216,7 +216,7 @@ pub const SIDECAR_VERSION: u32 = 2;
 /// `laterite_ags4_validator` rule engine, so a clean verdict is portable: a cert
 /// minted by one door (Python, Node, the CLI, wasm) is trusted by another. The
 /// *string* is trust-inert provenance — real trust gates on the
-/// [`EngineFingerprint`] and the tier coverage — so unifying it removes an
+/// `EngineFingerprint` and the tier coverage — so unifying it removes an
 /// accidental per-binding silo without weakening any real trust boundary.
 ///
 /// The DuckDB extension is **not** in that list: it is read-only and mints

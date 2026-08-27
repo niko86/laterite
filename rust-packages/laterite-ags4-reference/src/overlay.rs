@@ -114,7 +114,7 @@ pub enum DictFormat {
 /// How the base edition for an overlay is chosen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BaseSpec {
-    /// Detect structurally from the dictionary itself ([`detect_base`]).
+    /// Detect structurally from the dictionary itself (`detect_base`).
     Auto,
     /// Caller forced a base edition (`--dict-version`).
     Force(DictVersion),

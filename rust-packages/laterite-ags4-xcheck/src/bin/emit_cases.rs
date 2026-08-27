@@ -1,3 +1,15 @@
+// The clap `#[arg]` doc comments below are BOTH rustdoc and the CLI's help
+// text, and they name their placeholders the way a CLI must — `<path>`,
+// `<dir>`, `<run-id>`. rustdoc reads those as unclosed HTML tags. Every
+// markdown-level fix (backticks, `\<path\>`) leaks straight into `--help`,
+// and this crate's help text is mirrored byte-identically into README-cli.md
+// and gated, so a rustdoc warning would be paid for in user-facing output.
+//
+// Allowed rather than fixed because the trade is one-sided HERE and nowhere
+// else: `publish = false`, so no docs.rs reader exists to be misled. The
+// published crates stay strict — #748's `cargo doc` gate is workspace-wide and
+// this is the only class exempted from it.
+#![allow(rustdoc::invalid_html_tags)]
 //! `emit-cases` — the AUTHORITY leg of the cross-surface OUTPUT-VALUE gate
 //! (plan `output/output-value-gate-plan.md` §2).
 //!

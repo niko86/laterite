@@ -2,7 +2,7 @@
 //! word-parts so the variety is combinatorial (hundreds–thousands of
 //! distinct outputs), not a short fixed list; dates are sampled in a
 //! plausible range. All draws go through the shared deterministic
-//! [`Rng`](laterite_ags4_parity::Rng), so a seed → byte-identical output.
+//! [`Rng`], so a seed → byte-identical output.
 
 use laterite_ags4_parity::Rng;
 

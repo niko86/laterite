@@ -690,6 +690,25 @@ jobs:
         # --all-targets lints tests/benches/examples too, not just lib/bin code.
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # Nothing ran `cargo doc` at all until #748, so rustdoc warnings
+      # accumulated silently and indefinitely — 62 of them across 14 crates by
+      # the time anyone looked, the substantive class being public documentation
+      # on PUBLISHED crates linking to private items, which resolve to nothing
+      # on docs.rs. `cargo public-api` reads rustdoc's JSON for the API-snapshot
+      # gate and does not care about its warnings, so it was never the guard it
+      # looked like.
+      #
+      # --all-features because a doc comment behind a cfg is exactly the kind
+      # that rots unseen. The four `publish = false` CLI/QA crates carry a
+      # justified crate-root allow for `invalid_html_tags`: their doc comments
+      # are also clap help text, where `<path>` is correct and any markdown fix
+      # leaks into gated user-facing output.
+      - name: cargo doc (rustdoc warnings are errors)
+        working-directory: rust-packages
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --all-features
+
       # The shared parse leaf (#168) becomes a wasm dependency of the browser
       # validator from Phase 3 on. Build it for wasm32 NOW so a
       # wasm-incompatible change (name-allowlist ≠ wasm-compilability — memchr's

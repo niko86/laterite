@@ -9,7 +9,7 @@
 //!
 //! [`Dictionary`] is a lifetime-parametric enum (laterite-dev#568): `Bundled` is the
 //! zero-cost `&'static` phf handle used everywhere today; `Layered` overlays
-//! a runtime-owned [`OwnedDelta`](crate::overlay::OwnedDelta) (a custom `--dict`)
+//! a runtime-owned [`OwnedDelta`] (a custom `--dict`)
 //! on a bundled base, consulting the tiny delta first and falling through to the
 //! phf base. The enum stays `Copy` (both arms are refs/statics), so every existing
 //! by-value `Dictionary` site is unaffected. Lookups return small `Copy` view

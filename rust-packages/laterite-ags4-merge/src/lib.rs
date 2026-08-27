@@ -53,7 +53,7 @@ use serde_json::Value;
 /// What to do when two files declare a different AGS TYPE for the same heading.
 ///
 /// The three modes trade *type information* against *byte fidelity*, and they sit
-/// in that order — see [`merged_type`] for the lattice itself.
+/// in that order — see `merged_type` for the lattice itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TypeClashMode {
     /// Refuse. Reconciling two independent producers' declared types is
@@ -245,7 +245,7 @@ pub enum MergeError {
         types: Vec<String>,
     },
     /// Two files declare different (non-empty) UNITs for one heading. Fatal in
-    /// EVERY mode, unlike [`MergeError::TypeConflict`] — see [`merged_unit`] for
+    /// EVERY mode, unlike [`MergeError::TypeConflict`] — see `merged_unit` for
     /// why there is no lenient path (no absorber exists, and picking one silently
     /// mislabels the other file's values).
     UnitConflict {
