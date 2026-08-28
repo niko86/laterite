@@ -66,6 +66,7 @@ not what the gate runs, because a revision is not what any consumer installed.
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 import tomllib
@@ -93,6 +94,19 @@ def tree_version(crate: str) -> str:
     return ws["workspace"]["package"]["version"]
 
 
+# `cargo info` writes `version:` in bold green when colour is on, and CI sets
+# CARGO_TERM_COLOR=always at the job level — so the field label arrives wrapped in
+# escapes and a plain `startswith` never matches it. Stripped rather than
+# suppressed: an inherited TERM or a future default could turn colour back on, and
+# a parser that only works when someone remembered to disable it is the same bug
+# waiting.
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+# cargo's own wording for a crate the registry does not have. Matching it is what
+# separates "never published" from "could not ask" — see `published_version`.
+_NOT_IN_REGISTRY = re.compile(r"could not find `[^`]+` in registry")
+
+
 def published_version(crate: str) -> str | None:
     """The version crates.io serves for `crate`, or None if it has never published.
 
@@ -104,6 +118,15 @@ def published_version(crate: str) -> str | None:
     inside `rust-packages/` these crate names also name workspace members, and a
     lookup that could resolve to the member would report the tree's own number as
     though the registry served it.
+
+    **None means "the registry does not have this crate", and nothing else.** Any
+    other failure — a network fault, a subcommand that is not there, output this
+    cannot parse — raises. The first cut returned None for all of them, and the
+    difference is not cosmetic: `None` routes a crate into the ABSENT bucket,
+    which is a claim that there is no prior API to break. Under CI's forced colour
+    every one of the eleven took that path and the run reported eleven crates as
+    never published, all of which are on crates.io. Only the "nothing checkable"
+    guard turned that into a failure rather than a green vacuous pass.
     """
     proc = subprocess.run(
         ["cargo", "info", crate],
@@ -111,9 +134,23 @@ def published_version(crate: str) -> str | None:
         text=True,
         cwd=REPO,
     )
+    stderr = _ANSI.sub("", proc.stderr)
     if proc.returncode != 0:
-        return None
-    for line in proc.stdout.splitlines():
+        if _NOT_IN_REGISTRY.search(stderr):
+            return None
+        die(f"cannot ask the registry about {crate}:\n{stderr.strip()}")
+    found = version_in(proc.stdout)
+    if found is None:
+        die(
+            f"`cargo info {crate}` succeeded but printed no version line — refusing "
+            f"to guess whether it is published:\n{proc.stdout.strip()}"
+        )
+    return found
+
+
+def version_in(stdout: str) -> str | None:
+    """The `version:` field out of `cargo info` output, colour or no colour."""
+    for line in _ANSI.sub("", stdout).splitlines():
         if line.startswith("version:"):
             return line.split(":", 1)[1].strip()
     return None

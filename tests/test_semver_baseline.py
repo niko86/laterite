@@ -47,6 +47,7 @@ def _load():
 _GATE = _load()
 classify = _GATE.classify
 tree_version = _GATE.tree_version
+version_in = _GATE.version_in
 PUBLISH_SET = _GATE.PUBLISH_SET
 
 
@@ -110,3 +111,33 @@ def test_tree_version_resolves_workspace_inheritance() -> None:
         "these ever match it is a coincidence, and this test should be re-aimed "
         "at the manifests rather than deleted"
     )
+
+
+def test_the_version_is_read_through_cargos_colour_codes() -> None:
+    """CI sets `CARGO_TERM_COLOR: always`, and this is what that does to the field.
+
+    Captured from a real `cargo info` run under forced colour, not hand-written.
+    A plain `startswith("version:")` misses it entirely — which is how the first
+    cut of this gate reported all eleven published crates as never published, in
+    CI only, while passing locally.
+    """
+    coloured = (
+        "laterite-ags4-core #ags #ags4\n"
+        "DuckDB-free pure-string core modules for the AGS4 toolchain\n"
+        "\x1b[1m\x1b[92mversion:\x1b[0m 0.9.0\n"
+        "\x1b[1m\x1b[92mrust-version:\x1b[0m 1.85\n"
+    )
+    assert version_in(coloured) == "0.9.0"
+    # rust-version must not be mistaken for it, coloured or not.
+    assert version_in("rust-version: 1.85\n") is None
+
+
+def test_output_with_no_version_line_is_not_read_as_a_version() -> None:
+    """`None` here routes into a `die`, never into the ABSENT bucket.
+
+    Conflating the two is the defect this pair of tests exists to hold shut: a
+    crate reported ABSENT is a claim that there is no prior API to break, and an
+    unparseable answer is not evidence for that claim.
+    """
+    assert version_in("") is None
+    assert version_in("error: something else entirely\n") is None
