@@ -22,6 +22,27 @@ impl core::marker::Unpin for laterite_ags4_core::ags4_codec::DuplicateHeadings
 impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::DuplicateHeadings
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::DuplicateHeadings
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub enum laterite_ags4_core::ags4_codec::ExcessFields
+pub laterite_ags4_core::ags4_codec::ExcessFields::Error
+pub laterite_ags4_core::ags4_codec::ExcessFields::Truncate
+impl core::clone::Clone for laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::clone(&self) -> laterite_ags4_core::ags4_codec::ExcessFields
+impl core::cmp::Eq for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::eq(&self, &laterite_ags4_core::ags4_codec::ExcessFields) -> bool
+impl core::default::Default for laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::default() -> laterite_ags4_core::ags4_codec::ExcessFields
+impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::StructuralPartialEq for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::Freeze for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::Send for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::Sync for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::Unpin for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::ExcessFields
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::ExcessFields
 pub struct laterite_ags4_core::ags4_codec::AgsGroup
 pub laterite_ags4_core::ags4_codec::AgsGroup::code: alloc::string::String
 pub laterite_ags4_core::ags4_codec::AgsGroup::headings: alloc::vec::Vec<alloc::string::String>
@@ -57,6 +78,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec:
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::ParsedAgs4
 pub struct laterite_ags4_core::ags4_codec::ReadOptions
 pub laterite_ags4_core::ags4_codec::ReadOptions::duplicate_headings: laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub laterite_ags4_core::ags4_codec::ReadOptions::excess_fields: laterite_ags4_core::ags4_codec::ExcessFields
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ReadOptions
 pub fn laterite_ags4_core::ags4_codec::ReadOptions::clone(&self) -> laterite_ags4_core::ags4_codec::ReadOptions
 impl core::default::Default for laterite_ags4_core::ags4_codec::ReadOptions
@@ -80,6 +102,11 @@ pub enum laterite_ags4_core::error::CliError
 pub laterite_ags4_core::error::CliError::DuplicateHeading
 pub laterite_ags4_core::error::CliError::DuplicateHeading::group: alloc::string::String
 pub laterite_ags4_core::error::CliError::DuplicateHeading::heading: alloc::string::String
+pub laterite_ags4_core::error::CliError::ExcessFields
+pub laterite_ags4_core::error::CliError::ExcessFields::declared: usize
+pub laterite_ags4_core::error::CliError::ExcessFields::found: usize
+pub laterite_ags4_core::error::CliError::ExcessFields::group: alloc::string::String
+pub laterite_ags4_core::error::CliError::ExcessFields::line: u32
 pub laterite_ags4_core::error::CliError::FileNotFound(alloc::string::String)
 pub laterite_ags4_core::error::CliError::Schema(alloc::string::String)
 impl laterite_ags4_core::error::CliError
@@ -424,6 +451,7 @@ pub const laterite_ags4_core::index::SIDECAR_VERSION: u32
 pub fn laterite_ags4_core::index::group_index_from_parsed(&laterite_ags4_parse::ParsedFile) -> core::result::Result<laterite_ags4_core::index::GroupIndex, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::index_ags4_bytes(&[u8]) -> core::result::Result<laterite_ags4_core::index::GroupIndex, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::parse_group_slice(&[u8], laterite_ags4_core::index::Range, &str) -> core::result::Result<laterite_ags4_core::ags4_codec::AgsGroup, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::parse_group_slice_with(&[u8], laterite_ags4_core::index::Range, &str, laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_core::ags4_codec::AgsGroup, laterite_ags4_core::error::CliError>
 pub type laterite_ags4_core::index::Range = (u64, u64)
 pub mod laterite_ags4_core::keychain
 pub use laterite_ags4_core::keychain::<<laterite_ags4_reference::keychain::*>>
