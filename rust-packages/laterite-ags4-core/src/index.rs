@@ -202,8 +202,7 @@ pub fn parse_group_slice_with(
             bytes.len()
         ))
     })?;
-    let mut parsed =
-        read_ags4_bytes_with(slice, opts).map_err(|e| rebase_line(e, bytes, from))?;
+    let mut parsed = read_ags4_bytes_with(slice, opts).map_err(|e| rebase_line(e, bytes, from))?;
     parsed
         .groups
         .remove(code)
