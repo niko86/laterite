@@ -17,6 +17,7 @@ manifest changes and the page does not.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -229,9 +230,13 @@ def test_the_card_and_the_readme_cannot_disagree() -> None:
     """One computation, two renderings — the point of factoring `distribution()`.
 
     Half the audited defects lived outside `ags-wiki/`. If the wiki card and the
-    shipped README derived their facts separately they could state different
-    versions for the same crate, which is the drift this whole change exists to
+    shipped README derived their facts separately they could contradict each
+    other about the same crate, which is the drift this whole change exists to
     remove.
+
+    This used to assert both stated the same VERSION. #783 removed the version
+    from both, so that specific disagreement is now structurally impossible; what
+    is left to check is that they agree on the two facts still rendered.
     """
     man = gcg._manifests()
     for name in man:
@@ -242,9 +247,47 @@ def test_the_card_and_the_readme_cannot_disagree() -> None:
         if page is None:
             continue
         card = page.read_text(encoding="utf-8")
-        assert f"v{dist['version']}" in card, (
-            f"{page.name}'s card does not state v{dist['version']} for {name}"
+        assert "**Cleared for crates.io**" in card, (
+            f"{page.name}'s card does not say {name} is published, but its "
+            "manifest sets `publish = true`"
         )
+        tier = (
+            "versioned with the workspace"
+            if dist["inherited"]
+            else ("versioned on its own line")
+        )
+        assert tier in card, (
+            f"{page.name}'s card does not state {name}'s version tier ({tier})"
+        )
+
+
+def test_no_generated_block_restates_a_version_number() -> None:
+    """The invariant #783 bought, asserted so the number cannot come back.
+
+    A version in these documents cannot go stale — they are generated — so the
+    argument was never accuracy. It is that thirty of the thirty-five files in an
+    engine bump existed to restate one line, and that a reader resolving a
+    version wants the registry's answer, which the unpinned `cargo add` already
+    gives them. Re-adding a number would be invisible except as diff weight,
+    which is exactly the sort of regression only a test catches.
+
+    Asserted against what the GENERATOR emits, not against the files: a README's
+    hand-written prose may legitimately name a version (an MSRV, a dependency
+    pin), and this invariant is about the block the generator owns.
+    """
+    stamped = re.compile(r"\bv?\d+\.\d+\.\d+\b")
+    man = gcg._manifests()
+    for name in man:
+        dist = gcg.distribution(name, man)
+        for label, lines in (
+            ("card", gcg._card_lines(name, man, [])),
+            ("README availability block", gcg._availability_lines(dist)),
+        ):
+            body = "\n".join(lines)
+            assert not stamped.search(body), (
+                f"{name}'s {label} restates a version — `cargo add` is unpinned "
+                "and the registry is what answers that (#783)"
+            )
 
 
 @pytest.mark.parametrize("crate", ["laterite-ags4-parse", "laterite-ags4-diff"])

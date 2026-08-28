@@ -37,7 +37,7 @@ fn main() -> Result<(), laterite_ags4_parse::ParseError> {
 cargo add laterite-ags4-diff
 ```
 
-Currently v0.11.0 — the engine crates move in lockstep on the workspace version.
+The engine crates move in lockstep on the workspace version.
 <!-- END GENERATED: availability -->
 
 ## Why a line diff is the wrong tool

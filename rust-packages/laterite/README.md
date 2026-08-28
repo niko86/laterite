@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 cargo add laterite
 ```
 
-Currently v0.1.2 — this crate versions independently of the engine.
+This crate versions independently of the engine.
 <!-- END GENERATED: availability -->
 
 ## What it does

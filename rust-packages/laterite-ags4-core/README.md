@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 cargo add laterite-ags4-core
 ```
 
-Currently v0.11.0 — the engine crates move in lockstep on the workspace version.
+The engine crates move in lockstep on the workspace version.
 <!-- END GENERATED: availability -->
 
 ## What is in here
