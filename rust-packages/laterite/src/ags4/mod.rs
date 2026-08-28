@@ -13,7 +13,9 @@ mod report;
 
 use std::path::{Path, PathBuf};
 
-use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions, read_ags4_bytes_with};
+use laterite_ags4_core::ags4_codec::{
+    DuplicateHeadings, ExcessFields, ReadOptions, read_ags4_bytes_with,
+};
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, TranStamp, emit_ags4};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
@@ -142,6 +144,7 @@ pub struct Read {
     source: Source,
     encoding: Option<String>,
     recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
     cert: Option<CertInput>,
     only: Vec<String>,
 }
@@ -152,6 +155,7 @@ pub fn read(path: impl AsRef<Path>) -> Read {
         source: Source::Path(path.as_ref().to_path_buf()),
         encoding: None,
         recover_duplicate_headings: false,
+        truncate_excess_fields: false,
         cert: None,
         only: Vec::new(),
     }
@@ -163,6 +167,7 @@ pub fn read_bytes(bytes: impl Into<Vec<u8>>) -> Read {
         source: Source::Bytes(bytes.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        truncate_excess_fields: false,
         cert: None,
         only: Vec::new(),
     }
@@ -184,6 +189,7 @@ pub fn read_str(text: impl Into<String>) -> Read {
         source: Source::Text(text.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        truncate_excess_fields: false,
         cert: None,
         only: Vec::new(),
     }
@@ -215,6 +221,23 @@ impl Read {
     #[must_use]
     pub fn recover_duplicate_headings(mut self, yes: bool) -> Read {
         self.recover_duplicate_headings = yes;
+        self
+    }
+
+    /// Discard the extra fields on a DATA row that split into more of them than
+    /// its group declares headings, instead of refusing the file.
+    ///
+    /// Off by default, and for the same reason as
+    /// [`Read::recover_duplicate_headings`] — except that here nothing can be
+    /// renamed to rescue the value, because the extra field belongs to no
+    /// heading at all. The usual cause is a value containing a comma whose
+    /// quotes were lost (AGS4 Rule 5), and no reader can say which side of the
+    /// comma the heading wanted. Turning this on shortens such a row silently,
+    /// which is what every read did before #776. Use it to salvage a file you
+    /// cannot repair at source; never to round-trip or certify one.
+    #[must_use]
+    pub fn truncate_excess_fields(mut self, yes: bool) -> Read {
+        self.truncate_excess_fields = yes;
         self
     }
 
@@ -295,6 +318,11 @@ impl Read {
             } else {
                 DuplicateHeadings::Error
             },
+            excess_fields: if self.truncate_excess_fields {
+                ExcessFields::Truncate
+            } else {
+                ExcessFields::Error
+            },
         };
         // The sliced path, when a certificate can vouch for the byte index AND
         // the caller asked for specific groups. Every guard below is a reason to
@@ -342,14 +370,16 @@ impl Read {
                 let mut groups = std::collections::HashMap::with_capacity(ranges.len());
                 let mut order = Vec::with_capacity(ranges.len());
                 for (code, range) in ranges {
-                    let group = laterite_ags4_core::index::parse_group_slice(&bytes, range, &code)
-                        .map_err(|e| {
-                            Error::with_source(
-                                ErrorKind::NotAgs4,
-                                format!("cannot read group `{code}` from its byte range"),
-                                e,
-                            )
-                        })?;
+                    let group = laterite_ags4_core::index::parse_group_slice_with(
+                        &bytes, range, &code, opts,
+                    )
+                    .map_err(|e| {
+                        Error::with_source(
+                            ErrorKind::NotAgs4,
+                            format!("cannot read group `{code}` from its byte range"),
+                            e,
+                        )
+                    })?;
                     order.push(code.clone());
                     groups.insert(code, group);
                 }
@@ -930,6 +960,7 @@ impl std::fmt::Debug for Read {
                 "recover_duplicate_headings",
                 &self.recover_duplicate_headings,
             )
+            .field("truncate_excess_fields", &self.truncate_excess_fields)
             .field("only", &self.only)
             .field(
                 "index",

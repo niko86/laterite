@@ -434,6 +434,7 @@ pub fn laterite::ags4::Read::index_bytes(self, impl core::convert::Into<alloc::v
 pub fn laterite::ags4::Read::only<I, S>(self, I) -> laterite::ags4::Read where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
 pub fn laterite::ags4::Read::recover_duplicate_headings(self, bool) -> laterite::ags4::Read
 pub fn laterite::ags4::Read::run(self) -> core::result::Result<laterite::ags4::Document, laterite::Error>
+pub fn laterite::ags4::Read::truncate_excess_fields(self, bool) -> laterite::ags4::Read
 impl core::fmt::Debug for laterite::ags4::Read
 pub fn laterite::ags4::Read::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Read

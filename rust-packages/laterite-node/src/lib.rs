@@ -945,10 +945,14 @@ pub fn merge(
 /// match the Rust binary and Python byte-for-byte (#430).
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
-pub fn read_groups_raw(path: String, recover_duplicate_headings: Option<bool>) -> Result<String> {
+pub fn read_groups_raw(
+    path: String,
+    recover_duplicate_headings: Option<bool>,
+    truncate_excess_fields: Option<bool>,
+) -> Result<String> {
     let parsed = laterite_ags4_core::ags4_codec::read_ags4_with(
         Path::new(&path),
-        read_opts_from(recover_duplicate_headings),
+        read_opts_from(recover_duplicate_headings, truncate_excess_fields),
     )
     .map_err(|e| Error::from_reason(e.to_string()))?;
     let mut groups = Map::new();
@@ -1616,8 +1620,9 @@ pub fn ags4_bytes_to_xlsx(
     data: Uint8Array,
     ordered_keys: Option<Vec<String>>,
     recover_duplicate_headings: Option<bool>,
+    truncate_excess_fields: Option<bool>,
 ) -> Result<ExcelBytesResult> {
-    let opts = read_opts_from(recover_duplicate_headings);
+    let opts = read_opts_from(recover_duplicate_headings, truncate_excess_fields);
     let (xlsx, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(&data, ordered_keys, opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
     // Bounded the same way as `ExcelStats::from` above (group count /
@@ -1778,15 +1783,24 @@ pub fn registry_inherited_key_names(code: String) -> Result<Vec<String>> {
     Ok(names)
 }
 
-/// Map the surface-level boolean onto core's read policy. Duplicate headings are
-/// fatal by default on every read surface; a caller opts into recovery.
-fn read_opts_from(recover: Option<bool>) -> laterite_ags4_core::ags4_codec::ReadOptions {
-    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
+/// Map the surface-level booleans onto core's read policy. Both leniencies are
+/// off by default on every read surface — a file the reader cannot represent
+/// faithfully is refused; a caller opts in.
+fn read_opts_from(
+    recover: Option<bool>,
+    truncate: Option<bool>,
+) -> laterite_ags4_core::ags4_codec::ReadOptions {
+    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
     ReadOptions {
         duplicate_headings: if recover.unwrap_or(false) {
             DuplicateHeadings::Recover
         } else {
             DuplicateHeadings::Error
+        },
+        excess_fields: if truncate.unwrap_or(false) {
+            ExcessFields::Truncate
+        } else {
+            ExcessFields::Error
         },
     }
 }
