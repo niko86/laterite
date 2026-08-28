@@ -190,6 +190,42 @@ describe("cli (in-process): read", () => {
     expect(body).toContain("SECOND");
   });
 
+  it("read refuses a row with more fields than headings, and --truncate-excess-fields discards them", () => {
+    // PROJ_NAME was `"Acme, Bloggs and Co"` and lost its quotes, so AGS4 Rule 5's
+    // separator split one authored value in two -- and the second half binds to
+    // no heading. Before the guard it was dropped and the row came back looking
+    // complete, which validate, certify and a re-emit all then believed.
+    const ambiguous = join(tmp(), "ambiguous.ags");
+    writeFileSync(
+      ambiguous,
+      [
+        '"GROUP","PROJ"',
+        '"HEADING","PROJ_ID","PROJ_NAME"',
+        '"UNIT","",""',
+        '"TYPE","ID","X"',
+        '"DATA","P1",Acme, Bloggs and Co',
+      ].join("\r\n") + "\r\n",
+    );
+
+    const refused = runCli(["read", ambiguous, "PROJ", "--json"]);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain("belong to no heading");
+    // The line is what a reader has to act on, so it must be named.
+    expect(refused.stderr).toContain("line 5");
+
+    const { code, stdout } = runCli([
+      "read",
+      ambiguous,
+      "PROJ",
+      "--json",
+      "--truncate-excess-fields",
+    ]);
+    expect(code).toBe(0);
+    // Stated rather than implied: `Bloggs and Co` is gone and the column reads
+    // as a complete-looking `Acme`. That is what the opt-in costs.
+    expect(JSON.parse(stdout)).toEqual([{ PROJ_ID: "P1", PROJ_NAME: "Acme" }]);
+  });
+
   it("read --json lists the group order as a JSON array", () => {
     const { code, stdout } = runCli(["read", CLEAN, "--json"]);
     expect(code).toBe(0);

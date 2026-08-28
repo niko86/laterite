@@ -1583,19 +1583,25 @@ fn dict_group_unit_type<'py>(
 /// core's read codec (no typing). So the Rust binary and the Python `lat read`
 /// agree byte-for-byte on `read --json` / `--csv` (#430 PR 2).
 #[pyfunction]
-#[pyo3(signature = (path, recover_duplicate_headings = false))]
+#[pyo3(signature = (path, recover_duplicate_headings = false, truncate_excess_fields = false))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 fn read_groups_raw(
     py: Python<'_>,
     path: String,
     recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
 ) -> PyResult<Bound<'_, PyDict>> {
     let read_opts = laterite_ags4_core::ags4_codec::ReadOptions {
         duplicate_headings: if recover_duplicate_headings {
             laterite_ags4_core::ags4_codec::DuplicateHeadings::Recover
         } else {
             laterite_ags4_core::ags4_codec::DuplicateHeadings::Error
+        },
+        excess_fields: if truncate_excess_fields {
+            laterite_ags4_core::ags4_codec::ExcessFields::Truncate
+        } else {
+            laterite_ags4_core::ags4_codec::ExcessFields::Error
         },
     };
     let parsed =

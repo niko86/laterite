@@ -40,6 +40,7 @@
           "--json": false,
           "--out": true,
           "--recover-duplicate-headings": false,
+          "--truncate-excess-fields": false,
           "<file>": true,
           "<group>": true
         },
@@ -246,6 +247,7 @@
           "--json": false,
           "--out": true,
           "--recover-duplicate-headings": false,
+          "--truncate-excess-fields": false,
           "<file>": true,
           "<group>": true
         },
@@ -402,6 +404,7 @@
           "--json": false,
           "--out": true,
           "--recover-duplicate-headings": false,
+          "--truncate-excess-fields": false,
           "<file>": true,
           "<group>": true
         },

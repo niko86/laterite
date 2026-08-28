@@ -50,23 +50,38 @@ impl ExcelResult {
 pub fn ags4_to_xlsx(
     data: &[u8],
     recover_duplicate_headings: Option<bool>,
+    truncate_excess_fields: Option<bool>,
 ) -> Result<ExcelResult, JsError> {
     console_error_panic_hook::set_once();
-    ags4_to_xlsx_core(data, recover_duplicate_headings.unwrap_or(false))
-        .map_err(|m| JsError::new(&m))
+    ags4_to_xlsx_core(
+        data,
+        recover_duplicate_headings.unwrap_or(false),
+        truncate_excess_fields.unwrap_or(false),
+    )
+    .map_err(|m| JsError::new(&m))
 }
 
 /// The host-testable core of [`ags4_to_xlsx`].
 #[cfg(feature = "excel")]
-fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<ExcelResult, String> {
-    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
-    // Duplicate headings are fatal by default here as on every read surface; the
-    // browser caller opts into the suffixed recovery read.
+fn ags4_to_xlsx_core(
+    data: &[u8],
+    recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
+) -> Result<ExcelResult, String> {
+    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
+    // Both leniencies are off by default here as on every read surface; the
+    // browser caller opts into the suffixed recovery read, or into discarding
+    // fields that bind to no heading.
     let opts = ReadOptions {
         duplicate_headings: if recover_duplicate_headings {
             DuplicateHeadings::Recover
         } else {
             DuplicateHeadings::Error
+        },
+        excess_fields: if truncate_excess_fields {
+            ExcessFields::Truncate
+        } else {
+            ExcessFields::Error
         },
     };
     let (bytes, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(data, None, opts)
@@ -116,7 +131,7 @@ mod tests {
     #[cfg(feature = "excel")]
     #[test]
     fn an_ags_file_becomes_a_workbook_with_a_sheet_per_group() {
-        let res = ags4_to_xlsx_core(CLEAN, false).expect("converts");
+        let res = ags4_to_xlsx_core(CLEAN, false, false).expect("converts");
         assert!(res.sheets() > 0, "no sheets were written");
         assert!(res.rows() > 0, "no rows were written");
         // The xlsx magic — a zip container. Anything else is not a workbook,
@@ -137,11 +152,11 @@ mod tests {
 \"TYPE\",\"ID\",\"ID\"\r\n\
 \"DATA\",\"BH01\",\"BH01\"\r\n";
         assert!(
-            ags4_to_xlsx_core(dup, false).is_err(),
+            ags4_to_xlsx_core(dup, false, false).is_err(),
             "duplicate headings must be fatal by default"
         );
         assert!(
-            ags4_to_xlsx_core(dup, true).is_ok(),
+            ags4_to_xlsx_core(dup, true, false).is_ok(),
             "recovery must be reachable from the browser"
         );
     }
@@ -157,7 +172,7 @@ mod tests {
     fn a_workbook_round_trips_back_to_the_same_groups() {
         // The pair is only useful if it is a pair: converting out and back must
         // preserve the groups, not merely produce *some* AGS4.
-        let book = ags4_to_xlsx_core(CLEAN, false).expect("to xlsx");
+        let book = ags4_to_xlsx_core(CLEAN, false, false).expect("to xlsx");
         let back = xlsx_to_ags4_core(&book.bytes(), false).expect("from xlsx");
         let text = String::from_utf8(back.bytes()).expect("utf-8");
         for group in ["PROJ", "TRAN", "UNIT", "TYPE"] {

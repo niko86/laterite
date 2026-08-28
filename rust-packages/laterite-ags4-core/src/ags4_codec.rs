@@ -95,11 +95,42 @@ pub enum DuplicateHeadings {
     Recover,
 }
 
+/// What to do with a DATA row that split into MORE fields than its group
+/// declares headings. The excess binds to nothing, so the value it belongs to
+/// cannot be determined — the same shape as [`DuplicateHeadings`], one axis
+/// over: there a name collided, here a position has no name.
+///
+/// The usual cause is AGS4 Rule 5 — a value containing a comma whose quotes
+/// were lost, so `Acme, Bloggs and Co` splits in two.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ExcessFields {
+    /// Refuse the file, naming the group, the line and both counts. The
+    /// default, for the reason [`DuplicateHeadings::Error`] gives: a reader
+    /// that cannot represent the file faithfully should say so rather than
+    /// hand back a plausible-looking wrong answer.
+    ///
+    /// This one is worth refusing even more than a duplicate heading, because
+    /// the wrong answer survives everything downstream that might have caught
+    /// it. The truncated row satisfies Rule 4, the file then validates clean,
+    /// and `certify` mints an `.ags.idx` asserting `errors: measured, count 0`
+    /// over a value that is no longer there (#776).
+    #[default]
+    Error,
+    /// Discard the excess, which is what every read did before #776. Kept as an
+    /// opt-in for salvaging data from a file that cannot be repaired at source.
+    ///
+    /// The result is deliberately **lossy**: a value that lost its quotes is
+    /// silently shortened. Do not round-trip or certify it — that is the exact
+    /// path #776 exists to close.
+    Truncate,
+}
+
 /// Per-read behaviour switches. Defaults are the strict, faithful choices; a
 /// caller opts *into* leniency, never out of it by accident.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ReadOptions {
     pub duplicate_headings: DuplicateHeadings,
+    pub excess_fields: ExcessFields,
 }
 
 /// Read an AGS4 file from a path — slurps the bytes and delegates to
@@ -204,6 +235,8 @@ fn resolve_headings(
 ///
 /// Duplicate heading NAMES within a group are a different matter and are
 /// governed by [`ReadOptions::duplicate_headings`] — see [`resolve_headings`].
+/// A row with MORE fields than headings is governed by
+/// [`ReadOptions::excess_fields`], and is refused by default (#776).
 fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, CliError> {
     // Taken BY VALUE: the sole caller drops the parse immediately after, so
     // every heading/unit/type/value can be moved rather than cloned. Reading it
@@ -248,6 +281,7 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
             .rows
             .into_iter()
             .map(|r| {
+                let (line, found) = (r.line, r.values.len());
                 let mut row = HashMap::with_capacity(keys.len());
                 let mut values = r.values.into_iter();
                 for key in &keys {
@@ -256,9 +290,20 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
                     let v = values.next().map_or_else(String::new, trim_owned);
                     row.insert(Arc::clone(key), v);
                 }
-                row
+                // Whatever is LEFT in `values` bound to no heading. Dropping it
+                // here is how a row could come back shorter than it went in and
+                // still look complete all the way to a clean certificate (#776).
+                if values.next().is_some() && read_opts.excess_fields == ExcessFields::Error {
+                    return Err(CliError::ExcessFields {
+                        group: code.clone(),
+                        line,
+                        found,
+                        declared: keys.len(),
+                    });
+                }
+                Ok(row)
             })
-            .collect();
+            .collect::<Result<_, CliError>>()?;
         order.push(code.clone());
         groups.insert(
             code.clone(),
@@ -442,6 +487,7 @@ mod tests {
     fn recovery_keeps_every_cell_and_fixes_the_positional_read() {
         let opts = ReadOptions {
             duplicate_headings: DuplicateHeadings::Recover,
+            ..ReadOptions::default()
         };
         let parsed = read_ags4_bytes_with(DUP_HEADING, opts).expect("recovers");
         let g = parsed.get("LOCA").expect("LOCA");
@@ -466,6 +512,7 @@ mod tests {
 \"DATA\",\"1\",\"2\",\"3\",\"4\"\n";
         let opts = ReadOptions {
             duplicate_headings: DuplicateHeadings::Recover,
+            ..ReadOptions::default()
         };
         let parsed = read_ags4_bytes_with(src, opts).expect("recovers");
         let g = parsed.get("LOCA").expect("LOCA");
@@ -483,6 +530,7 @@ mod tests {
             src,
             ReadOptions {
                 duplicate_headings: DuplicateHeadings::Recover,
+                ..ReadOptions::default()
             },
         )
         .expect("clean");
@@ -491,6 +539,81 @@ mod tests {
             strict.get("LOCA").unwrap().headings,
             recover.get("LOCA").unwrap().headings
         );
+    }
+
+    /// The #776 fixture. `PROJ_CLNT` was `"Acme, Bloggs and Co"` and lost its
+    /// quotes, so AGS4 Rule 5's separator split one authored value into two
+    /// fields — and the second binds to no heading at all. Every other line is
+    /// well-formed, which is exactly what made this survive: the file looks
+    /// ordinary and the loss is one field wide.
+    const EXCESS_FIELDS: &[u8] = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_CLNT\"\n\
+\"UNIT\",\"\",\"\"\n\
+\"TYPE\",\"ID\",\"X\"\n\
+\"DATA\",\"P1\",Acme, Bloggs and Co\n";
+
+    /// Worth refusing more than a duplicate heading, because nothing downstream
+    /// catches it: the shortened row still satisfies Rule 4, so the file
+    /// validates clean and `certify` will mint an index asserting zero errors
+    /// over a value that is no longer there.
+    #[test]
+    fn excess_fields_are_fatal_by_default() {
+        let err = read_ags4_bytes(EXCESS_FIELDS).unwrap_err();
+        let CliError::ExcessFields {
+            group,
+            line,
+            found,
+            declared,
+        } = err
+        else {
+            panic!("expected ExcessFields, got {err:?}");
+        };
+        assert_eq!((group.as_str(), line, found, declared), ("PROJ", 5, 3, 2));
+    }
+
+    /// The opt-in keeps the pre-#776 behaviour, and the assertion states plainly
+    /// what that behaviour costs: `Bloggs and Co` is gone, and `PROJ_CLNT` reads
+    /// as a complete-looking `Acme`.
+    #[test]
+    fn truncate_discards_the_unbindable_field() {
+        let opts = ReadOptions {
+            excess_fields: ExcessFields::Truncate,
+            ..ReadOptions::default()
+        };
+        let parsed = read_ags4_bytes_with(EXCESS_FIELDS, opts).expect("truncates");
+        let g = parsed.get("PROJ").expect("PROJ");
+        assert_eq!(g.headings, ["PROJ_ID", "PROJ_CLNT"]);
+        assert_eq!(g.rows[0].get("PROJ_CLNT").map(String::as_str), Some("Acme"));
+    }
+
+    /// The control that says the guard keys on the LOST QUOTES, not on the
+    /// comma. Quoted, the same authored value is one field and reads whole
+    /// under the strict default.
+    #[test]
+    fn a_quoted_comma_is_one_field_and_still_reads() {
+        let src = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_CLNT\"\n\
+\"DATA\",\"P1\",\"Acme, Bloggs and Co\"\n";
+        let g = read_ags4_bytes(src).expect("clean");
+        let g = g.get("PROJ").expect("PROJ");
+        assert_eq!(
+            g.rows[0].get("PROJ_CLNT").map(String::as_str),
+            Some("Acme, Bloggs and Co")
+        );
+    }
+
+    /// The other direction is NOT symmetrical and must not become so. A row with
+    /// FEWER fields than headings loses nothing — the missing tail is knowable
+    /// (it is empty) — so it still pads to `""` as it always has. Only the
+    /// unbindable direction is fatal.
+    #[test]
+    fn a_short_row_still_pads_rather_than_failing() {
+        let src = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_CLNT\"\n\
+\"DATA\",\"P1\"\n";
+        let parsed = read_ags4_bytes(src).expect("short rows are fine");
+        let g = parsed.get("PROJ").expect("PROJ");
+        assert_eq!(g.rows[0].get("PROJ_CLNT").map(String::as_str), Some(""));
     }
 
     /// `trim_owned`'s in-place path only runs when there is whitespace to strip —
@@ -521,6 +644,7 @@ mod tests {
 \"DATA\",\"a\",\"b\",\"c\"\n";
         let opts = ReadOptions {
             duplicate_headings: DuplicateHeadings::Recover,
+            ..ReadOptions::default()
         };
         let err = read_ags4_bytes_with(src, opts).unwrap_err();
         let CliError::DuplicateHeading { group, heading } = err else {

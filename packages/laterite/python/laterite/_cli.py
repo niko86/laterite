@@ -723,7 +723,11 @@ def _run_read(args: argparse.Namespace) -> int:
         print(f"error: {args.file}: not found", file=sys.stderr)
         return 3
     try:
-        raw = _native.read_groups_raw(args.file, args.recover_duplicate_headings)
+        raw = _native.read_groups_raw(
+            args.file,
+            args.recover_duplicate_headings,
+            args.truncate_excess_fields,
+        )
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 4
@@ -1001,6 +1005,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Mirrors the Rust binary's flag exactly — `lat read` must accept the same
     # surface on both, or the cross-surface output gate diverges.
     prd.add_argument("--recover-duplicate-headings", action="store_true")
+    prd.add_argument("--truncate-excess-fields", action="store_true")
 
     pf = sub.add_parser("fix", add_help=False, parents=[gp, dp])
     pf.add_argument("file")

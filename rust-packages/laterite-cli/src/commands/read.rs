@@ -4,7 +4,9 @@
 
 use std::process::exit;
 
-use laterite_ags4_core::ags4_codec::{AgsGroup, DuplicateHeadings, ReadOptions, read_ags4_with};
+use laterite_ags4_core::ags4_codec::{
+    AgsGroup, DuplicateHeadings, ExcessFields, ReadOptions, read_ags4_with,
+};
 use laterite_ags4_core::read_render;
 use laterite_cliutil::{colour_enabled, styled_table, write_atomic};
 
@@ -23,6 +25,11 @@ pub fn run(args: &ReadArgs, json: bool) -> ! {
             DuplicateHeadings::Recover
         } else {
             DuplicateHeadings::Error
+        },
+        excess_fields: if args.truncate_excess_fields {
+            ExcessFields::Truncate
+        } else {
+            ExcessFields::Error
         },
     };
     let parsed = match read_ags4_with(path, read_opts) {
