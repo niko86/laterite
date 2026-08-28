@@ -67,17 +67,18 @@ fn excel_to_ags4<'py>(
 /// `(xlsx_bytes, stats)` so a caller who wants the workbook without a temp file
 /// (e.g. streaming it to an upload) gets both.
 #[pyfunction]
-#[pyo3(signature = (data, ordered_keys=None, recover_duplicate_headings=false))]
+#[pyo3(signature = (data, ordered_keys=None, recover_duplicate_headings=false, truncate_excess_fields=false))]
 fn ags4_bytes_to_xlsx<'py>(
     py: Python<'py>,
     data: &[u8],
     ordered_keys: Option<Vec<String>>,
     recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
 ) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
     let (xlsx, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(
         data,
         ordered_keys,
-        read_opts(recover_duplicate_headings),
+        read_opts(recover_duplicate_headings, truncate_excess_fields),
     )
     .map_err(|e| map_cli_err(&e))?;
     Ok((PyBytes::new(py, &xlsx), stats_to_pydict(py, stats)?))
@@ -105,15 +106,24 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Map the surface-level boolean onto core's read policy. Duplicate headings are
-/// fatal by default on every read surface; a caller opts into recovery.
-fn read_opts(recover_duplicate_headings: bool) -> laterite_ags4_core::ags4_codec::ReadOptions {
-    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
+/// Map the surface-level booleans onto core's read policy. Both leniencies are
+/// off by default on every read surface — a file the reader cannot represent
+/// faithfully is refused; a caller opts in.
+fn read_opts(
+    recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
+) -> laterite_ags4_core::ags4_codec::ReadOptions {
+    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
     ReadOptions {
         duplicate_headings: if recover_duplicate_headings {
             DuplicateHeadings::Recover
         } else {
             DuplicateHeadings::Error
+        },
+        excess_fields: if truncate_excess_fields {
+            ExcessFields::Truncate
+        } else {
+            ExcessFields::Error
         },
     }
 }

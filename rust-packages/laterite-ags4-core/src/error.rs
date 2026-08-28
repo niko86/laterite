@@ -25,6 +25,29 @@ pub enum CliError {
          to keep both, suffixed __2, __3, …"
     )]
     DuplicateHeading { group: String, heading: String },
+
+    /// A DATA row split into MORE fields than its group declares headings, so
+    /// the excess cannot be bound to anything and the value it belongs to
+    /// cannot be determined. Sibling of [`Self::DuplicateHeading`] and fatal
+    /// for the same reason: continuing hands back a row that looks complete
+    /// and is not.
+    ///
+    /// The usual cause is a value containing a comma whose quotes were lost
+    /// (AGS4 Rule 5) — `Acme, Bloggs and Co` unquoted splits in two, and
+    /// nothing can say which half belongs to the heading.
+    #[error(
+        "row at line {line} in group {group:?} has {found} field(s) but {group:?} \
+         declares {declared} heading(s) (AGS4 Rules 4/5) — the extra value(s) \
+         belong to no heading, so this row cannot be read faithfully; the usual \
+         cause is a value containing a comma that lost its quotes. Re-read with \
+         ExcessFields::Truncate to discard them deliberately."
+    )]
+    ExcessFields {
+        group: String,
+        line: u32,
+        found: usize,
+        declared: usize,
+    },
 }
 
 impl CliError {
@@ -33,7 +56,7 @@ impl CliError {
         match self {
             Self::FileNotFound(_) => 3,
             // Same class as Schema: the file is structurally unusable as read.
-            Self::Schema(_) | Self::DuplicateHeading { .. } => 6,
+            Self::Schema(_) | Self::DuplicateHeading { .. } | Self::ExcessFields { .. } => 6,
         }
     }
 }

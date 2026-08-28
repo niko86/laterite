@@ -480,3 +480,41 @@ fn a_duplicate_heading_is_refused_by_default_and_recoverable_on_request() {
         loca.headings()
     );
 }
+
+/// #776. `PROJ_NAME` was one authored value and lost its quotes, so the comma
+/// AGS4 Rule 5 reserves as a separator split it in two — and the second half
+/// binds to no heading at all.
+///
+/// Before the guard this read returned `Old` and threw `name` away, and every
+/// downstream step then agreed the file was fine: the shortened row still
+/// satisfies Rule 4, so it validates clean and certifies clean over a value that
+/// is no longer there. The refusal is the only place that can tell.
+#[test]
+fn a_row_with_more_fields_than_headings_is_refused_by_default() {
+    const AMBIGUOUS: &str = concat!(
+        "\"GROUP\",\"PROJ\"\r\n",
+        "\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n",
+        "\"UNIT\",\"\",\"\"\r\n",
+        "\"TYPE\",\"ID\",\"X\"\r\n",
+        "\"DATA\",\"P1\",Old, name\r\n",
+    );
+    let err = ags4::read_bytes(AMBIGUOUS.as_bytes()).run().unwrap_err();
+    assert_eq!(err.kind(), laterite::ErrorKind::NotAgs4);
+    // `{:#}` is the form documented to append the cause; the terse `{}` stays a
+    // wrapper's job. The detail a reader has to act on lives there.
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("PROJ") && msg.contains("line 5"),
+        "the cause must name the group and the line: {msg}"
+    );
+
+    // The opt-out is the pre-#776 behaviour, and it is lossy on purpose: `name`
+    // is gone and `PROJ_NAME` reads as a complete-looking `Old`.
+    let doc = ags4::read_bytes(AMBIGUOUS.as_bytes())
+        .truncate_excess_fields(true)
+        .run()
+        .expect("truncation was requested");
+    let proj = doc.group("PROJ").unwrap();
+    let row = proj.row(0).unwrap();
+    assert_eq!(row.cell("PROJ_NAME"), Some("Old"));
+}

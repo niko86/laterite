@@ -43,7 +43,7 @@ use laterite_ags4_parse::{ParseOptions, ParsedFile, parse_bytes_opts};
 use laterite_ags4_reference::dict::DictResolution;
 use serde::{Deserialize, Serialize};
 
-use crate::ags4_codec::{AgsGroup, read_ags4_bytes};
+use crate::ags4_codec::{AgsGroup, ReadOptions, read_ags4_bytes_with};
 use crate::error::CliError;
 
 /// Half-open byte range `[start, end)` of a group's section in the source bytes.
@@ -175,21 +175,78 @@ pub fn group_index_from_parsed(parsed: &ParsedFile) -> Result<GroupIndex, CliErr
 /// parser on just that slice. The slice begins at a `"GROUP",…` record, so the
 /// parser sees a self-contained one-group file.
 pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGroup, CliError> {
+    parse_group_slice_with(bytes, range, code, ReadOptions::default())
+}
+
+/// [`parse_group_slice`] with explicit [`ReadOptions`].
+///
+/// The sliced read and the whole-file read must reach the same verdict on the
+/// same bytes — an index is a shortcut to the answer, never a different answer —
+/// so the caller's read policy has to reach here too. Without it, a handle
+/// configured to tolerate something tolerated it only when the slice path
+/// happened not to be taken, which depends on whether a certificate was fresh.
+pub fn parse_group_slice_with(
+    bytes: &[u8],
+    range: Range,
+    code: &str,
+    opts: ReadOptions,
+) -> Result<AgsGroup, CliError> {
     let (start, end) = range;
     // Byte offsets are u64; every shipped target is 64-bit (usize == u64),
     // so this is a no-op there. Bounds are still checked below via `.get()`.
     #[allow(clippy::cast_possible_truncation)]
-    let slice = bytes.get(start as usize..end as usize).ok_or_else(|| {
+    let (from, to) = (start as usize, end as usize);
+    let slice = bytes.get(from..to).ok_or_else(|| {
         CliError::Schema(format!(
             "index range {start}..{end} out of bounds for {} bytes",
             bytes.len()
         ))
     })?;
-    let mut parsed = read_ags4_bytes(slice)?;
+    let mut parsed =
+        read_ags4_bytes_with(slice, opts).map_err(|e| rebase_line(e, bytes, from))?;
     parsed
         .groups
         .remove(code)
         .ok_or_else(|| CliError::Schema(format!("group '{code}' not found in its indexed slice")))
+}
+
+/// Restate a slice-relative line number in whole-file terms.
+///
+/// The slice parser counts from the `"GROUP"` record it was handed, so it would
+/// name line 3 of a group that starts at line 4000. A reader cannot act on that,
+/// and the number looks plausible enough not to be questioned. Counting the
+/// newlines before the slice is O(prefix) and only ever runs on the error path,
+/// so the fast read the index exists to enable is untouched.
+fn rebase_line(err: CliError, bytes: &[u8], start: usize) -> CliError {
+    match err {
+        CliError::ExcessFields {
+            group,
+            line,
+            found,
+            declared,
+        } => {
+            let before = u32::try_from(newlines_before(bytes, start)).unwrap_or(0);
+            CliError::ExcessFields {
+                group,
+                line: line + before,
+                found,
+                declared,
+            }
+        }
+        other => other,
+    }
+}
+
+/// Newlines in `bytes[..start]` — the slice's own first line is line 1, so this
+/// is exactly the offset to add.
+// clippy wants the `bytecount` crate. This runs only when a read has already
+// failed, and core is a leaf whose dependency list is a deliberate promise to
+// the wasm build — a crate earning its place on an error path is a bad trade.
+#[allow(clippy::naive_bytecount)]
+fn newlines_before(bytes: &[u8], start: usize) -> usize {
+    bytes
+        .get(..start)
+        .map_or(0, |prefix| prefix.iter().filter(|&&b| b == b'\n').count())
 }
 
 /// Format version of the `.ags.idx` sidecar.
@@ -856,6 +913,7 @@ mod tests {
     use std::fmt::Write as _;
 
     use super::*;
+    use crate::ags4_codec::read_ags4_bytes;
 
     // A normal two-group file (LF line endings, a blank-line separator).
     const TWO: &str = r#""GROUP","PROJ"
@@ -1058,6 +1116,41 @@ mod tests {
         let idx = index_ags4_bytes(bytes).unwrap();
         let proj = parse_group_slice(bytes, idx.range("PROJ").unwrap(), "PROJ").unwrap();
         assert!(proj.rows.is_empty());
+    }
+
+    /// The sliced read is a shortcut to the same answer, never a different one —
+    /// so #776's refusal has to reach it too. LOCA is the SECOND group here on
+    /// purpose: the slice parser counts lines from the `"GROUP"` record it was
+    /// handed, so an unrebased line number would come back as 3 and look
+    /// entirely plausible.
+    #[test]
+    fn a_sliced_read_refuses_excess_fields_and_names_the_whole_file_line() {
+        let f = "\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\"\n\
+\"UNIT\",\"\"\n\
+\"TYPE\",\"ID\"\n\
+\"DATA\",\"P1\"\n\
+\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_LOCX\"\n\
+\"DATA\",\"BH01\",Acme, Bloggs\n";
+        let bytes = f.as_bytes();
+        let idx = index_ags4_bytes(bytes).unwrap();
+        let range = idx.range("LOCA").unwrap();
+
+        let err = parse_group_slice(bytes, range, "LOCA").unwrap_err();
+        let CliError::ExcessFields { line, .. } = err else {
+            panic!("expected ExcessFields, got {err:?}");
+        };
+        assert_eq!(line, 8, "the line must be the file's, not the slice's");
+
+        // And the caller's opt-out reaches the slice path too, or a handle would
+        // tolerate the row only when no certificate happened to be fresh.
+        let opts = ReadOptions {
+            excess_fields: crate::ags4_codec::ExcessFields::Truncate,
+            ..ReadOptions::default()
+        };
+        let loca = parse_group_slice_with(bytes, range, "LOCA", opts).expect("truncates");
+        assert_eq!(loca.rows[0]["LOCA_LOCX"], "Acme");
     }
 
     /// Deterministic stand-in for a property test: many synthetic files varying

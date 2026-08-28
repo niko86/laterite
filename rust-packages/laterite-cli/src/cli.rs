@@ -249,6 +249,13 @@ pub struct ReadArgs {
     /// file. To repair it, use `lat fix --risky`.
     #[arg(long)]
     pub recover_duplicate_headings: bool,
+    /// Read a file whose DATA row has more fields than its group declares
+    /// headings (AGS4 Rules 4/5) instead of refusing it, discarding the extra
+    /// values. Nothing can say which heading they belonged to, so the row comes
+    /// back deliberately SHORTENED — this salvages data, it does not repair the
+    /// file, and the result must not be certified.
+    #[arg(long)]
+    pub truncate_excess_fields: bool,
 }
 
 #[derive(Args)]
