@@ -283,6 +283,16 @@ jobs:
               # toolchain and the wasm32 target and builds every wasm crate before
               # it lints a line.
               - 'tools/release/*wasm*.mjs'
+              # The rules catalogue's SOURCE, not just the copy under `web/`.
+              # `web/public/rules-catalogue.json` is a verbatim copy of this file
+              # and `src/lib/rulesCatalogue.test.ts` gates them byte-identical —
+              # but the gate lived behind a filter that only watched the copy. So
+              # #770 and #774 each edited the source, tripped no `web/**` path,
+              # never ran the drift gate, and merged green over a real drift. It
+              # surfaced days later on unrelated PRs that happened to wake this
+              # job. A gate whose trigger does not include the thing it compares
+              # against fires everywhere except where the change was.
+              - 'rust-packages/laterite-ags4-reference/data/rules_meta.json'
             prose:
               # `prose` = the cadence gate's inputs, and they really are this
               # broad: tests/test_stated_cadences_faithful.py walks every tracked

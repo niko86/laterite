@@ -231,8 +231,8 @@
     {
       "rule": "10c",
       "title": "Parent-Child Linkage",
-      "checks": "Checks that each row in a child group has a matching parent row in its parent group (per the dictionary) by matching KEY fields. A finding means a child record references a parent that does not exist (an orphan). Top-level groups with no parent (PROJ, TRAN, LOCA, etc.) are exempt. To fix: add the missing parent row or correct the child's KEY values to match an existing parent.",
-      "severity": "error",
+      "checks": "Checks that each row in a child group has a matching parent row in its parent group (per the dictionary) by matching KEY fields. A finding means a child record references a parent that does not exist (an orphan). Top-level groups with no parent (PROJ, TRAN, LOCA, etc.) are exempt. To fix: add the missing parent row or correct the child's KEY values to match an existing parent. With --show-fyi, also reports a link this rule cannot check at all: a KEY heading belonging to some group other than the declared parent (or its ancestors) is not part of the question this rule asks, so a reference through it can point at a row that does not exist and the file still passes.",
+      "severity": "mixed",
       "fixable": false,
       "observations": [
         {
@@ -258,6 +258,10 @@
         {
           "id": "O-51",
           "note": "If you validated with a custom dictionary as an OVERLAY, watch for an override warning alongside any finding here. An overlay that re-parents a standard group changes which parent this rule looks for, so rows nobody edited can start reporting as orphans, or stop."
+        },
+        {
+          "id": "O-56",
+          "note": "A group can key on a heading owned by a group that is not its declared parent, and AGS4 has no way to declare the second link - so this rule never checks it, and a reference through that heading can be an orphan on a file that validates clean. With --show-fyi you get an advisory naming the group whose link goes unchecked (which is not the same as saying the declared parent is wrong - sometimes both links are real and AGS4 can only carry one), emitted only where that group's whole KEY tuple is present in the child (otherwise it was never a candidate parent). It never fails the file, and python-ags4 has no equivalent."
         }
       ]
     },
@@ -320,8 +324,8 @@
     {
       "rule": "14",
       "title": "TRAN Group Presence and Row Count",
-      "checks": "Checks that the file contains a TRAN (transaction) group with exactly one DATA row. A finding means TRAN is missing or has zero/multiple data rows. To fix: add a TRAN group with a single transaction record, or reduce it to one row.",
-      "severity": "error",
+      "checks": "Checks that the file contains a TRAN (transaction) group with exactly one DATA row. A finding means TRAN is missing or has zero/multiple data rows. To fix: add a TRAN group with a single transaction record, or reduce it to one row. With --show-warnings, also flags a TRAN_AGS that is present but not a recognised dictionary edition — the rule is satisfied, but the file was judged against a fallback dictionary its author never declared.",
+      "severity": "mixed",
       "fixable": false,
       "observations": [
         {
