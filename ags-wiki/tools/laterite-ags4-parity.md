@@ -16,7 +16,7 @@ sources: []
 # laterite-ags4-parity
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Not published** — `laterite-ags4-parity` is a workspace crate, internal to this repo, at v0.11.0 (inherited from the workspace).
+> [!note] **Not published** — `laterite-ags4-parity` is a workspace crate, internal to this repo, versioned with the workspace.
 > **Used by** — [[laterite-ags4-compliance]], [[laterite-ags4-corpus-qa]], [[laterite-ags4-forge]].
 <!-- END GENERATED: crate-card -->
 

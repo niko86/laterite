@@ -26,7 +26,7 @@ sources: []
 > and `cargo add laterite-crate` resolves to nothing.** The crate is `laterite`.
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite` v0.1.2 (its own line) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> [!note] **Cleared for crates.io** — `laterite` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
 > **Used by** — nothing else in this workspace.
 <!-- END GENERATED: crate-card -->
 

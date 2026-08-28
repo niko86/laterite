@@ -468,17 +468,19 @@ def _page_for_crate() -> dict[str, Path]:
     return out
 
 
-def _version_of(d: dict) -> tuple[str, bool]:
-    """(version, inherited) — resolving `version.workspace = true`."""
-    v = d.get("package", {}).get("version")
-    if isinstance(v, str):
-        return v, False
-    ws = tomllib.loads((RUST / "Cargo.toml").read_text())
-    return ws["workspace"]["package"]["version"], True
+def _inherits_workspace_version(d: dict) -> bool:
+    """Does this crate take its number from `[workspace.package]`?
+
+    The number ITSELF is deliberately not returned (#783). Which tier a crate
+    versions on is a fact about the scheme and is stable; the number is a reading
+    that was being rendered into thirty documents, none of which a reader
+    resolves a version from.
+    """
+    return not isinstance(d.get("package", {}).get("version"), str)
 
 
 def distribution(name: str, man: dict[str, dict]) -> dict:
-    """Where `name` is installable from, and at what version.
+    """Where `name` is installable from, and on which version tier.
 
     Computed ONCE and rendered TWICE — into the crate's wiki card and into its
     shipped README. Half the audited defects lived outside `ags-wiki/`, and a
@@ -486,31 +488,38 @@ def distribution(name: str, man: dict[str, dict]) -> dict:
     line on crates.io cannot be corrected retroactively, only superseded by
     another release. Two renderings of one computation is what stops the wiki
     and the README disagreeing about the same crate.
+
+    **No version number** (#783). `cargo add` is unpinned in the rendered block,
+    so the registry already answers "which version" for the reader — and it is
+    the only thing that can, since the tree runs ahead of what is published for
+    most of a cycle. Restating the workspace number put a reading into thirty
+    documents and made every engine bump a 35-file diff to move one line.
     """
     d = man[name]
-    version, inherited = _version_of(d)
     return {
         "name": name,
-        "version": version,
-        "inherited": inherited,
+        "inherited": _inherits_workspace_version(d),
         "crates_io": d.get("package", {}).get("publish") is not False,
     }
 
 
 def _card_lines(name: str, man: dict[str, dict], consumers: list[str]) -> list[str]:
     dist = distribution(name, man)
-    version, inherited = dist["version"], dist["inherited"]
-    tier = "inherited from the workspace" if inherited else "its own line"
+    tier = (
+        "versioned with the workspace"
+        if dist["inherited"]
+        else "versioned on its own line"
+    )
     if not dist["crates_io"]:
         head = (
             f"> [!note] **Not published** — `{name}` is a workspace crate, "
-            f"internal to this repo, at v{version} ({tier})."
+            f"internal to this repo, {tier}."
         )
     else:
         head = (
-            f"> [!note] **Cleared for crates.io** — `{name}` v{version} "
-            f"({tier}) declares `publish = true`, so it is a public API under "
-            f"semver, not an internal detail."
+            f"> [!note] **Cleared for crates.io** — `{name}` declares "
+            f"`publish = true`, so it is a public API under semver, not an "
+            f"internal detail. It is {tier}."
         )
     used = (
         ", ".join(f"[[{c}]]" for c in consumers)
@@ -601,11 +610,14 @@ def _availability_lines(dist: dict) -> list[str]:
         f"cargo add {dist['name']}",
         "```",
         "",
-        f"Currently v{dist['version']}"
-        + (
-            " — the engine crates move in lockstep on the workspace version."
+        # No version line. `cargo add` above is unpinned, so it already resolves
+        # whatever crates.io serves — and a number here would be the WORKSPACE's,
+        # which runs ahead of the registry for most of a cycle. What is worth
+        # saying is which tier the crate moves on, because that does not drift.
+        (
+            "The engine crates move in lockstep on the workspace version."
             if dist["inherited"]
-            else " — this crate versions independently of the engine."
+            else "This crate versions independently of the engine."
         ),
     ]
 
