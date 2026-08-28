@@ -78,6 +78,19 @@ only thing that shows the claim is not stale:
                           filter: its `--built` half runs in that job and
                           nowhere else, because the built site is the only
                           artefact holding the generated pages' prose.
+  #786 (catalogue src)  1781 paths x 51 patterns = 90831 pairs, exact agreement
+                        — `rust-packages/laterite-ags4-reference/data/rules_meta.json`
+                          joined the `web` filter. `dot: true`, as above. An
+                          instance of the MISMATCHED TRIGGER shape named above,
+                          found the way that note predicts one is found: the
+                          gate was correct, watched only its own copy, and two
+                          edits to the source merged green before an unrelated
+                          PR woke the job. The run was falsified first — a
+                          planted `_matches` divergence on `.rs` paths produced
+                          mismatches, so the zero above is a comparison rather
+                          than an empty one. Note a `!`-pattern plant produced
+                          nothing: the block has carried no negation since #313,
+                          so that branch is unexercised by this corpus.
                           `dot: true`, as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
