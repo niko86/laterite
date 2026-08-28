@@ -608,21 +608,23 @@ jobs:
         run: uv run --no-project python tools/check_public_api.py
 
       # The snapshot says WHAT changed; this says whether it is BREAKING.
-      # Baseline is `main`, because nothing is on crates.io yet — at first
-      # publish the stronger baseline (the released version) becomes available
-      # and should replace it.
-      # The explicit fetch is belt-and-braces on top of fetch-depth: 0 — on a
-      # pull_request event the checked-out ref is the merge ref, and a missing
-      # `origin/main` would read as a tooling failure rather than the
-      # configuration mistake it is.
+      # Baseline is the crates.io RELEASE, not `main` (#782) — a version number
+      # is a promise to whoever ran `cargo add`, so the thing to compare against
+      # is what they got. Against `main` both sides carry the same version, so
+      # every break failed regardless of what the tree's version already
+      # permitted; that is what made each breaking PR need its own bump.
       #
-      # A script rather than one cargo command because a crate that does not
-      # exist at the baseline aborts the WHOLE run rather than being skipped —
-      # see the module docstring. It reports what it skipped and why.
-      - name: cargo semver-checks (against main)
-        run: |
-          git fetch --no-tags origin main
-          uv run --no-project python tools/check_semver.py
+      # The consequence is deliberate and the script prints it per crate: once
+      # the tree is ahead of the registry, semver already permits the change and
+      # cargo skips every lint. This gate is substantive in the window right
+      # after a publish, which is the window where a missing bump could reach a
+      # consumer.
+      #
+      # A script rather than one cargo command because a crate that has never
+      # published aborts the WHOLE run rather than being skipped — see the
+      # module docstring. It reports what it skipped and why.
+      - name: cargo semver-checks (against the crates.io release)
+        run: uv run --no-project python tools/check_semver.py
 
   rust:
     needs: changes
