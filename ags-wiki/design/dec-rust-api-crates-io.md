@@ -330,6 +330,23 @@ Each turned out to be a slightly different shape than the one-line plan implied:
   anything — but it makes a breaking reshape a louder, more deliberate event than
   it used to be.
 
+  > [!note] Superseded 2026-08-28 — the baseline is the registry now (#782)
+  > The switch-over condition above is met: all eleven publishable crates have a
+  > release. `repo:tools/check_semver.py` compares against what `cargo add`
+  > resolves, so the consequence recorded here is **spent** — a break no longer
+  > needs a bump in the same PR unless the tree is level with the registry.
+  >
+  > The trade named above did not survive contact with what the git baseline
+  > actually measured. Against `main` both sides carry the same version, so the
+  > gate could not tell a break from one the tree's version already permitted,
+  > and it blocked either way. It read as strictness and was closer to noise:
+  > #730, #741 and #776 each took a bump, and none of the three published.
+  >
+  > What replaces it is narrower and honest about being narrow. Once the tree
+  > runs ahead, semver permits the change and every lint skips — so the gate
+  > enforces only in the window right after a publish, and prints per crate
+  > which state it is in rather than reporting green over an empty run.
+
 The job is a **new required-status-check context** (`publish-gates`) and gates
 nothing until branch protection is told about it.
 
