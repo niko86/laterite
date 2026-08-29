@@ -25,7 +25,7 @@ name = "laterite-py"
 # maturin takes the wheel version from `packages/laterite/pyproject.toml`, so a
 # divergence here would put a different number in the cdylib than on the wheel
 # that contains it.
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 rust-version = "1.85"
 description = "PyO3 bindings exposing the clean-room laterite-ags4-validator engine to Python (laterite)"

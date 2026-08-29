@@ -18,7 +18,7 @@ name = "laterite-cli"
 # report different versions the first time the engine and the products diverge —
 # for the same command, doing the same thing. A CLI is something a person
 # installs, so it belongs on the number people install by.
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 rust-version = "1.85"
 description = "CLI validator for the AGS4 geotechnical transfer format"
