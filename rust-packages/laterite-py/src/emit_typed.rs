@@ -18,7 +18,7 @@ use arrow::array::{
 };
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
-use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
+use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4_owned};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -129,7 +129,11 @@ pub fn emit_ags4_from_arrow(
         ));
     }
 
-    let res = emit_ags4(&groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // Consuming entry: `groups` holds every cell as a 72-byte `serde_json::Value`
+    // on top of the caller's own frames — the borrowed entry kept all of it
+    // live across the write and the validating re-parse (a downstream consumer
+    // measured the build at ~30x its output; #788 and #789 hold the records).
+    let res = emit_ags4_owned(groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     let bytes = PyBytes::new(py, &res.bytes).unbind();
     let applied = crate::fixes_to_pylist(py, &res.applied)?;

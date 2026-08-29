@@ -160,3 +160,12 @@ strip = "symbols"
 # keeps backtraces useful while shedding the bulk — net faster CI + smaller cache.
 [profile.dev]
 debug = "line-tables-only"
+
+# Profiling only: release codegen with backtraces dhat can symbolise.
+# `strip = "symbols"` above is what turns every dhat frame into
+# `__mh_execute_header`; this profile exists so the heap_profile example can
+# attribute without touching what `release` ships.
+[profile.profiling]
+inherits = "release"
+debug = 1
+strip = "none"

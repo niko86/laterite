@@ -26,12 +26,19 @@ use crate::error::EmitError;
 /// One group ready to emit. Heading / unit / type / row order match the
 /// AGS4 file order. `rows` holds one inner Vec per data row, each item
 /// being the raw AGS4 string value aligned with `headings`.
+///
+/// Borrowed, like every other field: the writer only reads. This field used
+/// to be owned (`Vec<Vec<String>>`), which made every caller clone its whole
+/// formatted table to build the view — for the emit orchestrator that clone
+/// was a fourth simultaneous copy of every cell, live across the write and
+/// the validating re-parse (measured with `examples/heap_profile.rs`: ~29
+/// of ~215 requested bytes per cell at peak; #788).
 pub struct EmitGroup<'a> {
     pub code: &'a str,
     pub headings: Vec<&'a str>,
     pub units: Vec<&'a str>,
     pub types: Vec<&'a str>,
-    pub rows: Vec<Vec<String>>,
+    pub rows: &'a [Vec<String>],
 }
 
 /// Write an AGS4 file. Sections emitted in the order given.
@@ -55,7 +62,7 @@ pub fn write_ags4<W: Write>(out: &mut W, groups: &[EmitGroup<'_>]) -> Result<(),
         // TYPE row — same alignment rule, default missing entries to "X"
         write_aligned_with_default(out, "TYPE", &g.types, g.headings.len(), "X")?;
         // DATA rows
-        for row in &g.rows {
+        for row in g.rows {
             let mut cells: Vec<&str> = Vec::with_capacity(row.len() + 1);
             cells.push("DATA");
             cells.extend(row.iter().map(String::as_str));
@@ -251,12 +258,13 @@ mod tests {
     #[test]
     fn round_trip_via_reader() {
         // Build a tiny fixture, write it, confirm headings / rows survive.
+        let rows_1 = vec![vec!["P1".into(), "Test".into()]];
         let groups = vec![EmitGroup {
             code: "PROJ",
             headings: vec!["PROJ_ID", "PROJ_NAME"],
             units: vec!["", ""],
             types: vec!["X", "X"],
-            rows: vec![vec!["P1".into(), "Test".into()]],
+            rows: rows_1.as_slice(),
         }];
         let mut buf: Vec<u8> = Vec::new();
         write_ags4(&mut buf, &groups).unwrap();
@@ -270,12 +278,13 @@ mod tests {
 
     #[test]
     fn embedded_quotes_are_doubled() {
+        let rows_2 = vec![vec![r#"he said "hello""#.into()]];
         let groups = vec![EmitGroup {
             code: "PROJ",
             headings: vec!["NOTE"],
             units: vec![""],
             types: vec!["X"],
-            rows: vec![vec![r#"he said "hello""#.into()]],
+            rows: rows_2.as_slice(),
         }];
         let mut buf: Vec<u8> = Vec::new();
         write_ags4(&mut buf, &groups).unwrap();
@@ -291,6 +300,7 @@ mod tests {
     #[test]
     fn embedded_newline_in_a_cell_is_rejected_by_flavour() {
         for bad in ["line one\rline two", "line one\nline two", "a\r\nb"] {
+            let rows_3 = vec![vec!["BH1".into(), bad.into()]];
             let groups = vec![EmitGroup {
                 code: "LOCA",
                 headings: vec!["LOCA_ID", "LOCA_REM"],
@@ -298,7 +308,7 @@ mod tests {
                 types: vec!["ID", "X"],
                 // The offending value sits in the 2nd data column (field 2 of
                 // the DATA row: field 0 = "DATA", field 1 = "BH1").
-                rows: vec![vec!["BH1".into(), bad.into()]],
+                rows: rows_3.as_slice(),
             }];
             let mut buf: Vec<u8> = Vec::new();
             let err = write_ags4(&mut buf, &groups)
@@ -330,12 +340,13 @@ mod tests {
     /// human but carries no CR/LF (spaces, tabs) still emits fine.
     #[test]
     fn cell_without_cr_or_lf_still_emits() {
+        let rows_4 = vec![vec!["BH1".into(), "line one \t line two".into()]];
         let groups = vec![EmitGroup {
             code: "LOCA",
             headings: vec!["LOCA_ID", "LOCA_REM"],
             units: vec!["", ""],
             types: vec!["ID", "X"],
-            rows: vec![vec!["BH1".into(), "line one \t line two".into()]],
+            rows: rows_4.as_slice(),
         }];
         let mut buf: Vec<u8> = Vec::new();
         write_ags4(&mut buf, &groups).expect("no CR/LF, so nothing to reject");
@@ -347,20 +358,22 @@ mod tests {
     /// none before the first — a single-group test can't see either edge.
     #[test]
     fn write_ags4_separates_groups_with_a_blank_line_and_no_leading_one() {
+        let rows_5 = vec![vec!["P1".into()]];
+        let rows_6 = vec![vec!["BH01".into()]];
         let groups = vec![
             EmitGroup {
                 code: "PROJ",
                 headings: vec!["PROJ_ID"],
                 units: vec![""],
                 types: vec!["ID"],
-                rows: vec![vec!["P1".into()]],
+                rows: rows_5.as_slice(),
             },
             EmitGroup {
                 code: "LOCA",
                 headings: vec!["LOCA_ID"],
                 units: vec![""],
                 types: vec!["ID"],
-                rows: vec![vec!["BH01".into()]],
+                rows: rows_6.as_slice(),
             },
         ];
         let mut buf = Vec::new();

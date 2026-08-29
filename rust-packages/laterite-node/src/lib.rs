@@ -295,7 +295,7 @@ impl Reading {
                 headings: o.headings.iter().map(String::as_str).collect(),
                 units: o.units.iter().map(String::as_str).collect(),
                 types: o.types.iter().map(String::as_str).collect(),
-                rows: o.rows.clone(),
+                rows: &o.rows,
             })
             .collect();
         let mut buf = Vec::new();
