@@ -16,7 +16,7 @@ sources: []
 # laterite-ags4-types
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Cleared for crates.io** — `laterite-ags4-types` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned with the workspace.
+> [!note] **Cleared for crates.io** — `laterite-ags4-types` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
 > **Used by** — [[laterite-ags4-censor]], [[laterite-ags4-core]], [[laterite-ags4-diff]], [[laterite-ags4-emit]], [[laterite-ags4-forge]], [[laterite-ags4-merge]], [[laterite-ags4-perf]], [[laterite-ags4-reference]], [[laterite-ags4-tokenizer-wasm]], [[laterite-ags4-validator]], [[laterite-ags4-wasm]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 

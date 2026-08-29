@@ -13,7 +13,7 @@
 # factor can open the file, instead of age's machine-calibrated 20+.
 [package]
 name = "laterite-transport"
-version.workspace = true
+version = "0.11.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "Shared zstd + age passphrase file transport (pack/unpack/lock/unlock)"

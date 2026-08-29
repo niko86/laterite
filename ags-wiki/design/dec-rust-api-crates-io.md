@@ -190,6 +190,20 @@ plus minor-for-breaking gives the same protection without the diamond.
 This is a step toward [[reliquary|per-crate versioning]] (laterite#153) without
 deciding that question now.
 
+> [!note] Decided 2026-08-30 — per-crate, and lockstep is retired (#781)
+> The question the paragraph above deferred is answered: each published crate
+> carries its **own** `version` (the facade's own line was the precedent, not
+> the exception), bumped by `tools/release/bump_crate.py` when that crate
+> changes, published whenever a bump lands. Caret-plus-minor-for-breaking is
+> unchanged — it now applies per crate. What retired with the lockstep:
+> `tools/release/engine-version.toml`, `bump-version.sh engine`, and
+> `cut-release.sh`'s two-tier form. What the split bought on day one:
+> one crate's break no longer takes the other nine out of `check_semver`'s
+> enforcing window, and a version bump means something happened in that crate.
+> The catch-up publish (all ten at 0.11.0, 2026-08-29) was the last lockstep
+> act, deliberately first — it put every per-crate baseline level with the
+> registry, so the per-crate gates started enforced rather than vacuous.
+
 **Revised 2026-08-14 — what the rules above are a promise *about*.** Everything in
 this section is the mechanism by which the facade absorbs **engine** reshaping. It
 was being read as a promise the facade makes about **itself**, because both halves

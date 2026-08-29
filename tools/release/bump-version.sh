@@ -22,29 +22,23 @@
 # sed the version (a version-only change is exactly what `napi build` would
 # reproduce); the CI drift guard is the backstop if napi's template ever shifts.
 #
-# TWO NUMBERS, and you must say which (since 2026-08-01).
+# THIS STAMPS THE PRODUCT TIER ONLY (the wheel, the npm package, `lat`, the
+# browser package — what `pip install laterite` and `npm i laterite` resolve).
 #
-#   product  the wheel, the npm package, `lat`, the browser package. What
-#            `pip install laterite` and `npm i laterite` resolve.
-#   engine   the Rust workspace and the eight crates.io crates. What
-#            `cargo add laterite-ags4-validator` resolves.
+# The ENGINE tier stopped being one number on 2026-08-30 (#781): each published
+# crate versions per-crate, bumped with `tools/release/bump_crate.py <crate>`.
+# The lockstep this script's engine mode stamped had a cost with a name — every
+# breaking PR in one crate moved all ten, and crates.io is append-only — and it
+# is retired, not resting.
 #
-# They were one number, and the coupling had a cost with a name.
-# `laterite-ags4-wasm` is `version.workspace = true`, so shipping a browser-only
-# patch meant bumping the number every surface shared. It happened at 0.8.1 and
-# again at 0.8.2 — and because the advice below used to be "tag only what
-# changed", PyPI never saw either. Wheel versions 0.8.1 and 0.8.2 exist in git
-# history and on no registry.
-#
-# THE RULE THAT REPLACED IT: a bump and a release are the same act. If you stamp
-# a product version, every product ships at it — including the ones whose bytes
-# did not change. That is what the shared number costs, and it is what buys
-# `pip install laterite==X` and `npm i laterite@X` meaning the same thing.
+# THE PRODUCT RULE IS UNCHANGED: a bump and a release are the same act. If you
+# stamp a product version, every product ships at it — including the ones whose
+# bytes did not change. That is what the shared number costs, and it is what
+# buys `pip install laterite==X` and `npm i laterite@X` meaning the same thing.
 #
 # Usage:
 #   tools/release/bump-version.sh product minor              # 0.5.1 -> 0.6.0
 #   tools/release/bump-version.sh product patch              # 0.6.0 -> 0.6.1
-#   tools/release/bump-version.sh engine  minor              # the crates.io tier
 #   tools/release/bump-version.sh product --new-version 0.6.0rc1
 #   DRY_RUN=1 tools/release/bump-version.sh product minor    # stamp + regen, no commit
 set -euo pipefail
@@ -57,7 +51,7 @@ die() {
   exit 1
 }
 
-[ "$#" -ge 2 ] || die "usage: bump-version.sh <product|engine> <part|--new-version X>  (see header)"
+[ "$#" -ge 2 ] || die "usage: bump-version.sh product <part|--new-version X>  (see header; engine crates bump via bump_crate.py)"
 
 # The target is required rather than defaulted. A default here would be a way to
 # bump the wrong tier by omission, and the whole point of the split is that the
@@ -68,14 +62,13 @@ target="$1"; shift
 # plain quoted one. Under `set -u`, bash 3.2 -- which is what macOS still ships
 # -- treats an EMPTY array's `[@]` expansion as an unbound variable and aborts.
 # The product tier is exactly the empty case (it uses bump-my-version's default
-# config), so the plain form made `bump-version.sh product` die on macOS from the
-# moment the two-tier split introduced the array, while `engine` kept working
-# because its array is never empty.
+# config), so the plain form made `bump-version.sh product` die on macOS from
+# the moment the two-tier split introduced the array. The array survives the
+# engine mode's retirement (#781) because the empty case is the live one.
 case "$target" in
   product) CONFIG=(); SURFACES="wheel + umbrella + compat + npm + lat" ;;
-  engine)  CONFIG=(--config-file tools/release/engine-version.toml)
-           SURFACES="Rust workspace + [workspace.dependencies] (the crates.io tier)" ;;
-  *) die "unknown target '$target' — expected 'product' or 'engine'" ;;
+  engine)  die "the engine no longer bumps as one number (#781) — bump the crate that changed: tools/release/bump_crate.py <crate> <major|minor|patch>" ;;
+  *) die "unknown target '$target' — expected 'product'" ;;
 esac
 
 # --- guardrails: a release bump belongs on a clean release branch, not the trunk.
@@ -189,21 +182,6 @@ fi
 git add -A
 git commit -m "release: $new"
 
-if [ "$target" = "engine" ]; then
-cat <<EOF
-bump-version: committed 'release: engine $new' on branch '$branch'.
-Next (see RELEASING.md):
-  1. Open a PR into main and merge it.
-  2. Publish the crates.io tier from the merged main:
-       uv run --no-sync python tools/publish_crates.py            # dry run first
-       uv run --no-sync python tools/publish_crates.py --execute
-  3. An engine bump reaches NOBODY on its own — every product is built from these
-     crates and still ships the previous engine until it is rebuilt. Follow with:
-       tools/release/bump-version.sh product <part>
-     Engine changelog entries stay under [Unreleased] until that product release
-     rolls them, which is the release a reader can actually install.
-EOF
-else
 cat <<EOF
 bump-version: committed 'release: $new' on branch '$branch'.
 Next (see RELEASING.md):
@@ -229,7 +207,8 @@ Next (see RELEASING.md):
      shortcut here.
   3. Approve the 'pypi' / 'npm' environments on the resulting Actions runs.
      (The 'npm' env gates node-v* AND wasm-v*; see RELEASING-wasm.md.)
-  4. Cut the DuckDB extension at the SAME version (its own repo):
-       cd <niko86/laterite-duckdb> && bash scripts/release.sh $new
+  4. The DuckDB extension (its own repo) pins ENGINE crates, which version
+     per-crate (#781) — update its pins to the published crate versions it
+     builds against, then cut it on its own number:
+       cd <niko86/laterite-duckdb> && bash scripts/release.sh <its-version>
 EOF
-fi

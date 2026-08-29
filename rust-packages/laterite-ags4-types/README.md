@@ -39,7 +39,7 @@ writer side.
 cargo add laterite-ags4-types
 ```
 
-The engine crates move in lockstep on the workspace version.
+This crate versions independently of the engine.
 <!-- END GENERATED: availability -->
 
 ## Scope

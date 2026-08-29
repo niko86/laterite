@@ -19,16 +19,20 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 
 ## Cutting a release
 
-**There are two version numbers** (#153, split 2026-08-01):
+**There is one shared PRODUCT number, and a version per published crate**
+(#153 split product from engine 2026-08-01; #781 retired the engine lockstep
+2026-08-30):
 
 | | Covers | Resolved by | Bumped with |
 |---|---|---|---|
 | **product** | the Python wheel, the npm `laterite` package + its `@laterite/native-*` addons, the browser package, the `lat` binary, the DuckDB extension | `pip install laterite` · `npm i laterite` | `bump-version.sh product` |
-| **engine** | the Rust workspace and the ten crates.io engine crates | `cargo add laterite-ags4-validator` | `bump-version.sh engine` |
+| **each engine crate** | itself — ten crates.io engine crates + the `laterite` facade, each on its own line | `cargo add laterite-ags4-validator` | `bump_crate.py <crate> <part>` |
 
 Every **product** still shares one number, so `pip install laterite==X` and
-`npm i laterite@X` are the same release. The engine moves on its own, because it
-answers to a different audience and a different registry.
+`npm i laterite@X` are the same release. Each engine crate moves when IT
+changes: `laterite-ags4-excel` changing rarely no longer drags
+`laterite-ags4-validator`'s cadence, heterogeneous numbers across the set are
+expected, and a version bump means something happened in that crate.
 
 > [!IMPORTANT] **A bump and a release are the same act.** If you stamp a product
 > version, cut *every* product tag — not just the surfaces that changed. They
@@ -44,8 +48,9 @@ answers to a different audience and a different registry.
 uv run --no-sync python tools/release/release_status.py
 ```
 
-Prints both tiers, when each was last stamped, and a **derived** part for each.
-The engine verdict comes from the committed `cargo-public-api` snapshots in
+Prints every published crate (own version, API delta since its own last stamp,
+derived part) and the product tier. Each crate's verdict comes from ITS
+committed `cargo-public-api` snapshot in
 `tools/release/public-api/` — the only source that can see an addition, since
 `cargo semver-checks` has no `function_added` lint and skips every `minor` lint
 between releases. The product verdict comes from the `changelog.json` sections
@@ -58,44 +63,31 @@ means *not stamped in this tree*, which will not catch a stamped version whose
 tag was never cut (the 0.8.1/0.8.2 failure above). The same report runs nightly
 and lands in the run's step summary, so drift surfaces without anyone asking.
 
-### Cutting both tiers at one number
+### Cutting a product release
 
 ```bash
 git switch -c release/0.12.0
-tools/release/cut-release.sh 0.12.0            # prints the plan, then stamps both
+tools/release/cut-release.sh 0.12.0            # prints the plan, then stamps
 tools/release/cut-release.sh 0.12.0 --plan     # print the plan and stop
 ```
 
-One command, one `release: X` commit, both tiers at the same number — which is
-what makes `pip install laterite==X`, `npm i laterite@X` and
-`cargo add laterite-ags4-validator@X` mean the same release. It then prints the
-publish sequence in dependency order, because the order is forced: the engine
-goes to crates.io first (every product is built from those crates), then the
-product tags, then the DuckDB extension, which builds against the engine **from
-the registry** and so cannot move until the crates are on the index.
+One command, one `release: X` commit, the product tier only — engine crates are
+never stamped by a product cut. The old two-tier `cut-release.sh` and its
+`--skip engine` escape hatch are gone with the lockstep: skipping the engine
+existed to avoid burning eleven lockstep versions on a browser-only fix, and
+per-crate versioning dissolves the dilemma — a browser-only fix simply bumps no
+engine crate.
 
-`--skip engine` is the escape hatch, and it is there for one reason: crates.io is
-append-only, so burning eleven crate versions on a browser-only fix is a cost
-worth being able to decline. That is precisely the 0.8.1/0.8.2 case. The two
-numbers stay two fields for the same reason — `cut-release.sh` defaults them to
-the same value, it does not merge them.
-
-The single-tier `bump-version.sh` below is still there and still correct; reach
-for it when you genuinely mean one tier only.
-
-`tools/release/bump-version.sh <product|engine>` drives the in-repo bump
-(wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/)
-— product config in the root `pyproject.toml` `[tool.bumpversion]`, engine config
-in `tools/release/engine-version.toml` — plus lockfile regeneration). The target
-is required; there is no default, because bumping the wrong tier by omission is
-exactly the failure the split exists to prevent. The DuckDB extension lives in
+`tools/release/bump-version.sh product` drives the in-repo bump (wrapping
+[`bump-my-version`](https://callowayproject.github.io/bump-my-version/) —
+product config in the root `pyproject.toml` `[tool.bumpversion]` — plus
+lockfile regeneration). The DuckDB extension lives in
 its own repo and takes the **product** number when you cut it (below). The **docs
 site** carries the version too — it's derived at build and republishes on merge.
 
-Two crates sit outside both tiers on purpose: `laterite` (its own `0.1.x` until
-it reaches feature parity with the Python and Node surfaces, then it joins the
-product line) and `laterite-cli` (the product number, so `lat --version` agrees
-with the wheel's `lat`).
+The facade (`laterite`, its own `0.1.x` line) is just another per-crate line
+since #781 — it was the scheme's precedent, not an exception. `laterite-cli`
+carries the product number, so `lat --version` agrees with the wheel's `lat`.
 
 **Never hand-edit a version string** — `test_version_faithful.py`, the compat
 guard, and the `release.yml` tag-check all catch drift.
@@ -226,20 +218,31 @@ must match a fresh build — a stale one reds that guard). `web/src/wasm/package
 is gitignored and wasm-pack regenerates it from the crate version; the docs
 Changelog page derives its version at build. Neither needs stamping.
 
-### Cutting an engine release (crates.io)
+### Bumping and publishing engine crates (crates.io)
 
-Separate from the product flow above, and usually *before* it: the engine is the
-substrate every product is rebuilt from.
+Per-crate since #781: bump the crate that changed, when it changes — usually in
+(or right after) the PR that changed it, never as a side effect of a product
+cut.
 
 ```bash
-git switch -c release/engine-0.10.0
-tools/release/bump-version.sh engine minor   # stamps rust-packages/Cargo.toml only
-gh pr create -B main -t "release: engine 0.10.0" -b "engine version bump"
+uv run --no-project python tools/release/bump_crate.py laterite-ags4-emit minor
+git switch -c release/emit-0.12.0 && git add -A && git commit -m "release: laterite-ags4-emit 0.12.0"
+gh pr create -B main -t "release: laterite-ags4-emit 0.12.0" -b "per-crate bump"
 
 # once merged, publish from GitHub — never from a laptop (#463):
 gh workflow run publish-crates.yml --ref main                      # rehearsal: prints the waves
 gh workflow run publish-crates.yml --ref main -f execute=true      # the real thing
 ```
+
+`bump_crate.py` rewrites the pair that must agree — the crate's own `version`
+and its `[workspace.dependencies]` floor — regenerates `Cargo.lock`, and runs
+the faithfulness gate. The publisher then publishes every crate whose version
+is ahead of the registry and **skips the rest by version identity** — which
+after a real bump is the correct skip, and without one is the trap #781
+records: a crate whose content changed at an unchanged version silently stays
+stale on the registry. `check_semver` is the other half of the discipline: a
+crate LEVEL with the registry has every lint enforced, so a break demands its
+bump before it merges.
 
 Then **approve the `crates` environment** in the resulting Actions run, the same
 way `pypi` and `npm` are approved.
@@ -264,9 +267,10 @@ registry before starting the next, and is idempotent — a re-run after a failur
 resumes rather than restarting. It refuses a dirty tree, any branch but `main`,
 and any crate marked `publish = false`.
 
-**An engine release reaches nobody on its own.** Every product is built from
-these crates and keeps shipping the previous engine until it is rebuilt, so
-follow with a product bump. Engine changelog entries stay under `[Unreleased]`
+**An engine publish reaches crates.io consumers and `laterite-duckdb` only.**
+Every product compiles the engine SOURCE from the tree (bare `path` deps), so
+wheel/npm/CLI/wasm users get engine changes with the next product cut whether
+or not the crates published. Engine changelog entries stay under `[Unreleased]`
 until that product release rolls them — which is the release a reader can
 actually install.
 

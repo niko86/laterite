@@ -378,13 +378,14 @@ replace = "`{new_version}` — the laterite release."
 # entries were removed here after the hand-maintained CHANGELOG.md was retired in
 # favour of the generated one — leaving them made a bump abort on a missing file.)
 
-# The Rust workspace is NO LONGER stamped here. It moved to its own config,
-# `tools/release/engine-version.toml`, on 2026-08-01: the engine crates answer to
-# `cargo add`, the products answer to `pip install` / `npm i`, and they move for
-# different reasons. Driving both from this one number is what made a browser-only
-# patch bump every surface — twice, producing wheel versions 0.8.1 and 0.8.2 that
-# exist in git history and on no registry. `tools/release/bump-version.sh` now
-# takes an explicit target; see `ags-wiki/design/dec-rust-api-crates-io.md`.
+# The Rust workspace is NO LONGER stamped here — split out 2026-08-01, because
+# the engine crates answer to `cargo add` while the products answer to
+# `pip install` / `npm i`, and driving both from one number made a browser-only
+# patch bump every surface (twice, producing wheel versions 0.8.1 and 0.8.2 that
+# exist in git history and on no registry). Since #781 (2026-08-30) the engine
+# is not one number at all: each published crate carries its own version,
+# bumped by `tools/release/bump_crate.py`; see
+# `ags-wiki/design/dec-rust-api-crates-io.md`.
 #
 # FOUR Rust crates are stamped here, and the rule is one line: a crate that
 # SHIPS AS A PRODUCT carries the number people install by, not the engine's.

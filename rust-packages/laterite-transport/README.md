@@ -33,7 +33,7 @@ that never touch the filesystem.
 cargo add laterite-transport
 ```
 
-The engine crates move in lockstep on the workspace version.
+This crate versions independently of the engine.
 <!-- END GENERATED: availability -->
 
 ## Content-agnostic on purpose

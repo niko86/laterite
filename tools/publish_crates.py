@@ -126,12 +126,16 @@ def manifest(crate: str) -> dict:
 def crate_version(crate: str) -> str:
     """`crate`'s published version, resolving workspace inheritance.
 
-    Per-crate, NOT one number for the whole run. The engine crates inherit the
-    workspace version in lockstep, but `laterite` — the user-facing facade —
-    carries its own 0.1.x, deliberately: it is a different promise to a
-    different audience. A single `workspace_version()` here would have asked
-    crates.io whether `laterite 0.9.0` was published, got "no" for a version
-    that does not exist, and tried to publish it.
+    Per-crate, NOT one number for the whole run — and since #781 that is the
+    scheme, not an exception: every published crate carries its own version
+    (the facade always did; the engine crates joined it when the lockstep was
+    retired). The workspace-inheritance branch below survives for any future
+    member that still inherits, and because deleting a working fallback buys
+    nothing.
+
+    One known trap, recorded on #781: the skip below compares VERSION identity,
+    not manifest content. A crate whose content changed at an unchanged version
+    is skipped silently — bump it first (tools/release/bump_crate.py).
     """
     pkg = manifest(crate)["package"]
     version = pkg.get("version")

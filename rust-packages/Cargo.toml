@@ -66,6 +66,12 @@ members = [
 # reaches parity) and `laterite-cli` (the product version, so `lat --version`
 # agrees with the wheel's `lat`).
 [workspace.package]
+# The UNPUBLISHED members' shared number only (the QA tools, cliutil, censor,
+# compliance, the wasm tokenizer) — inert, never on a registry. The ten
+# published engine crates each carry their OWN `version` since #781 (per-crate
+# versioning, decided 2026-08-29); the facade always did; the four product
+# surfaces carry the product number. Bump a published crate with
+# `tools/release/bump_crate.py`, never by editing this line.
 version = "0.11.0"
 # crates.io bakes metadata into the PUBLISHED VERSION, not into the crate. Adding
 # `repository` after a publish fixes future versions only — the pages for the
@@ -109,6 +115,11 @@ repository = "https://github.com/niko86/laterite"
 # keychain/registry/codec without the `transport` feature, whose `age` dependency
 # pulls getrandom. A future member that wants the default build asks for it by
 # name — `{ workspace = true, features = ["transport"] }`.
+# Each entry's `version` is the PUBLISH FLOOR a sibling declares on this crate
+# (cargo strips `path` at publish; locally the path always wins). Since #781 it
+# must equal THAT crate's own `version` — per crate, not one shared number.
+# `test_engine_dependency_versions_match_engine` asserts the equality, and
+# `bump_crate.py` rewrites the pair together so it cannot drift by hand.
 laterite-ags4-core = { path = "laterite-ags4-core", version = "0.11.0", default-features = false }
 laterite-ags4-diff = { path = "laterite-ags4-diff", version = "0.11.0" }
 laterite-ags4-emit = { path = "laterite-ags4-emit", version = "0.11.0" }

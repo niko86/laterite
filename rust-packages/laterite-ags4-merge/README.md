@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 cargo add laterite-ags4-merge
 ```
 
-The engine crates move in lockstep on the workspace version.
+This crate versions independently of the engine.
 <!-- END GENERATED: availability -->
 
 ## Why this is a crate
