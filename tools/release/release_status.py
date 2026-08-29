@@ -2,8 +2,9 @@
 
 ## Why this exists
 
-The two version tiers (`product` and `engine`, split 2026-08-01) each move only
-when someone runs `bump-version.sh`. Nothing bumps on merge, which is correct —
+The product tier moves only when someone runs `bump-version.sh`; each published
+engine crate moves only when someone runs `bump_crate.py` on it (per-crate since
+#781). Nothing bumps on merge, which is correct —
 a release is a decision, not a side effect. But nothing said a release was
 *owed* either, and the two drifted: between engine 0.9.0 (#184) and this being
 written, the product shipped three times (0.10.0, 0.10.1, 0.11.0) while the
@@ -19,7 +20,8 @@ The bump part is DERIVED, from the two records this repo already keeps and
 already gates:
 
 * `tools/release/public-api/*.txt` — committed `cargo-public-api` snapshots, the
-  factual public surface per published crate. A `+pub` line is an addition, a
+  factual public surface per published crate — and, since #781, the census of
+  the per-crate engine tier: one snapshot, one crate, one verdict. A `+pub` line is an addition, a
   `-pub` line is a removal. This is the only source for the additive axis:
   `cargo semver-checks` has **no `function_added` lint at all**, so an addition
   is invisible to it by construction (it also skips every `minor` lint when
@@ -100,12 +102,18 @@ def version_of(manifest: Path, pattern: str) -> str:
     return m.group(1) if m else "?"
 
 
-def engine_version() -> str:
-    # The [workspace.package] one, not the [workspace.dependencies] pins that
-    # happen to carry the same string.
-    text = ENGINE_MANIFEST.read_text()
-    head = text.index("[workspace.package]")
-    return version_of_text(text[head:])
+def engine_crates() -> list[str]:
+    """The published set, derived from the snapshots — one file per crate.
+
+    The snapshot directory is already the census of what has a public API to
+    answer for; a crate joining the publish set gains a snapshot in the same PR
+    (check_public_api refuses otherwise), so there is no second list to forget.
+    """
+    return sorted(f.stem for f in SNAPSHOTS.glob("*.txt"))
+
+
+def crate_manifest(crate: str) -> Path:
+    return ROOT / "rust-packages" / crate / "Cargo.toml"
 
 
 def version_of_text(text: str) -> str:
@@ -139,16 +147,21 @@ def last_stamp(manifest: Path, anchor: str) -> tuple[str, str]:
     return sha, rest
 
 
-def api_delta(since: str) -> tuple[int, int, list[str]]:
-    """Net public-API additions and removals in the snapshots since `since`.
+def api_delta(since: str, crate: str) -> tuple[int, int, list[str]]:
+    """Net public-API additions and removals in ONE crate's snapshot since `since`.
 
     Net, not raw: a snapshot regeneration can rewrite a line in place, which
     shows as one `-pub` and one `+pub` for the same signature and is not a
     change to the surface at all.
+
+    Per crate since #781: the whole-directory diff this used to take collapsed
+    eleven independently versioned surfaces into one verdict, which is exactly
+    the reading lockstep imposed and per-crate versioning exists to retire.
     """
     if not since:
         return 0, 0, []
-    diff = sh("git", "diff", f"{since}..HEAD", "--", str(SNAPSHOTS.relative_to(ROOT)))
+    snap = SNAPSHOTS / f"{crate}.txt"
+    diff = sh("git", "diff", f"{since}..HEAD", "--", str(snap.relative_to(ROOT)))
     added = {ln[1:] for ln in diff.splitlines() if ln.startswith("+pub")}
     removed = {ln[1:] for ln in diff.splitlines() if ln.startswith("-pub")}
     net_add, net_rm = added - removed, removed - added
@@ -176,21 +189,26 @@ def verdict_from_api(added: int, removed: int) -> str:
 
 
 def collect() -> dict:
-    engine_sha, engine_stamp = last_stamp(
-        ENGINE_MANIFEST, "/^\\[workspace.package\\]/,+2"
-    )
     _, product_stamp = last_stamp(PRODUCT_MANIFEST, "/^version/,+1")
-    added, removed, removed_names = api_delta(engine_sha)
     sections = changelog_sections()
+    crates = []
+    for crate in engine_crates():
+        manifest = crate_manifest(crate)
+        sha, stamp = last_stamp(manifest, "/^version/,+1")
+        added, removed, removed_names = api_delta(sha, crate)
+        crates.append(
+            {
+                "crate": crate,
+                "version": version_of(manifest, r'^version\s*=\s*"([^"]+)"'),
+                "last_stamp": stamp,
+                "api_added": added,
+                "api_removed": removed,
+                "api_removed_names": removed_names[:20],
+                "verdict": verdict_from_api(added, removed),
+            }
+        )
     return {
-        "engine": {
-            "version": engine_version(),
-            "last_stamp": engine_stamp,
-            "api_added": added,
-            "api_removed": removed,
-            "api_removed_names": removed_names[:20],
-            "verdict": verdict_from_api(added, removed),
-        },
+        "engine_crates": crates,
         "product": {
             "version": version_of(PRODUCT_MANIFEST, r'^version\s*=\s*"([^"]+)"'),
             "last_stamp": product_stamp,
@@ -201,11 +219,16 @@ def collect() -> dict:
 
 
 def render(s: dict) -> str:
-    e, p = s["engine"], s["product"]
+    p = s["product"]
     lines = [
-        f"engine   {e['version']:<10} last stamped {e['last_stamp']}",
-        f"         public API since: +{e['api_added']} -{e['api_removed']}"
-        f"   ->  {e['verdict'].upper()}",
+        "engine crates (per-crate since #781; verdict = API delta since its own last stamp):"
+    ]
+    for c in s["engine_crates"]:
+        flag = "" if c["verdict"] == "none" else f"   ->  {c['verdict'].upper()}"
+        lines.append(
+            f"  {c['crate']:<26} {c['version']:<8} +{c['api_added']} -{c['api_removed']}{flag}"
+        )
+    lines += [
         f"product  {p['version']:<10} last stamped {p['last_stamp']}",
         "         changelog [unreleased]: "
         + (
@@ -214,12 +237,15 @@ def render(s: dict) -> str:
         )
         + f"   ->  {p['verdict'].upper()}",
     ]
-    if e["api_removed_names"]:
+    removed = [
+        (c["crate"], n) for c in s["engine_crates"] for n in c["api_removed_names"]
+    ]
+    if removed:
         lines.append("")
         lines.append(
-            "  public API REMOVED since the last engine stamp — a consumer has to follow:"
+            "  public API REMOVED since a crate's last stamp — a consumer has to follow:"
         )
-        lines += [f"    {n}" for n in e["api_removed_names"]]
+        lines += [f"    {crate}: {n}" for crate, n in removed]
     n_changed = s["changelog_unreleased"].get(AMBIGUOUS, 0)
     if n_changed:
         lines.append("")
@@ -233,7 +259,7 @@ def render(s: dict) -> str:
         lines.append("  a signature that moved is a major.")
     lines.append("")
     lines.append(
-        "  the engine verdict is from the API snapshots; the product verdict is from the"
+        "  each crate's verdict is from ITS API snapshot; the product verdict is from the"
     )
     lines.append(
         "  changelog sections. The product's own API surface is NOT measured — no committed"
@@ -249,19 +275,19 @@ def render(s: dict) -> str:
 
 
 def render_nag(s: dict) -> str:
-    e, p = s["engine"], s["product"]
-    owed = [
-        t
-        for t, v in (("engine", e["verdict"]), ("product", p["verdict"]))
-        if v != "none"
-    ]
-    if not owed:
-        return "release-status: nothing owed — engine and product are both level with the tree."
-    return (
-        f"release-status: engine {e['version']} (+{e['api_added']} -{e['api_removed']} API) · "
-        f"product {p['version']} · {' + '.join(owed)} release owed "
-        f"(engine {e['verdict']}, product {p['verdict']})"
-    )
+    p = s["product"]
+    owed_crates = [c for c in s["engine_crates"] if c["verdict"] != "none"]
+    parts = []
+    if owed_crates:
+        parts.append(
+            "crate bumps owed: "
+            + ", ".join(f"{c['crate']} ({c['verdict']})" for c in owed_crates)
+        )
+    if p["verdict"] != "none":
+        parts.append(f"product {p['version']} release owed ({p['verdict']})")
+    if not parts:
+        return "release-status: nothing owed — every crate and the product are level with their stamps."
+    return "release-status: " + " · ".join(parts)
 
 
 def main() -> int:

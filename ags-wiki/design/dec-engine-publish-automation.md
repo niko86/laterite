@@ -79,6 +79,19 @@ Two conditions were considered; only one needs watching.
   engine crate is `version.workspace = true`. It cannot arrive by accident, only
   as a deliberate decision, and that decision reopens this question by itself.
   Nothing needs to watch for it.
+
+  > [!note] This trigger fired: per-crate landed 2026-08-30 (#781)
+  > Every published crate now carries its own `version`
+  > (`tools/release/bump_crate.py` moves one; the lockstep files are retired),
+  > so this page's question is REOPENED as #781 predicted — and #781 already
+  > frames it: the owner's model wants a **nightly per-crate cut decision**
+  > (derive each crate's part from its API snapshot, cut when warranted,
+  > fail fast on a compile error and publish nothing on a partial build),
+  > which is release-plz's native shape. The decision to make is now
+  > **build vs adopt**: `release_status.py` already derives per-crate verdicts
+  > nightly (the build half's report exists), and Trusted Publishing already
+  > owns the upload, so what release-plz would add is the cut itself. Decide it
+  > on #781's step 4, and record the answer here.
 - **The crates.io publish needs to leave the maintainer's laptop.** The stronger
   trigger, and the one that was being tracked — see
   [#463](https://github.com/niko86/laterite/issues/463), which carries the

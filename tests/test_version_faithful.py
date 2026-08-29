@@ -6,7 +6,7 @@ entire point of the split.
 
     PRODUCT  the wheel, the umbrella, the compat prefix, the npm package, `lat`.
              What `pip install laterite` and `npm i laterite` resolve.
-    ENGINE   the Rust workspace and the crates.io tier. What
+    ENGINE   the published crates, versioned PER-CRATE since #781. What
              `cargo add laterite-ags4-validator` resolves.
 
 They were one number until 2026-08-01, and the coupling had a cost with a name.
@@ -68,9 +68,28 @@ def _toml(rel: str) -> dict:
 #: The shipped wheel's version — the value every other PRODUCT stamp mirrors.
 PRODUCT = _toml("packages/laterite/pyproject.toml")["project"]["version"]
 
-#: `[workspace.package].version` — inherited by every member crate that says
-#: `version.workspace = true`, and declared on the published crates' siblings.
-ENGINE = _toml("rust-packages/Cargo.toml")["workspace"]["package"]["version"]
+#: `[workspace.package].version` — since #781 inherited only by the UNPUBLISHED
+#: members (QA tools, cliutil, censor…); the published crates version per-crate.
+WORKSPACE = _toml("rust-packages/Cargo.toml")["workspace"]["package"]["version"]
+
+
+def _crate_version(crate: str) -> str | None:
+    """The crate's OWN `version`, None if it inherits the workspace one."""
+    v = _toml(f"rust-packages/{crate}/Cargo.toml")["package"].get("version")
+    return None if isinstance(v, dict) else v
+
+
+#: Every published crate's own version — the per-crate engine tier (#781).
+ENGINE_CRATES = {
+    name: _crate_version(name)
+    for name in sorted(
+        d.name
+        for d in (_REPO / "rust-packages").iterdir()
+        if (d / "Cargo.toml").exists()
+        and "publish = false" not in (d / "Cargo.toml").read_text()
+        and d.name != "laterite"  # the facade is its own line, asserted separately
+    )
+}
 
 
 # --- PRODUCT -------------------------------------------------------------
@@ -188,7 +207,7 @@ def test_product_crates_are_on_the_product_number() -> None:
         got = _toml(f"rust-packages/{crate}/Cargo.toml")["package"].get("version")
         assert got == PRODUCT, (
             f"{crate} is {got!r}, not the product {PRODUCT!r}"
-            + (" (it inherits the ENGINE version)" if got is None else "")
+            + (" (it inherits the workspace version)" if got is None else "")
             + f" — {consequence}"
         )
 
@@ -366,12 +385,13 @@ def test_shipped_readmes_carry_no_superseded_version() -> None:
     naming a version is covered the day it lands, with no list to maintain.
 
     A live tier's number is never "superseded", even when it collides with a past
-    product release. ENGINE is 0.9.0 today and `0.9.0` is also a past product
-    version — an engine README citing its own current version is correct, and a
-    gate that flagged it would be wrong in the direction that gets gates deleted.
+    product release — an engine README citing its own crate's current version is
+    correct, and a gate that flagged it would be wrong in the direction that gets
+    gates deleted. Since #781 the engine is not one number: every published
+    crate's own version is live.
     """
     facade = _toml("rust-packages/laterite/Cargo.toml")["package"]["version"]
-    live = {PRODUCT, ENGINE, facade}
+    live = {PRODUCT, WORKSPACE, facade} | {v for v in ENGINE_CRATES.values() if v}
     superseded = {
         r["version"]
         for r in json.loads((_REPO / "changelog.json").read_text())["releases"]
@@ -389,7 +409,7 @@ def test_shipped_readmes_carry_no_superseded_version() -> None:
     assert not stale, (
         "a README that ships to a registry names a superseded version:\n  "
         + "\n  ".join(stale)
-        + f"\n\nLive tiers: product {PRODUCT}, engine {ENGINE}, facade {facade}. "
+        + f"\n\nLive: product {PRODUCT}, facade {facade}, engine crates {sorted({v for v in ENGINE_CRATES.values() if v})}. "
         "These pages are permanent once published — fix before the next release."
     )
 
@@ -398,28 +418,34 @@ def test_shipped_readmes_carry_no_superseded_version() -> None:
 
 
 def test_engine_dependency_versions_match_engine() -> None:
-    """The `[workspace.dependencies]` versions track `[workspace.package]`.
+    """Each `[workspace.dependencies]` version equals THAT crate's own version.
 
-    These exist so `cargo package` will accept the crates at all — publishing strips
-    `path`, so a dependency with no version requirement is rejected outright. They
-    are inert locally (the path still wins), which is exactly what makes them easy
-    to leave behind: nothing in a normal build or test run reads them, so a stale
-    one would surface only at publish, as crates pinned to a version that no longer
-    matches the engine they shipped with.
+    The entries exist so `cargo package` will accept the crates at all —
+    publishing strips `path`, so a dependency with no version requirement is
+    rejected outright. They are inert locally (the path still wins), which is
+    exactly what makes them easy to leave behind: nothing in a normal build or
+    test run reads them, so a stale one would surface only at publish, as a
+    crate pinned to a sibling version that is not what the tree beside it holds.
 
-    They ride the same `version = "{current_version}"` substitution as
-    `workspace.package.version` — same file, and bump-my-version rewrites every
-    occurrence, not just the first. This test is what says that out loud, so the
-    lockstep is asserted rather than assumed to hold.
+    Under lockstep this asserted one shared number. Since #781 it asserts the
+    per-crate PAIR: `bump_crate.py` rewrites a crate's manifest and its
+    workspace entry together, and this is the gate that fires if either is
+    ever moved alone.
     """
     deps = _toml("rust-packages/Cargo.toml")["workspace"].get("dependencies", {})
     ours = {n: s for n, s in deps.items() if n.startswith("laterite")}
     assert ours, "no in-workspace [workspace.dependencies] entries found at all"
     for name, spec in ours.items():
-        assert spec.get("version") == ENGINE, (
-            f"[workspace.dependencies] {name} is pinned to {spec.get('version')!r}, "
-            f"not the engine {ENGINE!r} — a publish would declare a dependency "
-            "on a version that is not this engine"
+        own = _crate_version(name)
+        assert own is not None, (
+            f"{name} is in [workspace.dependencies] but inherits the workspace "
+            "version — a published crate carries its OWN version since #781"
+        )
+        assert spec.get("version") == own, (
+            f"[workspace.dependencies] {name} is pinned to {spec.get('version')!r} "
+            f"but the crate's own manifest says {own!r} — a publish would declare "
+            "a dependency on a version that is not what ships. bump_crate.py "
+            "moves the pair together; something moved one alone"
         )
         assert "path" in spec, (
             f"[workspace.dependencies] {name} lost its `path` — the local build "
@@ -427,30 +453,21 @@ def test_engine_dependency_versions_match_engine() -> None:
         )
 
 
-def test_engine_bump_config_tracks_the_workspace() -> None:
-    """`tools/release/engine-version.toml` is the engine's bookkeeping value.
-
-    It is a second file holding the same number, which is exactly the shape that
-    goes stale — and it goes stale silently, because nothing in a build reads it.
-    A wrong value here does not fail until the next engine bump computes the new
-    version from the wrong old one.
-    """
-    cfg = _toml("tools/release/engine-version.toml")["tool"]["bumpversion"]
-    assert cfg["current_version"] == ENGINE, (
-        f"engine-version.toml says {cfg['current_version']!r} but the workspace is "
-        f"{ENGINE!r} — the next `bump-version.sh engine` would bump from the wrong base"
-    )
-
-
 # --- the seam itself -----------------------------------------------------
 
 
 def test_the_two_tiers_are_stamped_from_different_configs() -> None:
-    """Neither bump config may stamp the other tier's files.
+    """The product bump may not reach the engine crates, nor the workspace.
 
-    The split is only real if the two stamping paths are disjoint. An entry added
-    to the wrong config would silently restore the lockstep — and it would look
-    like it was working, because the two numbers are equal today.
+    The split is only real if the stamping paths are disjoint. Under lockstep
+    the other half of this test held `engine-version.toml` to the same
+    discipline; that file is retired (#781) and the engine side is now
+    `bump_crate.py`, whose write set is the crate manifest plus its
+    `[workspace.dependencies]` entry — asserted per crate by
+    `test_engine_dependency_versions_match_engine` above. What is left to hold
+    HERE is the product config's reach: an engine path added to it would
+    silently restore the lockstep, and it would look like it was working
+    whenever the numbers happened to be equal.
     """
     product_files = {
         f["filename"] for f in _toml("pyproject.toml")["tool"]["bumpversion"]["files"]
@@ -460,23 +477,17 @@ def test_the_two_tiers_are_stamped_from_different_configs() -> None:
             f"{crate} is asserted to carry the product version but nothing stamps "
             "it — a bump would leave it behind at the old number"
         )
-    engine_files = {
-        f["filename"]
-        for f in _toml("tools/release/engine-version.toml")["tool"]["bumpversion"][
-            "files"
-        ]
-    }
 
     assert "rust-packages/Cargo.toml" not in product_files, (
         "the product bump would stamp the Rust workspace — that is the coupling "
         "that produced the phantom 0.8.1/0.8.2"
     )
-    assert "rust-packages/Cargo.toml" in engine_files, (
-        "nothing stamps the Rust workspace — an engine bump would move no crate"
-    )
-    assert not (product_files & engine_files), (
-        f"both configs stamp {sorted(product_files & engine_files)} — one file "
-        "cannot belong to two independent version lines"
+    engine_manifests = {f"rust-packages/{name}/Cargo.toml" for name in ENGINE_CRATES}
+    reached = sorted(product_files & engine_manifests)
+    assert not reached, (
+        f"the product bump stamps published engine crate manifest(s) {reached} — "
+        "engine crates version per-crate (#781); a product entry there restores "
+        "the lockstep by the back door"
     )
 
 

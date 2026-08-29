@@ -124,6 +124,9 @@
       },
       {
         "text": "**`build_ags4`'s emit adds nothing to its peak memory any more.** The validating re-parse never needed validate-during-emit — it needed sequencing: the formatted copy now drops before validation, which puts the re-parse entirely off-peak with the validator untouched, and the PyO3 host consumes its input row by row within a group through a new consuming entry point, `emit_ags4_owned(Vec<GroupInput>)` (#789). Row-by-row matters when one group dominates — per-group consumption still holds a 2.4M-row group's whole input live as its last row formats. After this and the `EmitGroup.rows` fix (#788), the high-water mark is set by the caller's input finishing, before formatting starts: 27.1x the emitted output down to 10.7x, requested bytes at peak, on the workload recorded in the issues. `emit_ags4(&[GroupInput])` is unchanged for every existing caller."
+      },
+      {
+        "text": "**The engine crates version per-crate — the lockstep is retired.** Ten crates.io crates shared one number inherited from the workspace, so one crate's breaking change stamped and published all ten, a browser-only fix once burned a version on every surface, and an unchanged crate's version history said nothing. Each published crate now carries its own version (the `laterite` facade's own line was the precedent), moves when it changes, and publishes individually — heterogeneous numbers across the set are the design, not drift. For a crates.io consumer nothing moves until the next per-crate bumps land; from then on `cargo add` sees versions that mean something happened in that crate. The release tooling followed: `bump_crate.py` bumps one crate (its manifest and its `[workspace.dependencies]` floor together), `cut-release.sh` cuts the product alone, and the nightly release-status report derives a verdict per crate from its own API snapshot."
       }
     ],
     "deprecated": [
