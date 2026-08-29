@@ -2314,7 +2314,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-types"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "arrow",
  "chrono",

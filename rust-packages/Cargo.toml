@@ -127,7 +127,7 @@ laterite-ags4-merge = { path = "laterite-ags4-merge", version = "0.11.0" }
 laterite-ags4-parse = { path = "laterite-ags4-parse", version = "0.11.0" }
 laterite-ags4-reference = { path = "laterite-ags4-reference", version = "0.11.0" }
 laterite-ags4-trust = { path = "laterite-ags4-trust", version = "0.11.0" }
-laterite-ags4-types = { path = "laterite-ags4-types", version = "0.11.0" }
+laterite-ags4-types = { path = "laterite-ags4-types", version = "0.11.1" }
 laterite-ags4-validator = { path = "laterite-ags4-validator", version = "0.11.0" }
 laterite-transport = { path = "laterite-transport", version = "0.11.0" }
 
