@@ -119,8 +119,10 @@ another engine crate costs nothing release-plz would refund.
 ## Consequences
 
 - `repo:tools/publish_crates.py` stays, and stays the only publish path for the
-  engine tier. `repo:tools/release/engine-version.toml` and its guard test stay
-  with it.
+  engine tier. ~~`engine-version.toml` and its guard test stay with it.~~
+  **Overtaken 2026-08-29:** #781's per-crate versioning (landed in #795)
+  retired the lockstep pin file; bumps go through
+  `repo:tools/release/bump_crate.py` now.
 - ~~The highest-consequence manual step in the release process remains manual, on
   the one registry that cannot be corrected after the fact.~~ **Paid, in #463.**
   The publish runs from GitHub behind the `crates` environment's reviewer, so the

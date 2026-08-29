@@ -20,7 +20,7 @@
 
 [package]
 name = "laterite-ags4-emit"
-version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.13.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "AGS4 producer — typed data -> valid AGS4 plaintext, DuckDB-free + wasm-safe"
@@ -45,12 +45,14 @@ laterite-ags4-types = { workspace = true }
 # The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
 # rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
 laterite-ags4-validator = { workspace = true }
-# Cells arrive as serde_json::Value (typed from Arrow/frames, or strings
-# from browser JSON); ags4_str/parse_value already speak this shape.
-serde_json = "1"
+# NO serde_json here, and that is load-bearing (#790): cells arrive as the
+# laterite-ags4-types `Cell` — a scalar enum immune to the `preserve_order`
+# feature-unification that swells `Value` workspace-wide. The absence is the
+# ratchet: this crate cannot grow a JSON-value hot path back without a
+# Cargo.toml diff saying so.
 # parse_bytes wants a &'static Encoding; we always emit/re-read UTF-8.
 encoding_rs = "0.8"
-# Optional: the Arrow→Value cell transpose (`arrow_in`), shared by BOTH
+# Optional: the Arrow→Cell transpose (`arrow_in`), shared by BOTH
 # emit hosts — native (laterite-py, off the DuckDB capsule) and wasm
 # (laterite-ags4-wasm, off an Arrow IPC stream) — so the conversion lives in one
 # place, not copied per host. default-features=false keeps it lean (no

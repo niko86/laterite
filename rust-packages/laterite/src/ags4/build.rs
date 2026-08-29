@@ -13,11 +13,14 @@ use crate::{Error, ErrorKind};
 /// it a string is a statement that the string is already what you want written,
 /// and it goes out verbatim.
 ///
-/// This is our own enum rather than a serialisation library's value type. That
-/// is the facade's central rule — no third-party type in a public signature —
-/// and it is load-bearing here: the engine's own row type is a
-/// `serde_json::Value`, so exposing that would let `serde_json`'s major version
-/// dictate ours.
+/// This is our own enum rather than the engine's. That is the facade's
+/// central rule — no non-`laterite` type in a public signature — and though
+/// the engine's row type is now a near-identical scalar enum of our own
+/// (`laterite_ags4_types::Cell`, since #790; it was a `serde_json::Value`,
+/// which is what this type was built to keep out of our API), the gate that
+/// enforces the rule (`tools/check_public_api.py`) cannot tell a benign
+/// engine type from a binding one, and holding the two apart keeps the
+/// engine free to reshape its cell without the facade's semver noticing.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cell {
@@ -81,13 +84,19 @@ impl<T: Into<Cell>> From<Option<T>> for Cell {
 }
 
 impl Cell {
-    fn to_engine(&self) -> serde_json::Value {
+    /// Consuming on purpose: `Text` moves its `String` across the boundary
+    /// instead of cloning it per cell — the same peak-shaving #788/#789
+    /// applied at the emit door, applied at this one (#790). A non-finite
+    /// float still crosses as the engine's `Null`, exactly as it did when
+    /// the engine cell was a `serde_json::Value` (JSON cannot carry NaN, and
+    /// the emitted bytes are pinned to the blank it produced).
+    fn into_engine(self) -> laterite_ags4_emit::Cell {
         match self {
-            Cell::Null => serde_json::Value::Null,
-            Cell::Text(s) => serde_json::Value::from(s.as_str()),
-            Cell::Int(v) => serde_json::Value::from(*v),
-            Cell::Float(v) => serde_json::Value::from(*v),
-            Cell::Bool(v) => serde_json::Value::from(*v),
+            Cell::Null => laterite_ags4_emit::Cell::Null,
+            Cell::Text(s) => laterite_ags4_emit::Cell::Text(s),
+            Cell::Int(v) => laterite_ags4_emit::Cell::Int(v),
+            Cell::Float(v) => laterite_ags4_emit::Cell::from(v),
+            Cell::Bool(v) => laterite_ags4_emit::Cell::Bool(v),
         }
     }
 }
@@ -182,8 +191,9 @@ impl GroupData {
         self.rows.is_empty()
     }
 
-    /// Check arity and hand the engine its own shape.
-    fn to_engine(&self) -> Result<GroupInput, Error> {
+    /// Check arity and hand the engine its own shape. Consuming: the rows
+    /// move — see [`Cell::into_engine`].
+    fn into_engine(self) -> Result<GroupInput, Error> {
         let width = self.headings.len();
         // Checked here, not by the emitter. A short row is padded by the safe
         // fix set and a long one is silently truncated by the writer, so a
@@ -220,14 +230,14 @@ impl GroupData {
             }
         }
         Ok(GroupInput {
-            code: self.code.clone(),
-            headings: self.headings.clone(),
-            units: self.units.clone(),
-            types: self.types.clone(),
+            code: self.code,
+            headings: self.headings,
+            units: self.units,
+            types: self.types,
             rows: self
                 .rows
-                .iter()
-                .map(|r| r.iter().map(Cell::to_engine).collect())
+                .into_iter()
+                .map(|r| r.into_iter().map(Cell::into_engine).collect())
                 .collect(),
         })
     }
@@ -355,8 +365,8 @@ impl Build {
     pub fn run(self) -> Result<Written, Error> {
         let groups = self
             .groups
-            .iter()
-            .map(GroupData::to_engine)
+            .into_iter()
+            .map(GroupData::into_engine)
             .collect::<Result<Vec<_>, _>>()?;
         emit_groups(
             &groups,

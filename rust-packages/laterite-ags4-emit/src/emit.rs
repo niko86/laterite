@@ -18,13 +18,12 @@
 //! Steps 1–3 are pure formatting; step 4 reuses the validator's shipped
 //! parse / `run_all` / `compute_fixes` / `apply_fixes` — no new fix logic.
 
-use laterite_ags4_types::ags4_str;
+use laterite_ags4_types::{Cell, ags4_str};
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
-use serde_json::Value;
 use std::collections::BTreeSet;
 
 use crate::error::EmitError;
@@ -32,14 +31,16 @@ use crate::writer::{EmitGroup, write_ags4};
 
 /// One group's data to emit. `units` / `types` are optional per-heading
 /// overrides — `None` (or a blank entry) means "fill from the dictionary".
-/// `rows` cells are JSON values: typed (Number / Bool / Null) from frames
-/// or Arrow, or strings from browser JSON.
+/// `rows` cells are [`Cell`]s: typed (`Int` / `Float` / `Bool` / `Null`)
+/// from frames or Arrow, or `Text` from browser JSON — deliberately not
+/// `serde_json::Value`, whose feature-unified footprint dominated
+/// `build_ags4`'s peak (#790; `ags-wiki/design/dec-emit-cell-representation.md`).
 pub struct GroupInput {
     pub code: String,
     pub headings: Vec<String>,
     pub units: Option<Vec<String>>,
     pub types: Option<Vec<String>>,
-    pub rows: Vec<Vec<Value>>,
+    pub rows: Vec<Vec<Cell>>,
 }
 
 /// What to do about the validity of the generated output.
@@ -322,18 +323,18 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
 /// Like [`emit_ags4`], but consuming its input, group by group.
 ///
 /// Behaviourally identical; the difference is the peak. Under the borrowed
-/// entry the caller's groups — every cell a `serde_json::Value`, 72 bytes
-/// apiece under this workspace's feature unification — stay live behind the
-/// borrow until the emit returns, co-resident with the formatted copy, the
-/// written bytes and the validating re-parse. Here each group's input drops
-/// the moment its cells are formatted, so the input copy and the re-parse
-/// never peak together. Measured with `examples/heap_profile.rs` (#789): that
-/// input copy is the single largest slice of the emit's live-at-peak bytes.
+/// entry the caller's groups stay live behind the borrow until the emit
+/// returns, co-resident with the formatted copy, the written bytes and the
+/// validating re-parse. Here each group's input drops the moment its cells
+/// are formatted, so the input copy and the re-parse never peak together.
+/// Measured with `examples/heap_profile.rs` (#789, then #790 — which also
+/// shrank the cells themselves from `serde_json::Value` to [`Cell`]): the
+/// input copy was the single largest slice of the emit's live-at-peak bytes.
 pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
     let owned: Vec<OwnedGroup> = groups
         .into_iter()
-        // `g` is consumed per iteration: its `Value` rows free here, not at return.
+        // `g` is consumed per iteration: its cell rows free here, not at return.
         .map(|g| owned_group_consuming(g, &dict))
         .collect();
     emit_owned_groups(owned, opts, &dict)
@@ -353,7 +354,7 @@ fn owned_group(g: &GroupInput, dict: &Dictionary) -> OwnedGroup {
     }
 }
 
-/// [`owned_group`], consuming: each input row's `Value`s free as soon as that
+/// [`owned_group`], consuming: each input row's cells free as soon as that
 /// row is formatted, so a large group's input copy and its formatted copy
 /// never fully coexist — the live set trades one for the other row by row.
 /// (Per-GROUP consumption alone does not get that: the measured TREL is one
@@ -393,7 +394,7 @@ fn resolved_meta(g: &GroupInput, dict: &Dictionary) -> (Vec<String>, Vec<String>
     (units, types)
 }
 
-fn format_row(row: &[Value], types: &[String]) -> Vec<String> {
+fn format_row(row: &[Cell], types: &[String]) -> Vec<String> {
     row.iter()
         .enumerate()
         .map(|(i, cell)| format_cell(cell, types.get(i).map_or("X", String::as_str)))
@@ -543,9 +544,9 @@ fn dict_type(dict: &Dictionary, code: &str, heading: &str) -> String {
 /// canonical `ags4_str`; string values emit verbatim so the validity
 /// *mode* is the single owner of canonicalisation (Report = unchanged,
 /// `AutoFix`'s text fixer pads/normalises, Strict rejects).
-fn format_cell(value: &Value, ags_type: &str) -> String {
+fn format_cell(value: &Cell, ags_type: &str) -> String {
     match value {
-        Value::String(s) => s.clone(),
+        Cell::Text(s) => s.clone(),
         _ => ags4_str(value, ags_type),
     }
 }
@@ -827,7 +828,11 @@ fn synth_abbr(rows: Vec<[String; 3]>) -> OwnedGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+
+    /// Cell shorthand — the role `json!` played before #790.
+    fn c(v: impl Into<Cell>) -> Cell {
+        v.into()
+    }
 
     fn proj() -> GroupInput {
         GroupInput {
@@ -835,7 +840,7 @@ mod tests {
             headings: vec!["PROJ_ID".into(), "PROJ_NAME".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("P1"), json!("Demo project")]],
+            rows: vec![vec![c("P1"), c("Demo project")]],
         }
     }
 
@@ -848,7 +853,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!(12.3)]],
+            rows: vec![vec![c("BH01"), c(12.3)]],
         };
         let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
         let text = String::from_utf8(r.bytes).unwrap();
@@ -867,7 +872,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!(12.3)]],
+            rows: vec![vec![c("BH01"), c(12.3)]],
         };
         let r = emit_ags4(
             &[proj(), loca],
@@ -896,7 +901,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!("12.3")]],
+            rows: vec![vec![c("BH01"), c("12.3")]],
         };
         let r = emit_ags4(
             &[proj(), loca],
@@ -924,7 +929,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!("12.3")]],
+            rows: vec![vec![c("BH01"), c("12.3")]],
         };
         let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
         let text = String::from_utf8(r.bytes).unwrap();
@@ -963,7 +968,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!(12.3)]],
+            rows: vec![vec![c("BH01"), c(12.3)]],
         }
     }
 
@@ -1250,7 +1255,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!(12.3)]],
+            rows: vec![vec![c("BH01"), c(12.3)]],
         };
         let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
         let text = String::from_utf8(r.bytes.clone()).unwrap();
@@ -1281,7 +1286,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_TYPE".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!("TP")]],
+            rows: vec![vec![c("BH01"), c("TP")]],
         };
         let opts = EmitOpts {
             synthesise_metadata: true,
@@ -1347,7 +1352,7 @@ mod tests {
             headings: vec![key.into(), desc.into()],
             units: Some(vec![String::new(), String::new()]),
             types: Some(vec!["X".into(), "X".into()]),
-            rows: syms.iter().map(|s| vec![json!(s), json!(s)]).collect(),
+            rows: syms.iter().map(|s| vec![c(*s), c(*s)]).collect(),
         };
         let tran = || GroupInput {
             code: "TRAN".into(),
@@ -1374,14 +1379,14 @@ mod tests {
                     .to_vec(),
             ),
             rows: vec![vec![
-                json!("1"),
-                json!("1900-01-01"),
-                json!("TBC"),
-                json!("TBC"),
-                json!("4.1.1"),
-                json!("TBC"),
-                json!("|"),
-                json!("+"),
+                c("1"),
+                c("1900-01-01"),
+                c("TBC"),
+                c("TBC"),
+                c("4.1.1"),
+                c("TBC"),
+                c("|"),
+                c("+"),
             ]],
         };
         let clean_file = || {
@@ -1406,7 +1411,7 @@ mod tests {
             headings: vec!["LOCA_ID".into()],
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01")], vec![json!("BH01")]],
+            rows: vec![vec![c("BH01")], vec![c("BH01")]],
         });
         let bad = emit_ags4(&with_dup, &strict);
         assert!(
@@ -1426,7 +1431,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units,
             types: None,
-            rows: vec![vec![json!("BH01"), json!(12.3)]],
+            rows: vec![vec![c("BH01"), c(12.3)]],
         };
         let opts = EmitOpts {
             mode: EmitMode::Report,
@@ -1464,7 +1469,7 @@ mod tests {
             headings: vec!["LOCA_ID".into(), "LOCA_STAR".into()], // LOCA_STAR is DT
             units: None,
             types: None,
-            rows: vec![vec![json!("BH01"), json!("2023-02-22T00:00:00")]],
+            rows: vec![vec![c("BH01"), c("2023-02-22T00:00:00")]],
         };
         let r = emit_ags4(
             &[proj(), loca],

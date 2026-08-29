@@ -12,7 +12,7 @@ repo_refs:
   lib: "repo:rust-packages/laterite-ags4-emit/src/lib.rs"
   writer: "repo:rust-packages/laterite-ags4-emit/src/writer.rs"
   orchestrator: "repo:rust-packages/laterite-ags4-emit/src/emit.rs"
-related: [crate-map, laterite-ags4-types, laterite-ags4-validator, laterite-ags4-xcheck, dec-laterite-ags4-types-leaf]
+related: [crate-map, laterite-ags4-types, laterite-ags4-validator, laterite-ags4-xcheck, dec-laterite-ags4-types-leaf, dec-emit-cell-representation]
 sources: []
 ---
 # laterite-ags4-emit
@@ -63,10 +63,11 @@ thing wherever it is applied.
 ## Inputs / outputs
 
 In: one `GroupInput` per group — code, headings, optional per-heading UNIT/TYPE
-overrides, and rows of `serde_json::Value` cells (typed from frames or Arrow,
-strings from browser JSON). Behind the optional `arrow` feature,
-`group_from_arrow` transposes an Arrow `RecordBatch` into that shape, shared by
-the native and browser hosts rather than reimplemented per host.
+overrides, and rows of [[laterite-ags4-types]] `Cell` cells (typed from frames
+or Arrow, strings from browser JSON — deliberately *not* a `serde_json::Value`;
+[[dec-emit-cell-representation]] holds why). Behind the optional `arrow`
+feature, `group_from_arrow` transposes an Arrow `RecordBatch` into that shape,
+shared by the native and browser hosts rather than reimplemented per host.
 
 Out: `EmitResult` — the AGS4 bytes plus any residual findings; or `EmitError`
 (`Invalid` under Strict). Everything is UTF-8: `parse_bytes` is handed a static

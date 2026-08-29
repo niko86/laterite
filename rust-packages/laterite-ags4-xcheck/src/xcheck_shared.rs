@@ -117,7 +117,7 @@ pub struct BuildGroup {
     pub units: Option<Vec<String>>,
     #[serde(default)]
     pub types: Option<Vec<String>>,
-    pub rows: Vec<Vec<serde_json::Value>>,
+    pub rows: Vec<Vec<laterite_ags4_emit::Cell>>,
 }
 
 /// Load and concatenate every `*.json` manifest in `cases_dir` (excluding the

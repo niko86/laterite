@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "arrow",
  "criterion",
@@ -2196,7 +2196,6 @@ dependencies = [
  "laterite-ags4-types",
  "laterite-ags4-validator",
  "proptest",
- "serde_json",
 ]
 
 [[package]]
@@ -2314,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-types"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2323,6 +2322,7 @@ dependencies = [
  "encoding_rs",
  "laterite-ags4-parse",
  "proptest",
+ "serde",
  "serde_json",
 ]
 

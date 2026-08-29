@@ -1215,12 +1215,11 @@ mod tests {
 #[cfg(test)]
 mod formatter_authority {
     use super::{NumericFormat, format_sf};
-    use laterite_ags4_types::ags4_str;
-    use serde_json::json;
+    use laterite_ags4_types::{Cell, ags4_str};
 
     /// Format `value` under `spec` the way the canonical AGS4 emitter does.
     fn authority(value: f64, spec: &str) -> String {
-        ags4_str(&json!(value), spec)
+        ags4_str(&Cell::from(value), spec)
     }
 
     /// Format `value` under `spec` the way an Excel round-trip does.

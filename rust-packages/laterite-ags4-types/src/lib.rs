@@ -127,19 +127,195 @@ pub fn sql_type(ags_type: &str) -> &'static str {
     canonical_type(ags_type).map_or("VARCHAR", CanonicalType::sql_type)
 }
 
+/// One emit-side cell value, before AGS4 formatting.
+///
+/// Deliberately NOT `serde_json::Value`, which this replaced (#790). A cell is
+/// only ever a scalar, but Cargo unifies features across a build graph, so the
+/// `preserve_order` that other workspace crates legitimately need swells
+/// `Value`'s never-used `Map` variant — and with it every cell — in every
+/// binary that links them. The heap records live on #788/#789/#790; the
+/// decision on `ags-wiki/design/dec-emit-cell-representation.md`. `ags4_str`
+/// below is the consumer, which is why the enum lives in this crate.
+///
+/// `Text` is a statement that the string is already what you want written —
+/// the emit orchestrator sends it out verbatim; the typed variants are
+/// rendered to wire form against the heading's declared TYPE.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Cell {
+    /// No value. Emitted as the empty cell AGS4 uses for absent data.
+    Null,
+    Text(String),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+}
+
+impl Cell {
+    #[must_use]
+    pub fn is_null(&self) -> bool {
+        matches!(self, Cell::Null)
+    }
+
+    /// Integer view, `Int` only — mirrors `serde_json`'s `as_i64` in never
+    /// answering for a float, so `ags4_str`'s 0DP branch keeps its exact
+    /// integer/float split.
+    #[must_use]
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Cell::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    /// Numeric view for the DP/SF/SCI formatters: both numeric variants,
+    /// nothing else — a `Text` is the caller's own string and never re-read
+    /// as a number here (matching `serde_json`, which does not parse).
+    #[must_use]
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Cell::Int(i) =>
+            {
+                #[allow(clippy::cast_precision_loss)]
+                Some(*i as f64)
+            }
+            Cell::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+}
+
+impl From<&str> for Cell {
+    fn from(s: &str) -> Cell {
+        Cell::Text(s.to_string())
+    }
+}
+
+impl From<String> for Cell {
+    fn from(s: String) -> Cell {
+        Cell::Text(s)
+    }
+}
+
+impl From<i64> for Cell {
+    fn from(v: i64) -> Cell {
+        Cell::Int(v)
+    }
+}
+
+impl From<bool> for Cell {
+    fn from(v: bool) -> Cell {
+        Cell::Bool(v)
+    }
+}
+
+/// A non-finite float becomes `Null`, exactly as `serde_json::Value::from`
+/// made it — JSON cannot carry NaN/inf, and three surfaces' emitted bytes
+/// are pinned to that behaviour (a NaN Arrow cell emits as blank).
+impl From<f64> for Cell {
+    fn from(v: f64) -> Cell {
+        if v.is_finite() {
+            Cell::Float(v)
+        } else {
+            Cell::Null
+        }
+    }
+}
+
+/// `None` is the absent cell — an `Option<T>` column maps straight across.
+impl<T: Into<Cell>> From<Option<T>> for Cell {
+    fn from(v: Option<T>) -> Cell {
+        v.map_or(Cell::Null, Into::into)
+    }
+}
+
+/// Bridge from the read side: `parse_value` yields `serde_json::Value`
+/// scalars, and a caller round-tripping read→write needs the emit-side
+/// shape. Scalar-only by construction — an array or object cell does not
+/// exist in AGS4, so those map to `Null` like any other unrepresentable
+/// value.
+impl From<&Value> for Cell {
+    fn from(v: &Value) -> Cell {
+        match v {
+            Value::Null | Value::Array(_) | Value::Object(_) => Cell::Null,
+            Value::Bool(b) => Cell::Bool(*b),
+            Value::Number(n) => n
+                .as_i64()
+                .map_or_else(|| n.as_f64().map_or(Cell::Null, Cell::from), Cell::Int),
+            Value::String(s) => Cell::Text(s.clone()),
+        }
+    }
+}
+
+/// Hand-written rather than derived-untagged: serde's `untagged` buffers each
+/// value into a private `Content` tree before trying variants, which is a
+/// per-cell allocation — the exact cost class this enum exists to remove. A
+/// visitor maps each JSON scalar to its variant with no intermediate.
+impl<'de> serde::Deserialize<'de> for Cell {
+    fn deserialize<D>(deserializer: D) -> Result<Cell, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CellVisitor;
+
+        impl serde::de::Visitor<'_> for CellVisitor {
+            type Value = Cell;
+
+            fn expecting(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                f.write_str("an AGS4 cell: null, a string, a number, or a bool")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Cell, E> {
+                Ok(Cell::Bool(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Cell, E> {
+                Ok(Cell::Int(v))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Cell, E> {
+                // Above i64: fall to f64 rather than refuse. No AGS heading
+                // holds a 19-digit count; this is shape tolerance, not a
+                // precision promise.
+                #[allow(clippy::cast_precision_loss)]
+                i64::try_from(v).map_or(Ok(Cell::from(v as f64)), |i| Ok(Cell::Int(i)))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Cell, E> {
+                Ok(Cell::from(v))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Cell, E> {
+                Ok(Cell::Text(v.to_string()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Cell, E> {
+                Ok(Cell::Text(v))
+            }
+
+            fn visit_unit<E>(self) -> Result<Cell, E> {
+                Ok(Cell::Null)
+            }
+
+            fn visit_none<E>(self) -> Result<Cell, E> {
+                Ok(Cell::Null)
+            }
+        }
+
+        deserializer.deserialize_any(CellVisitor)
+    }
+}
+
 /// Format a typed value back to the AGS4 string form the codec would
 /// have read from the source file. Inverse of `parse_value` (lossy on
 /// width — we only carry the AGS-spec precision hint, not the original
-/// trailing-zero count beyond what the type implies). Used by
-/// `ags4-to-db --append` to reconstruct shared-key lookup tuples from
-/// on-disk rows so on-disk + new rows match string-wise.
+/// trailing-zero count beyond what the type implies).
 ///
 /// Examples:
-///   `ags4_str(Value::from(100.5), "2DP")` -> `"100.50"`
-///   `ags4_str(Value::from(5_i64), "0DP")` -> `"5"`
-///   `ags4_str(Value::Null,        _   )` -> `""`
+///   `ags4_str(&Cell::from(100.5), "2DP")` -> `"100.50"`
+///   `ags4_str(&Cell::from(5_i64), "0DP")` -> `"5"`
+///   `ags4_str(&Cell::Null,        _   )` -> `""`
 #[must_use]
-pub fn ags4_str(value: &Value, ags_type: &str) -> String {
+pub fn ags4_str(value: &Cell, ags_type: &str) -> String {
     if value.is_null() {
         return String::new();
     }
@@ -155,12 +331,12 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
     // letters `Y` / `N` (Rule 8 type check). `parse_value` does the
     // forward mapping; we do the reverse here.
     if t == "YN" {
-        if let Value::Bool(b) = value {
+        if let Cell::Bool(b) = value {
             return (if *b { "Y" } else { "N" }).to_string();
         }
     }
     if t == "DT" {
-        if let Value::String(s) = value {
+        if let Cell::Text(s) = value {
             let trimmed = if let Some(idx) = s.find('.') {
                 let (head, tail) = s.split_at(idx);
                 if tail.trim_start_matches('.').chars().all(|c| c == '0') {
@@ -218,8 +394,28 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
         }
     }
     match value {
-        Value::String(s) => s.clone(),
-        other => other.to_string(),
+        Cell::Text(s) => s.clone(),
+        Cell::Int(i) => i.to_string(),
+        // Through serde_json, not `{f}` or raw ryu: `Cell` replaced
+        // `serde_json::Value` here (#790) and three surfaces' emitted bytes
+        // are pinned to ITS float spellings, which match neither — std
+        // expands 1e30 to 31 digits, and ryu writes `1e30` where serde_json
+        // writes `1e+30` (a first draft of this arm used ryu; the
+        // differential test below went red on exactly that). The crate keeps
+        // serde_json regardless (`parse_value` returns `Value`), so faithful
+        // costs nothing. Non-finite renders blank, as the `Null` that
+        // `Value::from(f64)` always made of it — `Value::from` here would
+        // spell it `null`.
+        Cell::Float(f) => {
+            if f.is_finite() {
+                Value::from(*f).to_string()
+            } else {
+                String::new()
+            }
+        }
+        Cell::Bool(b) => b.to_string(),
+        // First line of the function, kept for exhaustiveness.
+        Cell::Null => String::new(),
     }
 }
 
@@ -844,10 +1040,10 @@ mod tests {
     fn nsf_emits_fixed_point_for_small_values() {
         // Match python-ags4 validator's expected form: 3SF of 0.002 is
         // "0.00200" (fixed-point, three sig figs visible), not "2.00e-3".
-        assert_eq!(ags4_str(&Value::from(0.002), "3SF"), "0.00200");
-        assert_eq!(ags4_str(&Value::from(0.006), "3SF"), "0.00600");
-        assert_eq!(ags4_str(&Value::from(0.020), "3SF"), "0.0200");
-        assert_eq!(ags4_str(&Value::from(1.23), "3SF"), "1.23");
+        assert_eq!(ags4_str(&Cell::from(0.002), "3SF"), "0.00200");
+        assert_eq!(ags4_str(&Cell::from(0.006), "3SF"), "0.00600");
+        assert_eq!(ags4_str(&Cell::from(0.020), "3SF"), "0.0200");
+        assert_eq!(ags4_str(&Cell::from(1.23), "3SF"), "1.23");
     }
 
     #[test]
@@ -855,9 +1051,9 @@ mod tests {
         // python-ags4's validator wants plain decimal under nSF: 100
         // under 2SF stays "100", 1234 under 3SF rounds to "1230" — not
         // "1.0e2" / "1.23e3" scientific forms.
-        assert_eq!(ags4_str(&Value::from(100.0), "2SF"), "100");
-        assert_eq!(ags4_str(&Value::from(1234.0), "3SF"), "1230");
-        assert_eq!(ags4_str(&Value::from(10.0), "1SF"), "10");
+        assert_eq!(ags4_str(&Cell::from(100.0), "2SF"), "100");
+        assert_eq!(ags4_str(&Cell::from(1234.0), "3SF"), "1230");
+        assert_eq!(ags4_str(&Cell::from(10.0), "1SF"), "10");
     }
 
     #[test]
@@ -998,20 +1194,69 @@ mod tests {
 
     // --- ags4_str: the reverse formatter --------------------------
 
+    /// The fallback arm's spelling contract (#790): `Cell` replaced
+    /// `serde_json::Value`, and the arm must keep ITS renderings on the
+    /// shapes where plausible alternatives disagree (std expands exponents;
+    /// ryu writes `1e30` for `serde_json`'s `1e+30` — a first draft used ryu
+    /// and this test caught it). Differential on purpose: the claim "same
+    /// bytes as before" stays checked rather than remembered, so the arm's
+    /// implementation can change but its output cannot.
+    #[test]
+    fn cell_float_fallback_matches_the_value_rendering_it_replaced() {
+        for f in [1.5, 1.0, 0.1, 1e30, 1e-7, -2.25, 12345.678, f64::MAX] {
+            assert_eq!(
+                ags4_str(&Cell::from(f), "X"),
+                Value::from(f).to_string(),
+                "{f}: the fallback must keep serde_json's spelling"
+            );
+        }
+        // And the non-float fallbacks, same contract.
+        assert_eq!(ags4_str(&Cell::Int(-64), "X"), Value::from(-64).to_string());
+        assert_eq!(
+            ags4_str(&Cell::Bool(true), "X"),
+            Value::from(true).to_string()
+        );
+    }
+
+    /// The wasm door's path: a browser JSON scalar lands directly on its
+    /// `Cell` variant, with no `serde_json::Value` intermediate. A u64 above
+    /// i64 falls to f64 (shape tolerance — no AGS heading holds one); a
+    /// non-finite never arrives via JSON, and `From<f64>` nulls it anyway.
+    #[test]
+    fn cell_deserialises_each_json_scalar_to_its_variant() {
+        let cells: Vec<Cell> =
+            serde_json::from_str(r#"[null, "BH01", 5, -3, 1.5, true]"#).expect("valid JSON");
+        assert_eq!(
+            cells,
+            vec![
+                Cell::Null,
+                Cell::Text("BH01".into()),
+                Cell::Int(5),
+                Cell::Int(-3),
+                Cell::Float(1.5),
+                Cell::Bool(true),
+            ]
+        );
+        let big: Cell = serde_json::from_str("18446744073709551615").expect("u64 max");
+        assert_eq!(big, Cell::Float(18_446_744_073_709_551_615_u64 as f64));
+        let arr: Result<Cell, _> = serde_json::from_str("[1,2]");
+        assert!(arr.is_err(), "an array is not a cell");
+    }
+
     #[test]
     fn ags4_str_null_is_empty() {
-        assert_eq!(ags4_str(&Value::Null, "2DP"), "");
-        assert_eq!(ags4_str(&Value::Null, "X"), "");
-        assert_eq!(ags4_str(&Value::Null, "DT"), "");
+        assert_eq!(ags4_str(&Cell::Null, "2DP"), "");
+        assert_eq!(ags4_str(&Cell::Null, "X"), "");
+        assert_eq!(ags4_str(&Cell::Null, "DT"), "");
     }
 
     #[test]
     fn ags4_str_yn_bool_renders_letters() {
-        assert_eq!(ags4_str(&Value::Bool(true), "YN"), "Y");
-        assert_eq!(ags4_str(&Value::Bool(false), "YN"), "N");
+        assert_eq!(ags4_str(&Cell::Bool(true), "YN"), "Y");
+        assert_eq!(ags4_str(&Cell::Bool(false), "YN"), "N");
         // A non-bool value under YN (shouldn't happen, but the branch
         // falls through to the generic tail).
-        assert_eq!(ags4_str(&Value::String("Y".into()), "YN"), "Y");
+        assert_eq!(ags4_str(&Cell::Text("Y".into()), "YN"), "Y");
     }
 
     /// The three cases #695 turns on, stated as one table so the symmetry is
@@ -1162,13 +1407,13 @@ mod tests {
     fn ags4_str_dt_strips_zero_time_to_date_only() {
         // ISO form with a midnight time portion collapses to date-only.
         assert_eq!(
-            ags4_str(&Value::String("2023-02-22T00:00:00".into()), "DT"),
+            ags4_str(&Cell::Text("2023-02-22T00:00:00".into()), "DT"),
             "2023-02-22",
         );
         // Zero fractional seconds get trimmed first, then the zero-time
         // collapse applies.
         assert_eq!(
-            ags4_str(&Value::String("2023-02-22T00:00:00.000".into()), "DT"),
+            ags4_str(&Cell::Text("2023-02-22T00:00:00.000".into()), "DT"),
             "2023-02-22",
         );
     }
@@ -1177,13 +1422,13 @@ mod tests {
     fn ags4_str_dt_keeps_iso_separator_for_real_times() {
         // A non-midnight time keeps the full ISO form.
         assert_eq!(
-            ags4_str(&Value::String("2023-02-22T10:24:37".into()), "DT"),
+            ags4_str(&Cell::Text("2023-02-22T10:24:37".into()), "DT"),
             "2023-02-22T10:24:37",
         );
         // Non-zero fractional seconds are preserved verbatim (the all-zero
         // strip guard does not fire).
         assert_eq!(
-            ags4_str(&Value::String("2023-02-22T10:24:37.500".into()), "DT"),
+            ags4_str(&Cell::Text("2023-02-22T10:24:37.500".into()), "DT"),
             "2023-02-22T10:24:37.500",
         );
     }
@@ -1192,24 +1437,24 @@ mod tests {
     fn ags4_str_dt_non_string_falls_through() {
         // A DT-typed numeric value isn't a string, so the DT branch is
         // skipped and the generic tail stringifies it.
-        assert_eq!(ags4_str(&Value::from(5_i64), "DT"), "5");
+        assert_eq!(ags4_str(&Cell::from(5_i64), "DT"), "5");
     }
 
     #[test]
     fn ags4_str_0dp_handles_int_and_float() {
-        assert_eq!(ags4_str(&Value::from(5_i64), "0DP"), "5");
+        assert_eq!(ags4_str(&Cell::from(5_i64), "0DP"), "5");
         // A float-valued 0DP cell ROUNDS, exactly like every other DP width
         // (#793 — it truncated, a one-signed downward bias no sibling had).
         // Round-half-even, matching both format_ndp's `{f:.n$}` and
         // python-ags4's `f"{x:.0f}"`, so the parity oracle agrees on halves.
-        assert_eq!(ags4_str(&Value::from(5.9_f64), "0DP"), "6");
-        assert_eq!(ags4_str(&Value::from(2.5_f64), "0DP"), "2");
-        assert_eq!(ags4_str(&Value::from(3.5_f64), "0DP"), "4");
+        assert_eq!(ags4_str(&Cell::from(5.9_f64), "0DP"), "6");
+        assert_eq!(ags4_str(&Cell::from(2.5_f64), "0DP"), "2");
+        assert_eq!(ags4_str(&Cell::from(3.5_f64), "0DP"), "4");
         // `-0.4` renders "-0" — the same as python-ags4's f-string and the
         // siblings' own "-0.00" shape; pinned so the choice is visible.
-        assert_eq!(ags4_str(&Value::from(-0.4_f64), "0DP"), "-0");
+        assert_eq!(ags4_str(&Cell::from(-0.4_f64), "0DP"), "-0");
         // A non-numeric value under 0DP yields the empty default.
-        assert_eq!(ags4_str(&Value::String("x".into()), "0DP"), "");
+        assert_eq!(ags4_str(&Cell::Text("x".into()), "0DP"), "");
     }
 
     #[test]
@@ -1217,32 +1462,32 @@ mod tests {
     // 3dp — not an attempt to approximate PI.
     #[allow(clippy::approx_constant)]
     fn ags4_str_ndp_formats_to_precision() {
-        assert_eq!(ags4_str(&Value::from(100.5_f64), "2DP"), "100.50");
-        assert_eq!(ags4_str(&Value::from(3.14159_f64), "3DP"), "3.142");
+        assert_eq!(ags4_str(&Cell::from(100.5_f64), "2DP"), "100.50");
+        assert_eq!(ags4_str(&Cell::from(3.14159_f64), "3DP"), "3.142");
     }
 
     #[test]
     fn ags4_str_nsci_emits_scientific() {
         // nSCI uses Rust's lowercase `e` scientific format with n
         // fractional digits.
-        assert_eq!(ags4_str(&Value::from(12345.0_f64), "2SCI"), "1.23e4");
-        assert_eq!(ags4_str(&Value::from(0.0012_f64), "1SCI"), "1.2e-3");
+        assert_eq!(ags4_str(&Cell::from(12345.0_f64), "2SCI"), "1.23e4");
+        assert_eq!(ags4_str(&Cell::from(0.0012_f64), "1SCI"), "1.2e-3");
     }
 
     #[test]
     fn ags4_str_string_passthrough_for_text_types() {
-        assert_eq!(ags4_str(&Value::String("LOCA1".into()), "ID"), "LOCA1");
+        assert_eq!(ags4_str(&Cell::Text("LOCA1".into()), "ID"), "LOCA1");
         // A non-string, non-numeric-typed value stringifies via the
         // generic arm.
-        assert_eq!(ags4_str(&Value::from(7_i64), "X"), "7");
+        assert_eq!(ags4_str(&Cell::from(7_i64), "X"), "7");
     }
 
     #[test]
     fn ags4_str_nsf_zero_renders_fixed_point() {
         // Zero under nSF takes the dedicated `f == 0.0` branch:
         // n-1 fractional digits.
-        assert_eq!(ags4_str(&Value::from(0.0_f64), "3SF"), "0.00");
-        assert_eq!(ags4_str(&Value::from(0.0_f64), "1SF"), "0");
+        assert_eq!(ags4_str(&Cell::from(0.0_f64), "3SF"), "0.00");
+        assert_eq!(ags4_str(&Cell::from(0.0_f64), "1SF"), "0");
     }
 
     // --- quote_field / write_quoted_field -------------------------
@@ -1518,7 +1763,7 @@ mod proptest_suite {
             let s = if neg && int_part != 0 { format!("-{body}") } else { body };
 
             let parsed = parse_value(Some(&s), &ty);
-            let formatted = ags4_str(&parsed, &ty);
+            let formatted = ags4_str(&Cell::from(&parsed), &ty);
             // The formatted form re-parses to the SAME number.
             let reparsed = parse_value(Some(&formatted), &ty);
             prop_assert_eq!(&reparsed, &parsed, "s={:?} fmt={:?}", s, formatted);
