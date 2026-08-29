@@ -21,8 +21,8 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use laterite_ags4_emit::Cell;
 use laterite_ags4_emit::{EmitGroup, EmitMode, EmitOpts, GroupInput, emit_ags4, write_ags4};
-use serde_json::Value;
 
 const HEADINGS: [&str; 8] = [
     "LOCA_ID",
@@ -93,7 +93,7 @@ fn bench_orchestrator(c: &mut Criterion) {
         types: None,
         rows: rows(n)
             .into_iter()
-            .map(|r| r.into_iter().map(Value::String).collect())
+            .map(|r| r.into_iter().map(Cell::Text).collect())
             .collect(),
     }];
 

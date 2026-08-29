@@ -6,7 +6,7 @@ tags: [design, decision, api, wasm, output]
 decided: 2026-06-12
 supersedes: []
 from_gap: []
-related: [api-surface-1.0, pyo3-boundary, crate-map, tech-stack-wasm, dec-laterite-ags4-types-leaf, reliquary]
+related: [api-surface-1.0, pyo3-boundary, crate-map, tech-stack-wasm, dec-laterite-ags4-types-leaf, dec-emit-cell-representation, reliquary]
 sources: []
 ---
 
@@ -162,6 +162,31 @@ data model that Rule 10's relational checks then trust.
 release. The docs examples (`ex09a`/`ex09b`) were rewritten to demonstrate both
 paths rather than narrate the old one — showing the findings first and the opt-in
 second teaches the boundary better than the previous one-call version did.
+
+## Update (2026-08-29): the scale assumption is superseded — the cell stops being a JSON value
+
+**Supersedes two claims below**, both written for the validator site's Export
+tab and both outlived by a downstream consumer building multi-million-cell
+files (#790):
+
+- *"Performance is a non-issue at site scale — the emitter is microseconds;
+  the only cost is the data boundary, minimised by Arrow for columnar
+  input."* At build scale the boundary **is** the cost — and the Arrow door
+  is the expensive one, because it is the only door that manufactures a
+  row-major `serde_json::Value` copy the caller did not already have. Do not
+  reason from this line for anything larger than the Export tab.
+- The *As built* "DRY — the transpose is shared, not copied" trade. The
+  drift-prevention goal stands; the mechanism moves. Phase 1's original
+  `GroupInput` / `RowData` (typed-columns | string-cells) split — specified
+  on this page and never built — is now built in its Arrow-concrete form:
+  the doors split at the input and rejoin at the formatted `OwnedGroup`,
+  with a differential test on the join.
+
+The decision, the two-PR staging, the two-`Cell`-types consequence and the
+measurement records are on [[dec-emit-cell-representation]]; the figures
+themselves live on #788/#789/#790, where the instrument
+(`repo:rust-packages/laterite-ags4-emit/examples/heap_profile.rs`) can
+recompute them.
 
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 

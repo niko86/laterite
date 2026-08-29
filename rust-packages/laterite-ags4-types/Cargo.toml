@@ -12,7 +12,7 @@
 
 [package]
 name = "laterite-ags4-types"
-version = "0.11.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "AGS4 type system (canonical types + permissive value casting) — DuckDB-free, wasm-safe"
@@ -39,6 +39,9 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # parse_value returns serde_json::Value (scalar shapes only — no Maps,
 # so no preserve_order needed here; the native side unifies its own).
 serde_json = "1"
+# The emit-side `Cell` deserialises straight off a JSON scalar (#790) —
+# serde core only, no derive: the impl is a hand-written visitor.
+serde = { version = "1", default-features = false, features = ["std"] }
 # Typed Arrow column building (arrow_cols), behind the `arrow` feature.
 # Optional + default-features=false so non-Arrow consumers (e.g.
 # laterite-ags4-core) don't pull it: only the core array/schema/record_batch crates,

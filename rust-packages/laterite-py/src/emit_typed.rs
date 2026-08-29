@@ -6,8 +6,8 @@
 //! — **pyarrow-free for both backends**, because DuckDB's own scanner +
 //! Arrow exporter do the work, not pyarrow. `pyo3_arrow::PyTable` imports
 //! that capsule zero-copy. Each batch is transposed to typed
-//! `serde_json::Value` rows by `laterite_ags4_emit::group_from_arrow` (the shared
-//! Arrow→Value conversion the wasm host uses too) and fed to the orchestrator,
+//! `Cell` rows by `laterite_ags4_emit::group_from_arrow` (the shared
+//! Arrow→Cell conversion the wasm host uses too) and fed to the orchestrator,
 //! which formats (via `ags4_str` for typed non-strings + dictionary UNIT/TYPE
 //! fill) and applies the
 //! chosen validity mode (`AutoFix` / Report / Strict).
@@ -113,7 +113,7 @@ pub fn emit_ags4_from_arrow(
         let (batches, schema) = table.into_inner();
         let u = units.as_ref().and_then(|m| m.get(&code));
         let t = types.as_ref().and_then(|m| m.get(&code));
-        // The Arrow→Value transpose is shared with the wasm host in laterite-ags4-emit.
+        // The Arrow→Cell transpose is shared with the wasm host in laterite-ags4-emit.
         // The edition goes in so a typed temporal column is rendered at the
         // precision its heading's declared UNIT asks for, instead of Arrow's
         // canonical form — otherwise a date-only DT cell read from disk
@@ -129,10 +129,10 @@ pub fn emit_ags4_from_arrow(
         ));
     }
 
-    // Consuming entry: `groups` holds every cell as a 72-byte `serde_json::Value`
-    // on top of the caller's own frames — the borrowed entry kept all of it
-    // live across the write and the validating re-parse (a downstream consumer
-    // measured the build at ~30x its output; #788 and #789 hold the records).
+    // Consuming entry: `groups` holds a transposed cell copy on top of the
+    // caller's own frames — the borrowed entry kept all of it live across the
+    // write and the validating re-parse (#788/#789 hold the records; #790
+    // shrank the cells themselves from `serde_json::Value` to `Cell`).
     let res = emit_ags4_owned(groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     let bytes = PyBytes::new(py, &res.bytes).unbind();

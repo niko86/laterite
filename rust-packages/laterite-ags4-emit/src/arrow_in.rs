@@ -1,4 +1,4 @@
-//! The Arrow → `serde_json::Value` cell transpose — the single shared
+//! The Arrow → [`Cell`] cell transpose — the single shared
 //! conversion for both emit hosts (behind the `arrow` feature):
 //!
 //! - **native** (`laterite-py`): a DuckDB relation's Arrow C-stream capsule
@@ -6,9 +6,10 @@
 //! - **wasm** (`laterite-ags4-wasm`): an Arrow IPC stream → `StreamReader` →
 //!   `(batches, schema)` → here.
 //!
-//! Living in `laterite-ags4-emit` keeps the type→`Value` mapping in one place, so the
+//! Living in `laterite-ags4-emit` keeps the type→[`Cell`] mapping in one place, so the
 //! two hosts can't drift. Symmetric with the read path's shared *builder*
-//! (`laterite-ags4-types::arrow_cols`, `Value`→Arrow).
+//! (`laterite-ags4-types::arrow_cols`, `Value`→Arrow). The cell stopped being a
+//! `serde_json::Value` in #790 (`ags-wiki/design/dec-emit-cell-representation.md`).
 
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
@@ -19,17 +20,16 @@ use std::collections::HashMap;
 use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
-use laterite_ags4_types::dt_to_unit_precision;
+use laterite_ags4_types::{Cell, dt_to_unit_precision};
 use laterite_ags4_validator::{DictVersion, Dictionary};
-use serde_json::Value;
 
 use crate::GroupInput;
 
-/// One cell of an Arrow column → the `serde_json::Value` the orchestrator
-/// formats. Typed numerics/bools become JSON numbers/bools (so `ags4_str`
-/// renders them canonically); strings stay strings (emitted verbatim, the
-/// validity mode owns canonicalisation); temporal/decimal/other types fall
-/// back to Arrow's own canonical display string (e.g. `2023-02-22T10:24:00`).
+/// One cell of an Arrow column → the [`Cell`] the orchestrator formats.
+/// Typed numerics/bools become `Int`/`Float`/`Bool` (so `ags4_str` renders
+/// them canonically); strings stay `Text` (emitted verbatim, the validity
+/// mode owns canonicalisation); temporal/decimal/other types fall back to
+/// Arrow's own canonical display string (e.g. `2023-02-22T10:24:00`).
 ///
 /// A temporal cell lands in that last arm as a **string**, which the
 /// orchestrator then emits verbatim — `ags4_str`'s DT handling is unreachable
@@ -37,19 +37,19 @@ use crate::GroupInput;
 /// needs its declared precision applied at THIS layer, where the value is
 /// still known to have come from a typed column rather than from the caller's
 /// keyboard: see [`group_from_arrow_with_meta_at_edition`] (#695).
-pub fn cell_value(array: &dyn Array, row: usize) -> Value {
+pub fn cell_value(array: &dyn Array, row: usize) -> Cell {
     if array.is_null(row) {
-        return Value::Null;
+        return Cell::Null;
     }
     macro_rules! num {
         ($ty:ty) => {
-            Value::from(i64::from(
+            Cell::Int(i64::from(
                 array.as_any().downcast_ref::<$ty>().unwrap().value(row),
             ))
         };
     }
     match array.data_type() {
-        DataType::Utf8 => Value::String(
+        DataType::Utf8 => Cell::Text(
             array
                 .as_any()
                 .downcast_ref::<StringArray>()
@@ -57,7 +57,7 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
                 .value(row)
                 .to_string(),
         ),
-        DataType::LargeUtf8 => Value::String(
+        DataType::LargeUtf8 => Cell::Text(
             array
                 .as_any()
                 .downcast_ref::<LargeStringArray>()
@@ -65,7 +65,7 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
                 .value(row)
                 .to_string(),
         ),
-        DataType::Boolean => Value::Bool(
+        DataType::Boolean => Cell::Bool(
             array
                 .as_any()
                 .downcast_ref::<BooleanArray>()
@@ -79,21 +79,28 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
         DataType::UInt8 => num!(UInt8Array),
         DataType::UInt16 => num!(UInt16Array),
         DataType::UInt32 => num!(UInt32Array),
-        DataType::UInt64 => Value::from(
-            array
+        // Above i64: fall to f64, as `Cell`'s deserialiser does for the same
+        // shape — no AGS heading holds a 19-digit count.
+        DataType::UInt64 => {
+            let v = array
                 .as_any()
                 .downcast_ref::<UInt64Array>()
                 .unwrap()
-                .value(row),
-        ),
-        DataType::Float32 => Value::from(f64::from(
+                .value(row);
+            #[allow(clippy::cast_precision_loss)]
+            i64::try_from(v).map_or(Cell::from(v as f64), Cell::Int)
+        }
+        // Both float arms go through `Cell::from`, which nulls a non-finite —
+        // the behaviour `Value::from(f64)` gave these cells before #790 (a
+        // NaN measurement emits as blank, not as the text `NaN`).
+        DataType::Float32 => Cell::from(f64::from(
             array
                 .as_any()
                 .downcast_ref::<Float32Array>()
                 .unwrap()
                 .value(row),
         )),
-        DataType::Float64 => Value::from(
+        DataType::Float64 => Cell::from(
             array
                 .as_any()
                 .downcast_ref::<Float64Array>()
@@ -104,8 +111,8 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
         // the canonical string (then `ags4_str`'s DT/passthrough handling +
         // the validity mode finish the job).
         _ => match ArrayFormatter::try_new(array, &FormatOptions::default()) {
-            Ok(fmt) => Value::String(fmt.value(row).to_string()),
-            Err(_) => Value::Null,
+            Ok(fmt) => Cell::Text(fmt.value(row).to_string()),
+            Err(_) => Cell::Null,
         },
     }
 }
@@ -215,7 +222,7 @@ pub fn group_from_arrow_with_meta_at_edition<S: std::hash::BuildHasher>(
         })
         .collect();
 
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows: Vec<Vec<Cell>> = Vec::new();
     for batch in batches {
         let ncols = batch.num_columns();
         for r in 0..batch.num_rows() {
@@ -223,8 +230,8 @@ pub fn group_from_arrow_with_meta_at_edition<S: std::hash::BuildHasher>(
             for c in 0..ncols {
                 let v = cell_value(batch.column(c).as_ref(), r);
                 row.push(match (&v, dt_units.get(c).and_then(Option::as_deref)) {
-                    (Value::String(s), Some(unit)) => {
-                        dt_to_unit_precision(s, unit).map_or(v, Value::String)
+                    (Cell::Text(s), Some(unit)) => {
+                        dt_to_unit_precision(s, unit).map_or(v, Cell::Text)
                     }
                     _ => v,
                 });
@@ -263,7 +270,7 @@ mod tests {
     use std::sync::Arc;
 
     /// Build a one-row group from a single named column and read the cell back.
-    fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: Option<DictVersion>) -> Value {
+    fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: Option<DictVersion>) -> Cell {
         let schema = Schema::new(vec![Field::new(heading, col.data_type().clone(), true)]);
         let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![col]).expect("valid batch");
         let g = group_from_arrow_with_meta_at_edition::<std::collections::hash_map::RandomState>(
@@ -296,7 +303,7 @@ mod tests {
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
                 Some(DictVersion::V4_2),
             ),
-            Value::from("2021-08-09"),
+            Cell::from("2021-08-09"),
             "midnight under a date-only unit should render date-only"
         );
         // MOND_DTIM declares `yyyy-mm-ddThh:mm:ss`. The SAME instant must keep
@@ -308,7 +315,7 @@ mod tests {
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
                 Some(DictVersion::V4_2),
             ),
-            Value::from("2021-08-09T00:00:00"),
+            Cell::from("2021-08-09T00:00:00"),
             "the declared precision, not the value's zeros, decides"
         );
         // A real time under a date-only unit is a genuine mismatch between the
@@ -321,7 +328,7 @@ mod tests {
                 Arc::new(TimestampMillisecondArray::from(vec![AFTERNOON_MS])),
                 Some(DictVersion::V4_2),
             ),
-            Value::from("2021-08-09T14:30:00"),
+            Cell::from("2021-08-09T14:30:00"),
             "a lossy render must be refused, not applied"
         );
     }
@@ -339,7 +346,7 @@ mod tests {
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
                 None,
             ),
-            Value::from("2021-08-09T00:00:00"),
+            Cell::from("2021-08-09T00:00:00"),
             "no edition: unchanged from before #695"
         );
         assert_eq!(
@@ -349,7 +356,7 @@ mod tests {
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
                 Some(DictVersion::V4_2),
             ),
-            Value::from("2021-08-09T00:00:00"),
+            Cell::from("2021-08-09T00:00:00"),
             "a heading outside the standard dictionary declares no precision here"
         );
     }
@@ -366,49 +373,49 @@ mod tests {
                 Arc::new(StringArray::from(vec!["2021-08-09T00:00:00"])),
                 Some(DictVersion::V4_2),
             ),
-            Value::from("2021-08-09T00:00:00"),
+            Cell::from("2021-08-09T00:00:00"),
             "a caller-written string stays the caller's"
         );
     }
 
-    fn one(a: &dyn Array) -> Value {
+    fn one(a: &dyn Array) -> Cell {
         cell_value(a, 0)
     }
 
-    /// Every arm the `match` names, pinned to the `Value` variant the emit
+    /// Every arm the `match` names, pinned to the [`Cell`] variant the emit
     /// orchestrator expects. `ags4_str` renders numbers and bools differently
     /// from strings, so an arm returning the wrong *variant* changes the output
     /// bytes even when the text looks right.
     #[test]
-    fn typed_arms_map_to_their_json_variant() {
-        assert_eq!(one(&StringArray::from(vec!["BH01"])), Value::from("BH01"));
+    fn typed_arms_map_to_their_cell_variant() {
+        assert_eq!(one(&StringArray::from(vec!["BH01"])), Cell::from("BH01"));
         assert_eq!(
             one(&LargeStringArray::from(vec!["BH01"])),
-            Value::from("BH01")
+            Cell::from("BH01")
         );
-        assert_eq!(one(&BooleanArray::from(vec![true])), Value::Bool(true));
-        assert_eq!(one(&Int8Array::from(vec![-8i8])), Value::from(-8));
-        assert_eq!(one(&Int16Array::from(vec![-16i16])), Value::from(-16));
-        assert_eq!(one(&Int32Array::from(vec![-32i32])), Value::from(-32));
-        assert_eq!(one(&Int64Array::from(vec![-64i64])), Value::from(-64));
-        assert_eq!(one(&UInt8Array::from(vec![8u8])), Value::from(8));
-        assert_eq!(one(&UInt16Array::from(vec![16u16])), Value::from(16));
-        assert_eq!(one(&UInt32Array::from(vec![32u32])), Value::from(32));
-        assert_eq!(one(&UInt64Array::from(vec![64u64])), Value::from(64));
-        assert_eq!(one(&Float64Array::from(vec![1.5f64])), Value::from(1.5));
-        // f32 widens to f64 — pinned because a naive `Value::from(f32)` would
+        assert_eq!(one(&BooleanArray::from(vec![true])), Cell::Bool(true));
+        assert_eq!(one(&Int8Array::from(vec![-8i8])), Cell::from(-8));
+        assert_eq!(one(&Int16Array::from(vec![-16i16])), Cell::from(-16));
+        assert_eq!(one(&Int32Array::from(vec![-32i32])), Cell::from(-32));
+        assert_eq!(one(&Int64Array::from(vec![-64i64])), Cell::from(-64));
+        assert_eq!(one(&UInt8Array::from(vec![8u8])), Cell::from(8));
+        assert_eq!(one(&UInt16Array::from(vec![16u16])), Cell::from(16));
+        assert_eq!(one(&UInt32Array::from(vec![32u32])), Cell::from(32));
+        assert_eq!(one(&UInt64Array::from(vec![64u64])), Cell::from(64));
+        assert_eq!(one(&Float64Array::from(vec![1.5f64])), Cell::from(1.5));
+        // f32 widens to f64 — pinned because a naive `Cell::from(f32)` would
         // serialise 1.5f32 as 1.5000000596046448.
-        assert_eq!(one(&Float32Array::from(vec![1.5f32])), Value::from(1.5));
+        assert_eq!(one(&Float32Array::from(vec![1.5f32])), Cell::from(1.5));
     }
 
-    /// A null cell is `Value::Null` for EVERY type, checked before the match —
+    /// A null cell is `Cell::Null` for EVERY type, checked before the match —
     /// so the `unwrap()`s on the downcasts are only ever reached for a valid row.
     #[test]
     fn nulls_short_circuit_before_the_downcast() {
-        assert_eq!(one(&StringArray::from(vec![None::<&str>])), Value::Null);
-        assert_eq!(one(&Int64Array::from(vec![None::<i64>])), Value::Null);
-        assert_eq!(one(&BooleanArray::from(vec![None::<bool>])), Value::Null);
-        assert_eq!(one(&Date32Array::from(vec![None::<i32>])), Value::Null);
+        assert_eq!(one(&StringArray::from(vec![None::<&str>])), Cell::Null);
+        assert_eq!(one(&Int64Array::from(vec![None::<i64>])), Cell::Null);
+        assert_eq!(one(&BooleanArray::from(vec![None::<bool>])), Cell::Null);
+        assert_eq!(one(&Date32Array::from(vec![None::<i32>])), Cell::Null);
     }
 
     /// The fallback arm. **Every `DT` column on the emit path lands here**, so
@@ -418,19 +425,19 @@ mod tests {
     fn temporal_and_decimal_fall_back_to_arrows_canonical_string() {
         assert_eq!(
             one(&Date32Array::from(vec![19738])),
-            Value::from("2024-01-16")
+            Cell::from("2024-01-16")
         );
         assert_eq!(
             one(&TimestampMillisecondArray::from(vec![1_677_064_000_000i64])),
-            Value::from("2023-02-22T11:06:40")
+            Cell::from("2023-02-22T11:06:40")
         );
         let dec = Decimal128Array::from(vec![123_456i128])
             .with_precision_and_scale(10, 2)
             .expect("valid precision/scale");
-        assert_eq!(one(&dec), Value::from("1234.56"));
+        assert_eq!(one(&dec), Cell::from("1234.56"));
     }
 
-    /// The `Err(_) => Value::Null` arm is **defensive, not live**. Probed across
+    /// The `Err(_) => Cell::Null` arm is **defensive, not live**. Probed across
     /// arrow 59's exotic types — union, run-end, dictionary, struct, map,
     /// interval, duration, binary, fixed-size-binary, time64 — `try_new` does
     /// not fail for any of them. This test pins the one most likely to regress
@@ -450,7 +457,7 @@ mod tests {
         .expect("valid union");
         assert_ne!(
             cell_value(&u, 0),
-            Value::Null,
+            Cell::Null,
             "a formattable type reached the Err arm — the fallback is now eating real data"
         );
     }
@@ -486,8 +493,8 @@ mod tests {
         assert_eq!(
             g.rows,
             vec![
-                vec![Value::from("A"), Value::from(1.0)],
-                vec![Value::from("B"), Value::from(2.0)],
+                vec![Cell::from("A"), Cell::from(1.0)],
+                vec![Cell::from("B"), Cell::from(2.0)],
             ]
         );
         assert!(
@@ -506,7 +513,7 @@ mod tests {
             &[batch(vec!["A"], vec![1.0]), batch(vec!["B"], vec![2.0])],
         );
         assert_eq!(g.rows.len(), 2);
-        assert_eq!(g.rows[1][0], Value::from("B"));
+        assert_eq!(g.rows[1][0], Cell::from("B"));
     }
 
     /// The reason `schema` is a separate argument: a group whose stream carried

@@ -1,4 +1,5 @@
 pub mod laterite_ags4_emit
+pub use laterite_ags4_emit::Cell
 pub use laterite_ags4_emit::DictVersion
 pub enum laterite_ags4_emit::EmitError
 pub laterite_ags4_emit::EmitError::EmbeddedNewline
@@ -87,7 +88,7 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::EmitResult
 pub struct laterite_ags4_emit::GroupInput
 pub laterite_ags4_emit::GroupInput::code: alloc::string::String
 pub laterite_ags4_emit::GroupInput::headings: alloc::vec::Vec<alloc::string::String>
-pub laterite_ags4_emit::GroupInput::rows: alloc::vec::Vec<alloc::vec::Vec<serde_json::value::Value>>
+pub laterite_ags4_emit::GroupInput::rows: alloc::vec::Vec<alloc::vec::Vec<laterite_ags4_types::Cell>>
 pub laterite_ags4_emit::GroupInput::types: core::option::Option<alloc::vec::Vec<alloc::string::String>>
 pub laterite_ags4_emit::GroupInput::units: core::option::Option<alloc::vec::Vec<alloc::string::String>>
 impl core::marker::Freeze for laterite_ags4_emit::GroupInput
@@ -144,7 +145,7 @@ impl core::marker::Unpin for laterite_ags4_emit::TranStampError
 impl core::marker::UnsafeUnpin for laterite_ags4_emit::TranStampError
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::TranStampError
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::TranStampError
-pub fn laterite_ags4_emit::cell_value(&dyn arrow_array::array::Array, usize) -> serde_json::value::Value
+pub fn laterite_ags4_emit::cell_value(&dyn arrow_array::array::Array, usize) -> laterite_ags4_types::Cell
 pub fn laterite_ags4_emit::emit_ags4(&[laterite_ags4_emit::GroupInput], &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::emit_ags4_owned(alloc::vec::Vec<laterite_ags4_emit::GroupInput>, &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::group_from_arrow(alloc::string::String, &arrow_schema::schema::Schema, &[arrow_array::record_batch::RecordBatch]) -> laterite_ags4_emit::GroupInput

@@ -3,8 +3,7 @@
 Produce byte-faithful **AGS4** plaintext from typed or string data.
 
 ```rust
-use laterite_ags4_emit::{emit_ags4, EmitOpts, GroupInput};
-use serde_json::Value;
+use laterite_ags4_emit::{emit_ags4, Cell, EmitOpts, GroupInput};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let groups = vec![GroupInput {
@@ -12,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         headings: vec!["PROJ_ID".into()],
         units: None,
         types: Some(vec!["ID".into()]),
-        rows: vec![vec![Value::String("P1".into())]],
+        rows: vec![vec![Cell::Text("P1".into())]],
     }];
 
     let out = emit_ags4(&groups, &EmitOpts::default())?;

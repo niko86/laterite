@@ -11,8 +11,10 @@ use wasm_bindgen::prelude::*;
 
 /// One group of input data, deserialised from the browser's JSON. The
 /// column `headings` are the AGS headings; `units`/`types` are optional
-/// per-heading overrides (the dictionary fills the rest); `rows` cells are
-/// JSON values (numbers/strings/bools/null).
+/// per-heading overrides (the dictionary fills the rest); `rows` cells land
+/// directly on the emit-side [`laterite_ags4_emit::Cell`] — its deserialiser
+/// maps each JSON scalar to a variant with no `serde_json::Value`
+/// intermediate, so the browser door never builds one (#790).
 #[derive(Deserialize)]
 struct GroupInputJson {
     code: String,
@@ -21,7 +23,7 @@ struct GroupInputJson {
     units: Option<Vec<String>>,
     #[serde(default)]
     types: Option<Vec<String>>,
-    rows: Vec<Vec<serde_json::Value>>,
+    rows: Vec<Vec<laterite_ags4_emit::Cell>>,
 }
 
 /// One emit finding, flattened with its rule label for the JS side.
@@ -916,8 +918,8 @@ mod tests {
         // And the values must stay aligned with the columns that survived — a
         // projection that dropped the schema entry but not the data would put
         // "u-1" under LOCA_ID.
-        assert_eq!(group.rows[0][0], "BH01");
-        assert_eq!(group.rows[0][1], "100.00");
+        assert_eq!(group.rows[0][0], laterite_ags4_emit::Cell::from("BH01"));
+        assert_eq!(group.rows[0][1], laterite_ags4_emit::Cell::from("100.00"));
     }
 
     #[cfg(feature = "arrow")]

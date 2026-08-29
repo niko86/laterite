@@ -15,7 +15,7 @@
 //! exists:
 //!
 //!   * `cell_value` only allocates for STRING and fallback columns — a
-//!     `Float64` cell crosses as a typed `Value::Number`, no String. So
+//!     `Float64` cell crosses as a typed numeric cell, no String. So
 //!     "copy 1" is per string cell, not per cell.
 //!   * `emit_ags4`'s step 3 builds its `EmitGroup` views with
 //!     `rows: g.rows.clone()` — a full fourth copy of every formatted cell,
@@ -48,8 +48,8 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, Float64Array, Int64Array, RecordBatch, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
+use laterite_ags4_emit::Cell;
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, emit_ags4_owned, group_from_arrow};
-use serde_json::Value;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -173,7 +173,7 @@ fn dict_group() -> GroupInput {
         "DICT_REM",
     ];
     let rem = "AGS-L draft, publish 2026";
-    let mut rows: Vec<Vec<Value>> = vec![
+    let mut rows: Vec<Vec<Cell>> = vec![
         [
             "GROUP",
             "TREL",
@@ -186,14 +186,14 @@ fn dict_group() -> GroupInput {
             rem,
         ]
         .iter()
-        .map(|s| Value::String((*s).to_string()))
+        .map(|s| Cell::Text((*s).to_string()))
         .collect(),
     ];
     for (name, _, dtyp, unit, stat) in TREL {
         rows.push(
             ["HEADING", "TREL", name, stat, dtyp, name, unit, "", rem]
                 .iter()
-                .map(|s| Value::String((*s).to_string()))
+                .map(|s| Cell::Text((*s).to_string()))
                 .collect(),
         );
     }
@@ -218,7 +218,7 @@ fn proj_group() -> GroupInput {
         rows: vec![
             ["121415", "Clacton Marine GI", "Clacton-on-Sea"]
                 .iter()
-                .map(|s| Value::String((*s).to_string()))
+                .map(|s| Cell::Text((*s).to_string()))
                 .collect(),
         ],
     }
@@ -255,7 +255,7 @@ fn main() {
     let (schema, batch) = trel_batch(rows);
     stats("arrow batch built");
 
-    // --- copy 1: the Arrow -> Value transpose (the PyO3 host's seam) ---
+    // --- copy 1: the Arrow -> Cell transpose (the PyO3 host's seam) ---
     let units: HashMap<String, String> = TREL
         .iter()
         .map(|(n, _, _, u, _)| ((*n).to_string(), (*u).to_string()))

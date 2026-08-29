@@ -42,6 +42,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use laterite_ags4_emit::Cell;
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, emit_ags4};
 use laterite_ags4_parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::DictVersion;
@@ -784,7 +785,7 @@ fn reconcile_rows(
     pad: &[Option<usize>],
     warnings: &mut Vec<MergeWarning>,
     revisions: &mut Vec<RevisionNote>,
-) -> Vec<Vec<Value>> {
+) -> Vec<Vec<Cell>> {
     let mut order: Vec<Vec<Option<MCell>>> = Vec::new();
     let mut created_by: Vec<usize> = Vec::new();
     let mut pos: HashMap<Vec<String>, usize> = HashMap::new();
@@ -878,7 +879,7 @@ fn reconcile_rows(
         }
     }
 
-    // `Option<MCell>` cells → emit `Value`s. A not-carried cell is Null (→ blank);
+    // `Option<MCell>` cells → emit `Cell`s. A not-carried cell is Null (→ blank);
     // a carried cell is the producer's raw text, verbatim.
     //
     // The one exception is a PROMOTED column (`pad[ui] == Some(n)`) — the only
@@ -887,25 +888,25 @@ fn reconcile_rows(
     // string-only and refuses any pad it can't do losslessly, so a value it turns
     // down is kept byte-for-byte rather than rounded.
     let mut unpaddable: Vec<usize> = vec![0; union_h.len()];
-    let rows: Vec<Vec<Value>> = order
+    let rows: Vec<Vec<Cell>> = order
         .into_iter()
         .map(|cells| {
             cells
                 .into_iter()
                 .enumerate()
                 .map(|(ui, c)| {
-                    let Some(m) = c else { return Value::Null };
+                    let Some(m) = c else { return Cell::Null };
                     match pad[ui] {
                         // Blank means "no opinion", not zero — never pad it into one.
                         Some(n) if !m.value.trim().is_empty() => {
                             if let Some(padded) = pad_decimals(&m.value, n) {
-                                Value::String(padded)
+                                Cell::Text(padded)
                             } else {
                                 unpaddable[ui] += 1;
-                                Value::String(m.value)
+                                Cell::Text(m.value)
                             }
                         }
-                        _ => Value::String(m.value),
+                        _ => Cell::Text(m.value),
                     }
                 })
                 .collect()
@@ -978,25 +979,25 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp, edition: DictVersion
         "TRAN_REM".to_string(),
     ];
     let mut row = vec![
-        Value::String(stamp.isno.clone()),
-        Value::String(stamp.date.clone()),
-        Value::String(stamp.prod.clone()),
-        Value::String(stamp.stat.clone()),
+        Cell::Text(stamp.isno.clone()),
+        Cell::Text(stamp.date.clone()),
+        Cell::Text(stamp.prod.clone()),
+        Cell::Text(stamp.stat.clone()),
         // TRAN_AGS is REQUIRED and derivable: the edition merge resolved is the
         // edition the output is written against. `TranStamp::new` leaves it
         // empty precisely so callers can't contradict it — fill it here, the
         // same way emit's `synth_tran` does.
-        Value::String(if stamp.ags.trim().is_empty() {
+        Cell::Text(if stamp.ags.trim().is_empty() {
             edition.as_str().to_string()
         } else {
             stamp.ags.clone()
         }),
-        Value::String(stamp.recv.clone()),
-        Value::String(remarks),
+        Cell::Text(stamp.recv.clone()),
+        Cell::Text(remarks),
     ];
     if let Some(d) = &stamp.desc {
         headings.push("TRAN_DESC".to_string());
-        row.push(Value::String(d.clone()));
+        row.push(Cell::Text(d.clone()));
     }
     GroupInput {
         code: "TRAN".to_string(),

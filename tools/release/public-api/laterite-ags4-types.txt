@@ -50,7 +50,47 @@ impl core::marker::Unpin for laterite_ags4_types::CanonicalType
 impl core::marker::UnsafeUnpin for laterite_ags4_types::CanonicalType
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_types::CanonicalType
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_types::CanonicalType
-pub fn laterite_ags4_types::ags4_str(&serde_json::value::Value, &str) -> alloc::string::String
+pub enum laterite_ags4_types::Cell
+pub laterite_ags4_types::Cell::Bool(bool)
+pub laterite_ags4_types::Cell::Float(f64)
+pub laterite_ags4_types::Cell::Int(i64)
+pub laterite_ags4_types::Cell::Null
+pub laterite_ags4_types::Cell::Text(alloc::string::String)
+impl laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::as_f64(&self) -> core::option::Option<f64>
+pub fn laterite_ags4_types::Cell::as_i64(&self) -> core::option::Option<i64>
+pub fn laterite_ags4_types::Cell::is_null(&self) -> bool
+impl core::clone::Clone for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::clone(&self) -> laterite_ags4_types::Cell
+impl core::cmp::PartialEq for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::eq(&self, &laterite_ags4_types::Cell) -> bool
+impl core::convert::From<&serde_json::value::Value> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(&serde_json::value::Value) -> laterite_ags4_types::Cell
+impl core::convert::From<&str> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(&str) -> laterite_ags4_types::Cell
+impl core::convert::From<alloc::string::String> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(alloc::string::String) -> laterite_ags4_types::Cell
+impl core::convert::From<bool> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(bool) -> laterite_ags4_types::Cell
+impl core::convert::From<f64> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(f64) -> laterite_ags4_types::Cell
+impl core::convert::From<i64> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(i64) -> laterite_ags4_types::Cell
+impl core::fmt::Debug for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_types::Cell
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::deserialize<D>(D) -> core::result::Result<laterite_ags4_types::Cell, <D as serde_core::de::Deserializer>::Error> where D: serde_core::de::Deserializer<'de>
+impl<T: core::convert::Into<laterite_ags4_types::Cell>> core::convert::From<core::option::Option<T>> for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::from(core::option::Option<T>) -> laterite_ags4_types::Cell
+impl core::marker::Freeze for laterite_ags4_types::Cell
+impl core::marker::Send for laterite_ags4_types::Cell
+impl core::marker::Sync for laterite_ags4_types::Cell
+impl core::marker::Unpin for laterite_ags4_types::Cell
+impl core::marker::UnsafeUnpin for laterite_ags4_types::Cell
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_types::Cell
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_types::Cell
+pub fn laterite_ags4_types::ags4_str(&laterite_ags4_types::Cell, &str) -> alloc::string::String
 pub fn laterite_ags4_types::canonical_type(&str) -> core::option::Option<laterite_ags4_types::CanonicalType>
 pub fn laterite_ags4_types::decimal_places(&str) -> core::option::Option<usize>
 pub fn laterite_ags4_types::display_hint(&str) -> core::option::Option<alloc::string::String>

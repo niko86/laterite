@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-27
-counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 36}
+generated: 2026-08-29
+counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 37}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 36 |
-| **Total (live)** | **423** |
+| Design | 37 |
+| **Total (live)** | **424** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 35 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 36 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -496,6 +496,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | [[dec-duckdb-per-host-engine]] | accepted | — |
 | [[dec-duckdb-perf-architecture]] | accepted | — |
 | [[dec-edition-selection]] | accepted | — |
+| [[dec-emit-cell-representation]] | accepted | — |
 | [[dec-engine-publish-automation]] | accepted | — |
 | [[dec-engine-tiering]] | accepted | — |
 | [[dec-example-header-environment]] | accepted | — |

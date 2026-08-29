@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-types"
   lib: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
-related: [crate-map, laterite-ags4-core, laterite-ags4-wasm, dec-laterite-ags4-types-leaf, dec-ags4-merge-semantics]
+related: [crate-map, laterite-ags4-core, laterite-ags4-wasm, dec-laterite-ags4-types-leaf, dec-ags4-merge-semantics, dec-emit-cell-representation]
 sources: []
 ---
 # laterite-ags4-types
@@ -45,7 +45,10 @@ string to `n` places *without* going through `f64` (an f64 round-trip can
 perturb a value past 2^53; `pad_decimals` instead returns `None`, "cannot pad
 losslessly", for anything it won't touch). See [[dec-ags4-merge-semantics]].
 Read-side casting has a write-side mirror: `ags4_str` (typed value → AGS4
-wire form, laterite-dev#528) and — since laterite-dev#533, part of the laterite-dev#527 convergence arc —
+wire form, laterite-dev#528) — since #790 it takes this crate's own `Cell`
+enum (`Null | Text | Int | Float | Bool`, the emit-side cell representation;
+[[dec-emit-cell-representation]] holds why that is not a
+`serde_json::Value`) — and — since laterite-dev#533, part of the laterite-dev#527 convergence arc —
 `write_quoted_field<W: Write>`/`quote_field` (wrap a raw value in `"…"`,
 doubling an embedded `"`; the streaming form is the field primitive
 `laterite-ags4-emit`'s byte-faithful writer streams every cell through).

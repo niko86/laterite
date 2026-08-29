@@ -806,7 +806,15 @@ impl<'a> Write<'a> {
                         .map(|r| {
                             headings
                                 .iter()
-                                .map(|h| serde_json::Value::from(r.cell(h).unwrap_or("")))
+                                // `Text` goes out verbatim — a document's cells
+                                // were already formatted when its file was
+                                // written (#790: no more `Value` wrapper around
+                                // an already-owned string).
+                                .map(|h| {
+                                    laterite_ags4_emit::Cell::Text(
+                                        r.cell(h).unwrap_or("").to_string(),
+                                    )
+                                })
                                 .collect()
                         })
                         .collect(),

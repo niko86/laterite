@@ -27,6 +27,9 @@ pub use writer::{EmitGroup, write_ags4, write_ags4_matrix};
 // Re-export the edition enum so callers configure emit without taking a
 // direct `laterite-ags4-validator` dependency just for the type.
 pub use laterite_ags4_validator::DictVersion;
+// Same courtesy for the cell: `GroupInput.rows` is `Vec<Vec<Cell>>` (#790),
+// so a caller building rows shouldn't need a `laterite-ags4-types` line for it.
+pub use laterite_ags4_types::Cell;
 
 // The README's example is a doctest, not a second copy of one. `cfg(doctest)`
 // means this module exists only while rustdoc collects doctests: it is absent
