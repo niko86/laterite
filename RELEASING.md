@@ -58,10 +58,16 @@ every PR is already forced to fill in.
 
 Read what it says it cannot see. The product's own API surface is **not**
 measured — no committed snapshot exists for the Python or Node surface — so that
-verdict is a suggestion. Neither tier is checked against a registry: *unreleased*
-means *not stamped in this tree*, which will not catch a stamped version whose
-tag was never cut (the 0.8.1/0.8.2 failure above). The same report runs nightly
-and lands in the run's step summary, so drift surfaces without anyone asking.
+verdict is a suggestion. The **engine** tier IS checked against crates.io — each
+crate's stamp is looked up in the sparse index, and a stamp that never published
+shows as `PUBLISH OWED` beside its bump verdict, because a bump owed and a
+publish owed are different actions. A read that fails is reported as unasked and
+never as unpublished, and the count of crates that went unasked prints on every
+run. The **product** tier is not checked: nothing here asks PyPI or npm, so a
+stamped product version whose tag was never cut is still invisible (the
+0.8.1/0.8.2 failure above). `--no-registry` skips the lookup for an offline run.
+The same report runs nightly and lands in the run's step summary, so drift
+surfaces without anyone asking.
 
 ### Cutting a product release
 

@@ -127,6 +127,12 @@ another engine crate costs nothing release-plz would refund.
   append-only registry is now the one with an approval in front of it rather than
   the one without. What stays manual is the *dispatch* and the approval, which is
   the point of them.
+- **The report reads the registry now (#801).** `repo:tools/release/release_status.py`
+  looks each crate's stamp up in the crates.io sparse index, so *stamped here but
+  never published* — the state the manual-dispatch shape leaves reachable, and
+  which `laterite-ags4-emit` 0.12.0 sat in unnoticed — is reported rather than
+  invisible. That is evidence for the build-vs-adopt question above, not an answer
+  to it: it closes the detection gap, and says nothing about who should run the cut.
 - **If this is revisited, start from #216's spike comment, not from that issue's
   body** — the body was written before any of it was checked against the source,
   and several of its premises did not survive contact.
