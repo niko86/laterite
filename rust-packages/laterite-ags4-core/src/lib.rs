@@ -25,6 +25,12 @@ pub mod ags4_codec;
 // original DuckDB-backed crate's {convert,query,spec_tables} modules and its
 // own 2nd-hop `ags_types` re-export, laterite-py — keeps working unchanged.
 pub use laterite_ags4_types as ags_types;
+// The Rule 18 effective dictionary (standard ∪ the file's own DICT group),
+// homed in `laterite-ags4-reference` beside the dictionary it unions with and
+// re-exported here — the same move as `registry` — plus the adapter for this
+// crate's own read codec, so a read-only consumer that takes only this crate
+// can bind a file-declared group's columns (#777).
+pub mod effective_dict;
 pub mod error;
 pub mod index;
 pub mod keychain;

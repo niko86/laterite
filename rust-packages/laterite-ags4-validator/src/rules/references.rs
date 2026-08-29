@@ -43,9 +43,9 @@
 use std::collections::HashSet;
 
 use crate::dict::Dictionary;
+use crate::effective_dict::EffectiveDict;
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
-use crate::rules::dictionary::collect_file_dict;
 
 const RULE_19B: &str = "AGS Format Rule 19b";
 /// Shared with [`crate::world`], which owns Rule 20's on-disk half — the two
@@ -58,28 +58,19 @@ pub(crate) const RULE_20: &str = "AGS Format Rule 20";
 const PREFIX_EXCEPTIONS: &[&str] = &["SPEC", "TEST"];
 
 pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
-    let file_dict = collect_file_dict(parsed);
+    // The Rule 18 union, read by the shared `effective_dict` module (#777).
+    let eff = EffectiveDict::build(parsed, *dict);
 
     // Headings defined under each group = standard dict ∪ file DICT.
     let merged = |group: &str| -> HashSet<String> {
-        let mut s: HashSet<String> = dict
-            .group_headings(group)
+        eff.headings(group)
             .iter()
             .map(|h| (*h).to_string())
-            .collect();
-        if let Some(extra) = file_dict.get(group) {
-            s.extend(extra.iter().cloned());
-        }
-        s
+            .collect()
     };
 
     // Every heading name defined anywhere (Rule 19b_3 global check).
-    let mut defined_anywhere: HashSet<&str> = dict.all_heading_names().collect();
-    for hs in file_dict.values() {
-        for h in hs {
-            defined_anywhere.insert(h.as_str());
-        }
-    }
+    let defined_anywhere: HashSet<&str> = eff.all_heading_names().collect();
 
     for code in &parsed.group_order {
         let g = &parsed.groups[code];

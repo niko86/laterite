@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**The effective dictionary is a public API.** AGS4 Rule 18 makes the dictionary a file validates against the standard dictionary ∪ the file's own DICT group — and until now that union existed only as two private copies inside the validator, so a read-only consumer could not build it without pulling in the rule engine or writing a third copy. The one shared implementation now lives in `laterite-ags4-reference::effective_dict`: `FileDict` reads every column a DICT row can declare (`DICT_GRP`, `DICT_HDNG`, `DICT_STAT`, `DICT_DTYP`, `DICT_UNIT`, plus `DICT_PGRP` from GROUP-type rows), tolerantly — malformed DICT contributes nothing, because reporting it stays Rule 18's job — and `EffectiveDict` layers it over a standard edition. `laterite-ags4-core` re-exports the module with an adapter for its own read codec, so a reader that depends on core alone can bind a file-declared group's columns, statuses, units and parent. The validator's Rule 7/9, 10a–c and 19b families all consume the shared module now; both private copies are deleted, and python-ags4 parity held by identity across the rewire. (#777)"
+      }
+    ],
     "changed": [],
     "deprecated": [],
     "removed": [],

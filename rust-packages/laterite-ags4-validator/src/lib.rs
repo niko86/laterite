@@ -80,6 +80,12 @@ pub use fixes::{
 // `laterite_ags4_validator::dict::…` path throughout this crate + its
 // consumers (laterite-py, laterite-node, wasm) keeps resolving unchanged.
 pub use laterite_ags4_reference::dict;
+// The Rule 18 effective dictionary (standard ∪ the file's own DICT group) —
+// the shared implementation the Rule 7/9, 10a-c and 19b families all consume
+// since #777 (O-25/O-29 record the two private copies it replaced). Re-exported
+// so surfaces and tests reach it as `laterite_ags4_validator::effective_dict::…`
+// without a second dependency on the reference leaf.
+pub use laterite_ags4_reference::effective_dict;
 // The runtime custom-dictionary overlay (laterite-dev#568): `CustomDict` (parsed once at the
 // surface boundary, carried on `CheckOptions::custom_dict`), `parse_dict`, and
 // its `DictError`. Re-exported so surfaces build a `CustomDict` through

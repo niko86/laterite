@@ -49,6 +49,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::CheckOptions;
 use crate::dict::Dictionary;
+use crate::effective_dict::EffectiveDict;
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
 
@@ -76,123 +77,6 @@ const RULE_11C: &str = "AGS Format Rule 11c";
 const PARENTLESS: &[&str] = &[
     "PROJ", "TRAN", "ABBR", "DICT", "UNIT", "TYPE", "LOCA", "FILE", "LBSG", "PREM", "STND",
 ];
-
-/// Standard dictionary + the file's own DICT group, answering the
-/// status / parent questions Rules 10a–10c need. Owned `String`s keep
-/// the call sites lifetime-free.
-struct EffectiveDict<'a> {
-    std: Dictionary<'a>,
-    /// group → [(heading, `DICT_STAT`)] declared in the file's DICT.
-    file_hdng: HashMap<String, Vec<(String, String)>>,
-    /// group → raw `DICT_PGRP` from a file DICT `GROUP`-type row.
-    file_parent: HashMap<String, String>,
-}
-
-impl<'a> EffectiveDict<'a> {
-    fn build(parsed: &ParsedFile, std: Dictionary<'a>) -> Self {
-        let mut file_hdng: HashMap<String, Vec<(String, String)>> = HashMap::new();
-        let mut file_parent: HashMap<String, String> = HashMap::new();
-        if let Some(d) = parsed.groups.get("DICT") {
-            let idx = |n: &str| d.headings.iter().position(|h| h == n);
-            let (ti, gi, hi, si, pi) = (
-                idx("DICT_TYPE"),
-                idx("DICT_GRP"),
-                idx("DICT_HDNG"),
-                idx("DICT_STAT"),
-                idx("DICT_PGRP"),
-            );
-            if let (Some(ti), Some(gi)) = (ti, gi) {
-                for r in &d.rows {
-                    let get = |i: Option<usize>| {
-                        i.and_then(|i| r.values.get(i)).map_or("", String::as_str)
-                    };
-                    let dtype = r.values.get(ti).map_or("", String::as_str);
-                    let grp = r.values.get(gi).map_or("", String::as_str);
-                    if grp.is_empty() {
-                        continue;
-                    }
-                    match dtype {
-                        "GROUP" => {
-                            file_parent.insert(grp.to_string(), get(pi).to_string());
-                        }
-                        "HEADING" => {
-                            let h = get(hi);
-                            if !h.is_empty() {
-                                file_hdng
-                                    .entry(grp.to_string())
-                                    .or_default()
-                                    .push((h.to_string(), get(si).to_string()));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-        EffectiveDict {
-            std,
-            file_hdng,
-            file_parent,
-        }
-    }
-
-    /// Headings of `group` whose status contains `want` (case-
-    /// insensitive: `"KEY"` or `"REQUIRED"`), standard dict first then
-    /// file-DICT extras, de-duplicated.
-    fn fields_with_status(&self, group: &str, want: &str) -> Vec<String> {
-        let mut out: Vec<String> = Vec::new();
-        for h in self.std.group_headings(group).iter() {
-            if let Some(e) = self.std.heading(group, h) {
-                if e.status.to_ascii_uppercase().contains(want) {
-                    out.push((*h).to_string());
-                }
-            }
-        }
-        if let Some(extra) = self.file_hdng.get(group) {
-            for (h, st) in extra {
-                if st.to_ascii_uppercase().contains(want) && !out.iter().any(|x| x == h) {
-                    out.push(h.clone());
-                }
-            }
-        }
-        out
-    }
-
-    fn key_fields(&self, group: &str) -> Vec<String> {
-        self.fields_with_status(group, "KEY")
-    }
-    fn required_fields(&self, group: &str) -> Vec<String> {
-        self.fields_with_status(group, "REQUIRED")
-    }
-
-    /// `Some(parent)` (possibly `""` = blank in dictionary), or `None`
-    /// if the group has no definition in either dictionary.
-    fn parent(&self, group: &str) -> Option<String> {
-        if let Some(m) = self.std.group(group) {
-            return Some(m.parent.to_string()); // build.rs maps '-' → ""
-        }
-        self.file_parent
-            .get(group)
-            .map(|p| if p == "-" { String::new() } else { p.clone() })
-    }
-
-    /// `group` plus every group above it on the declared `DICT_PGRP` chain.
-    ///
-    /// Cycle-guarded, because half this chain is file-authored: a DICT that
-    /// declares A's parent B and B's parent A is malformed but parses, and an
-    /// unguarded walk would spin on it forever.
-    fn ancestry(&self, group: &str) -> HashSet<String> {
-        let mut seen: HashSet<String> = HashSet::new();
-        let mut cur = group.to_string();
-        while seen.insert(cur.clone()) {
-            match self.parent(&cur) {
-                Some(p) if !p.is_empty() => cur = p,
-                _ => break,
-            }
-        }
-        seen
-    }
-}
 
 /// The published 3-argument entry point, kept because `rules` is public API
 /// and crates.io freezes what ships: breaking it would force a version bump
@@ -440,7 +324,7 @@ fn rule_10c<'p>(
         );
         return;
     }
-    let Some(pg) = parsed.groups.get(&parent) else {
+    let Some(pg) = parsed.groups.get(parent) else {
         add(
             found,
             RULE_10C,
@@ -451,7 +335,7 @@ fn rule_10c<'p>(
         return;
     };
 
-    let pkeys = eff.key_fields(&parent);
+    let pkeys = eff.key_fields(parent);
     if pkeys.is_empty() {
         add(
             found,
@@ -501,7 +385,7 @@ fn rule_10c<'p>(
     // per-parent, so built once and cached (see `check`). `entry` clones the
     // parent code once per child — cheap beside the row scan it replaces.
     let cidx = cols(g, &pkeys);
-    let ptuples = parent_tuples.entry(parent.clone()).or_insert_with(|| {
+    let ptuples = parent_tuples.entry(parent.to_string()).or_insert_with(|| {
         let pidx = cols(pg, &pkeys);
         pg.rows.iter().map(|r| tuple_at(&pidx, r)).collect()
     });
@@ -871,7 +755,7 @@ mod tests {
         let parsed = parse_str(src).expect("fixture parses");
         let dict = Dictionary::bundled(DictVersion::V4_2);
         let eff = EffectiveDict::build(&parsed, dict);
-        let keys = eff.fields_with_status("LOCA", "KEY");
+        let keys = eff.key_fields("LOCA");
         assert_eq!(
             keys.iter().filter(|h| h.as_str() == "LOCA_ID").count(),
             1,

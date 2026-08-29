@@ -5,6 +5,8 @@ status: drafted
 tags: [concept]
 ags_editions: []
 repo_refs:
+  shared_module: "repo:rust-packages/laterite-ags4-reference/src/effective_dict.rs"
+  core_reexport: "repo:rust-packages/laterite-ags4-core/src/effective_dict.rs"
   rules_7_9: "repo:rust-packages/laterite-ags4-validator/src/rules/dictionary.rs"
   rules_10a_c: "repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs"
   rule_19b_dict_aware: "repo:rust-packages/laterite-ags4-validator/src/rules/references.rs"
@@ -22,7 +24,11 @@ Validation uses the standard AGS dictionary (§3.6) MERGED with any in-file DICT
 ## Why it matters
 Rules 7/9/10a-c/19b never validate against the bundled standard dictionary alone — they validate against standard ∪ the file's own DICT group (Rule 18/18a). Mis-merge the DICT overlay and you get false Rule 9s on legitimate user-defined headings (this is exactly the class of false-positive the corpus dogfood guards against).
 
-**Where each one reads the union**, because one of them is easy to miss: Rules 7 and 9 in `repo:rust-packages/laterite-ags4-validator/src/rules/dictionary.rs`, Rules 10a-c in `repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs` (through its private `EffectiveDict`), and Rule 19b in `repo:rust-packages/laterite-ags4-validator/src/rules/references.rs`, which builds `standard dict ∪ file DICT` per group and again across every group. Rule 19b's *other* half lives in `repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs` and consults no dictionary at all — it is a purely lexical shape check. Reading only the naming module is how a reader concludes 19b does not belong on this list. It does; the dictionary-aware half is one module over.
+**One implementation, since #777**: the union is built by the shared `effective_dict` module in `repo:rust-packages/laterite-ags4-reference/src/effective_dict.rs` — `FileDict` reads the file's own DICT group tolerantly (all of `DICT_GRP`/`DICT_HDNG`/`DICT_STAT`/`DICT_DTYP`/`DICT_UNIT`, plus `DICT_PGRP` from `GROUP`-type rows; malformed content contributes nothing, because reporting it is Rule 18's job), and `EffectiveDict` layers it over the resolved standard edition. It replaced two private copies inside the validator (`collect_file_dict` and `relational.rs`'s own `EffectiveDict` — O-25/O-29 record that arc), neither of which read the type or unit columns a reader needs.
+
+**Where each rule reads the union**, because one of them is easy to miss: Rules 7 and 9 in `repo:rust-packages/laterite-ags4-validator/src/rules/dictionary.rs`, Rules 10a-c in `repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs`, and Rule 19b in `repo:rust-packages/laterite-ags4-validator/src/rules/references.rs` — all through the shared module. Rule 19b's *other* half lives in `repo:rust-packages/laterite-ags4-validator/src/rules/naming.rs` and consults no dictionary at all — it is a purely lexical shape check. Reading only the naming module is how a reader concludes 19b does not belong on this list. It does; the dictionary-aware half is one module over.
+
+**Read-only consumers** reach the same union without the rule engine: `repo:rust-packages/laterite-ags4-core/src/effective_dict.rs` re-exports the module (the `registry` move, repeated) and adds the adapter for core's own read codec, so a reader that depends on `laterite-ags4-core` alone can bind a file-declared group's columns. The strict cousin is the [[dec-custom-dict-overlay]] `--dict` path (`parse_dict`): that one ingests a *standalone* dictionary file and refuses a bad one — a bad DICT group inside a delivery file is a finding on the file, never a refusal to read it.
 
 ## Diagram
 

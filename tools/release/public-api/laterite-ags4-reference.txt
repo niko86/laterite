@@ -228,6 +228,100 @@ impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict:
 pub const laterite_ags4_reference::dict::FALLBACK: laterite_ags4_reference::dict::DictVersion
 pub fn laterite_ags4_reference::dict::dictionary_dto(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::DictionaryDto
 pub fn laterite_ags4_reference::dict::heading_key(&str, &str) -> alloc::string::String
+pub mod laterite_ags4_reference::effective_dict
+pub struct laterite_ags4_reference::effective_dict::DictRow<'a>
+pub laterite_ags4_reference::effective_dict::DictRow::ags_type: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::desc: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::dict_type: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::group: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::heading: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::parent: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::status: &'a str
+pub laterite_ags4_reference::effective_dict::DictRow::unit: &'a str
+impl<'a> core::clone::Clone for laterite_ags4_reference::effective_dict::DictRow<'a>
+pub fn laterite_ags4_reference::effective_dict::DictRow<'a>::clone(&self) -> laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::fmt::Debug for laterite_ags4_reference::effective_dict::DictRow<'a>
+pub fn laterite_ags4_reference::effective_dict::DictRow<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::marker::Freeze for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::marker::Send for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::marker::Sync for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::effective_dict::DictRow<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::effective_dict::DictRow<'a>
+pub struct laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::all_heading_names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::ancestry(&self, &str) -> std::collections::hash::set::HashSet<alloc::string::String>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::build(&laterite_ags4_parse::ParsedFile, laterite_ags4_reference::dict::Dictionary<'a>) -> Self
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::file(&self) -> &laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::heading(&self, &str, &str) -> core::option::Option<laterite_ags4_reference::dict::HeadingRef<'_>>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::headings(&self, &str) -> alloc::vec::Vec<&str>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::key_fields(&self, &str) -> alloc::vec::Vec<alloc::string::String>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::new(laterite_ags4_reference::dict::Dictionary<'a>, laterite_ags4_reference::effective_dict::FileDict) -> Self
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::parent(&self, &str) -> core::option::Option<&str>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::required_fields(&self, &str) -> alloc::vec::Vec<alloc::string::String>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::std(&self) -> laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::clone::Clone for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::clone(&self) -> laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::fmt::Debug for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::marker::Send for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::marker::Sync for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub struct laterite_ags4_reference::effective_dict::FileDict
+impl laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::all_heading_names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn laterite_ags4_reference::effective_dict::FileDict::from_parsed(&laterite_ags4_parse::ParsedFile) -> Self
+pub fn laterite_ags4_reference::effective_dict::FileDict::from_rows<'a>(impl core::iter::traits::collect::IntoIterator<Item = laterite_ags4_reference::effective_dict::DictRow<'a>>) -> Self
+pub fn laterite_ags4_reference::effective_dict::FileDict::groups(&self) -> alloc::collections::btree::set::BTreeSet<&str>
+pub fn laterite_ags4_reference::effective_dict::FileDict::heading(&self, &str, &str) -> core::option::Option<&laterite_ags4_reference::effective_dict::FileHeading>
+pub fn laterite_ags4_reference::effective_dict::FileDict::headings(&self, &str) -> &[laterite_ags4_reference::effective_dict::FileHeading]
+pub fn laterite_ags4_reference::effective_dict::FileDict::is_empty(&self) -> bool
+pub fn laterite_ags4_reference::effective_dict::FileDict::parent(&self, &str) -> core::option::Option<&str>
+impl core::clone::Clone for laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::clone(&self) -> laterite_ags4_reference::effective_dict::FileDict
+impl core::cmp::Eq for laterite_ags4_reference::effective_dict::FileDict
+impl core::cmp::PartialEq for laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::eq(&self, &laterite_ags4_reference::effective_dict::FileDict) -> bool
+impl core::default::Default for laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::default() -> laterite_ags4_reference::effective_dict::FileDict
+impl core::fmt::Debug for laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::effective_dict::FileDict
+impl core::marker::Freeze for laterite_ags4_reference::effective_dict::FileDict
+impl core::marker::Send for laterite_ags4_reference::effective_dict::FileDict
+impl core::marker::Sync for laterite_ags4_reference::effective_dict::FileDict
+impl core::marker::Unpin for laterite_ags4_reference::effective_dict::FileDict
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::effective_dict::FileDict
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::effective_dict::FileDict
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::effective_dict::FileDict
+pub struct laterite_ags4_reference::effective_dict::FileHeading
+pub laterite_ags4_reference::effective_dict::FileHeading::ags_type: alloc::string::String
+pub laterite_ags4_reference::effective_dict::FileHeading::desc: alloc::string::String
+pub laterite_ags4_reference::effective_dict::FileHeading::heading: alloc::string::String
+pub laterite_ags4_reference::effective_dict::FileHeading::status: alloc::string::String
+pub laterite_ags4_reference::effective_dict::FileHeading::unit: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::effective_dict::FileHeading
+pub fn laterite_ags4_reference::effective_dict::FileHeading::clone(&self) -> laterite_ags4_reference::effective_dict::FileHeading
+impl core::cmp::Eq for laterite_ags4_reference::effective_dict::FileHeading
+impl core::cmp::PartialEq for laterite_ags4_reference::effective_dict::FileHeading
+pub fn laterite_ags4_reference::effective_dict::FileHeading::eq(&self, &laterite_ags4_reference::effective_dict::FileHeading) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::effective_dict::FileHeading
+pub fn laterite_ags4_reference::effective_dict::FileHeading::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::effective_dict::FileHeading
+impl core::marker::Freeze for laterite_ags4_reference::effective_dict::FileHeading
+impl core::marker::Send for laterite_ags4_reference::effective_dict::FileHeading
+impl core::marker::Sync for laterite_ags4_reference::effective_dict::FileHeading
+impl core::marker::Unpin for laterite_ags4_reference::effective_dict::FileHeading
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::effective_dict::FileHeading
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::effective_dict::FileHeading
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::effective_dict::FileHeading
 pub mod laterite_ags4_reference::keychain
 pub fn laterite_ags4_reference::keychain::canonical_encode(&str, &[(alloc::string::String, alloc::string::String)]) -> alloc::vec::Vec<u8>
 pub fn laterite_ags4_reference::keychain::content_hash(&str, &[(&str, &str, &str, &str)]) -> uuid::Uuid

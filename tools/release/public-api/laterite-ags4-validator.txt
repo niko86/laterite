@@ -4,6 +4,7 @@ pub use laterite_ags4_validator::DictVersion
 pub use laterite_ags4_validator::Dictionary
 pub use laterite_ags4_validator::RULE_LABELS
 pub use laterite_ags4_validator::dict
+pub use laterite_ags4_validator::effective_dict
 pub use laterite_ags4_validator::overlay
 pub use laterite_ags4_validator::rule_metadata_json
 pub mod laterite_ags4_validator::catalogue
