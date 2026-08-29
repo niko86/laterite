@@ -1,26 +1,20 @@
 //! Allocation-site attribution for the emit pipeline's per-cell copies.
 //!
 //! `build_ags4` was measured (by a downstream consumer of the wheel) peaking
-//! at ~30x the size of the file it writes, ~244 bytes per cell, and the
-//! attribution there was structural: three owned-String copies read off the
-//! source at `arrow_in.rs` (`cell_value`'s `.to_string()`),
-//! `emit.rs` (`OwnedGroup`'s formatted `Vec<Vec<String>>`), and the parse-back
-//! in `laterite-ags4-parse` (`DataRow.values`). This harness replaces that
-//! read-off with a measurement: dhat as the global allocator, the pipeline
-//! entered at the same seam the PyO3 host enters it — `group_from_arrow`,
-//! typed Arrow batches in — and the live bytes at global peak attributed by
-//! call site.
+//! at many times the size of the file it writes; the composition tables and
+//! the per-cell ladder across the fixes live on #788/#789/#790. This harness
+//! is the instrument: dhat as the global allocator, the pipeline entered at
+//! the same seam the PyO3 host enters it — [`emit_ags4_from_arrow`], typed
+//! Arrow batches in — and the live bytes at global peak attributed by call
+//! site.
 //!
-//! Two things the structural account could not see, which are the reason this
-//! exists:
-//!
-//!   * `cell_value` only allocates for STRING and fallback columns — a
-//!     `Float64` cell crosses as a typed numeric cell, no String. So
-//!     "copy 1" is per string cell, not per cell.
-//!   * `emit_ags4`'s step 3 builds its `EmitGroup` views with
-//!     `rows: g.rows.clone()` — a full fourth copy of every formatted cell,
-//!     co-resident with the other three, under a comment saying the struct
-//!     borrows.
+//! The pipeline it measures is the post-#790 one: the Arrow door streams
+//! each cell straight off its array into the formatted string, so the copies
+//! left to see are the formatted `OwnedGroup` rows, the written bytes, and
+//! the validating parse-back (`DataRow.values` in `laterite-ags4-parse`).
+//! The input transpose this example used to attribute — one `Cell`
+//! (previously a `serde_json::Value`) per cell, the peak's largest slice —
+//! no longer exists; its retirement is what #790's ladder priced.
 //!
 //! The workload is a downstream build's `TREL`: the same 22 columns
 //! polars hands over (7 Utf8, 12 Float64, 3 Int64), the same cell widths, the
@@ -48,8 +42,7 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, Float64Array, Int64Array, RecordBatch, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
-use laterite_ags4_emit::Cell;
-use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, emit_ags4_owned, group_from_arrow};
+use laterite_ags4_emit::{ArrowGroup, EmitMode, EmitOpts, emit_ags4_from_arrow};
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -158,9 +151,31 @@ fn trel_batch(rows: usize) -> (Arc<Schema>, RecordBatch) {
     (schema, batch)
 }
 
+/// An all-string [`ArrowGroup`] from headings + row-major cells — how the
+/// PyO3 host hands over a non-numeric frame (a polars Utf8 frame crosses as
+/// Utf8 columns). UNIT/TYPE left to the dictionary.
+fn string_group(code: &str, headings: &[&str], rows: &[Vec<&str>]) -> ArrowGroup {
+    let fields: Vec<Field> = headings
+        .iter()
+        .map(|h| Field::new(*h, DataType::Utf8, false))
+        .collect();
+    let schema = Arc::new(Schema::new(fields));
+    let columns: Vec<ArrayRef> = (0..headings.len())
+        .map(|c| Arc::new(StringArray::from_iter_values(rows.iter().map(|r| r[c]))) as ArrayRef)
+        .collect();
+    let batch = RecordBatch::try_new(schema.clone(), columns).expect("a coherent batch");
+    ArrowGroup {
+        code: code.to_string(),
+        schema,
+        batches: vec![batch],
+        units: None,
+        types: None,
+    }
+}
+
 /// The file's own account of TREL, as the real delivery carries one (Rule 18).
 /// DICT is a standard group, so its own UNIT/TYPE fill from the dictionary.
-fn dict_group() -> GroupInput {
+fn dict_group() -> ArrowGroup {
     let headings = [
         "DICT_TYPE",
         "DICT_GRP",
@@ -173,55 +188,31 @@ fn dict_group() -> GroupInput {
         "DICT_REM",
     ];
     let rem = "AGS-L draft, publish 2026";
-    let mut rows: Vec<Vec<Cell>> = vec![
-        [
-            "GROUP",
-            "TREL",
-            "",
-            "",
-            "",
-            "Triaxial Tests - Effective Stress - Logged Data",
-            "",
-            "",
-            rem,
-        ]
-        .iter()
-        .map(|s| Cell::Text((*s).to_string()))
-        .collect(),
-    ];
-    for (name, _, dtyp, unit, stat) in TREL {
-        rows.push(
-            ["HEADING", "TREL", name, stat, dtyp, name, unit, "", rem]
-                .iter()
-                .map(|s| Cell::Text((*s).to_string()))
-                .collect(),
-        );
+    let mut rows: Vec<Vec<&str>> = vec![vec![
+        "GROUP",
+        "TREL",
+        "",
+        "",
+        "",
+        "Triaxial Tests - Effective Stress - Logged Data",
+        "",
+        "",
+        rem,
+    ]];
+    for (name, _, dtyp, unit, stat) in &TREL {
+        rows.push(vec![
+            "HEADING", "TREL", name, stat, dtyp, name, unit, "", rem,
+        ]);
     }
-    GroupInput {
-        code: "DICT".to_string(),
-        headings: headings.iter().map(ToString::to_string).collect(),
-        units: None,
-        types: None,
-        rows,
-    }
+    string_group("DICT", &headings, &rows)
 }
 
-fn proj_group() -> GroupInput {
-    GroupInput {
-        code: "PROJ".to_string(),
-        headings: ["PROJ_ID", "PROJ_NAME", "PROJ_LOC"]
-            .iter()
-            .map(ToString::to_string)
-            .collect(),
-        units: None,
-        types: None,
-        rows: vec![
-            ["121415", "Clacton Marine GI", "Clacton-on-Sea"]
-                .iter()
-                .map(|s| Cell::Text((*s).to_string()))
-                .collect(),
-        ],
-    }
+fn proj_group() -> ArrowGroup {
+    string_group(
+        "PROJ",
+        &["PROJ_ID", "PROJ_NAME", "PROJ_LOC"],
+        &[vec!["121415", "Clacton Marine GI", "Clacton-on-Sea"]],
+    )
 }
 
 fn stats(label: &str) {
@@ -255,7 +246,12 @@ fn main() {
     let (schema, batch) = trel_batch(rows);
     stats("arrow batch built");
 
-    // --- copy 1: the Arrow -> Cell transpose (the PyO3 host's seam) ---
+    // --- the Arrow door (the PyO3 host's seam): batches -> formatted ----
+    // TREL's UNIT/TYPE come as override maps, the way the downstream build
+    // passes its DICT-declared metadata. One call, three groups, exactly as
+    // `build_ags4` sends them — PROJ and DICT are frames too in production,
+    // so they cross as Utf8 columns. There is no input transpose left to
+    // price: each cell formats off its array into the final string (#790).
     let units: HashMap<String, String> = TREL
         .iter()
         .map(|(n, _, _, u, _)| ((*n).to_string(), (*u).to_string()))
@@ -264,28 +260,20 @@ fn main() {
         .iter()
         .map(|(n, _, t, _, _)| ((*n).to_string(), (*t).to_string()))
         .collect();
-    let trel = laterite_ags4_emit::group_from_arrow_with_meta(
-        "TREL".to_string(),
-        &schema,
-        std::slice::from_ref(&batch),
-        Some(&units),
-        Some(&types),
-    );
-    // The downstream caller goes through `_at_edition`, which for TREL resolves
-    // no DT units (no temporal columns, and the heading is not in the standard
-    // dictionary) — `group_from_arrow_with_meta` is the identical path.
-    let _ = group_from_arrow; // referenced so the doc comment's seam is checked
-    stats("copy 1: GroupInput");
-
-    let groups = vec![proj_group(), dict_group(), trel];
-
-    // --- copies 2, 2b, 3: format, clone for the writer, parse back -----
     let opts = EmitOpts {
         mode,
         ..EmitOpts::default()
     };
-    let result = emit_ags4_owned(groups, &opts).expect("emits");
-    stats("emit_ags4 returned");
+    let trel = ArrowGroup {
+        code: "TREL".to_string(),
+        schema,
+        batches: vec![batch],
+        units: Some(units),
+        types: Some(types),
+    };
+    let result =
+        emit_ags4_from_arrow(vec![proj_group(), dict_group(), trel], &opts).expect("emits");
+    stats("emit_ags4_from_arrow returned");
 
     let cells = rows * TREL.len();
     let findings: usize = result.findings.values().map(Vec::len).sum();
