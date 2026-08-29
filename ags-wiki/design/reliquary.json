@@ -348,6 +348,38 @@
       "status": "removed",
       "removed_in": "the PR retiring the field with its last reader",
       "evidence": "Stranded by #500: the field fed the AGS5 requirement register, which that change retired. Empty on every page that carried it, so it had never pointed at anything. Deferred at the time as a separate unit of work, then done once the deferral was re-examined and found to rest on a wrong count AND a missed reader. THE COUNT: this row said \"31 insight pages\". It was 29 pages across TWO classes — 18 `insight`, 11 `strategy` — plus two templates, and `_template-strategy.md` carried the field as well, which the row never mentioned. 31 was the file count read as a page count. THE READER: `insights/_README.md` had a live dataview block, \"Confirmed gaps feeding AGS5\", selecting the column — so the field was not inert, it had a query pointing at it, and #500 missed it by grepping that file for the retired CLASS names rather than for the mechanism. Removed with it. `feeds_strategy`, its sibling, IS live and stays."
+    },
+    {
+      "symbol": "`group_from_arrow()`",
+      "verify": "`rust-packages/laterite-ags4-emit/src/arrow_in.rs::pub fn group_from_arrow(`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "feat/emit-arrow-door-790 (#790 PR2)",
+      "evidence": "The Arrow→cell transpose's no-overrides entry; only caller was the heap_profile instrument (a `let _ =` doc-honesty reference). Superseded by `emit_ags4_from_arrow`, which streams batches straight into the formatted OwnedGroup. Published on crates.io ≤0.13.0, so \"no in-repo caller\" was checked, not assumed — the crate takes the break under its 0.x line."
+    },
+    {
+      "symbol": "`group_from_arrow_with_meta()`",
+      "verify": "`rust-packages/laterite-ags4-emit/src/arrow_in.rs::pub fn group_from_arrow_with_meta<`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "feat/emit-arrow-door-790 (#790 PR2)",
+      "evidence": "Override-map variant of the transpose; hosts had all moved to `_at_edition`. Its {heading→value} alignment survives inside `owned_group_from_arrow`."
+    },
+    {
+      "symbol": "`group_from_arrow_with_meta_at_edition()`",
+      "verify": "`rust-packages/laterite-ags4-emit/src/arrow_in.rs::pub fn group_from_arrow_with_meta_at_edition`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "feat/emit-arrow-door-790 (#790 PR2)",
+      "evidence": "The transpose entry all three hosts actually called (#695 DT precision rode its `edition`). The DT-precision behaviour moved into the streaming door unchanged — `opts.edition` drives it; the `edition: None` pre-#695 rendering it also offered is retired with it (every host passed Some)."
+    },
+    {
+      "symbol": "`cell_value()` (public)",
+      "verify": "`rust-packages/laterite-ags4-emit/src/arrow_in.rs::pub fn cell_value`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "feat/emit-arrow-door-790 (#790 PR2)",
+      "evidence": "Demoted to pub(crate), not deleted: it is still the ONE type→cell mapping both doors share — `owned_group_from_arrow` streams through it per cell. What was retired is the public export nothing outside the crate called."
     }
   ]
 }

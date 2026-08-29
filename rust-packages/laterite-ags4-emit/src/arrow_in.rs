@@ -310,6 +310,7 @@ mod tests {
     /// door's group conversion, and read the FORMATTED cell back. The old
     /// transpose returned a `Cell` here; the door returns wire strings, which
     /// is the honest layer to pin — it is what the file will carry.
+    #[allow(clippy::needless_pass_by_value)] // test helper: owned reads clearer at call sites
     fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: DictVersion) -> String {
         let schema = Schema::new(vec![Field::new(heading, col.data_type().clone(), true)]);
         let batch =

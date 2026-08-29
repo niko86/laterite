@@ -62,12 +62,17 @@ thing wherever it is applied.
 
 ## Inputs / outputs
 
-In: one `GroupInput` per group — code, headings, optional per-heading UNIT/TYPE
-overrides, and rows of [[laterite-ags4-types]] `Cell` cells (typed from frames
-or Arrow, strings from browser JSON — deliberately *not* a `serde_json::Value`;
-[[dec-emit-cell-representation]] holds why). Behind the optional `arrow`
-feature, `group_from_arrow` transposes an Arrow `RecordBatch` into that shape,
-shared by the native and browser hosts rather than reimplemented per host.
+In, via two doors that join at the formatted group ([[dec-emit-cell-representation]]):
+one `GroupInput` per group — code, headings, optional per-heading UNIT/TYPE
+overrides, and rows of [[laterite-ags4-types]] `Cell` cells (typed values, or
+strings from browser JSON — deliberately *not* a `serde_json::Value`); or,
+behind the optional `arrow` feature, one `ArrowGroup` per group into
+`emit_ags4_from_arrow`, which streams each `RecordBatch` cell straight off its
+array into the formatted string — no row-major intermediate — shared by the
+native, node and browser hosts rather than reimplemented per host. A
+differential test holds the doors byte-identical where they should agree, and
+pins the one intended divergence (a typed temporal renders at its heading's
+declared UNIT precision; a caller's string emits verbatim).
 
 Out: `EmitResult` — the AGS4 bytes plus any residual findings; or `EmitError`
 (`Invalid` under Strict). Everything is UTF-8: `parse_bytes` is handed a static

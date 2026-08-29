@@ -335,10 +335,7 @@ fn shape_report(res: &laterite_ags4_emit::EmitResult) -> BuildAgs4Report {
 /// Decode one group's Arrow IPC stream → a [`laterite_ags4_emit::ArrowGroup`]
 /// (the column names are the AGS headings) for the shared streaming door.
 #[cfg(feature = "arrow")]
-fn group_from_ipc(
-    code: String,
-    bytes: &[u8],
-) -> Result<laterite_ags4_emit::ArrowGroup, String> {
+fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::ArrowGroup, String> {
     let reader = arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
         .map_err(|e| format!("arrow ipc: {e}"))?;
     let schema = reader.schema();
