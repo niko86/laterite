@@ -2,13 +2,13 @@
 # crate; this is the one a stranger is expected to depend on.
 #
 # It carries its OWN version (0.1.x), deliberately NOT `version.workspace = true`.
-# The engine tier is at 0.9.0 and moves whenever the engine does; publishing this
-# crate at 0.9.0 would advertise nine minors of API history that never existed,
+# The engine tier moves whenever the engine does; publishing this crate at the
+# engine's number would advertise minors of API history that never existed,
 # and would then drag the user-facing semver commitment along with every internal
 # reshape. Two clocks is the point of the two tiers.
 [package]
 name = "laterite"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.85"
 description = "Read, validate and write AGS4 — the geotechnical data transfer format"
