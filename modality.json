@@ -72,7 +72,7 @@
       "id": "duckdb",
       "label": "DuckDB extension",
       "source": "../laterite-duckdb/src/*.rs (a separate repo, checked out as a sibling — exercised in CI as the PUBLISHED artefact, never built there)",
-      "reflection": "documentation"
+      "reflection": "manifest-cross-check"
     }
   ],
   "excluded_axes": [
@@ -833,6 +833,15 @@
           },
           "gaps": [],
           "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** \"Construct from caller-supplied data\" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures."
         }
       ]
     },
@@ -994,6 +1003,15 @@
             }
           ],
           "note": "both sides are paths and the delta goes to stdout — there is no file output form here, unlike the other four CLI verbs in this table."
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design — output shape, not `read_only`.** `RevisionDelta` is three levels deep (groups → rows → cells) with group-level totals and heading changes, while every existing extension function returns a flat table of one subject; a SQL `ags_diff()` would be a new relational projection, not a port. The read-only manifest is NOT the reason — `ags_rules`, `ags_dictionary` and `ags_relationships` already read no user file."
         }
       ]
     },
@@ -1230,6 +1248,33 @@
           },
           "gaps": [],
           "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** There is no `lat censor` — censor is browser-only among shipped surfaces, so there is no CLI spelling for this capability to be absent from. Matches the `rust` and `duckdb` cells on this row."
+        },
+        {
+          "surface": "python",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Censor is browser-only among shipped surfaces, so there is no Python spelling for this capability to be absent from. Matches the `rust`, `duckdb` and `cli` cells on this row."
+        },
+        {
+          "surface": "node",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Censor is browser-only among shipped surfaces, so there is no Node spelling for this capability to be absent from. Matches the `rust`, `duckdb` and `cli` cells on this row."
         }
       ]
     },
@@ -1680,6 +1725,15 @@
           },
           "gaps": [],
           "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design — but NOT because of the file-tool promise, which does not exclude it**: a normalising re-emit reads a path and writes a file. The reason is that emit is a *component* on this surface rather than a user-facing verb — there is no handle to emit from, and `lat fix --fix-out`, `lat merge --out` and `lat excel` already do the emitting. A reader who sees the promise cited elsewhere on this row will correctly notice it does not fit here."
         }
       ]
     },
@@ -2135,6 +2189,27 @@
           },
           "gaps": [],
           "note": "**by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes."
+        },
+        {
+          "surface": "browser",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {
+            "bytes": "absent"
+          },
+          "output": {
+            "bytes": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "bytes",
+              "verdict": "gap",
+              "reason": "The zstd implementation is already loaded on this surface (`@bokuweb/zstd-wasm`, in the transport worker) and `lock` already runs it at level 9, so exposing the zstd-only `pack`/`unpack` door is wiring rather than new capability — the surface is incomplete here, not deliberately narrow.",
+              "priority": "P3"
+            }
+          ],
+          "note": "The crate's wasm-hostile `age`/`zstd` deps are NOT the reason this is empty: this surface reimplements transport in JS (`web/src/lib/transportClient.ts`) and does not use `laterite-transport` at all — the wasm CRATE has zero transport code. A reader who takes the absence as \"zstd does not work in the browser\" has it backwards. Distinct from the `gzip not zstd` choice on the report download (`ags-wiki/design/validator-site.md`), which is about a throwaway artifact and no native browser zstd ENCODER, not about this envelope."
         }
       ]
     },
@@ -2399,6 +2474,24 @@
           },
           "gaps": [],
           "note": "**by-design.** This capability is defined as reading into the typed-graph object model — the generated group classes. `read_ags` returns a typed RELATION, which is a different thing and is already recorded under `read`. A SQL surface has no object model to return."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** `read_typed` hands back an in-process object model, and a CLI has no process to hold the graph in. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures."
+        },
+        {
+          "surface": "browser",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** The typed-graph object model is a Python-only surface; every other cell on this row is absent for the same reason. The browser reads to a handle, not to a graph."
         }
       ]
     },
@@ -2459,6 +2552,33 @@
           },
           "gaps": [],
           "note": "**gap.** Defined as output-shaping of a read (`xn` numeric coercion). `XN` canonicalises to `string`, so the extension emits it VARCHAR with no opt-in to coerce, where Python offers `read(xn='numeric')`. Nothing prevents an `xn=` named parameter on `read_ags` — it already takes `encoding` — so this reads as not-yet rather than declined. The weakest verdict on this surface, and the only one here that is not `by-design`."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** `lat read` emits strings; there is no numeric coercion to offer a view over. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures."
+        },
+        {
+          "surface": "node",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records — there is no Node sibling for it to be a view over."
+        },
+        {
+          "surface": "browser",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it."
         }
       ]
     }

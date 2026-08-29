@@ -357,11 +357,11 @@ def uncovered(doc: dict) -> list[str]:
     `cap["cells"]`, so an absent one is never visited. Ten cells were missing when
     #771 found them by reading, not by any run going red.
 
-    This is a REPORT, not the assertion. The assertion — every capability has a
-    cell for every surface — cannot land while `build`, `censor`, `emit`,
-    `read_typed` and `read-output-view` have no settled CLI verdict; it belongs in
-    the change that records those. Until then the absences are at least counted
-    on every run, rather than being a blind spot with a green tick on it.
+    This is still the REPORT — it prints on every run, pass or fail. It is no
+    longer the only thing watching: #779 recorded the last twelve verdicts and
+    landed the assertion, which reads THIS function rather than restating the
+    predicate, so the count printed here and the pair that fails CI can never
+    disagree. See `test_every_capability_has_a_cell_for_every_surface`.
     """
     surfaces = [s["id"] for s in doc["surfaces"]]
     out: list[str] = []
