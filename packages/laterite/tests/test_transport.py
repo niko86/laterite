@@ -62,27 +62,51 @@ def test_unpack_strips_zst_suffix(ags_file: Path) -> None:
     assert out == zst.with_suffix("") and out.exists()
 
 
+#: Cheap scrypt work factor for tests whose subject is NOT the KDF strength.
+#: At the shipped factor 18 each derivation is memory-hard by design (256 MiB),
+#: which a laptop absorbs and a CI runner does not — these tests ran 27-102s
+#: there against under a second locally. The envelope carries its factor in the
+#: header, so every property tested here (round-trip, error paths, form parity,
+#: zstd levels) is factor-independent. The shipped default still has two
+#: round-trip proofs that pay full price on purpose:
+#: `test_lock_unlock_round_trip` below, and the docs example `ex17_lock.py`.
+#: (Same pattern and constant as test_transport_interop.py's _TEST_LOG_N.)
+_TEST_LOG_N = 10
+
+
 def test_lock_unlock_round_trip(ags_file: Path, tmp_path: Path) -> None:
+    # Deliberately at the SHIPPED work factor — the one test here that proves
+    # the default tier round-trips, and asserts the header pins factor 18.
+    # Every other test in this file dials `log_n` down (see _TEST_LOG_N above).
     src_bytes = ags_file.read_bytes()
     locked = transport.lock(ags_file, password="hunter2")
     assert locked == ags_file.with_suffix(".ags.zst.age")
     assert locked.exists()
-    assert locked.read_bytes() != src_bytes  # encrypted, not the plain file
+    sealed = locked.read_bytes()
+    assert sealed != src_bytes  # encrypted, not the plain file
+    stanza = next(
+        line for line in sealed[:200].split(b"\n") if line.startswith(b"-> scrypt ")
+    )
+    assert int(stanza.rsplit(b" ", 1)[1]) == 18  # the shipped default tier
     restored = tmp_path / "restored.ags"
     transport.unlock(locked, password="hunter2", dest=restored)
     assert restored.read_bytes() == src_bytes
 
 
 def test_unlock_wrong_password_raises(ags_file: Path, tmp_path: Path) -> None:
-    locked = transport.lock(ags_file, password="correct")
+    locked = transport.lock(ags_file, password="correct", log_n=_TEST_LOG_N)
     with pytest.raises(RuntimeError) as exc:
         transport.unlock(locked, password="wrong", dest=tmp_path / "x.ags")
     assert "laterite error" in str(exc.value)
 
 
 def test_lock_both_levels_work(ags_file: Path, tmp_path: Path) -> None:
-    out1 = transport.lock(ags_file, password="p", level=1, dest=tmp_path / "l1.age")
-    out9 = transport.lock(ags_file, password="p", level=9, dest=tmp_path / "l9.age")
+    out1 = transport.lock(
+        ags_file, password="p", level=1, log_n=_TEST_LOG_N, dest=tmp_path / "l1.age"
+    )
+    out9 = transport.lock(
+        ags_file, password="p", level=9, log_n=_TEST_LOG_N, dest=tmp_path / "l9.age"
+    )
     assert out1.exists() and out9.exists()
 
 
@@ -96,12 +120,8 @@ def test_lock_bytes_honours_log_n_and_still_round_trips() -> None:
     )
     assert int(stanza.rsplit(b" ", 1)[1]) == 12  # the factor we asked for
     assert transport.unlock_bytes(sealed, password="pw") == _AGS
-    # Default (log_n=None) pins the standard tier 18.
-    default = transport.lock_bytes(_AGS, password="pw")
-    dstanza = next(
-        line for line in default[:200].split(b"\n") if line.startswith(b"-> scrypt ")
-    )
-    assert int(dstanza.rsplit(b" ", 1)[1]) == 18
+    # The default tier's header pin (18) lives in test_lock_unlock_round_trip,
+    # the one test that pays the shipped factor — not duplicated here.
 
 
 @pytest.mark.parametrize("bad", [0, 21, 25])
@@ -124,7 +144,7 @@ def test_pack_bytes_round_trip() -> None:
 
 
 def test_lock_bytes_round_trip_and_wrong_password() -> None:
-    sealed = transport.lock_bytes(_AGS, password="hunter2")
+    sealed = transport.lock_bytes(_AGS, password="hunter2", log_n=_TEST_LOG_N)
     assert sealed != _AGS  # encrypted
     assert transport.unlock_bytes(sealed, password="hunter2") == _AGS
     with pytest.raises(RuntimeError):
@@ -136,10 +156,12 @@ def test_bytes_and_file_forms_interoperate(ags_file: Path, tmp_path: Path) -> No
     # file lock opens with unlock_bytes — same envelope either way.
     data = ags_file.read_bytes()
 
-    (tmp_path / "b.zst.age").write_bytes(transport.lock_bytes(data, password="pw"))
+    (tmp_path / "b.zst.age").write_bytes(
+        transport.lock_bytes(data, password="pw", log_n=_TEST_LOG_N)
+    )
     assert transport.unlock(tmp_path / "b.zst.age", password="pw").read_bytes() == data
 
-    locked = transport.lock(ags_file, password="pw")
+    locked = transport.lock(ags_file, password="pw", log_n=_TEST_LOG_N)
     assert transport.unlock_bytes(locked.read_bytes(), password="pw") == data
 
 
