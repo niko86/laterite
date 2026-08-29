@@ -29,6 +29,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Fixed
+
+- **A fractional value under a 0DP heading now rounds on emit, like every other DP width.** It truncated toward zero — `212.9` kPa declared 0DP was written `212`, understating by up to one unit of the declared precision, always downward, so every ratio derived from the file leaned one way. No sibling behaved like this: 1DP-and-up already round half-even, and python-ags4 formats 0DP with the same rounding, so the fix removes a parity divergence as well as the bias. What a 0DP cell *accepts* on read is unchanged — this is only what emit writes for an in-range fractional value.
+
 ## [0.12.0] — 2026-08-29
 
 ### Added

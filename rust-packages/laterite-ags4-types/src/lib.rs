@@ -184,13 +184,18 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
         if let Some(i) = value.as_i64() {
             return i.to_string();
         }
-        // A float value under a 0DP type is unusual — `parse_value` now nulls an
-        // out-of-range 0DP cell (laterite-dev#611), so this only sees a float from an odd
-        // re-typed import. Render it only if it fits i64 (see `f64_fits_i64`);
-        // otherwise blank, rather than fabricate a saturated integer.
+        // A float reaches here on every `build_ags4`: Arrow crosses numeric
+        // columns typed, so a Float64 column under a 0DP-declared heading is
+        // the NORMAL build-path case, not an odd re-typed import (#793 — the
+        // old comment said otherwise, and the old code truncated toward zero,
+        // a one-signed downward bias no other DP width had). Round-half-even
+        // like the siblings (`format_ndp`'s `{f:.n$}`) and like python-ags4's
+        // `f"{x:.0f}"`. Render only if it fits i64 (see `f64_fits_i64`);
+        // otherwise blank, rather than fabricate a saturated integer. The
+        // read-side policy is untouched: `parse_value` still nulls an
+        // out-of-range 0DP cell (laterite-dev#611).
         if let Some(f) = value.as_f64().filter(|f| f64_fits_i64(*f)) {
-            #[allow(clippy::cast_possible_truncation)] // range-checked by the filter
-            return (f as i64).to_string();
+            return format!("{f:.0}");
         }
         return String::new();
     }
@@ -1193,8 +1198,16 @@ mod tests {
     #[test]
     fn ags4_str_0dp_handles_int_and_float() {
         assert_eq!(ags4_str(&Value::from(5_i64), "0DP"), "5");
-        // A float-valued 0DP cell truncates toward zero.
-        assert_eq!(ags4_str(&Value::from(5.9_f64), "0DP"), "5");
+        // A float-valued 0DP cell ROUNDS, exactly like every other DP width
+        // (#793 — it truncated, a one-signed downward bias no sibling had).
+        // Round-half-even, matching both format_ndp's `{f:.n$}` and
+        // python-ags4's `f"{x:.0f}"`, so the parity oracle agrees on halves.
+        assert_eq!(ags4_str(&Value::from(5.9_f64), "0DP"), "6");
+        assert_eq!(ags4_str(&Value::from(2.5_f64), "0DP"), "2");
+        assert_eq!(ags4_str(&Value::from(3.5_f64), "0DP"), "4");
+        // `-0.4` renders "-0" — the same as python-ags4's f-string and the
+        // siblings' own "-0.00" shape; pinned so the choice is visible.
+        assert_eq!(ags4_str(&Value::from(-0.4_f64), "0DP"), "-0");
         // A non-numeric value under 0DP yields the empty default.
         assert_eq!(ags4_str(&Value::String("x".into()), "0DP"), "");
     }
