@@ -285,6 +285,14 @@ mod tests {
         temp_dir().join(format!("lat_transport_{}_{tag}", std::process::id()))
     }
 
+    /// Cheap work factor for tests whose subject is NOT the KDF tier. scrypt at
+    /// `SCRYPT_LOG_N` is memory-hard by design (256 MiB per derivation), which
+    /// a laptop absorbs and a CI runner does not — and every property below
+    /// except the two full-price tests (the header pin, and one default-tier
+    /// round trip, this crate being the constant's owner) is factor-independent:
+    /// the envelope carries its factor in the header.
+    const TEST_LOG_N: u8 = 10;
+
     #[test]
     fn pack_then_unpack_round_trips() {
         let (src, packed, out) = (tmp("p.src"), tmp("p.zst"), tmp("p.out"));
@@ -311,6 +319,8 @@ mod tests {
         let payload = b"sensitive AGS payload ".repeat(60);
         fs::write(&src, &payload).unwrap();
 
+        // Deliberately at the shipped factor — the crate's own proof that its
+        // DEFAULT tier round-trips; every other test here uses TEST_LOG_N.
         lock(&src, &locked, "hunter2", 9, SCRYPT_LOG_N).unwrap();
 
         // wrong passphrase must fail
@@ -334,7 +344,7 @@ mod tests {
     fn plaintext_bytes_round_trip_through_the_age_envelope() {
         // The byte-level path the consumers reuse directly.
         let msg = b"the quick brown fox jumps over 13 lazy dogs";
-        let sealed = encrypt_with_passphrase(msg, "pw", SCRYPT_LOG_N).unwrap();
+        let sealed = encrypt_with_passphrase(msg, "pw", TEST_LOG_N).unwrap();
         assert_ne!(sealed, msg, "ciphertext must differ from plaintext");
         assert_eq!(decrypt_with_passphrase(&sealed, "pw").unwrap(), msg);
         assert!(decrypt_with_passphrase(&sealed, "nope").is_err());
@@ -347,14 +357,16 @@ mod tests {
         // our OWN files. Prove the mechanism machine-independently: a cap BELOW the
         // file's factor rejects (the bug), while `decrypt_with_passphrase` — which
         // pins the cap at the encrypt max (20) — accepts.
-        let sealed = encrypt_with_passphrase(b"secret", "pw", SCRYPT_LOG_N).unwrap();
+        // Factor-RELATIVE, so it runs at the cheap tier: the property is
+        // "a cap below the file's factor rejects", not anything about 18.
+        let sealed = encrypt_with_passphrase(b"secret", "pw", TEST_LOG_N).unwrap();
 
         // Simulate a starved machine: an identity capped below the file's factor
         // refuses it, exactly as the CI runner did.
         let decryptor = age::Decryptor::new(&sealed[..]).unwrap();
         let mut capped =
             age::scrypt::Identity::new(SecretString::new("pw".to_owned().into_boxed_str()));
-        capped.set_max_work_factor(SCRYPT_LOG_N - 1);
+        capped.set_max_work_factor(TEST_LOG_N - 1);
         assert!(
             decryptor
                 .decrypt(std::iter::once(&capped as &dyn age::Identity))
@@ -377,7 +389,7 @@ mod tests {
     #[test]
     fn lock_bytes_unlock_bytes_round_trip_and_rejects_wrong_password() {
         let payload = b"sensitive AGS payload ".repeat(60);
-        let sealed = lock_bytes(&payload, "hunter2", 9, SCRYPT_LOG_N).unwrap();
+        let sealed = lock_bytes(&payload, "hunter2", 9, TEST_LOG_N).unwrap();
         assert_ne!(sealed, payload, "sealed bytes differ from plaintext");
         assert!(unlock_bytes(&sealed, "wrong").is_err());
         assert_eq!(unlock_bytes(&sealed, "hunter2").unwrap(), payload);
@@ -389,7 +401,7 @@ mod tests {
         // and a file `lock` opens with `unlock_bytes` — same envelope either way.
         let payload = b"\"GROUP\",\"LOCA\"\r\nrepetitive ".repeat(50);
 
-        let sealed = lock_bytes(&payload, "pw", 9, SCRYPT_LOG_N).unwrap();
+        let sealed = lock_bytes(&payload, "pw", 9, TEST_LOG_N).unwrap();
         let (locked, out) = (tmp("i.age"), tmp("i.out"));
         fs::write(&locked, &sealed).unwrap();
         unlock(&locked, &out, "pw").unwrap();
@@ -397,7 +409,7 @@ mod tests {
 
         let (src, locked2) = (tmp("i.src"), tmp("i2.age"));
         fs::write(&src, &payload).unwrap();
-        lock(&src, &locked2, "pw", 9, SCRYPT_LOG_N).unwrap();
+        lock(&src, &locked2, "pw", 9, TEST_LOG_N).unwrap();
         let opened = unlock_bytes(&fs::read(&locked2).unwrap(), "pw").unwrap();
         assert_eq!(opened, payload, "file lock → unlock_bytes");
 

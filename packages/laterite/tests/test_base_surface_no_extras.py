@@ -95,7 +95,9 @@ _EXERCISE = textwrap.dedent(
         from laterite import transport
         z = transport.pack(ags); assert z.exists()
         assert transport.unpack(z).exists()
-        a = transport.lock(ags, password="pw"); assert a.exists()
+        # log_n dialed down: the subject is "imports work without extras",
+        # not KDF strength — at the shipped factor this one probe was 79s on CI.
+        a = transport.lock(ags, password="pw", log_n=10); assert a.exists()
         transport.unlock(a, password="pw")
     def t_registry():
         from laterite.registry import GROUPS, child_groups
