@@ -230,6 +230,9 @@
       },
       {
         "text": "**The published crates' docs.rs pages stop pointing at things a reader cannot open.** Twelve doc links on public items resolved to private ones — `BaseSpec::Auto` naming `detect_base`, the merge modes naming their lattice helpers, `ags4_codec` naming `from_shared` — and rendered on docs.rs as links that go nowhere. They are plain code spans now: the name still says what it is, without promising a page that cannot exist. Two sample-output blocks (the AGS4 writer's and the codec's) were being parsed as prose rather than code, so their angle-bracket placeholders were swallowed as markup and one line had been garbled by an earlier partial fix; both are fenced now and render as written. Three links in `laterite-ags4-forge` that named real items but did not resolve now do. `cargo doc` runs in CI for the first time with warnings as errors, so none of this can come back unseen."
+      },
+      {
+        "text": "**`cargo add laterite` no longer resolves two-minors-stale engines.** The facade published at 0.1.2 declares `^0.9.0` floors on its engine crates, and a 0.x caret never crosses a minor — so after the engine tier's 0.11.0 publish, the facade went on handing its consumers 0.9.0 engines, and the publisher's skip-by-version (\"already on crates.io\") hid it, the version number matching while the manifest content did not. The facade moves to 0.1.3 — a deps-only patch; its own API is unchanged — so its published floors state the engines it is actually built against."
       }
     ],
     "security": []
