@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite[pyarrow]==0.11.0"]
+# dependencies = ["laterite[pyarrow]==0.12.0"]
 # ///
 """Docs example — run it with `uv run ex21_synthetic_keys.py`, from anywhere.
 

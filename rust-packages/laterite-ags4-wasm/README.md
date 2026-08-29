@@ -110,7 +110,7 @@ you're calling, and it lists exactly the features you built with.
 import init, { validate, read, version } from "@laterite/ags4-wasm";
 
 await init();                       // required, once, before anything else
-version();                          // "0.11.0"
+version();                          // "0.12.0"
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
