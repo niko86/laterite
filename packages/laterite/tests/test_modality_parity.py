@@ -31,13 +31,19 @@ Each reflected cell asserts, for the forms it can OBSERVE:
 * every observed-ABSENT form is NOT credited present — a register that claims a
   door which no longer exists (a closed/removed gap) fails CI.
 
-CLI and DuckDB are documentation-only here (the CLI parser isn't statically typed;
-the DuckDB ext lives in a separate gitignored repo absent from this checkout, so a
-`output/**` regex would be a permanent no-op — see the register's surface notes).
+The CLI is documentation-only here — its parser isn't statically typed.
+
+DuckDB no longer is, and the register's `reflection` says so (`manifest-cross-check`,
+was `documentation`). #763 shipped `tools/check_duckdb_manifest.py`, gated in
+`repo-gates`, which cross-checks the register's duckdb verbs against the extension's
+own `functions.json` in BOTH directions. Note the scope: that instrument sees the
+PRESENCE half only. Whether a cell's *content* is right is still hand-authored and
+unreflected, so a duckdb cell can be wrong in every way except existing.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import inspect
 import io
 import json
@@ -51,6 +57,23 @@ REPO = Path(__file__).parents[3]
 REGISTER = REPO / "modality.json"
 TS = REPO / "rust-packages" / "laterite-node" / "ts"
 WASM_SRC = REPO / "rust-packages" / "laterite-ags4-wasm" / "src"
+
+
+def _gen_modality():
+    """The generator, loaded by path — the house pattern for a tools/ script.
+
+    Imported for `uncovered()` alone. That predicate is what `gen_modality.py`
+    already PRINTS on every run, and this test is what makes it fail; defining
+    it twice would let the report and the gate drift into disagreeing about
+    which pairs are missing.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "gen_modality", REPO / "tools" / "gen_modality.py"
+    )
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def _wasm_source() -> str:
@@ -190,6 +213,43 @@ def test_register_well_formed():
 # --------------------------------------------------------------------------- #
 # Python — executed probes + inspect + attr presence
 # --------------------------------------------------------------------------- #
+
+
+def test_every_capability_has_a_cell_for_every_surface():
+    """The grid is WHOLE — every capability x surface pair holds a verdict.
+
+    `test_register_well_formed` validates every cell that EXISTS: it iterates
+    `for cell in cap["cells"]`, so a pair with no cell is never visited and
+    never judged. That is the blind spot this closes, and it is not academic —
+    twelve pairs were missing when this landed, ten of them `cli` (#772, #779).
+
+    The other two guards cannot see it either. `gen_modality.py --check`
+    compares the rendered page to the SSOT, and a missing cell renders
+    faithfully as nothing, so both agree while both omit the row.
+
+    The pair COUNT is asserted rather than printed. Per the house rule a gate
+    says what it covered on every run, and pytest captures stdout — so a number
+    nobody sees is not a report. In the assertion it is a gate: add a surface
+    or a capability and this fails until every pair on the new row or column
+    carries a verdict, which is the whole point.
+    """
+    doc = _doc()
+    surfaces = [s["id"] for s in doc["surfaces"]]
+    caps = doc["capabilities"]
+
+    missing = _gen_modality().uncovered(doc)
+    assert not missing, (
+        f"{len(missing)} capability x surface pair(s) hold no verdict — a cell "
+        f"absent from the register is invisible to every other guard here:\n  "
+        + "\n  ".join(missing)
+    )
+
+    covered = sum(len({c["surface"] for c in cap["cells"]}) for cap in caps)
+    assert covered == len(caps) * len(surfaces), (
+        f"grid covers {covered} pairs, expected "
+        f"{len(caps)} capabilities x {len(surfaces)} surfaces = "
+        f"{len(caps) * len(surfaces)}"
+    )
 
 
 def test_python_read_input_doors():

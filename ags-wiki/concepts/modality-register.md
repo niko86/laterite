@@ -27,7 +27,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 - **🔴 P1** (0): —
 - **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
-- **🟡 P3** (4): read/rust (in.file-like); validate/rust (in.file-like); read_typed/node (out.handle); read-output-view/python (out.table)
+- **🟡 P3** (5): read/rust (in.file-like); validate/rust (in.file-like); transport-pack/browser (in.bytes); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (17): intentional absences, rationale in each cell below.
 
 ## Excluded axes
@@ -160,6 +160,7 @@ _Notes:_
 | browser (free) | ≈ | ✓ |   |   |
 | rust (chained) |   |   | ✓ | ✓ |
 | duckdb (n/a) | — | — | — | — |
+| cli (absent) |   |   |   |   |
 
 **Output**
 
@@ -170,6 +171,7 @@ _Notes:_
 | browser (free) | ✓ |   |
 | rust (chained) |   | ✓ |
 | duckdb (n/a) | — | — |
+| cli (absent) |   |   |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
@@ -177,6 +179,7 @@ _Findings:_
 _Notes:_
 - _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
+- _cli_: **by-design.** "Construct from caller-supplied data" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
 
 ### diff — Compare two AGS4 revisions.
 
@@ -191,6 +194,7 @@ _Notes:_
 | browser (free) |   |   | ✓ |   |   |
 | rust (chained) | ✓ |   | ✓ |   | ✓ |
 | cli (free) | ✓ |   | — |   |   |
+| duckdb (absent) |   |   |   |   |   |
 
 **Output**
 
@@ -201,6 +205,7 @@ _Notes:_
 | browser (free) | ✓ |   |
 | rust (chained) | ✓ |   |
 | cli (free) | ✓ | ✓ |
+| duckdb (absent) |   |   |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; DiffSource is string|Uint8Array|Ags4File.
@@ -209,6 +214,7 @@ _Findings:_
 _Notes:_
 - _rust_: Added 2026-08-06 (phase 4d of dec-facade-parity). The value form is a typed `Delta` of first-party handles, not the engine's `Serialize` structs — the same rule that made `Cell` its own enum. NOTE the handle door compares each document AS IT STANDS, edits included, by re-emitting it: python's handle form resolves to `Ags4File.bytes` (the re-emit) for the same reason, and diffing the file on disk instead would silently ignore an edit. One asymmetry worth knowing about the shared engine: a group present on only one side is reported whole via `groups_added`/`groups_removed` and its rows do NOT reach the totals, so summing them is the wrong way to ask whether anything changed.
 - _cli_: both sides are paths and the delta goes to stdout — there is no file output form here, unlike the other four CLI verbs in this table.
+- _duckdb_: **by-design — output shape, not `read_only`.** `RevisionDelta` is three levels deep (groups → rows → cells) with group-level totals and heading changes, while every existing extension function returns a flat table of one subject; a SQL `ags_diff()` would be a new relational projection, not a port. The read-only manifest is NOT the reason — `ags_rules`, `ags_dictionary` and `ags_relationships` already read no user file.
 
 ### merge — Reconcile N AGS4 deliveries of one project into one file.
 
@@ -255,6 +261,9 @@ _Notes:_
 | browser (free) | ✓ |
 | rust (absent) |   |
 | duckdb (n/a) | — |
+| cli (absent) |   |
+| python (absent) |   |
+| node (absent) |   |
 
 **Output**
 
@@ -263,10 +272,16 @@ _Notes:_
 | browser (free) | ✓ | ✓ |
 | rust (absent) |   |   |
 | duckdb (n/a) | — | — |
+| cli (absent) |   |   |
+| python (absent) |   |   |
+| node (absent) |   |   |
 
 _Notes:_
 - _rust_: Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
+- _cli_: **by-design.** There is no `lat censor` — censor is browser-only among shipped surfaces, so there is no CLI spelling for this capability to be absent from. Matches the `rust` and `duckdb` cells on this row.
+- _python_: **by-design.** Censor is browser-only among shipped surfaces, so there is no Python spelling for this capability to be absent from. Matches the `rust`, `duckdb` and `cli` cells on this row.
+- _node_: **by-design.** Censor is browser-only among shipped surfaces, so there is no Node spelling for this capability to be absent from. Matches the `rust`, `duckdb` and `cli` cells on this row.
 
 ### certify — Mint an .ags.idx validity certificate (cert as OUTPUT).
 
@@ -352,6 +367,7 @@ _Notes:_
 | browser (chained) | ✓ |
 | rust (chained) | ✓ |
 | duckdb (n/a) | — |
+| cli (absent) |   |
 
 **Output**
 
@@ -362,6 +378,7 @@ _Notes:_
 | browser (chained) |   | — | — | ✓ |
 | rust (chained) | ✓ | ✓ | ✓ |   |
 | duckdb (n/a) | — | — | — | — |
+| cli (absent) |   |   |   |   |
 
 _Findings:_
 - 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/rows_json — and arrow_ipc where the `arrow` feature is built (#330; the published package is the slim build, which has rows_json only). All are typed table-out: no .text/.bytes AGS4 re-emit on the handle itself, so there is no round-trip AGS4 out of a browser read the way Python/Node Ags4File have .text/.bytes/.save. Assemblable rather than absent since #330 — meta() + rows_json() together ARE build_ags4's input shape, so read -> edit -> write composes through the separate build verb (held by `rows_json_feeds_build_ags4_straight_back` in the crate's tests); the gap is that the handle does not do it for you.
@@ -369,6 +386,7 @@ _Findings:_
 _Notes:_
 - _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
+- _cli_: **by-design — but NOT because of the file-tool promise, which does not exclude it**: a normalising re-emit reads a path and writes a file. The reason is that emit is a *component* on this surface rather than a user-facing verb — there is no handle to emit from, and `lat fix --fix-out`, `lat merge --out` and `lat excel` already do the emitting. A reader who sees the promise cited elsewhere on this row will correctly notice it does not fit here.
 
 ### to_excel — Convert AGS4 to an .xlsx workbook.
 
@@ -459,6 +477,7 @@ _Notes:_
 | rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ | — |
 | duckdb (n/a) | — | — |
+| browser (absent) |   | — |
 
 **Output**
 
@@ -469,15 +488,18 @@ _Notes:_
 | rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ |   |
 | duckdb (n/a) | — | — |
+| browser (absent) |   | — |
 
 _Findings:_
 - ⚪ by-design · **cli** in.bytes — the CLI is a file tool: lat pack/unpack takes an input path and writes an output file; there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs (see transport-lock/cli, the same posture).
+- 🟡 P3 · **browser** in.bytes — The zstd implementation is already loaded on this surface (`@bokuweb/zstd-wasm`, in the transport worker) and `lock` already runs it at level 9, so exposing the zstd-only `pack`/`unpack` door is wiring rather than new capability — the surface is incomplete here, not deliberately narrow.
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
 - _rust_: Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.
 - _cli_: declared four lines from `lock`/`unlock` in the same `#[cfg(feature = "transport")]` block and identical in posture — which is why this cell being absent while transport-lock's was present was an omission rather than a judgement (#771).
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
+- _browser_: The crate's wasm-hostile `age`/`zstd` deps are NOT the reason this is empty: this surface reimplements transport in JS (`web/src/lib/transportClient.ts`) and does not use `laterite-transport` at all — the wasm CRATE has zero transport code. A reader who takes the absence as "zstd does not work in the browser" has it backwards. Distinct from the `gzip not zstd` choice on the report download (`ags-wiki/design/validator-site.md`), which is about a throwaway artifact and no native browser zstd ENCODER, not about this envelope.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
 
@@ -527,6 +549,8 @@ _Notes:_
 | node (free) |   |   |   |   |
 | rust (absent) |   |   |   |   |
 | duckdb (n/a) | — | — | — | — |
+| cli (absent) |   |   |   |   |
+| browser (absent) |   |   |   |   |
 
 **Output**
 
@@ -536,6 +560,8 @@ _Notes:_
 | node (free) | — |
 | rust (absent) |   |
 | duckdb (n/a) | — |
+| cli (absent) |   |
+| browser (absent) |   |
 
 _Findings:_
 - 🟡 P3 · **node** out.handle `node-read-typed` — Node has the 174 typed-graph classes (for buildAgs4) but no read_typed to populate them FROM a file — the biggest port lift, a real typed-graph reader. Last in the backlog.
@@ -543,6 +569,8 @@ _Findings:_
 _Notes:_
 - _rust_: Absent. The 0.2 milestone this cell used to cite was RETIRED by dec-facade-parity on 2026-08-04 — the facade goes to parity once and then joins the product line, so there is no waypoint release left to hold this for. It is also outside the floor: `read_typed` has no Node sibling to take the intersection with, so parity never owes it. A Rust-native typed-graph reader stays an open question rather than a scheduled one.
 - _duckdb_: **by-design.** This capability is defined as reading into the typed-graph object model — the generated group classes. `read_ags` returns a typed RELATION, which is a different thing and is already recorded under `read`. A SQL surface has no object model to return.
+- _cli_: **by-design.** `read_typed` hands back an in-process object model, and a CLI has no process to hold the graph in. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
+- _browser_: **by-design.** The typed-graph object model is a Python-only surface; every other cell on this row is absent for the same reason. The browser reads to a handle, not to a graph.
 
 ### read-output-view — Output-shaping of a read (xn numeric coercion).
 
@@ -555,6 +583,9 @@ _Notes:_
 | python (free) | ✓ |
 | rust (absent) |   |
 | duckdb (n/a) | — |
+| cli (absent) |   |
+| node (absent) |   |
+| browser (absent) |   |
 
 **Output**
 
@@ -563,6 +594,9 @@ _Notes:_
 | python (free) | ≈ |
 | rust (absent) |   |
 | duckdb (n/a) | — |
+| cli (absent) |   |
+| node (absent) |   |
+| browser (absent) |   |
 
 _Findings:_
 - 🟡 P3 · **python** out.table `xn-numeric-view` — read(xn=) casts XN columns to Float64 — a Python-only output-shaping view with no sibling and (unlike keys/backend) no knob-parity gate. An open port-or-document decision, so it is a P3 gap/divergence, not a settled by-design.
@@ -570,6 +604,9 @@ _Findings:_
 _Notes:_
 - _rust_: Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types.
 - _duckdb_: **gap.** Defined as output-shaping of a read (`xn` numeric coercion). `XN` canonicalises to `string`, so the extension emits it VARCHAR with no opt-in to coerce, where Python offers `read(xn='numeric')`. Nothing prevents an `xn=` named parameter on `read_ags` — it already takes `encoding` — so this reads as not-yet rather than declined. The weakest verdict on this surface, and the only one here that is not `by-design`.
+- _cli_: **by-design.** `lat read` emits strings; there is no numeric coercion to offer a view over. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
+- _node_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records — there is no Node sibling for it to be a view over.
+- _browser_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it.
 
 ## Legend
 
