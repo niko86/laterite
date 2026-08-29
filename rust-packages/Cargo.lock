@@ -2191,6 +2191,7 @@ version = "0.11.0"
 dependencies = [
  "arrow",
  "criterion",
+ "dhat",
  "encoding_rs",
  "laterite-ags4-types",
  "laterite-ags4-validator",

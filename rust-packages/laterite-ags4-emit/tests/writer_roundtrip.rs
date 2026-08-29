@@ -40,7 +40,7 @@ proptest! {
             headings: vec!["PROJ_ID"],
             units: vec![""],
             types: vec!["X"],
-            rows: vec![cells.clone()],
+            rows: std::slice::from_ref(&cells),
         };
         let mut buf = Vec::new();
         write_ags4(&mut buf, &[g]).expect("write_ags4");

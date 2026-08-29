@@ -121,6 +121,9 @@
       },
       {
         "text": "**`forge edit --patch-template` now prints a worked projection.** The example was a cell edit and an appended row — two unrelated operations that showed the file format and nothing else. It now shows the thing the command is for: create a column, declare its UNIT and TYPE, put a value in it, and add the type code to the file's TYPE group, which together give a file that dual-validates with no findings on either engine. The header states the canonical order, so a reader learns that listing order does not decide the result before they discover it by accident."
+      },
+      {
+        "text": "**`build_ags4`'s emit adds nothing to its peak memory any more.** The validating re-parse never needed validate-during-emit — it needed sequencing: the formatted copy now drops before validation, which puts the re-parse entirely off-peak with the validator untouched, and the PyO3 host consumes its input row by row within a group through a new consuming entry point, `emit_ags4_owned(Vec<GroupInput>)` (#789). Row-by-row matters when one group dominates — per-group consumption still holds a 2.4M-row group's whole input live as its last row formats. After this and the `EmitGroup.rows` fix (#788), the high-water mark is set by the caller's input finishing, before formatting starts: 27.1x the emitted output down to 10.7x, requested bytes at peak, on the workload recorded in the issues. `emit_ags4(&[GroupInput])` is unchanged for every existing caller."
       }
     ],
     "deprecated": [
@@ -236,6 +239,10 @@
       },
       {
         "text": "**`cargo add laterite` no longer resolves two-minors-stale engines.** The facade published at 0.1.2 declares `^0.9.0` floors on its engine crates, and a 0.x caret never crosses a minor — so after the engine tier's 0.11.0 publish, the facade went on handing its consumers 0.9.0 engines, and the publisher's skip-by-version (\"already on crates.io\") hid it, the version number matching while the manifest content did not. The facade moves to 0.1.3 — a deps-only patch; its own API is unchanged — so its published floors state the engines it is actually built against."
+      },
+      {
+        "text": "**Breaking: `EmitGroup.rows` borrows the formatted cells, as its doc comment always said it did.** The field was an owned `Vec<Vec<String>>` under a comment saying the struct borrows, so both hosts — the PyO3 orchestrator and laterite-node — deep-copied every formatted cell just to build the write view, and that copy stayed live across the write and the validating re-parse (#788). The field is now `&[Vec<String>]`. Output is byte-identical and nothing changes on the wheel, npm, CLI or wasm surfaces; the break is for a direct Rust consumer of `laterite-ags4-emit` who constructs an `EmitGroup` or names its `rows` field, who now hands the writer a borrow instead of an owned table.",
+        "breaking": true
       }
     ],
     "security": []

@@ -315,48 +315,98 @@ pub struct EmitResult {
 /// Build valid AGS4 bytes from typed/string group data per `opts`.
 pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
+    let owned: Vec<OwnedGroup> = groups.iter().map(|g| owned_group(g, &dict)).collect();
+    emit_owned_groups(owned, opts, &dict)
+}
 
-    // --- steps 1–2: resolve UNIT/TYPE (hybrid) + format cells ---------
-    // `OwnedGroup` holds Strings; `EmitGroup` borrows them for the write.
-    let mut owned: Vec<OwnedGroup> = groups
-        .iter()
-        .map(|g| {
-            let units: Vec<String> = (0..g.headings.len())
-                .map(|i| {
-                    resolve_meta(g.units.as_ref(), i, || {
-                        dict_unit(&dict, &g.code, &g.headings[i])
-                    })
-                })
-                .collect();
-            let types: Vec<String> = (0..g.headings.len())
-                .map(|i| {
-                    resolve_meta(g.types.as_ref(), i, || {
-                        dict_type(&dict, &g.code, &g.headings[i])
-                    })
-                })
-                .collect();
-            let rows: Vec<Vec<String>> = g
-                .rows
-                .iter()
-                .map(|row| {
-                    row.iter()
-                        .enumerate()
-                        .map(|(i, cell)| {
-                            format_cell(cell, types.get(i).map_or("X", String::as_str))
-                        })
-                        .collect()
-                })
-                .collect();
-            OwnedGroup {
-                code: g.code.clone(),
-                headings: g.headings.clone(),
-                units,
-                types,
-                rows,
-            }
+/// Like [`emit_ags4`], but consuming its input, group by group.
+///
+/// Behaviourally identical; the difference is the peak. Under the borrowed
+/// entry the caller's groups — every cell a `serde_json::Value`, 72 bytes
+/// apiece under this workspace's feature unification — stay live behind the
+/// borrow until the emit returns, co-resident with the formatted copy, the
+/// written bytes and the validating re-parse. Here each group's input drops
+/// the moment its cells are formatted, so the input copy and the re-parse
+/// never peak together. Measured with `examples/heap_profile.rs` (#789): that
+/// input copy is the single largest slice of the emit's live-at-peak bytes.
+pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
+    let dict = Dictionary::bundled(opts.edition);
+    let owned: Vec<OwnedGroup> = groups
+        .into_iter()
+        // `g` is consumed per iteration: its `Value` rows free here, not at return.
+        .map(|g| owned_group_consuming(g, &dict))
+        .collect();
+    emit_owned_groups(owned, opts, &dict)
+}
+
+/// Steps 1–2 for one group: resolve UNIT/TYPE (hybrid) + format every cell.
+/// `OwnedGroup` holds Strings; the writer borrows them for the write.
+fn owned_group(g: &GroupInput, dict: &Dictionary) -> OwnedGroup {
+    let (units, types) = resolved_meta(g, dict);
+    let rows: Vec<Vec<String>> = g.rows.iter().map(|row| format_row(row, &types)).collect();
+    OwnedGroup {
+        code: g.code.clone(),
+        headings: g.headings.clone(),
+        units,
+        types,
+        rows,
+    }
+}
+
+/// [`owned_group`], consuming: each input row's `Value`s free as soon as that
+/// row is formatted, so a large group's input copy and its formatted copy
+/// never fully coexist — the live set trades one for the other row by row.
+/// (Per-GROUP consumption alone does not get that: the measured TREL is one
+/// group of 2.4M rows, and its whole input was still live at the moment its
+/// last row formatted.)
+fn owned_group_consuming(g: GroupInput, dict: &Dictionary) -> OwnedGroup {
+    let (units, types) = resolved_meta(&g, dict);
+    let rows: Vec<Vec<String>> = g
+        .rows
+        .into_iter()
+        .map(|row| format_row(&row, &types))
+        .collect();
+    OwnedGroup {
+        code: g.code,
+        headings: g.headings,
+        units,
+        types,
+        rows,
+    }
+}
+
+fn resolved_meta(g: &GroupInput, dict: &Dictionary) -> (Vec<String>, Vec<String>) {
+    let units: Vec<String> = (0..g.headings.len())
+        .map(|i| {
+            resolve_meta(g.units.as_ref(), i, || {
+                dict_unit(dict, &g.code, &g.headings[i])
+            })
         })
         .collect();
+    let types: Vec<String> = (0..g.headings.len())
+        .map(|i| {
+            resolve_meta(g.types.as_ref(), i, || {
+                dict_type(dict, &g.code, &g.headings[i])
+            })
+        })
+        .collect();
+    (units, types)
+}
 
+fn format_row(row: &[Value], types: &[String]) -> Vec<String> {
+    row.iter()
+        .enumerate()
+        .map(|(i, cell)| format_cell(cell, types.get(i).map_or("X", String::as_str)))
+        .collect()
+}
+
+/// Steps 2.5–4, from formatted groups: synthesize missing metadata, write,
+/// validate the bytes, apply the validity mode.
+fn emit_owned_groups(
+    mut owned: Vec<OwnedGroup>,
+    opts: &EmitOpts,
+    dict: &Dictionary,
+) -> Result<EmitResult, EmitError> {
     // --- step 2.5: synthesize missing mandatory metadata groups -------
     // AutoFix only: a data-only build (notably a typed PROJ graph, which
     // can't reach the parentless root-metadata groups) still yields a valid
@@ -365,23 +415,30 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     // PROJ is never synthesized (real project identity), so a missing PROJ stays
     // a Rule 13 finding.
     if opts.mode == EmitMode::AutoFix && opts.synthesise_metadata {
-        let synth = synthesise_metadata(&owned, &dict, opts.tran.as_ref());
+        let synth = synthesise_metadata(&owned, dict, opts.tran.as_ref());
         owned.extend(synth);
     }
 
     // --- step 3: write the sections -----------------------------------
-    let views: Vec<EmitGroup<'_>> = owned
-        .iter()
-        .map(|g| EmitGroup {
-            code: &g.code,
-            headings: g.headings.iter().map(String::as_str).collect(),
-            units: g.units.iter().map(String::as_str).collect(),
-            types: g.types.iter().map(String::as_str).collect(),
-            rows: g.rows.clone(),
-        })
-        .collect();
     let mut bytes: Vec<u8> = Vec::new();
-    write_ags4(&mut bytes, &views)?;
+    {
+        let views: Vec<EmitGroup<'_>> = owned
+            .iter()
+            .map(|g| EmitGroup {
+                code: &g.code,
+                headings: g.headings.iter().map(String::as_str).collect(),
+                units: g.units.iter().map(String::as_str).collect(),
+                types: g.types.iter().map(String::as_str).collect(),
+                rows: &g.rows,
+            })
+            .collect();
+        write_ags4(&mut bytes, &views)?;
+    }
+    // The formatted copy is dead once written: everything past here reads the
+    // BYTES (validate, compute_fixes, apply_fixes), so holding `owned` across
+    // the re-parse would keep a whole extra copy of every cell at the peak
+    // for nothing.
+    drop(owned);
 
     // --- step 4: apply the validity mode ------------------------------
     // Keep the ParsedFile: `AutoFix` needs it for `compute_fixes`, and it used

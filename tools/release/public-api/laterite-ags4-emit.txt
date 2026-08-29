@@ -44,7 +44,7 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::EmitMode
 pub struct laterite_ags4_emit::EmitGroup<'a>
 pub laterite_ags4_emit::EmitGroup::code: &'a str
 pub laterite_ags4_emit::EmitGroup::headings: alloc::vec::Vec<&'a str>
-pub laterite_ags4_emit::EmitGroup::rows: alloc::vec::Vec<alloc::vec::Vec<alloc::string::String>>
+pub laterite_ags4_emit::EmitGroup::rows: &'a [alloc::vec::Vec<alloc::string::String>]
 pub laterite_ags4_emit::EmitGroup::types: alloc::vec::Vec<&'a str>
 pub laterite_ags4_emit::EmitGroup::units: alloc::vec::Vec<&'a str>
 impl<'a> core::marker::Freeze for laterite_ags4_emit::EmitGroup<'a>
@@ -146,6 +146,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::TranStampEr
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::TranStampError
 pub fn laterite_ags4_emit::cell_value(&dyn arrow_array::array::Array, usize) -> serde_json::value::Value
 pub fn laterite_ags4_emit::emit_ags4(&[laterite_ags4_emit::GroupInput], &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
+pub fn laterite_ags4_emit::emit_ags4_owned(alloc::vec::Vec<laterite_ags4_emit::GroupInput>, &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::group_from_arrow(alloc::string::String, &arrow_schema::schema::Schema, &[arrow_array::record_batch::RecordBatch]) -> laterite_ags4_emit::GroupInput
 pub fn laterite_ags4_emit::group_from_arrow_with_meta<S: core::hash::BuildHasher>(alloc::string::String, &arrow_schema::schema::Schema, &[arrow_array::record_batch::RecordBatch], core::option::Option<&std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>>, core::option::Option<&std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>>) -> laterite_ags4_emit::GroupInput
 pub fn laterite_ags4_emit::group_from_arrow_with_meta_at_edition<S: core::hash::BuildHasher>(alloc::string::String, &arrow_schema::schema::Schema, &[arrow_array::record_batch::RecordBatch], core::option::Option<&std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>>, core::option::Option<&std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>>, core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>) -> laterite_ags4_emit::GroupInput

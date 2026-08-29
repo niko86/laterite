@@ -65,7 +65,7 @@ fn bench_writer(c: &mut Criterion) {
             headings: HEADINGS.to_vec(),
             units: vec!["", "m", "", "", "", "yyyy-mm-dd", "m", ""],
             types: TYPES.to_vec(),
-            rows: data,
+            rows: &data,
         };
         // Bytes written, not rows: makes this comparable to the parse side's
         // MB/s so read and write can be read on the same axis.

@@ -401,16 +401,13 @@ pub fn xlsx_bytes_to_ags4(
         ));
     }
 
-    // Convert AgsGroup → EmitGroup (borrowed view) and call write_ags4.
-    let emit_views: Vec<EmitGroup<'_>> = emit_groups
+    // Convert AgsGroup → EmitGroup and call write_ags4. The rows are built
+    // here (each sheet row is a map, the writer wants positional cells), so
+    // they need an owned home first — `EmitGroup` borrows everything.
+    let emit_rows: Vec<Vec<Vec<String>>> = emit_groups
         .iter()
-        .map(|g| EmitGroup {
-            code: &g.code,
-            headings: g.headings.iter().map(String::as_str).collect(),
-            units: g.units.iter().map(String::as_str).collect(),
-            types: g.types.iter().map(String::as_str).collect(),
-            rows: g
-                .rows
+        .map(|g| {
+            g.rows
                 .iter()
                 .map(|row| {
                     g.headings
@@ -418,7 +415,18 @@ pub fn xlsx_bytes_to_ags4(
                         .map(|h| row.get(h.as_str()).cloned().unwrap_or_default())
                         .collect()
                 })
-                .collect(),
+                .collect()
+        })
+        .collect();
+    let emit_views: Vec<EmitGroup<'_>> = emit_groups
+        .iter()
+        .zip(&emit_rows)
+        .map(|(g, rows)| EmitGroup {
+            code: &g.code,
+            headings: g.headings.iter().map(String::as_str).collect(),
+            units: g.units.iter().map(String::as_str).collect(),
+            types: g.types.iter().map(String::as_str).collect(),
+            rows,
         })
         .collect();
 

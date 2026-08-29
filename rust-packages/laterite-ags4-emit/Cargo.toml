@@ -63,10 +63,22 @@ arrow = { version = "59", default-features = false, optional = true }
 proptest = "1"
 # Write-path benches (benches/emit.rs). Same criterion the validator uses.
 criterion = "0.8"
+# Allocation-site attribution for examples/heap_profile.rs (profiling use
+# only). dhat replaces the global allocator IN THE EXAMPLE BINARY alone — the
+# shipped crate and the cdylibs that link it are untouched, and the numbers it
+# reports are requested/live bytes, NOT RSS (no allocator retention).
+dhat = "0.3"
 
 [[bench]]
 name = "emit"
 harness = false
+
+# The memory-attribution harness. Needs `arrow` because the
+# whole point is entering the pipeline at the same seam the PyO3 host does —
+# `group_from_arrow` — so the typed-vs-string cell split is the real one.
+[[example]]
+name = "heap_profile"
+required-features = ["arrow"]
 
 [features]
 # Typed-Arrow input support (the `arrow_in` transpose). Off by default so
