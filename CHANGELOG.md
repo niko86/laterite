@@ -29,6 +29,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Added
+
+- **The effective dictionary is a public API.** AGS4 Rule 18 makes the dictionary a file validates against the standard dictionary ∪ the file's own DICT group — and until now that union existed only as two private copies inside the validator, so a read-only consumer could not build it without pulling in the rule engine or writing a third copy. The one shared implementation now lives in `laterite-ags4-reference::effective_dict`: `FileDict` reads every column a DICT row can declare (`DICT_GRP`, `DICT_HDNG`, `DICT_STAT`, `DICT_DTYP`, `DICT_UNIT`, plus `DICT_PGRP` from GROUP-type rows), tolerantly — malformed DICT contributes nothing, because reporting it stays Rule 18's job — and `EffectiveDict` layers it over a standard edition. `laterite-ags4-core` re-exports the module with an adapter for its own read codec, so a reader that depends on core alone can bind a file-declared group's columns, statuses, units and parent. The validator's Rule 7/9, 10a–c and 19b families all consume the shared module now; both private copies are deleted, and python-ags4 parity held by identity across the rewire. (#777)
+
 ### Fixed
 
 - **A fractional value under a 0DP heading now rounds on emit, like every other DP width.** It truncated toward zero — `212.9` kPa declared 0DP was written `212`, understating by up to one unit of the declared precision, always downward, so every ratio derived from the file leaned one way. No sibling behaved like this: 1DP-and-up already round half-even, and python-ags4 formats 0DP with the same rounding, so the fix removes a parity divergence as well as the bias. What a 0DP cell *accepts* on read is unchanged — this is only what emit writes for an in-range fractional value.

@@ -16,7 +16,7 @@
 
 [package]
 name = "laterite-ags4-core"
-version = "0.11.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "DuckDB-free pure-string core modules for the AGS4 toolchain"

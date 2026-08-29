@@ -472,22 +472,30 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Upstream-reportable**: no — an implementation capability, not a spec divergence.
 - **Our decision**: shipped across all four surfaces. The `.ags.idx` certificate **records** the effective dictionary's `{name, hash}` — a record, not a contract (O-48): a later `validate --index` against a different dictionary re-validates and surfaces `revalidate_reason = dictionary_changed`, it never silently vouches. Custom-dict content is per-invocation input and is never hashed into `ENGINE_FINGERPRINT`. Companion authoring ergonomics (`lat dict export` / `convert` / `generate`) are a tracked fast-follow, not part of this arc.
 
-### O-29 [NOTE] EffectiveDict consolidation (O-25) deliberately not done
+### O-29 [NOTE] EffectiveDict consolidation (O-25) — deferred at V8, done in #777
 - **Context**: V4 (`dictionary.rs`), V7 (`relational.rs`) and V8
   (`references.rs`) each consume the file's DICT group. O-25 flagged a
   possible V8 consolidation into one shared `EffectiveDict`.
-- **Decision**: **not** consolidated. V8 made the smallest safe move —
+- **Decision (V8)**: **not** consolidated. V8 made the smallest safe move —
   exposed `dictionary::collect_file_dict` as `pub(crate)` so V4 and V8
   share the heading-name collector — but a full merge of the three
   consumers (different questions: names, status/parent, borrow sets)
   at the final phase would churn five green rule families for an
   internal-tidiness gain. The three consumers are small, independently
   tested, and stable.
-- **Upstream-reportable**: no — accepted internal tech debt.
-- **Our decision**: closed as "deliberately deferred". A future
-  refactor (one `EffectiveDict` answering names + status + parent +
-  borrow membership, parsed once) is the clean path if this code is
-  next touched; recorded so the intent isn't lost.
+- **Reality**: consolidated in **#777**, when a read-only consumer needed
+  the union too — with `DICT_DTYP`/`DICT_UNIT`, which neither private copy
+  read — and the alternative was a third copy in a second repo. The one
+  shared `effective_dict` module lives in `laterite-ags4-reference`
+  (beside the standard dictionary it unions with), is consumed by the
+  Rule 7/9, 10a–c and 19b families, and is re-exported by
+  `laterite-ags4-core` for readers; both private copies are deleted. The
+  churn the deferral feared was bounded by the oracle: the python-ags4
+  parity contract was met by identity across the rewire.
+- **Upstream-reportable**: no — internal structure.
+- **Our decision**: debt paid. One implementation answers names + status +
+  parent + types/units + borrow membership, exactly the shape this record
+  said the eventual refactor should take.
 
 ---
 

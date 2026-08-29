@@ -36,9 +36,10 @@
 //! keep it (attributed to Rule 7, matching python's count). See
 //! OBSERVATIONS O-8/O-9/O-10.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 use crate::dict::Dictionary;
+use crate::effective_dict::EffectiveDict;
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
 
@@ -46,9 +47,9 @@ const RULE_7: &str = "AGS Format Rule 7";
 const RULE_9: &str = "AGS Format Rule 9";
 
 pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
-    // User-defined headings declared in the file's own DICT group,
-    // per group, in file order. Consumed here, validated in V6.
-    let file_dict = collect_file_dict(parsed);
+    // The Rule 18 union (standard ∪ the file's own DICT group), read by the
+    // shared `effective_dict` module (#777). Consumed here, validated in V6.
+    let eff = EffectiveDict::build(parsed, *dict);
 
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
@@ -61,14 +62,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         // Effective order = standard order, then any DICT-group
         // headings for this group not already present (Rule 9's
         // "user-defined ... at the end after the standard HEADINGs").
-        let mut order: Vec<&str> = dict.group_headings(code).to_vec();
-        if let Some(extra) = file_dict.get(code.as_str()) {
-            for h in extra {
-                if !order.contains(&h.as_str()) {
-                    order.push(h.as_str());
-                }
-            }
-        }
+        let order: Vec<&str> = eff.headings(code);
         let known: BTreeSet<&str> = order.iter().copied().collect();
 
         // Rule 9 — every heading must be defined somewhere. `ci` is the
@@ -184,34 +178,6 @@ fn rule_7_2(
     }
 }
 
-/// Pull the file's own DICT group into `group -> [user heading, …]`
-/// (file order). Columns are resolved by name from the DICT HEADING
-/// row, so column reordering doesn't break it. Mirrors python-ags4's
-/// `combine_DICT_tables` (standard dict first, file DICT appended);
-/// here we only read it — DICT *validation* is V6.
-pub(crate) fn collect_file_dict(parsed: &ParsedFile) -> HashMap<String, Vec<String>> {
-    let mut out: HashMap<String, Vec<String>> = HashMap::new();
-    let Some(dictg) = parsed.groups.get("DICT") else {
-        return out;
-    };
-    let col = |name: &str| dictg.headings.iter().position(|h| h == name);
-    let (Some(gi), Some(hi)) = (col("DICT_GRP"), col("DICT_HDNG")) else {
-        return out; // malformed DICT — Rule 18 (V6) reports that
-    };
-    for row in &dictg.rows {
-        let grp = row.values.get(gi).map_or("", String::as_str);
-        let hdng = row.values.get(hi).map_or("", String::as_str);
-        if grp.is_empty() || hdng.is_empty() {
-            continue; // GROUP-type rows / blanks contribute no heading
-        }
-        let v = out.entry(grp.to_string()).or_default();
-        if !v.iter().any(|x| x == hdng) {
-            v.push(hdng.to_string());
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322,23 +288,5 @@ mod tests {
         assert_eq!(f.location.target, Target::Heading);
         assert_eq!(f.location.field_index, Some(1));
         assert_eq!(f.location.heading.as_deref(), Some("LOCA_ZZZZ"));
-    }
-
-    /// `collect_file_dict` skips empty GROUP-type rows and de-duplicates a
-    /// heading declared twice for the same group.
-    #[test]
-    fn collect_file_dict_skips_empty_and_dedups() {
-        let src = "\"GROUP\",\"DICT\"\r\n\
-                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
-                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
-                   \"DATA\",\"GROUP\",\"XXXX\",\"\"\r\n\
-                   \"DATA\",\"HEADING\",\"XXXX\",\"XXXX_ONE\"\r\n\
-                   \"DATA\",\"HEADING\",\"XXXX\",\"XXXX_ONE\"\r\n";
-        let pf = parse_str(src).unwrap();
-        let d = collect_file_dict(&pf);
-        assert_eq!(
-            d.get("XXXX").map(Vec::as_slice),
-            Some(&["XXXX_ONE".to_string()][..]),
-        );
     }
 }

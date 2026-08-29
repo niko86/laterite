@@ -97,6 +97,12 @@ pub fn laterite_ags4_core::ags4_codec::read_ags4(&std::path::Path) -> core::resu
 pub fn laterite_ags4_core::ags4_codec::read_ags4_bytes(&[u8]) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::ags4_codec::read_ags4_bytes_with(&[u8], laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::ags4_codec::read_ags4_with(&std::path::Path, laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
+pub mod laterite_ags4_core::effective_dict
+pub use laterite_ags4_core::effective_dict::<<laterite_ags4_reference::effective_dict::*>>
+pub use laterite_ags4_core::effective_dict::DictVersion
+pub use laterite_ags4_core::effective_dict::Dictionary
+pub fn laterite_ags4_core::effective_dict::effective_dict_of<'a>(&laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_reference::dict::Dictionary<'a>) -> laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub fn laterite_ags4_core::effective_dict::file_dict_of(&laterite_ags4_core::ags4_codec::ParsedAgs4) -> laterite_ags4_reference::effective_dict::FileDict
 pub mod laterite_ags4_core::error
 pub enum laterite_ags4_core::error::CliError
 pub laterite_ags4_core::error::CliError::DuplicateHeading

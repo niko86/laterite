@@ -36,7 +36,11 @@ Modules (`repo:rust-packages/laterite-ags4-core/src/lib.rs`): `registry` (the
 descriptors — 92 is the dormant AGS5-only count, a different dictionary
 entirely; since laterite-dev#475 this module is a flat `pub use` re-export of
 [[laterite-ags4-reference]]'s `union`, so this path is unchanged for every
-consumer), `ddl`
+consumer), `effective_dict`
+(the Rule 18 standard ∪ file-DICT union — the shared implementation homed in
+[[laterite-ags4-reference]] since #777, re-exported here with an adapter for
+the read codec so a reader can bind a file-declared group's columns; see
+[[effective-dictionary]]), `ddl`
 (pure-string DDL emitter — no DuckDB connection), `ags4_codec` (CRLF /
 double-quoted CSV reader), `ags4_writer` (spec-correct AGS4 emitter),
 `excel` (AGS4 ↔ XLSX via calamine + rust_xlsxwriter), `transport`

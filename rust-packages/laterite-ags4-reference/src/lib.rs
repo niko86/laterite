@@ -14,6 +14,10 @@
 
 pub mod catalogue;
 pub mod dict;
+// The Rule 18 effective dictionary (standard ∪ the delivery file's own DICT
+// group) — the one shared implementation (#777), consumed by the validator's
+// Rule 7/9/10a-c/19b families and re-exported by core for read-only consumers.
+pub mod effective_dict;
 // Runtime-owned custom-dictionary overlay (laterite-dev#568): the sparse delta a `--dict`
 // override contributes over a bundled base. `dict::Dictionary::Layered` borrows it.
 pub mod overlay;

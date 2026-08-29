@@ -13,6 +13,7 @@ repo_refs:
   build: "repo:rust-packages/laterite-ags4-reference/build.rs"
   dict: "repo:rust-packages/laterite-ags4-reference/src/dict.rs"
   catalogue: "repo:rust-packages/laterite-ags4-reference/src/catalogue.rs"
+  effective_dict: "repo:rust-packages/laterite-ags4-reference/src/effective_dict.rs"
   union: "repo:rust-packages/laterite-ags4-reference/src/union.rs"
   dictionary_json: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json"
   rules_meta_json: "repo:rust-packages/laterite-ags4-reference/data/rules_meta.json"
@@ -36,6 +37,11 @@ The AGS4 **reference-data leaf** (laterite-dev#475): everything mechanically der
 the bundled `ags_dictionary.json` / `rules_meta.json` JSON, single-sourced in
 one wasm-safe crate — the multi-edition dictionary registry, the per-edition
 `phf`-compiled dictionary projection, and the rules-catalogue data accessors.
+Since #777 it also carries `effective_dict`, the one shared implementation of
+the Rule 18 standard ∪ file-DICT union ([[effective-dictionary]]) — homed here
+beside the dictionary it unions with, consumed by the validator's Rule
+7/9/10a-c/19b families and re-exported by [[laterite-ags4-core]] for read-only
+consumers.
 "Leaf" names its position, not its dep count: it is **not dependency-free** —
 it takes `laterite-ags4-types` for `keychain`, which is why laterite-dev#550's engine-fingerprint
 walk must recurse *through* it to reach that crate. The page said
