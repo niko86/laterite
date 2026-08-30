@@ -85,6 +85,10 @@ Consequences, verified against the workspace:
   keep compiling the tree. A version field on their deps is a claim nothing verifies.
 - `laterite-py` is `crate-type = ["cdylib"]` + `publish = false`; a cdylib can never
   be a crates.io library dependency, so its dep versions would be read by nobody.
+  *(Overtaken 2026-08-30 by #781 step 5: the surfaces now DO carry `version`
+  beside `path` — not for publishing, which still never happens, but as the
+  provenance record read by `test_surface_engine_pins_record_what_ships` and
+  enforced by cargo's own path-vs-version check. See the step-5 note below.)*
 - Only deps **of publishable crates** need version fields: **21 sites**, not the 84
   across the whole workspace. The 3 dev-only path deps are stripped at publish.
   **Done** — but not written at the 21 sites. They live once in
@@ -203,6 +207,21 @@ deciding that question now.
 > The catch-up publish (all ten at 0.11.0, 2026-08-29) was the last lockstep
 > act, deliberately first — it put every per-crate baseline level with the
 > registry, so the per-crate gates started enforced rather than vacuous.
+
+> [!note] Step 5 landed 2026-08-30 — the surfaces pin what they ship
+> The last of #781's sequence. The four product surfaces (`laterite-py`,
+> `laterite-node`, `laterite-cli`, `laterite-ags4-wasm`) declare their
+> published engine deps as `{ path, version }`: the **path still wins locally**
+> (same-PR engine + surface work keeps working — the provenance reading, not
+> the build-constraint one), and the version makes the manifest at any product
+> tag the record of which engine versions that release shipped.
+> `tools/release/bump_crate.py` moves every member pin with the crate — found
+> by scan, never by a list of surfaces — and
+> `test_surface_engine_pins_record_what_ships` holds the pins equal to each
+> crate's own version; cargo itself refuses to resolve a path crate a pin no
+> longer admits, so a drifted pin is a loud build error rather than a quiet
+> lie. Unpublished laterite deps (`excel`, `censor`, `cliutil`) deliberately
+> carry **no** version: nothing published exists for one to record.
 
 **Revised 2026-08-14 — what the rules above are a promise *about*.** Everything in
 this section is the mechanism by which the facade absorbs **engine** reshaping. It

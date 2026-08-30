@@ -107,7 +107,7 @@ censor = ["dep:laterite-ags4-censor", "dep:sha2", "dep:hex"]
 
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
-laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.12.0" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
 # ONE shared id maths every surface uses (byte-identical to the extension + wheel
@@ -118,15 +118,15 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # Optional because only two surfaces reach it directly: the keychain (`arrow`)
 # and the AGS4 read codec `ags4_to_xlsx` configures (`excel`). Validation and
 # the JSON read path go through the parse leaf, never core.
-laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false, optional = true }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.12.0", default-features = false, optional = true }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", optional = true }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.12.0", optional = true }
 # The shared parse leaf (#168 Phase 3): `parse_bytes` + the parse types +
 # `field_span` come straight from the leaf (encoding_rs + memchr only — wasm-safe).
 # Its `ParseError` → ValidatorError via the Phase-2 `From` bridge so the
 # `classify`/`to_string` error text is unchanged. Validator dep stays for rules.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
 # The shared AGS4 emit orchestrator (`to_ags4`): typed/string cells ->
 # valid AGS4 + AutoFix. Same core the native PyO3 binding uses; depends
 # only on laterite-ags4-types + laterite-ags4-validator, so it adds no wasm-hostile weight.
@@ -135,16 +135,16 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # `build_ags4_ipc` path — the same conversion the native host uses, not a copy.
 # arrow's display fallback stays comfy-table-free. The JSON `build_ags4` door
 # needs none of it, which is why the feature moved off this line.
-laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.13.0" }
 # The KEY-aware/type-aware revision diff core (`diff_parsed`), extracted
 # out of this crate as a wasm-safe leaf so the same engine-consistent diff
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
 # validator dict + laterite-ags4-types, all already pulled here — no new weight.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", optional = true }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.0", optional = true }
 # `merge()` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
 # already here — the same leaf PyO3 + Node + the CLI reuse.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", optional = true }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.0", optional = true }
 # `censor()` — the shared AGS4 scrub engine (laterite-dev#581) behind the browser
 # Anonymiser, the SAME engine the corpus `censor` tool drives. Wasm-safe: it
 # pulls only parse + reference + types, all already here. The leaf takes a
@@ -168,7 +168,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", features = ["wasm"], op
 # shared typed-column/record-batch builder both hosts emit through — is gated,
 # by ours, so the browser and the native PyCapsule path still cast
 # byte-identically wherever Arrow is in play.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.12.0" }
 # Arrow IPC framing only. The typed columns are built by the shared emitter
 # in laterite-ags4-types (arrow_cols); here we just StreamWriter that batch into an
 # IPC stream for duckdb-wasm (the native side hands the same batch to

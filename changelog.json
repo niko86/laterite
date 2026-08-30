@@ -14,6 +14,9 @@
       },
       {
         "text": "**The engine release cut derives itself nightly.** `release_status.py` now measures each published crate from the exact commit its crates.io tarball was built from (never a stamp that went nowhere), reads the requirement ranges the registry froze — the signal #809 proved invisible to every in-tree gate, where a moved dependency floor strands published crates that re-export it — and derives the owed act per crate: bump (0.x parts, never a major), publish, or needs-a-human. The nightly `engine-cut` job tracks the owed set on its own issue, auto-dispatches the approval-gated crates.io publish for anything stamped but absent, and (once promoted from answer-only via `ENGINE_CUT_MODE=pr`) opens the cut PR itself; a per-PR coherence gate fails any change that moves a floor past a published pin without bumping the pinning crates alongside."
+      },
+      {
+        "text": "**Each product surface records the engine versions it ships.** The four product surfaces (`laterite-py`, `laterite-node`, `laterite-cli`, `laterite-ags4-wasm`) now declare their published engine dependencies as `{ path, version }` — the path still wins locally, and the version turns the manifest at any product tag into the record of which engine versions that release shipped. `bump_crate.py` moves every member pin with the crate it bumps, a guard test holds the pins equal to each crate's own version, and cargo itself refuses a path crate a pin no longer admits. The last step of #781's per-crate sequence."
       }
     ],
     "changed": [
