@@ -238,31 +238,85 @@ fn py_float_str(f: f64) -> String {
 /// Columns arrive pre-selected/ordered by the Python side, so the schema
 /// field order *is* the AGS heading order.
 #[pyfunction]
-pub fn emit_ags4_compat(tables: Vec<(String, PyTable)>) -> PyResult<String> {
-    let mut blocks: Vec<(String, Vec<Vec<String>>)> = Vec::with_capacity(tables.len());
-    for (code, table) in tables {
-        let (batches, schema) = table.into_inner();
-        let header: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
-        let mut matrix: Vec<Vec<String>> = Vec::new();
-        matrix.push(header);
-        for batch in &batches {
-            for r in 0..batch.num_rows() {
-                let mut cells = Vec::with_capacity(batch.num_columns());
-                for c in 0..batch.num_columns() {
-                    cells.push(compat_cell_string(batch.column(c).as_ref(), r));
-                }
-                matrix.push(cells);
-            }
-        }
-        blocks.push((code, matrix));
-    }
+pub fn emit_ags4_compat(py: Python<'_>, tables: Vec<(String, PyTable)>) -> PyResult<Py<PyBytes>> {
     // The shared, GUARDED verbatim writer (was `laterite-py`'s own private emitter, which
     // lacked the embedded-CR/LF guard and could split a DATA row across two lines, #423).
     // `trailing_blank_line = true` keeps `compat` byte-faithful to python-ags4's
     // `dataframe_to_AGS4`; the guard is the only behaviour change — a cell containing a
-    // newline is now REFUSED, not silently torn into an illegal file.
-    let mut out = Vec::new();
-    laterite_ags4_emit::write_ags4_matrix(&mut out, &blocks, true)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-    String::from_utf8(out).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    // newline is REFUSED, not silently torn into an illegal file.
+    //
+    // Streamed group-at-a-time (#805): one group's string matrix is live at a
+    // time beside the output, not every group's at once — and the return is
+    // `bytes`, so the Python side writes it straight to disk instead of
+    // encoding a `str` it never wanted (the UTF-8 bytes ARE the file).
+    let mut stream = laterite_ags4_emit::MatrixStream::new(Vec::new(), true);
+    for (code, table) in tables {
+        let matrix = compat_group_matrix(table);
+        stream
+            .group(&code, &matrix)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    }
+    let out = stream
+        .finish()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(PyBytes::new(py, &out).unbind())
+}
+
+/// `compat`'s all-Rust AGS4 write, straight to `path` (#805): groups stream
+/// through [`laterite_ags4_emit::MatrixStream`] into a buffered temp file in
+/// the destination's directory, renamed over `path` only on success — so the
+/// refusal contract is preserved (a rejected cell, e.g. an embedded newline,
+/// leaves whatever was at `path` untouched) while the process never holds
+/// more than one group's matrix beside the file buffer.
+#[pyfunction]
+pub fn emit_ags4_compat_to_path(tables: Vec<(String, PyTable)>, path: &str) -> PyResult<()> {
+    use std::io::Write as _;
+
+    let dest = std::path::Path::new(path);
+    let dir = dest.parent().filter(|p| !p.as_os_str().is_empty());
+    let mut tmp = tempfile::Builder::new()
+        .prefix(".laterite-compat-")
+        .suffix(".tmp")
+        .tempfile_in(dir.unwrap_or_else(|| std::path::Path::new(".")))
+        .map_err(|e| PyRuntimeError::new_err(format!("compat write: temp file: {e}")))?;
+    {
+        let mut stream =
+            laterite_ags4_emit::MatrixStream::new(std::io::BufWriter::new(tmp.as_file_mut()), true);
+        for (code, table) in tables {
+            let matrix = compat_group_matrix(table);
+            stream
+                .group(&code, &matrix)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        }
+        let mut buf = stream
+            .finish()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        buf.flush()
+            .map_err(|e| PyRuntimeError::new_err(format!("compat write: flush: {e}")))?;
+    }
+    // Success is the only path that touches `dest`; every error above drops
+    // `tmp`, which unlinks it.
+    tmp.persist(dest)
+        .map_err(|e| PyRuntimeError::new_err(format!("compat write: rename into place: {e}")))?;
+    Ok(())
+}
+
+/// One python-ags4-shaped frame → its verbatim string matrix: the column
+/// names as the HEADING row, then every data row's cells stringified (the
+/// loop that was `compat._matrix_from_df`).
+fn compat_group_matrix(table: PyTable) -> Vec<Vec<String>> {
+    let (batches, schema) = table.into_inner();
+    let header: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    let mut matrix: Vec<Vec<String>> = Vec::new();
+    matrix.push(header);
+    for batch in &batches {
+        for r in 0..batch.num_rows() {
+            let mut cells = Vec::with_capacity(batch.num_columns());
+            for c in 0..batch.num_columns() {
+                cells.push(compat_cell_string(batch.column(c).as_ref(), r));
+            }
+            matrix.push(cells);
+        }
+    }
+    matrix
 }

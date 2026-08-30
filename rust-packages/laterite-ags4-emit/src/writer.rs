@@ -96,26 +96,69 @@ pub fn write_ags4_matrix<W: Write>(
     groups: &[(String, Vec<Vec<String>>)],
     trailing_blank_line: bool,
 ) -> Result<(), EmitError> {
-    for (i, (code, matrix)) in groups.iter().enumerate() {
-        // Blank line BETWEEN groups (both shapes) — the section separator, same as
-        // `write_ags4`'s `if i > 0`. The private emitter folded this into a per-group
-        // trailing blank, which is why dropping that blank for `.text` also needs this
-        // to keep the separator.
-        if i > 0 {
-            out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
+    let mut stream = MatrixStream::new(out, trailing_blank_line);
+    for (code, matrix) in groups {
+        stream.group(code, matrix)?;
+    }
+    stream.finish().map(drop)
+}
+
+/// [`write_ags4_matrix`], one group at a time — the streaming door (#805).
+///
+/// A caller with many groups need not hold every group's matrix (nor the
+/// whole output) live at once: convert one group, [`Self::group`] it, drop
+/// it, repeat, then [`Self::finish`]. The bytes are IDENTICAL to a single
+/// [`write_ags4_matrix`] call over the same groups — that function is now a
+/// thin loop over this type, so the two cannot drift, and the differential
+/// test pins the equality anyway.
+///
+/// Failure shape is per ROW (the row writer scans before it emits), but a mid-stream
+/// error necessarily leaves the earlier groups already written to `out` —
+/// a caller whose `out` is a real file and whose contract is
+/// refuse-without-touching (the compat write's) must stage to a temp file
+/// and rename on success.
+pub struct MatrixStream<W: Write> {
+    out: W,
+    trailing_blank_line: bool,
+    wrote_any: bool,
+}
+
+impl<W: Write> MatrixStream<W> {
+    pub fn new(out: W, trailing_blank_line: bool) -> Self {
+        Self {
+            out,
+            trailing_blank_line,
+            wrote_any: false,
         }
-        write_row(out, &["GROUP", code])?;
+    }
+
+    /// Write one group: the section separator (between groups only, same as
+    /// `write_ags4`'s `if i > 0` — the private emitter folded this into a
+    /// per-group trailing blank, which is why dropping that blank for `.text`
+    /// also needs this to keep the separator), the `GROUP` row, then the
+    /// matrix rows verbatim.
+    pub fn group(&mut self, code: &str, matrix: &[Vec<String>]) -> Result<(), EmitError> {
+        if self.wrote_any {
+            self.out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
+        }
+        self.wrote_any = true;
+        write_row(&mut self.out, &["GROUP", code])?;
         for row in matrix {
             let cells: Vec<&str> = row.iter().map(String::as_str).collect();
-            write_row(out, &cells)?;
+            write_row(&mut self.out, &cells)?;
         }
+        Ok(())
     }
-    // python-ags4 appends a blank line AFTER the final group too; the canonical shape
-    // does not. This is the only byte-level difference between the two.
-    if trailing_blank_line && !groups.is_empty() {
-        out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
+
+    /// Close the stream, returning the writer. python-ags4 appends a blank
+    /// line AFTER the final group too; the canonical shape does not — this is
+    /// the only byte-level difference between the two.
+    pub fn finish(mut self) -> Result<W, EmitError> {
+        if self.trailing_blank_line && self.wrote_any {
+            self.out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
+        }
+        Ok(self.out)
     }
-    Ok(())
 }
 
 fn write_aligned<W: Write>(
@@ -401,5 +444,53 @@ mod tests {
             s.starts_with("\"GROUP\",\"PROJ\""),
             "must not start with a blank line: {s:?}"
         );
+    }
+
+    /// The streaming door and the batch door are ONE serializer: identical
+    /// bytes for the same groups, across both trailing shapes and the empty
+    /// input. `write_ags4_matrix` is a loop over `MatrixStream`, so this is a
+    /// pin against future divergence, not a proof of today's.
+    #[test]
+    fn matrix_stream_matches_the_batch_door_byte_for_byte() {
+        let groups: Vec<(String, Vec<Vec<String>>)> = vec![
+            (
+                "PROJ".into(),
+                vec![
+                    vec!["HEADING".into(), "PROJ_ID".into()],
+                    vec!["UNIT".into(), String::new()],
+                    vec!["TYPE".into(), "ID".into()],
+                    vec!["DATA".into(), "P1".into()],
+                ],
+            ),
+            (
+                "LOCA".into(),
+                vec![
+                    vec!["HEADING".into(), "LOCA_ID".into()],
+                    vec!["DATA".into(), "quote \"inside\"".into()],
+                ],
+            ),
+        ];
+        for trailing in [false, true] {
+            for n in 0..=groups.len() {
+                let subset = &groups[..n];
+                let mut batch = Vec::new();
+                write_ags4_matrix(&mut batch, subset, trailing).expect("batch door");
+                let mut stream = MatrixStream::new(Vec::new(), trailing);
+                for (code, matrix) in subset {
+                    stream.group(code, matrix).expect("stream group");
+                }
+                let streamed = stream.finish().expect("stream finish");
+                assert_eq!(batch, streamed, "trailing={trailing} n={n}");
+            }
+        }
+    }
+
+    /// The stream refuses an embedded newline exactly as the batch door does
+    /// — the #423 guard rides `write_row`, which both share.
+    #[test]
+    fn matrix_stream_keeps_the_embedded_newline_refusal() {
+        let mut stream = MatrixStream::new(Vec::new(), true);
+        let bad = vec![vec!["DATA".into(), "torn\nrow".into()]];
+        assert!(stream.group("PROJ", &bad).is_err());
     }
 }

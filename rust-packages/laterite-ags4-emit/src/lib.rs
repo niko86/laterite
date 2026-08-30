@@ -20,7 +20,7 @@ pub use emit::{
     emit_ags4_owned,
 };
 pub use error::EmitError;
-pub use writer::{EmitGroup, write_ags4, write_ags4_matrix};
+pub use writer::{EmitGroup, MatrixStream, write_ags4, write_ags4_matrix};
 
 // Re-export the edition enum so callers configure emit without taking a
 // direct `laterite-ags4-validator` dependency just for the type.

@@ -477,10 +477,24 @@ def dataframe_to_AGS4(
             nf.columns
         )
         blocks.append((code, nf.select(cols)))
-    text = _native.emit_ags4_compat(blocks)
+    # The common case (fresh UTF-8 write) streams group-at-a-time straight to
+    # a temp file beside the destination, renamed over it on success (#805) —
+    # no whole-file text/bytes copy on this side of the boundary at all, and a
+    # refused cell (embedded newline) leaves the existing file untouched, as
+    # the build-then-write path always did. Append mode and a non-UTF-8
+    # ``encoding=`` take the byte-building door: append must not clobber the
+    # existing file with a rename, and a transcode needs the bytes in hand.
+    import codecs
+
+    if mode != "a" and codecs.lookup(encoding).name == "utf-8":
+        _native.emit_ags4_compat_to_path(blocks, str(Path(filepath)))
+        return
+    data = _native.emit_ags4_compat(blocks)
+    if codecs.lookup(encoding).name != "utf-8":
+        data = data.decode("utf-8").encode(encoding)
     m = "ab" if mode == "a" else "wb"
     with Path(filepath).open(m) as f:
-        f.write(text.encode(encoding))
+        f.write(data)
 
 
 # --- numeric coercion ----------------------------------------------
