@@ -37,6 +37,9 @@
    },
    {
     "text": "**laterite-ags4-validator 0.13.0** — the Rule 5 fix adds a `FixKind` variant, a breaking change on the exhaustive public enum (the semver gate's verdict against the published 0.12.0), so the crate takes the 0.x minor. `laterite-ags4-emit` 0.13.1 and `laterite-ags4-trust` 0.13.1 ride along: their published pins froze `^0.12.0`, and the coherence gate holds that a moved floor may not strand a published crate (#809's class)."
+   },
+   {
+    "text": "**compat's `dataframe_to_AGS4` stops holding the whole file several times over** (#805). The write streams group-at-a-time through the new `laterite-ags4-emit::MatrixStream` door (`write_ags4_matrix` is now a loop over it — one serializer, and a differential test pins the bytes) straight into a temp file beside the destination, renamed over it only on success — so the #423 refusal still leaves an existing file untouched, now test-pinned on both doors. Append mode and a non-UTF-8 `encoding=` take the byte-building door, which returns `bytes` across the PyO3 boundary instead of a `str` the caller immediately re-encoded. Output bytes are unchanged — the python-ags4 parity oracle holds by identity. `laterite-ags4-emit` 0.14.0 (the additive door), `laterite-ags4-merge` 0.12.1 rides the moved floor (coherence gate)."
    }
   ],
   "deprecated": [],
