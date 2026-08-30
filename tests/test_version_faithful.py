@@ -453,6 +453,56 @@ def test_engine_dependency_versions_match_engine() -> None:
         )
 
 
+def test_surface_engine_pins_record_what_ships() -> None:
+    """Each product surface pins its published engine deps: `{ path, version }`.
+
+    #781 step 5, and the last of its sequence. The surfaces compile engine
+    SOURCE (the path always wins locally), so before these pins the engine
+    version was invisible at the consuming edge: "which engines did wheel X
+    ship?" had no answer in the manifest that built it. With the pin, the
+    manifest at any product tag IS the record — and cargo enforces the honest
+    half by itself, refusing to resolve a path crate the pin no longer admits.
+
+    Three assertions, because each fails differently:
+    * a published engine dep with NO version records nothing — the gap this
+      test exists to close;
+    * a pin unequal to the crate's own version is drift — `bump_crate.py`
+      rewrites every member pin when it moves a crate, so an unequal pin means
+      something was moved by hand;
+    * an UNPUBLISHED laterite dep (excel, censor, cliutil) must NOT carry a
+      version — there is no published version to record, so a number there
+      would be an invention that starts lying at its first divergence.
+    """
+    published = {**ENGINE_CRATES}
+    for surface in PRODUCT_CRATES:
+        deps = _toml(f"rust-packages/{surface}/Cargo.toml").get("dependencies", {})
+        ours = {n: s for n, s in deps.items() if n.startswith("laterite")}
+        assert ours, f"{surface}: no laterite deps parsed — the discovery went stale"
+        for name, spec in ours.items():
+            assert isinstance(spec, dict), (
+                f"{surface}: {name} is a bare string dep — engine deps here are "
+                "path deps into the tree beside them"
+            )
+            if name in published:
+                own = published[name]
+                assert spec.get("version") == own, (
+                    f"{surface}: {name} pins {spec.get('version')!r} but the crate "
+                    f"is {own!r} — the manifest would record engine versions the "
+                    "product did not ship. bump_crate.py moves every member pin "
+                    "with the crate; something was edited alone"
+                )
+                assert "path" in spec, (
+                    f"{surface}: {name} lost its `path` — the surface would compile "
+                    "the crates.io copy instead of the tree beside it"
+                )
+            else:
+                assert "version" not in spec, (
+                    f"{surface}: {name} is not a published crate, so its "
+                    f"version pin {spec.get('version')!r} records nothing that "
+                    "exists on a registry — remove it"
+                )
+
+
 # --- the seam itself -----------------------------------------------------
 
 

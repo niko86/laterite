@@ -2,14 +2,17 @@
 
 #781 (decided 2026-08-29) retired the engine lockstep: each published crate
 carries its own version, moves when it changes, and publishes individually.
-This is the tool that moves one. It rewrites the PAIR that must agree —
+This is the tool that moves one. It rewrites every spelling that must agree —
 
-  * the crate's own `version` in `rust-packages/<crate>/Cargo.toml`, and
+  * the crate's own `version` in `rust-packages/<crate>/Cargo.toml`,
   * the `[workspace.dependencies]` entry siblings declare it at (the publish
     floor; cargo strips `path` at publish, so this is what a published sibling
-    actually pins) —
+    actually pins), and
+  * the surface pins (#781 step 5): any member manifest declaring this crate
+    as `{ path, version }` — found by scan, never by list — so a product tag's
+    manifests record which engine versions shipped —
 
-then regenerates `Cargo.lock` and runs the faithfulness gate, so the two
+then regenerates `Cargo.lock` and runs the faithfulness gate, so the
 spellings cannot drift apart by hand-editing one of them.
 `tests/test_version_faithful.py::test_engine_dependency_versions_match_engine`
 asserts the same equality per crate; this tool is why it should never fire.
@@ -111,6 +114,23 @@ def bump(crate: str, part_or_version: str) -> None:
             f"found {n} [workspace.dependencies] entries for {crate} at {old} — "
             "expected exactly 1; the manifest edit is applied, fix the entry by hand"
         )
+
+    # The surface pins (#781 step 5): a product surface declares its engine deps
+    # as `{ path, version }`, so the manifest at any product tag RECORDS which
+    # engine versions it shipped. Derived by scan, not a list of surfaces — any
+    # member manifest that pins this crate is moved, and the guard test
+    # (`test_surface_engine_pins_record_what_ships`) fails on one this missed.
+    # Cargo enforces its half too: a pin the path crate no longer satisfies is
+    # a resolution error, not a quiet lie.
+    for member in sorted((ROOT / "rust-packages").iterdir()):
+        dep_manifest = member / "Cargo.toml"
+        if member.name == crate or not dep_manifest.is_file():
+            continue
+        dep_text = dep_manifest.read_text()
+        dep_new, moved = entry.subn(rf"\g<1>{new}\g<2>", dep_text)
+        if moved:
+            dep_manifest.write_text(dep_new)
+            print(f"bump_crate:   {member.name} pin {old} -> {new}")
 
     print("bump_crate: regenerating Cargo.lock…")
     subprocess.run(
