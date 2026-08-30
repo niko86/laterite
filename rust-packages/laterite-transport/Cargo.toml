@@ -41,3 +41,8 @@ thiserror = "2"
 
 [lints]
 workspace = true
+
+# Which release train cuts this crate (#806): the nightly engine cut derives
+# bumps for `engine` crates only; `product` crates ride the product trains.
+[package.metadata.laterite]
+release_tier = "engine"

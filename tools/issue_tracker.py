@@ -209,6 +209,70 @@ EXT_DRIFT = Tracker(
 )
 
 
+RELEASE_MARKER = "engine-release-tracker"
+
+
+def _release_line(token: str) -> str:
+    """A tracker token, prettified for the body.
+
+    Tokens because the state marker cannot hold spaces; the body is where they
+    become sentences. An unrecognised token renders verbatim rather than being
+    dropped — the tracker must never report on less than it holds.
+    """
+    crate, _, act = token.partition(":")
+    if act.startswith("bump-"):
+        return (
+            f"`{crate}` — a **{act[5:]} bump** is owed (the nightly cut PR carries it)"
+        )
+    if act.startswith("publish-"):
+        return (
+            f"`{crate}` — **publish {act[8:]}**: approve the pending publish-crates run"
+        )
+    if act == "human":
+        return f"`{crate}` — **needs a human**; the run's step summary says why"
+    return f"`{token}`"
+
+
+def _release_body(items: list[str], run_url: str, nights: int) -> str:
+    nights_line = (
+        "first seen tonight" if nights <= 1 else f"**owed {nights} nights running**"
+    )
+    return "\n".join(
+        [
+            f"The nightly engine cut (#806) derived {len(items)} release act(s) "
+            f"owed — {nights_line}.",
+            "",
+            *(f"- {_release_line(i)}" for i in items),
+            "",
+            f"**Latest run:** {run_url}",
+            "",
+            "Derived from the committed `cargo-public-api` snapshots, the code "
+            "changed under each crate, and the pins its published version "
+            "carries on crates.io — measured from the last PUBLISHED version, "
+            "never a stamp that went nowhere.",
+            "",
+            "This body is rewritten by each nightly run, so it always shows the "
+            "CURRENT state; comments below mark only the nights where the set "
+            "changed. The issue closes itself when the registry is level with "
+            "the tree. A night where the registry is unreachable leaves it "
+            "untouched rather than guessing in either direction.",
+            "",
+            state_marker(RELEASE_MARKER, items, nights),
+        ]
+    )
+
+
+RELEASE = Tracker(
+    title="Engine release work owed",
+    marker=RELEASE_MARKER,
+    body=_release_body,
+    changed=lambda gained, lost, run_url: _changed_line(gained, lost, run_url, "owed"),
+    closed=lambda run_url: (
+        f"The registry is level with the tree as of {run_url}. Closing."
+    ),
+)
+
+
 def _changed_line(gained: list[str], lost: list[str], run_url: str, word: str) -> str:
     parts = []
     if gained:
@@ -367,11 +431,24 @@ def _ext_drift_action(run_url: str, repo: str) -> dict[str, Any]:
     )
 
 
+def _release_action(run_url: str, repo: str) -> dict[str, Any]:
+    """The engine-cut channel (#806): `ITEMS`, one token per line, empty = level.
+
+    Same contract as ext-drift — an empty `ITEMS` is what closes the issue. The
+    caller (engine_cut.py --items) refuses to emit an empty set on partial
+    registry knowledge, so "empty" here really does mean the registry is level.
+    """
+    items = [ln.strip() for ln in os.environ.get("ITEMS", "").splitlines()]
+    return plan_items(
+        [i for i in items if i], _find_issue(repo, RELEASE.title), run_url, RELEASE
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--tracker",
-        choices=("nightly", "ext-drift"),
+        choices=("nightly", "ext-drift", "release"),
         default="nightly",
         help="which channel to drive (default: nightly)",
     )
@@ -389,6 +466,8 @@ def main() -> int:
         action = _nightly_action(run_url, repo)
         if action is None:
             return 1
+    elif args.tracker == "release":
+        action = _release_action(run_url, repo)
     else:
         action = _ext_drift_action(run_url, repo)
 
