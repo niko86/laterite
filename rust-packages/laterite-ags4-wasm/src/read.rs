@@ -244,15 +244,31 @@ impl ParsedDataset {
         // a file byte-identically by construction. Framed here only for
         // duckdb-wasm.
         let reg = laterite_ags4_core::registry::registry();
-        let ids = (keys && reg.get(code).is_some()).then(|| {
-            laterite_ags4_core::keychain::group_row_ids(
+        let ids = if keys && reg.get(code).is_some() {
+            Some(laterite_ags4_core::keychain::group_row_ids(
                 reg,
                 code,
                 &group.headings,
                 group.rows.len(),
                 |col, row| group.cell(col, row),
-            )
-        });
+            ))
+        } else if keys {
+            // Rule 18 (#815): a file-declared group mints from its declared
+            // KEY tuple + parent; declared keyless (or undeclared) stays
+            // unkeyed. The DICT walk is paid only on this rare branch.
+            let fd = laterite_ags4_core::effective_dict::FileDict::from_parsed(&self.parsed);
+            let v = laterite_ags4_core::keychain::group_row_ids_effective(
+                reg,
+                &fd,
+                code,
+                &group.headings,
+                group.rows.len(),
+                |col, row| group.cell(col, row),
+            );
+            (!v.is_empty()).then_some(v)
+        } else {
+            None
+        };
         let hashes = if content_hash {
             Some(laterite_ags4_core::keychain::group_content_hashes(
                 code,

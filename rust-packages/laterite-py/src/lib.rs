@@ -1171,9 +1171,13 @@ impl Reading {
         // cross-group join in `.sql()` works with no opt-in — the Python frame
         // accessor strips them by default. The ids come from the one shared
         // keychain (`group_row_ids` → `keychain::row_ids`), so they are byte-
-        // identical across every surface that shares this crate. A custom/passthrough group is
-        // absent from the registry → it has no spec keys → unkeyed (`ids: None`,
-        // #303).
+        // identical across every surface that shares this crate. A group the
+        // registry does not know mints from the Rule 18 effective dictionary
+        // instead (#815): its file-declared KEY tuple — the same declarations
+        // the validator keys Rule 10a off — with the declared parent chain, so
+        // `child._parent_id == parent._id` holds across the registry/file
+        // boundary. Declared keyless (or not declared at all) → unkeyed
+        // (`ids: None`, #303's original shape).
         //
         // The hash needs NO registry — it hashes every heading rather than the
         // spec key-chain, so a custom/passthrough group (which gets no `_id` at
@@ -1192,15 +1196,28 @@ impl Reading {
         // byte-identical ids the certificate + cross-surface gates pin.
         let ids = if with_keys {
             let reg = laterite_ags4_core::registry::registry();
-            reg.get(code).map(|_| {
-                laterite_ags4_core::keychain::group_row_ids(
+            if reg.get(code).is_some() {
+                Some(laterite_ags4_core::keychain::group_row_ids(
                     reg,
                     code,
                     &g.headings,
                     g.rows.len(),
                     |col, row| g.cell(col, row),
-                )
-            })
+                ))
+            } else {
+                // The DICT walk is paid only on this (rare) branch — a
+                // standard group's read builds no FileDict.
+                let fd = laterite_ags4_core::effective_dict::FileDict::from_parsed(&self.parsed);
+                let v = laterite_ags4_core::keychain::group_row_ids_effective(
+                    reg,
+                    &fd,
+                    code,
+                    &g.headings,
+                    g.rows.len(),
+                    |col, row| g.cell(col, row),
+                );
+                (!v.is_empty()).then_some(v)
+            }
         } else {
             None
         };

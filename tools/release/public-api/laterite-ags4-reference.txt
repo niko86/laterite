@@ -283,6 +283,7 @@ pub fn laterite_ags4_reference::effective_dict::FileDict::groups(&self) -> alloc
 pub fn laterite_ags4_reference::effective_dict::FileDict::heading(&self, &str, &str) -> core::option::Option<&laterite_ags4_reference::effective_dict::FileHeading>
 pub fn laterite_ags4_reference::effective_dict::FileDict::headings(&self, &str) -> &[laterite_ags4_reference::effective_dict::FileHeading]
 pub fn laterite_ags4_reference::effective_dict::FileDict::is_empty(&self) -> bool
+pub fn laterite_ags4_reference::effective_dict::FileDict::key_headings(&self, &str) -> impl core::iter::traits::iterator::Iterator<Item = &laterite_ags4_reference::effective_dict::FileHeading>
 pub fn laterite_ags4_reference::effective_dict::FileDict::parent(&self, &str) -> core::option::Option<&str>
 impl core::clone::Clone for laterite_ags4_reference::effective_dict::FileDict
 pub fn laterite_ags4_reference::effective_dict::FileDict::clone(&self) -> laterite_ags4_reference::effective_dict::FileDict
@@ -328,6 +329,7 @@ pub fn laterite_ags4_reference::keychain::content_hash(&str, &[(&str, &str, &str
 pub fn laterite_ags4_reference::keychain::content_id(&str, &[(alloc::string::String, alloc::string::String)]) -> uuid::Uuid
 pub fn laterite_ags4_reference::keychain::group_content_hashes<'a, F>(&str, &[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> alloc::vec::Vec<alloc::string::String> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_reference::keychain::group_row_ids<'a, F>(&laterite_ags4_reference::union::Registry, &str, &[alloc::string::String], usize, F) -> alloc::vec::Vec<(alloc::string::String, core::option::Option<alloc::string::String>)> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_reference::keychain::group_row_ids_effective<'a, F>(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::effective_dict::FileDict, &str, &[alloc::string::String], usize, F) -> alloc::vec::Vec<(alloc::string::String, core::option::Option<alloc::string::String>)> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_reference::keychain::key_chain_values<S: core::hash::BuildHasher>(&laterite_ags4_reference::union::GroupDescriptor, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>) -> alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
 pub fn laterite_ags4_reference::keychain::key_heading_names(&laterite_ags4_reference::union::GroupDescriptor) -> alloc::vec::Vec<&str>
 pub fn laterite_ags4_reference::keychain::parent_chain_values<S: core::hash::BuildHasher>(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::union::GroupDescriptor, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>) -> core::option::Option<alloc::vec::Vec<(alloc::string::String, alloc::string::String)>>
