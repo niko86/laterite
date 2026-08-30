@@ -40,6 +40,19 @@ sources: []
 > every gate this arc and the surface census own compares knob *names* or
 > capability *presence*, never an *answer* — see [[modality-register]].
 
+> [!note] **The cert says what the file defines (2026-08-30, laterite#768).**
+> A `defines` field joined the format — still v2, additive with a serde
+> default, the `custom_dict` precedent: the sorted group codes the file's own
+> `DICT` declares, read through the one shared [[edition-resolution|effective-dictionary]]
+> implementation (laterite#777), derived at mint from the same bytes the index
+> locates. Names only — the definitions stay in `DICT`, which `groups` points
+> at — so a remote reader learns from one cert fetch that a file carries
+> non-standard groups, instead of fetching and parsing `DICT` to find out.
+> `None`/absent means a cert minted before the field (nothing measured);
+> `[]` means measured, nothing declared — the [[cert-trust-v2|TierCoverage]]
+> distinction, one level up. It is a RECORD, not a trust input:
+> `Sidecar::decide` does not read it.
+
 ## Context
 
 The v1 certificate (`Sidecar`, `repo:rust-packages/laterite-ags4-core/src/index.rs`)

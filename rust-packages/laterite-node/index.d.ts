@@ -111,6 +111,13 @@ export declare class Sidecar {
   get errors(): number | null
   get warnings(): number | null
   get fyi(): number | null
+  /**
+   * The groups the file's own DICT declares (#768), sorted — or `null` for a
+   * cert minted before the field existed (nothing measured; an empty array
+   * means measured, the file declares nothing). Names only — the
+   * definitions stay in `DICT`, which the byte index locates.
+   */
+  get defines(): Array<string> | null
 }
 
 /**

@@ -616,3 +616,101 @@ def test_a_certificate_minted_through_another_decoder_does_not_answer(tmp_path):
         .report
     )
     assert same.certified
+
+
+# --- #768: the certificate says what the file defines -----------------------
+
+# CLEAN's discipline, plus the three groups a self-describing delivery needs:
+# an ABBR for the DICT's own PA values, a DICT declaring one bespoke group
+# (XMON, keyed PROJ_ID + XMON_ID, parented under PROJ), and the XMON data
+# itself. Validates with zero findings — certify()'s precondition — which is
+# what makes it a fixture and not just an example: Rule 18's effective
+# dictionary is doing real work here.
+WITH_BESPOKE = "\r\n".join(
+    [
+        '"GROUP","PROJ"',
+        '"HEADING","PROJ_ID","PROJ_NAME"',
+        '"UNIT","",""',
+        '"TYPE","ID","X"',
+        '"DATA","P1","Bespoke-group fixture"',
+        "",
+        '"GROUP","TRAN"',
+        '"HEADING","TRAN_ISNO","TRAN_DATE","TRAN_PROD","TRAN_STAT","TRAN_AGS","TRAN_RECV","TRAN_DLIM","TRAN_RCON"',
+        '"UNIT","","yyyy-mm-dd","","","","","",""',
+        '"TYPE","X","DT","X","X","X","X","X","X"',
+        '"DATA","1","2020-08-18","ACME Drilling Ltd","Draft","4.2","ACME Consulting","|","+"',
+        "",
+        '"GROUP","UNIT"',
+        '"HEADING","UNIT_UNIT","UNIT_DESC"',
+        '"UNIT","",""',
+        '"TYPE","X","X"',
+        '"DATA","yyyy-mm-dd","year month day"',
+        "",
+        '"GROUP","TYPE"',
+        '"HEADING","TYPE_TYPE","TYPE_DESC"',
+        '"UNIT","",""',
+        '"TYPE","X","X"',
+        '"DATA","ID","Unique identifier"',
+        '"DATA","X","Text"',
+        '"DATA","DT","Date and time"',
+        '"DATA","PA","Text from abbreviations"',
+        '"DATA","PT","Text from types"',
+        '"DATA","PU","Text from units"',
+        "",
+        '"GROUP","ABBR"',
+        '"HEADING","ABBR_HDNG","ABBR_CODE","ABBR_DESC"',
+        '"UNIT","","",""',
+        '"TYPE","X","X","X"',
+        '"DATA","DICT_TYPE","GROUP","Group definition"',
+        '"DATA","DICT_TYPE","HEADING","Heading definition"',
+        '"DATA","DICT_STAT","KEY","Key field"',
+        '"DATA","DICT_STAT","OTHER","Other field"',
+        "",
+        '"GROUP","DICT"',
+        '"HEADING","DICT_TYPE","DICT_GRP","DICT_HDNG","DICT_STAT","DICT_DTYP","DICT_DESC","DICT_UNIT","DICT_PGRP"',
+        '"UNIT","","","","","","","",""',
+        '"TYPE","PA","X","X","PA","PT","X","PU","X"',
+        '"DATA","GROUP","XMON","","","","Monitoring bespoke group","","PROJ"',
+        '"DATA","HEADING","XMON","PROJ_ID","KEY","ID","Project key","",""',
+        '"DATA","HEADING","XMON","XMON_ID","KEY","ID","Monitoring point id","",""',
+        '"DATA","HEADING","XMON","XMON_DESC","OTHER","X","Description","",""',
+        "",
+        '"GROUP","XMON"',
+        '"HEADING","PROJ_ID","XMON_ID","XMON_DESC"',
+        '"UNIT","","",""',
+        '"TYPE","ID","ID","X"',
+        '"DATA","P1","M1","Standpipe"',
+        "",
+    ]
+)
+
+
+def test_cert_names_the_groups_the_file_defines(tmp_path):
+    """#768 option (1): one fetch of the cert says this file carries groups no
+    standard dictionary has — names beside ``edition``, never the definitions,
+    which stay in ``DICT`` where ``groups`` locates them precisely."""
+    import json
+
+    src = _write(tmp_path, text=WITH_BESPOKE)
+    cert = json.loads(lat.read(src).validate().certify().read_bytes())
+    assert cert["defines"] == ["XMON"]
+
+
+def test_a_dictless_cert_measures_an_empty_defines(tmp_path):
+    """Measured-and-none is ``[]``, present in the JSON — not an absent key.
+    An absent key means a cert minted before the field existed, and the two
+    must stay distinguishable or the field re-learns the confident-zero lie
+    the v2 stamp was built to retire."""
+    import json
+
+    src = _write(tmp_path)
+    cert = json.loads(lat.read(src).validate().certify().read_bytes())
+    assert cert["defines"] == []
+
+
+def test_the_sidecar_getter_exposes_defines(tmp_path):
+    from laterite import _laterite_native as native
+
+    src = _write(tmp_path, text=WITH_BESPOKE)
+    blob = lat.read(src).validate().certify_bytes()
+    assert native.Sidecar.from_json(blob).defines == ["XMON"]

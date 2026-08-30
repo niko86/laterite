@@ -1193,6 +1193,16 @@ impl Sidecar {
     pub fn fyi(&self) -> Option<u32> {
         tier_count(self.inner.validation.fyi)
     }
+
+    /// The groups the file's own DICT declares (#768), sorted — or `null` for a
+    /// cert minted before the field existed (nothing measured; an empty array
+    /// means measured, the file declares nothing). Names only — the
+    /// definitions stay in `DICT`, which the byte index locates.
+    #[napi(getter)]
+    #[must_use]
+    pub fn defines(&self) -> Option<Vec<String>> {
+        self.inner.defines.clone()
+    }
 }
 
 /// One applied fix — the Node mirror of laterite-py's `applied[]` entries.

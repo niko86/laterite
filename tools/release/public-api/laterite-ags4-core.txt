@@ -387,6 +387,7 @@ impl core::marker::UnsafeUnpin for laterite_ags4_core::index::Question
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::Question
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::Question
 pub struct laterite_ags4_core::index::Sidecar
+pub laterite_ags4_core::index::Sidecar::defines: core::option::Option<alloc::vec::Vec<alloc::string::String>>
 pub laterite_ags4_core::index::Sidecar::file: laterite_ags4_core::index::FileMeta
 pub laterite_ags4_core::index::Sidecar::groups: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_core::index::Range>>
 pub laterite_ags4_core::index::Sidecar::order: alloc::vec::Vec<alloc::string::String>
