@@ -512,7 +512,8 @@ export function listRules(): RuleMeta[] {
  * `only` / `exclude`. Mirrors laterite-py's `FixableRule`; kept in lockstep with
  * the engine's `fixable_rules()` by a cross-surface drift gate
  * (`test_typed_choices.py`). Use {@link listRules} (`fixable: true`) at runtime. */
-export type FixableRule = "1" | "2a" | "4" | "6" | "7" | "8" | "11a" | "11b";
+export type FixableRule =
+  "1" | "2a" | "4" | "5" | "6" | "7" | "8" | "11a" | "11b";
 
 export interface FixOptions {
   /** Repair in-memory `text` instead of a file path. */

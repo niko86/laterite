@@ -42,6 +42,13 @@ CASES: dict[str, dict] = {
         "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
         '"TYPE","ID","X"\r\n"DATA","P1"\r\n'
     },
+    # unquoted DATA row that binds without excess fields -> Rule 5
+    # (QuoteUnquotedRow, safe — the conditional fix, #778; an OVERFLOWING row
+    # stays declined, proven by test_rule_5_overflow_stays_declined below)
+    "5": {
+        "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\nDATA,P1,  padded  \r\n'
+    },
     # embedded CR inside a DATA value -> Rule 6 (StripEmbeddedCr, safe)
     "6": {
         "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n'
@@ -117,6 +124,26 @@ def test_fix_clears_the_rule_on_revalidate(short):
     after = L.read(data=fixed.bytes).validate()
     assert label not in _rules(after.report), (
         f"{label} must be gone after fix — got {sorted(_rules(after.report))}"
+    )
+
+
+def test_rule_5_overflow_stays_declined():
+    """The conditional half of Rule 5's entry (#778): a row that split into MORE
+    fields than the group declares headings is the genuinely ambiguous case —
+    nothing can say which side of the comma the heading wanted — and the fix
+    engine must leave it alone, Rule 5 finding intact."""
+    text = (
+        '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\nDATA,P1,Acme, Bloggs and Co\r\n'
+    )
+    fixed = L.fix(risky=True, text=text)
+    assert not any(a["kind"] == "quote_unquoted_row" for a in fixed.applied), (
+        f"an overflowing row must not be re-quoted: {fixed.applied}"
+    )
+    # The fixer re-validates its own output — the survived findings are the
+    # honest record that the row still needs a human.
+    assert any(f["rule"] == "AGS Format Rule 5" for f in fixed.findings), (
+        f"the finding must survive: {fixed.findings}"
     )
 
 
