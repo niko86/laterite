@@ -129,7 +129,7 @@ laterite-ags4-reference = { path = "laterite-ags4-reference", version = "0.12.0"
 laterite-ags4-trust = { path = "laterite-ags4-trust", version = "0.13.0" }
 laterite-ags4-types = { path = "laterite-ags4-types", version = "0.12.0" }
 laterite-ags4-validator = { path = "laterite-ags4-validator", version = "0.12.0" }
-laterite-transport = { path = "laterite-transport", version = "0.11.0" }
+laterite-transport = { path = "laterite-transport", version = "0.11.1" }
 
 # Workspace-wide clippy pedantic (lever 6, chore/clippy-pedantic): every member
 # opts in via `[lints] workspace = true` (see each member's Cargo.toml), except
