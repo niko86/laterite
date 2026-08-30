@@ -157,6 +157,7 @@ pub laterite_ags4_validator::fixes::FixKind::InsertTranRcon
 pub laterite_ags4_validator::fixes::FixKind::NormalizeCrlf
 pub laterite_ags4_validator::fixes::FixKind::NormalizeTypography
 pub laterite_ags4_validator::fixes::FixKind::PadShortRow
+pub laterite_ags4_validator::fixes::FixKind::QuoteUnquotedRow
 pub laterite_ags4_validator::fixes::FixKind::ReformatNumeric
 pub laterite_ags4_validator::fixes::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::fixes::FixKind::StripBom
@@ -357,6 +358,7 @@ pub laterite_ags4_validator::FixKind::InsertTranRcon
 pub laterite_ags4_validator::FixKind::NormalizeCrlf
 pub laterite_ags4_validator::FixKind::NormalizeTypography
 pub laterite_ags4_validator::FixKind::PadShortRow
+pub laterite_ags4_validator::FixKind::QuoteUnquotedRow
 pub laterite_ags4_validator::FixKind::ReformatNumeric
 pub laterite_ags4_validator::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::FixKind::StripBom

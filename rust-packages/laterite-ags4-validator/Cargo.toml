@@ -7,7 +7,7 @@
 
 [package]
 name = "laterite-ags4-validator"
-version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.13.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "Clean-room Rust validator for the AGS4 geotechnical transfer format"

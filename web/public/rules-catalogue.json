@@ -88,9 +88,9 @@
     {
       "rule": "5",
       "title": "Quoted Fields",
-      "checks": "Checks that every field is wrapped in double quotes and that any literal double-quote inside a field is escaped by doubling it (\"\"). A finding means a field is unquoted or has an unescaped/unbalanced quote. To fix: wrap the field in quotes and double any embedded quote characters.",
+      "checks": "Checks that every field is wrapped in double quotes and that any literal double-quote inside a field is escaped by doubling it (\"\"). A finding means a field is unquoted or has an unescaped/unbalanced quote. To fix: wrap the field in quotes and double any embedded quote characters. The automatic fix re-quotes a DATA row only when the repair is provably lossless: the row must not carry more fields than the group declares headings (an overflowing row is ambiguous — nothing can say which split belongs to which heading) and the re-quoted line must tokenize back to the identical values. Overflowing, quote-mangled, and non-DATA rows stay flagged for manual repair.",
       "severity": "error",
-      "fixable": false,
+      "fixable": true,
       "observations": [
         {
           "id": "O-3",

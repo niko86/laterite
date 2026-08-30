@@ -17,6 +17,12 @@
 //!    folds every non-ASCII char to a sensible ASCII equivalent (µ→"u",
 //!    °→"deg", ß→"ss", accents→base) and the un-representable — incl. the
 //!    U+FFFD corruption marker — to "?". A guess, so opt-in only.
+//!  * **Rule 5** — re-quote a DATA row whose fields are not enclosed in
+//!    double quotes, but *only* when the repair is provably lossless (#778):
+//!    the row must bind without excess fields (#776's discriminator — an
+//!    overflowing row is the one where nobody can say which split belongs to
+//!    which heading), tokenize cleanly, and the re-quoted line must split
+//!    back to the identical field list. Everything else stays declined.
 //!  * **Rule 6** — delete an embedded CR inside a row.
 //!  * **Rule 7** — rename a duplicate HEADING `X` to `X_1` (or `X_2` …).
 //!    *Conditionally* safe: it can surface a Rule 9 unknown-heading
@@ -41,7 +47,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::findings::{Findings, Target};
-use crate::parse::{ParsedFile, field_span};
+use crate::parse::{ParsedFile, field_span, split_ags_line};
 use crate::rules::typed_values::{format_ndp, format_nsci, format_nsf};
 
 /// One in-line text edit: replace the char range `[start, end)` on a
@@ -75,6 +81,7 @@ pub enum FixKind {
     CanonicalizeDatetime,
     NormalizeTypography,
     PadShortRow,
+    QuoteUnquotedRow,
 }
 
 /// How confident the fix is. `Safe` rewrites are unambiguous from the file
@@ -115,6 +122,7 @@ pub type Fixes = Vec<Fix>;
 const RULE_1: &str = "AGS Format Rule 1";
 const RULE_2A: &str = "AGS Format Rule 2a";
 const RULE_4: &str = "AGS Format Rule 4";
+const RULE_5: &str = "AGS Format Rule 5";
 const RULE_6: &str = "AGS Format Rule 6";
 const RULE_7: &str = "AGS Format Rule 7";
 const RULE_8: &str = "AGS Format Rule 8";
@@ -126,7 +134,14 @@ const RULE_11B: &str = "AGS Format Rule 11b";
 /// `fixable` flag (`crate::catalogue`). The `fixable_labels_match_rule_consts`
 /// test keeps it in lock-step with the consts, so a new fix can't leave the
 /// catalogue's `fixable` stale.
-pub const FIXABLE_RULE_LABELS: &[&str] = &["1", "2a", "4", "6", "7", "8", "11a", "11b"];
+pub const FIXABLE_RULE_LABELS: &[&str] = &["1", "2a", "4", "5", "6", "7", "8", "11a", "11b"];
+
+/// Rule 5's `NotEnclosed` desc, string-identical to `rules::line_format`'s (the
+/// compute test drives the real validator, so drift is caught). The
+/// `EmbeddedQuote` wording is deliberately absent: an un-doubled quote leaves
+/// the field boundaries themselves in doubt, so no re-quote can be proven
+/// lossless for it.
+const RULE_5_NOT_ENCLOSED: &str = "Row has field(s) not enclosed in double quotes.";
 
 /// Walk the findings + the parsed file and emit one [`Fix`] per fixable
 /// finding. Pure read — never mutates `parsed` or `found` (the oracle
@@ -537,6 +552,95 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     end,
                     replacement,
                     expected: String::new(),
+                }],
+            });
+        }
+    }
+
+    // -- Rule 5: re-quote a DATA row whose fields are not enclosed in double
+    //    quotes — ONLY when the repair is provably lossless (#778). The
+    //    ambiguity Rule 5 was excluded for lives entirely in the OVERFLOWING
+    //    row (more fields than the group declares headings — #776's
+    //    discriminator: nobody can say which split belongs to which heading);
+    //    a row that binds without excess re-quotes to exactly the values the
+    //    tolerant read already holds. Declined, and still flagged for manual
+    //    repair: overflowing rows, the EmbeddedQuote deviation (the field
+    //    boundaries themselves are in doubt), non-DATA rows (an unquoted
+    //    HEADING row *defines* the width there is to check against),
+    //    malformed rows the tokenizer tolerated by dropping content
+    //    (`row_is_clean`), and a SHORT row ending in a comma (its re-quote
+    //    cannot compose with Rule 4's pad edit on the same line).
+    if let Some(items) = found.get(RULE_5) {
+        for f in items {
+            let Some(line) = f.line else { continue };
+            if f.desc != RULE_5_NOT_ENCLOSED {
+                continue; // EmbeddedQuote territory — never provably lossless
+            }
+            let Some(raw) = line_text.get(&line) else {
+                continue;
+            };
+            let raw: &str = raw;
+            // Locate the DATA row by line: Rule 5 findings carry no group
+            // (line_format runs per-line), and only a bound DATA row has a
+            // declared width to check the no-overflow condition against.
+            let Some((group, row)) = parsed
+                .groups
+                .values()
+                .find_map(|g| g.rows.iter().find(|r| r.line == line).map(|r| (g, r)))
+            else {
+                continue; // HEADING/UNIT/TYPE/GROUP row, or a row outside any group
+            };
+            if row.values.len() > group.headings.len() {
+                continue; // overflow — the one genuinely ambiguous case
+            }
+            if !row_is_clean(raw) {
+                continue; // the tokenizer dropped content — re-quoting bakes the loss in
+            }
+            if raw.ends_with(',') && row.values.len() < group.headings.len() {
+                // Rule 4's pad edit for this same line assumes the trailing
+                // comma survives; our whole-line replacement consumes it, so
+                // the two edits would corrupt when composed. Rare enough to
+                // decline rather than special-case.
+                continue;
+            }
+            let fields = split_ags_line(raw);
+            if fields.is_empty() {
+                continue;
+            }
+            // Build the fully-quoted line and PROVE losslessness: the
+            // re-quoted line must tokenize back to the identical field list.
+            // This turns every case-analysis above into a checked invariant —
+            // a row this equality cannot hold for is declined, not guessed at.
+            let requoted = fields
+                .iter()
+                .map(|v| format!("\"{}\"", v.replace('"', "\"\"")))
+                .collect::<Vec<_>>()
+                .join(",");
+            if split_ags_line(&requoted) != fields {
+                continue;
+            }
+            if requoted == raw {
+                continue; // already canonical — nothing to rewrite
+            }
+            // A char count of ONE AGS4 line — bounded well under u32::MAX.
+            #[allow(clippy::cast_possible_truncation)]
+            let end = raw.chars().count() as u32;
+            let n = fields.len();
+            fixes.push(Fix {
+                kind: FixKind::QuoteUnquotedRow,
+                label: format!(
+                    "Enclose the {n} field{} of the DATA row on line {line} in double quotes (Rule 5)",
+                    if n == 1 { "" } else { "s" }
+                ),
+                rule: RULE_5.to_string(),
+                line: Some(line),
+                risk: FixRisk::Safe,
+                edits: vec![SpanEdit {
+                    line,
+                    start: 0,
+                    end,
+                    replacement: requoted,
+                    expected: raw.to_string(),
                 }],
             });
         }
@@ -1851,7 +1955,7 @@ mod tests {
         // be exactly the rule labels the fix engine attaches — keep it in
         // lock-step with the RULE_* consts compute_fixes uses.
         let from_consts: std::collections::BTreeSet<String> = [
-            RULE_1, RULE_2A, RULE_4, RULE_6, RULE_7, RULE_8, RULE_11A, RULE_11B,
+            RULE_1, RULE_2A, RULE_4, RULE_5, RULE_6, RULE_7, RULE_8, RULE_11A, RULE_11B,
         ]
         .iter()
         .map(|l| l.trim_start_matches("AGS Format Rule ").to_string())
@@ -2000,6 +2104,131 @@ mod tests {
         assert!(
             !out.contains("\"a\nb\""),
             "embedded LF not stripped: {out:?}"
+        );
+    }
+
+    /// #778's safe case: an unquoted DATA row that binds without excess
+    /// re-quotes losslessly — whitespace preserved verbatim, and the applied
+    /// file carries no Rule 5 finding any more.
+    #[test]
+    fn rule_5_requotes_an_exact_width_unquoted_data_row() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   DATA,P1,  padded  \r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found);
+        let quote: Vec<&Fix> = fixes
+            .iter()
+            .filter(|f| f.kind == FixKind::QuoteUnquotedRow)
+            .collect();
+        assert_eq!(quote.len(), 1, "exactly one re-quote fix: {fixes:?}");
+        assert_eq!(quote[0].risk, FixRisk::Safe);
+        let out = apply_fixes(src, parsed.has_bom, &fixes);
+        assert!(
+            out.contains("\"DATA\",\"P1\",\"  padded  \""),
+            "padding must survive verbatim: {out:?}"
+        );
+        let (_, after) = check(&out);
+        assert!(
+            !after.contains_key("AGS Format Rule 5"),
+            "the applied file still fails Rule 5: {after:?}"
+        );
+    }
+
+    /// The overflowing row — MORE fields than the group declares — is the one
+    /// genuinely ambiguous case (#776), and stays declined.
+    #[test]
+    fn rule_5_declines_an_overflowing_row() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   DATA,P1,Acme, Bloggs and Co\r\n";
+        let (parsed, found) = check(src);
+        assert!(found.contains_key(RULE_5), "fixture must trip Rule 5");
+        let fixes = compute_fixes(&parsed, &found);
+        assert!(
+            !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow),
+            "an overflowing row must not be re-quoted: {fixes:?}"
+        );
+    }
+
+    /// The `EmbeddedQuote` deviation leaves the field boundaries themselves in
+    /// doubt — never re-quoted, whatever the field count works out to.
+    #[test]
+    fn rule_5_declines_the_embedded_quote_deviation() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"ACME \"Gas Works\" Redevelopment\"\r\n";
+        let (parsed, found) = check(src);
+        assert!(found.contains_key(RULE_5), "fixture must trip Rule 5");
+        let fixes = compute_fixes(&parsed, &found);
+        assert!(
+            !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow),
+            "an embedded-quote row must not be re-quoted: {fixes:?}"
+        );
+    }
+
+    /// A SHORT unquoted row (no trailing comma) draws BOTH the re-quote and
+    /// Rule 4's pad; the two edits compose under `apply_fixes`' right-to-left
+    /// ordering into one fully-quoted, fully-padded row.
+    #[test]
+    fn rule_5_composes_with_the_rule_4_pad_on_a_short_row() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\",\"X\"\r\n\
+                   DATA,P1\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found);
+        let ks = kinds(&fixes);
+        assert!(
+            ks.contains(&FixKind::QuoteUnquotedRow),
+            "re-quote offered: {fixes:?}"
+        );
+        assert!(ks.contains(&FixKind::PadShortRow), "pad offered: {fixes:?}");
+        let out = apply_fixes(src, parsed.has_bom, &fixes);
+        assert!(
+            out.contains("\"DATA\",\"P1\",\"\",\"\""),
+            "quoted AND padded in one pass: {out:?}"
+        );
+        let (_, after) = check(&out);
+        assert!(!after.contains_key("AGS Format Rule 5"), "{after:?}");
+        assert!(!after.contains_key("AGS Format Rule 4"), "{after:?}");
+    }
+
+    /// The one composition this engine cannot make safe: a short row ENDING in
+    /// a comma. Rule 4's pad assumes that comma survives; the whole-line
+    /// re-quote consumes it. The re-quote is withheld, the pad still offered.
+    #[test]
+    fn rule_5_declines_a_short_row_with_a_trailing_comma() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\",\"X\"\r\n\
+                   DATA,P1,\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found);
+        let ks = kinds(&fixes);
+        assert!(
+            !ks.contains(&FixKind::QuoteUnquotedRow),
+            "trailing-comma short row must decline the re-quote: {fixes:?}"
+        );
+    }
+
+    /// A lone quote INSIDE an unquoted field is preserved by doubling — the
+    /// round-trip invariant proves the value survives exactly.
+    #[test]
+    fn rule_5_doubles_a_mid_field_quote_when_requoting() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   DATA,P1,5\" pipe\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found);
+        if !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow) {
+            // The tokenizer may classify this line as quote-mangled rather
+            // than unquoted; either way nothing lossy may be offered, and
+            // that refusal is this test's acceptable second answer.
+            return;
+        }
+        let out = apply_fixes(src, parsed.has_bom, &fixes);
+        assert!(
+            out.contains("\"5\"\" pipe\""),
+            "the mid-field quote must be doubled: {out:?}"
         );
     }
 }

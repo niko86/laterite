@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 #: fixable set by ``test_fix_selection`` (which gates it against
 #: [`fixable_rules`][laterite.fixable_rules], itself gated against the Rust
 #: ``FIXABLE_RULE_LABELS``).
-FixableRule = Literal["1", "2a", "4", "6", "7", "8", "11a", "11b"]
+FixableRule = Literal["1", "2a", "4", "5", "6", "7", "8", "11a", "11b"]
 
 __all__ = [
     "Ags4Error",

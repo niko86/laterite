@@ -98,7 +98,7 @@ export interface AppliedFix {
   kind: "normalize_crlf" | "strip_bom" | "strip_embedded_cr"
       | "rename_duplicate_heading" | "insert_tran_dlim" | "insert_tran_rcon"
       | "reformat_numeric" | "canonicalize_datetime" | "normalize_typography"
-      | "pad_short_row";
+      | "pad_short_row" | "quote_unquoted_row";
   label: string;
   /** The exact rule label (`"AGS Format Rule 8"`, …), for cross-linking back
    *  to the originating finding. */
