@@ -92,6 +92,8 @@ Two conditions were considered; only one needs watching.
   > nightly (the build half's report exists), and Trusted Publishing already
   > owns the upload, so what release-plz would add is the cut itself. Decide it
   > on #781's step 4, and record the answer here.
+  >
+  > **Answered 2026-08-30: BUILD.** See "The reopened question, answered" below.
 - **The crates.io publish needs to leave the maintainer's laptop.** The stronger
   trigger, and the one that was being tracked — see
   [#463](https://github.com/niko86/laterite/issues/463), which carries the
@@ -116,6 +118,41 @@ point of the spike. `publish_crates.py` derives its waves from the manifests on
 every run — deliberately, so the dependency order is never stated twice — so
 another engine crate costs nothing release-plz would refund.
 
+## The reopened question, answered (2026-08-30)
+
+Per-crate versioning landed and reopened this page, as #781 predicted. The
+question narrowed to **build the nightly cut on `release_status.py`, or adopt
+release-plz for it** — and the answer is **build**, tracked in #806.
+
+Two reasons, the first structural rather than a preference.
+
+**The publish stays approval-gated, so `publish_crates.py` stays with it.** That
+spends release-plz's strongest advantage before the comparison starts. This page
+already recorded why: crates.io shipped Trusted Publishing after the spike, so
+the half-step that made release-plz attractive — someone to hold the credential —
+stopped being needed at all. What remained was the cut alone.
+
+**And it would supply the cut from weaker evidence.** release-plz derives the
+version part from conventional commit subjects; #216's spike measured that a
+substantial share of recent commits carry no conventional type, and that 0.x
+semantics tighten under it. This repo's part comes from the `cargo-public-api`
+snapshot — the public surface itself, and the only source that can see an
+addition at all, since `cargo semver-checks` has no `function_added` lint.
+Adopting would mean a second release automation replacing better evidence with a
+proxy, and inheriting the spike's unverified list, chiefly whether
+`--manifest-path` carries a workspace below the git root.
+
+**What building costs, stated so it is not discovered later:** the cut logic
+becomes ours to own, and it is subtler than a snapshot diff. Its baseline must be
+the last **published** version rather than the last stamp — measuring from a
+stamp that never published reports a bump as owed when the standing number
+already covers it, which is a wrong verdict a human shrugs at and a machine acts
+on. #806 carries that as a prerequisite rather than a follow-up.
+
+**What the decision does not change.** The dispatch becomes automatic; the
+`crates` environment approval does not. That gate is the reason this page's
+earlier consequence could be struck through, and nothing here reopens it.
+
 ## Consequences
 
 - `repo:tools/publish_crates.py` stays, and stays the only publish path for the
@@ -129,6 +166,10 @@ another engine crate costs nothing release-plz would refund.
   append-only registry is now the one with an approval in front of it rather than
   the one without. What stays manual is the *dispatch* and the approval, which is
   the point of them.
+- **The cut is ours to build (#806), and the nightly gains a second duty.**
+  The same report that says a bump is owed also says a publish is owed, so one
+  derivation drives both — opening a cut PR, and dispatching the approval-gated
+  publish for anything stamped but absent from the registry.
 - **The report reads the registry now (#801).** `repo:tools/release/release_status.py`
   looks each crate's stamp up in the crates.io sparse index, so *stamped here but
   never published* — the state the manual-dispatch shape leaves reachable, and
