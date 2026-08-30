@@ -5,12 +5,12 @@
 //! DuckDB engine, and DuckDB streams it back as an Arrow C-stream capsule
 //! — **pyarrow-free for both backends**, because DuckDB's own scanner +
 //! Arrow exporter do the work, not pyarrow. `pyo3_arrow::PyTable` imports
-//! that capsule zero-copy. Each batch is transposed to typed
-//! `Cell` rows by `laterite_ags4_emit::group_from_arrow` (the shared
-//! Arrow→Cell conversion the wasm host uses too) and fed to the orchestrator,
-//! which formats (via `ags4_str` for typed non-strings + dictionary UNIT/TYPE
-//! fill) and applies the
-//! chosen validity mode (`AutoFix` / Report / Strict).
+//! that capsule zero-copy. Each batch streams through
+//! `laterite_ags4_emit::emit_ags4_from_arrow` (the shared Arrow door the wasm
+//! and node hosts use too), which formats each cell straight off its array
+//! (via `ags4_str` for typed non-strings + dictionary UNIT/TYPE fill — no
+//! row-major input copy, #790) and applies the chosen validity mode
+//! (`AutoFix` / Report / Strict).
 
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
@@ -18,7 +18,9 @@ use arrow::array::{
 };
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
-use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4_owned};
+use laterite_ags4_emit::{
+    ArrowGroup, DictVersion, EmitMode, EmitOpts, emit_ags4_from_arrow as engine_emit_from_arrow,
+};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -108,32 +110,29 @@ pub fn emit_ags4_from_arrow(
         synthesise_metadata,
     };
 
-    let mut groups: Vec<GroupInput> = Vec::with_capacity(tables.len());
+    let mut groups: Vec<ArrowGroup> = Vec::with_capacity(tables.len());
     for (code, table) in tables {
         let (batches, schema) = table.into_inner();
-        let u = units.as_ref().and_then(|m| m.get(&code));
-        let t = types.as_ref().and_then(|m| m.get(&code));
-        // The Arrow→Cell transpose is shared with the wasm host in laterite-ags4-emit.
-        // The edition goes in so a typed temporal column is rendered at the
-        // precision its heading's declared UNIT asks for, instead of Arrow's
-        // canonical form — otherwise a date-only DT cell read from disk
-        // re-emits as midnight ISO and fails the Rule 8 its own heading
-        // declares (#695).
-        groups.push(laterite_ags4_emit::group_from_arrow_with_meta_at_edition(
+        // The Arrow door is shared with the wasm and node hosts in
+        // laterite-ags4-emit; `opts.edition` drives the #695 DT-precision
+        // rendering there (a typed temporal column renders at the precision
+        // its heading's declared UNIT asks for, not Arrow's canonical form).
+        // Streaming: each cell formats straight off its array — no transposed
+        // input copy on top of the caller's own frames (#788/#789/#790 hold
+        // the peak records this retired).
+        let u = units.as_ref().and_then(|m| m.get(&code)).cloned();
+        let t = types.as_ref().and_then(|m| m.get(&code)).cloned();
+        groups.push(ArrowGroup {
             code,
-            schema.as_ref(),
-            &batches,
-            u,
-            t,
-            Some(opts.edition),
-        ));
+            schema,
+            batches,
+            units: u,
+            types: t,
+        });
     }
 
-    // Consuming entry: `groups` holds a transposed cell copy on top of the
-    // caller's own frames — the borrowed entry kept all of it live across the
-    // write and the validating re-parse (#788/#789 hold the records; #790
-    // shrank the cells themselves from `serde_json::Value` to `Cell`).
-    let res = emit_ags4_owned(groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let res = engine_emit_from_arrow(groups, &opts)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     let bytes = PyBytes::new(py, &res.bytes).unbind();
     let applied = crate::fixes_to_pylist(py, &res.applied)?;

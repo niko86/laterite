@@ -377,21 +377,32 @@ fn owned_group_consuming(g: GroupInput, dict: &Dictionary) -> OwnedGroup {
 }
 
 fn resolved_meta(g: &GroupInput, dict: &Dictionary) -> (Vec<String>, Vec<String>) {
-    let units: Vec<String> = (0..g.headings.len())
-        .map(|i| {
-            resolve_meta(g.units.as_ref(), i, || {
-                dict_unit(dict, &g.code, &g.headings[i])
-            })
-        })
+    resolved_meta_parts(
+        &g.code,
+        &g.headings,
+        g.units.as_ref(),
+        g.types.as_ref(),
+        dict,
+    )
+}
+
+/// [`resolved_meta`] over loose parts — shared with the Arrow door
+/// (`arrow_in`), whose group is not a [`GroupInput`], so the hybrid
+/// caller-wins/dictionary-fills resolution stays in exactly one place.
+pub(crate) fn resolved_meta_parts(
+    code: &str,
+    headings: &[String],
+    units: Option<&Vec<String>>,
+    types: Option<&Vec<String>>,
+    dict: &Dictionary,
+) -> (Vec<String>, Vec<String>) {
+    let resolved_units: Vec<String> = (0..headings.len())
+        .map(|i| resolve_meta(units, i, || dict_unit(dict, code, &headings[i])))
         .collect();
-    let types: Vec<String> = (0..g.headings.len())
-        .map(|i| {
-            resolve_meta(g.types.as_ref(), i, || {
-                dict_type(dict, &g.code, &g.headings[i])
-            })
-        })
+    let resolved_types: Vec<String> = (0..headings.len())
+        .map(|i| resolve_meta(types, i, || dict_type(dict, code, &headings[i])))
         .collect();
-    (units, types)
+    (resolved_units, resolved_types)
 }
 
 fn format_row(row: &[Cell], types: &[String]) -> Vec<String> {
@@ -403,7 +414,7 @@ fn format_row(row: &[Cell], types: &[String]) -> Vec<String> {
 
 /// Steps 2.5–4, from formatted groups: synthesize missing metadata, write,
 /// validate the bytes, apply the validity mode.
-fn emit_owned_groups(
+pub(crate) fn emit_owned_groups(
     mut owned: Vec<OwnedGroup>,
     opts: &EmitOpts,
     dict: &Dictionary,
@@ -506,12 +517,19 @@ fn emit_owned_groups(
 
 /// Owned mirror of an emit group — `EmitGroup` borrows `&str`s, so we
 /// build owned Strings first then borrow them for the write.
-struct OwnedGroup {
-    code: String,
-    headings: Vec<String>,
-    units: Vec<String>,
-    types: Vec<String>,
-    rows: Vec<Vec<String>>,
+///
+/// `pub(crate)`: this is the JOIN POINT of the two input doors (#790). The
+/// JSON/document door ([`owned_group`]) and the Arrow door
+/// (`arrow_in::owned_group_from_arrow`) each produce one of these, and
+/// everything after — synthesis, write, validate, mode — is a single code
+/// path. A differential test holds the doors equal here, so the type stays
+/// crate-internal: it is a meeting place, not a surface.
+pub(crate) struct OwnedGroup {
+    pub(crate) code: String,
+    pub(crate) headings: Vec<String>,
+    pub(crate) units: Vec<String>,
+    pub(crate) types: Vec<String>,
+    pub(crate) rows: Vec<Vec<String>>,
 }
 
 /// Hybrid metadata resolution: the caller's explicit non-blank value

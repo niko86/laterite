@@ -1442,11 +1442,14 @@ pub fn emit_ags4_from_ipc(
     };
     let mut inputs = Vec::with_capacity(groups.len());
     for g in groups {
-        let u = units.as_ref().and_then(|m| m.get(&g.code));
-        let t = types.as_ref().and_then(|m| m.get(&g.code));
-        inputs.push(group_from_ipc(g.code, &g.ipc, u, t, opts.edition)?);
+        let u = units.as_ref().and_then(|m| m.get(&g.code)).cloned();
+        let t = types.as_ref().and_then(|m| m.get(&g.code)).cloned();
+        inputs.push(group_from_ipc(g.code, &g.ipc, u, t)?);
     }
-    let res = laterite_ags4_emit::emit_ags4(&inputs, &opts)
+    // The streaming Arrow door (#790): each cell formats straight off its
+    // array — no row-major input copy, and this surface stops holding every
+    // group borrowed across the write + validating re-parse as a bonus.
+    let res = laterite_ags4_emit::emit_ags4_from_arrow(inputs, &opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     // Bounded the same way as `fixes_applied` in `fix_ags4` above.
@@ -1463,10 +1466,9 @@ pub fn emit_ags4_from_ipc(
 fn group_from_ipc(
     code: String,
     bytes: &[u8],
-    units: Option<&std::collections::HashMap<String, String>>,
-    types: Option<&std::collections::HashMap<String, String>>,
-    edition: DictVersion,
-) -> Result<laterite_ags4_emit::GroupInput> {
+    units: Option<std::collections::HashMap<String, String>>,
+    types: Option<std::collections::HashMap<String, String>>,
+) -> Result<laterite_ags4_emit::ArrowGroup> {
     let reader = StreamReader::try_new(Cursor::new(bytes), None)
         .map_err(|e| Error::from_reason(format!("arrow ipc: {e}")))?;
     let schema = reader.schema();
@@ -1474,17 +1476,16 @@ fn group_from_ipc(
     for b in reader {
         batches.push(b.map_err(|e| Error::from_reason(format!("arrow ipc batch: {e}")))?);
     }
-    // The edition is passed so a typed temporal column is rendered at the
-    // precision its heading's declared UNIT asks for, rather than Arrow's
-    // (#695) — this surface must answer like the others.
-    Ok(laterite_ags4_emit::group_from_arrow_with_meta_at_edition(
+    // The door renders a typed temporal column at the precision its heading's
+    // declared UNIT asks for, from `opts.edition` (#695) — this surface must
+    // answer like the others.
+    Ok(laterite_ags4_emit::ArrowGroup {
         code,
-        schema.as_ref(),
-        &batches,
+        schema,
+        batches,
         units,
         types,
-        Some(edition),
-    ))
+    })
 }
 
 // --- helpers ------------------------------------------------------------

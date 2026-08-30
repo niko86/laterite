@@ -1,15 +1,22 @@
-//! The Arrow → [`Cell`] cell transpose — the single shared
-//! conversion for both emit hosts (behind the `arrow` feature):
+//! The Arrow door: record batches → formatted AGS4 cells, streaming — no
+//! row-major intermediate (behind the `arrow` feature).
 //!
 //! - **native** (`laterite-py`): a DuckDB relation's Arrow C-stream capsule
-//!   → `PyTable` → `(batches, schema)` → here;
-//! - **wasm** (`laterite-ags4-wasm`): an Arrow IPC stream → `StreamReader` →
-//!   `(batches, schema)` → here.
+//!   → `PyTable` → `(batches, schema)` → [`ArrowGroup`] → here;
+//! - **wasm** (`laterite-ags4-wasm`) / **node** (`laterite-node`): an Arrow
+//!   IPC stream → `StreamReader` → `(batches, schema)` → [`ArrowGroup`] → here.
 //!
-//! Living in `laterite-ags4-emit` keeps the type→[`Cell`] mapping in one place, so the
-//! two hosts can't drift. Symmetric with the read path's shared *builder*
-//! (`laterite-ags4-types::arrow_cols`, `Value`→Arrow). The cell stopped being a
-//! `serde_json::Value` in #790 (`ags-wiki/design/dec-emit-cell-representation.md`).
+//! Living in `laterite-ags4-emit` keeps the type→cell mapping in one place, so
+//! the hosts can't drift. Symmetric with the read path's shared *builder*
+//! (`laterite-ags4-types::arrow_cols`, `Value`→Arrow).
+//!
+//! This door used to materialise a full `Vec<Vec<Cell>>` transpose of the
+//! input and hand it to the cell-rows door — pure overhead for a caller whose
+//! batches are already resident, and (as a `serde_json::Value`) the single
+//! largest slice of `build_ags4`'s peak. Now each cell formats straight off
+//! its array into the final string, and the two doors meet at the formatted
+//! [`OwnedGroup`] instead of at the input — the JOIN a differential test
+//! holds (#790; `ags-wiki/design/dec-emit-cell-representation.md`).
 
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
@@ -17,13 +24,14 @@ use arrow::array::{
 };
 use std::collections::HashMap;
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
-use laterite_ags4_types::{Cell, dt_to_unit_precision};
-use laterite_ags4_validator::{DictVersion, Dictionary};
+use laterite_ags4_types::{Cell, ags4_str, dt_to_unit_precision};
+use laterite_ags4_validator::Dictionary;
 
-use crate::GroupInput;
+use crate::emit::{OwnedGroup, emit_owned_groups, resolved_meta_parts};
+use crate::{EmitError, EmitOpts, EmitResult};
 
 /// One cell of an Arrow column → the [`Cell`] the orchestrator formats.
 /// Typed numerics/bools become `Int`/`Float`/`Bool` (so `ags4_str` renders
@@ -36,8 +44,13 @@ use crate::GroupInput;
 /// from here, whatever its own doc comment implies. That is why a DT column
 /// needs its declared precision applied at THIS layer, where the value is
 /// still known to have come from a typed column rather than from the caller's
-/// keyboard: see [`group_from_arrow_with_meta_at_edition`] (#695).
-pub fn cell_value(array: &dyn Array, row: usize) -> Cell {
+/// keyboard: see [`owned_group_from_arrow`] (#695).
+///
+/// `pub(crate)` since #790: the public transpose entry points are retired
+/// (see the reliquary), but the type→cell MAPPING stays this one function —
+/// [`owned_group_from_arrow`] streams through it cell by cell, so the doors
+/// still share one conversion without sharing a materialised transpose.
+pub(crate) fn cell_value(array: &dyn Array, row: usize) -> Cell {
     if array.is_null(row) {
         return Cell::Null;
     }
@@ -135,113 +148,76 @@ fn is_temporal(dt: &DataType) -> bool {
     )
 }
 
-/// Build a [`GroupInput`] from Arrow record batches: headings are the schema
-/// field names (the AGS headings); UNIT/TYPE are left to the dictionary; rows
-/// are the transposed cells. `schema` is passed explicitly so a 0-batch group
-/// still emits its (empty) section with the right headings.
-#[must_use]
-pub fn group_from_arrow(code: String, schema: &Schema, batches: &[RecordBatch]) -> GroupInput {
-    // No override maps, so the hasher never matters — pin the default one to
-    // give type inference something concrete for `S`.
-    group_from_arrow_with_meta::<std::collections::hash_map::RandomState>(
-        code, schema, batches, None, None,
-    )
+/// One group's Arrow data, ready for [`emit_ags4_from_arrow`]: the code, the
+/// schema (field names are the AGS headings — passed even when `batches` is
+/// empty, so a 0-batch group still emits its section), the batches, and
+/// optional per-heading UNIT/TYPE overrides as `{heading → value}` maps
+/// (#294 F#9; a heading absent from the map is filled from the dictionary;
+/// order-independent — keyed by name, not column position).
+pub struct ArrowGroup {
+    pub code: String,
+    pub schema: SchemaRef,
+    pub batches: Vec<RecordBatch>,
+    pub units: Option<HashMap<String, String>>,
+    pub types: Option<HashMap<String, String>>,
 }
 
-/// Like [`group_from_arrow`] but with per-heading UNIT/TYPE **overrides**: a
-/// `{heading → value}` map (#294 F#9). The map is aligned to the group's
-/// headings into the per-heading `Option<Vec<String>>` [`GroupInput`] wants — a
-/// heading named in the map takes that value, any other heading gets a blank
-/// entry ("fill from the dictionary"). `None` leaves the whole tier to the
-/// dictionary (identical to `group_from_arrow`). Order-independent: it keys off
-/// the heading name, not the column position.
-#[must_use]
-pub fn group_from_arrow_with_meta<S: std::hash::BuildHasher>(
-    code: String,
-    schema: &Schema,
-    batches: &[RecordBatch],
-    units: Option<&HashMap<String, String, S>>,
-    types: Option<&HashMap<String, String, S>>,
-) -> GroupInput {
-    group_from_arrow_with_meta_at_edition(code, schema, batches, units, types, None)
-}
-
-/// Like [`group_from_arrow_with_meta`], but rendering each **typed temporal**
-/// column at the precision its heading's declared UNIT asks for.
+/// Build valid AGS4 bytes straight from Arrow record batches per `opts` —
+/// the columnar door beside [`crate::emit_ags4`]'s cell-rows door.
 ///
-/// `edition: None` is exactly [`group_from_arrow_with_meta`] — Arrow's own
-/// display string, whatever the heading declares. Existing callers keep that
-/// behaviour; this entry point is additive.
+/// Streaming on purpose: each cell formats directly off its array into the
+/// final string, so the only per-group allocation is the formatted output
+/// itself — there is no row-major input copy to peak alongside it, which for
+/// the profiled build workload was the single largest slice of live-at-peak
+/// bytes (#790; the records live on the issue). Groups convert one at a
+/// time, so one group's batches drop before the next converts.
 ///
-/// # Why this layer
+/// # DT precision (#695)
 ///
-/// An AGS4 `DT` column declares its precision in its UNIT, and Rule 8 judges
-/// the cell against it. A typed instant carries no such precision: a date-only
-/// cell read back from disk is a midnight timestamp, and Arrow renders that
+/// A typed temporal column is rendered at the precision its heading's
+/// declared UNIT asks for — `opts.edition` names the dictionary consulted. A
+/// typed instant carries no precision of its own: a date-only cell read back
+/// from disk is a midnight timestamp, and Arrow renders that
 /// `2021-08-09T00:00:00`, which fails the `yyyy-mm-dd` unit its own heading
 /// declares. The orchestrator cannot fix that downstream — it emits strings
 /// verbatim so the validity *mode* owns canonicalisation — so the precision
-/// has to be applied here, at the point where the value is still known to be
-/// a typed instant rather than a string the caller wrote (#695).
-///
-/// The rendering is refused whenever it would lose information (a real time
-/// under a date-only unit), so a genuine mismatch between the data and its
-/// heading still reaches the caller as a Rule 8 finding instead of being
-/// silently trimmed away.
-///
-/// # Scope
-///
-/// Only headings in the **standard** dictionary carry a declared UNIT here.
-/// A heading defined by the file's own `DICT` group is not visible at this
-/// layer, so its temporal columns keep Arrow's rendering — the pre-#695
-/// behaviour — rather than being guessed at.
-#[must_use]
-pub fn group_from_arrow_with_meta_at_edition<S: std::hash::BuildHasher>(
-    code: String,
-    schema: &Schema,
-    batches: &[RecordBatch],
-    units: Option<&HashMap<String, String, S>>,
-    types: Option<&HashMap<String, String, S>>,
-    edition: Option<DictVersion>,
-) -> GroupInput {
-    let headings: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
-
-    // Per column: the declared UNIT to render against, or None to leave the
-    // cell as Arrow rendered it. Resolved once, not per row.
-    let dict = edition.map(Dictionary::bundled);
-    let dt_units: Vec<Option<String>> = schema
-        .fields()
-        .iter()
-        .map(|f| {
-            let d = dict.as_ref()?;
-            if !is_temporal(f.data_type()) {
-                return None;
-            }
-            let unit = d.heading(&code, f.name()).map(|h| h.unit.to_string())?;
-            (!unit.trim().is_empty()).then_some(unit)
-        })
+/// applies here, where the value is still known to be a typed instant rather
+/// than a string the caller wrote. The rendering is refused whenever it
+/// would lose information (a real time under a date-only unit), so a genuine
+/// mismatch still reaches the caller as a Rule 8 finding rather than being
+/// silently trimmed. Only headings in the **standard** dictionary carry a
+/// declared UNIT here; a DICT-defined heading's temporal columns keep
+/// Arrow's rendering rather than being guessed at.
+pub fn emit_ags4_from_arrow(
+    groups: Vec<ArrowGroup>,
+    opts: &EmitOpts,
+) -> Result<EmitResult, EmitError> {
+    let dict = Dictionary::bundled(opts.edition);
+    let owned: Vec<OwnedGroup> = groups
+        .into_iter()
+        // Consumed per iteration: a group's batches (our refs to them) drop
+        // here, not at return — the same peak discipline as `emit_ags4_owned`.
+        .map(|g| owned_group_from_arrow(g, &dict))
         .collect();
+    emit_owned_groups(owned, opts, &dict)
+}
 
-    let mut rows: Vec<Vec<Cell>> = Vec::new();
-    for batch in batches {
-        let ncols = batch.num_columns();
-        for r in 0..batch.num_rows() {
-            let mut row = Vec::with_capacity(ncols);
-            for c in 0..ncols {
-                let v = cell_value(batch.column(c).as_ref(), r);
-                row.push(match (&v, dt_units.get(c).and_then(Option::as_deref)) {
-                    (Cell::Text(s), Some(unit)) => {
-                        dt_to_unit_precision(s, unit).map_or(v, Cell::Text)
-                    }
-                    _ => v,
-                });
-            }
-            rows.push(row);
-        }
-    }
-    // Align a {heading → value} override map to the heading order; a heading not
-    // in the map gets "" (the emit orchestrator reads that as "fill from dict").
-    let align = |m: Option<&HashMap<String, String, S>>| -> Option<Vec<String>> {
+/// One [`ArrowGroup`] → the formatted [`OwnedGroup`] — the Arrow door's half
+/// of the two-door join (#790).
+///
+/// Cell semantics are `cell_value` + [`crate::emit::format_cell`]'s, fused:
+/// a string-producing arm (Utf8, and the display-formatter fallback) goes out
+/// verbatim — with the #695 DT-precision rendering applied to a temporal
+/// column's fallback string — and a typed scalar formats through `ags4_str`
+/// against the heading's resolved TYPE. The transient [`Cell`] for a typed
+/// scalar lives on the stack; the only heap allocation per cell is the final
+/// string itself.
+fn owned_group_from_arrow(g: ArrowGroup, dict: &Dictionary) -> OwnedGroup {
+    let headings: Vec<String> = g.schema.fields().iter().map(|f| f.name().clone()).collect();
+
+    // Align a {heading → value} override map to the heading order; a heading
+    // not in the map gets "" ("fill from the dictionary").
+    let align = |m: Option<&HashMap<String, String>>| -> Option<Vec<String>> {
         m.map(|map| {
             headings
                 .iter()
@@ -249,10 +225,59 @@ pub fn group_from_arrow_with_meta_at_edition<S: std::hash::BuildHasher>(
                 .collect()
         })
     };
-    let units = align(units);
-    let types = align(types);
-    GroupInput {
-        code,
+    let unit_overrides = align(g.units.as_ref());
+    let type_overrides = align(g.types.as_ref());
+    let (units, types) = resolved_meta_parts(
+        &g.code,
+        &headings,
+        unit_overrides.as_ref(),
+        type_overrides.as_ref(),
+        dict,
+    );
+
+    // Per column: the declared UNIT to render a temporal cell against, or
+    // None to leave Arrow's rendering. Resolved once, not per row.
+    let dt_units: Vec<Option<String>> = g
+        .schema
+        .fields()
+        .iter()
+        .map(|f| {
+            if !is_temporal(f.data_type()) {
+                return None;
+            }
+            let unit = dict
+                .heading(&g.code, f.name())
+                .map(|h| h.unit.to_string())?;
+            (!unit.trim().is_empty()).then_some(unit)
+        })
+        .collect();
+
+    let nrows: usize = g.batches.iter().map(RecordBatch::num_rows).sum();
+    let mut rows: Vec<Vec<String>> = Vec::with_capacity(nrows);
+    for batch in &g.batches {
+        let ncols = batch.num_columns();
+        for r in 0..batch.num_rows() {
+            let mut row = Vec::with_capacity(ncols);
+            for c in 0..ncols {
+                let ags_type = types.get(c).map_or("X", String::as_str);
+                let cell = cell_value(batch.column(c).as_ref(), r);
+                row.push(match (cell, dt_units.get(c).and_then(Option::as_deref)) {
+                    // A temporal fallback string, rendered at its declared
+                    // precision when that is lossless (#695) — then verbatim,
+                    // like every string.
+                    (Cell::Text(s), Some(unit)) => dt_to_unit_precision(&s, unit).unwrap_or(s),
+                    (Cell::Text(s), None) => s,
+                    // Typed scalars: the canonical wire form. The Cell here
+                    // is stack-only (no Text), so nothing was allocated to
+                    // be thrown away.
+                    (cell, _) => ags4_str(&cell, ags_type),
+                });
+            }
+            rows.push(row);
+        }
+    }
+    OwnedGroup {
+        code: g.code,
         headings,
         units,
         types,
@@ -266,20 +291,33 @@ mod tests {
     use arrow::array::{
         ArrayRef, Date32Array, Decimal128Array, TimestampMillisecondArray, UnionArray,
     };
-    use arrow::datatypes::{Field, UnionFields};
+    use arrow::datatypes::{Field, Schema, UnionFields};
+    use laterite_ags4_validator::DictVersion;
     use std::sync::Arc;
 
-    /// Build a one-row group from a single named column and read the cell back.
-    fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: Option<DictVersion>) -> Cell {
+    /// One [`ArrowGroup`] from loose parts — the shape every host builds.
+    fn arrow_group(code: &str, schema: Schema, batches: Vec<RecordBatch>) -> ArrowGroup {
+        ArrowGroup {
+            code: code.to_string(),
+            schema: Arc::new(schema),
+            batches,
+            units: None,
+            types: None,
+        }
+    }
+
+    /// Build a one-row group from a single named column, run it through the
+    /// door's group conversion, and read the FORMATTED cell back. The old
+    /// transpose returned a `Cell` here; the door returns wire strings, which
+    /// is the honest layer to pin — it is what the file will carry.
+    #[allow(clippy::needless_pass_by_value)] // test helper: owned reads clearer at call sites
+    fn cell_for(code: &str, heading: &str, col: ArrayRef, edition: DictVersion) -> String {
         let schema = Schema::new(vec![Field::new(heading, col.data_type().clone(), true)]);
-        let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![col]).expect("valid batch");
-        let g = group_from_arrow_with_meta_at_edition::<std::collections::hash_map::RandomState>(
-            code.to_string(),
-            &schema,
-            std::slice::from_ref(&batch),
-            None,
-            None,
-            edition,
+        let batch =
+            RecordBatch::try_new(Arc::new(schema.clone()), vec![col.clone()]).expect("valid batch");
+        let g = owned_group_from_arrow(
+            arrow_group(code, schema, vec![batch]),
+            &Dictionary::bundled(edition),
         );
         g.rows[0][0].clone()
     }
@@ -301,9 +339,9 @@ mod tests {
                 "TRAN",
                 "TRAN_DATE",
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
-                Some(DictVersion::V4_2),
+                DictVersion::V4_2,
             ),
-            Cell::from("2021-08-09"),
+            "2021-08-09",
             "midnight under a date-only unit should render date-only"
         );
         // MOND_DTIM declares `yyyy-mm-ddThh:mm:ss`. The SAME instant must keep
@@ -313,9 +351,9 @@ mod tests {
                 "MOND",
                 "MOND_DTIM",
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
-                Some(DictVersion::V4_2),
+                DictVersion::V4_2,
             ),
-            Cell::from("2021-08-09T00:00:00"),
+            "2021-08-09T00:00:00",
             "the declared precision, not the value's zeros, decides"
         );
         // A real time under a date-only unit is a genuine mismatch between the
@@ -326,37 +364,28 @@ mod tests {
                 "TRAN",
                 "TRAN_DATE",
                 Arc::new(TimestampMillisecondArray::from(vec![AFTERNOON_MS])),
-                Some(DictVersion::V4_2),
+                DictVersion::V4_2,
             ),
-            Cell::from("2021-08-09T14:30:00"),
+            "2021-08-09T14:30:00",
             "a lossy render must be refused, not applied"
         );
     }
 
-    /// The behaviour is opt-in at the call site: `edition: None` is exactly the
-    /// pre-#695 rendering, so an existing caller of `group_from_arrow` sees no
-    /// change. Same for a heading the standard dictionary does not carry — a
-    /// DICT-defined one — whose declared UNIT is not visible at this layer.
+    /// A heading the standard dictionary does not carry — a DICT-defined one —
+    /// declares no UNIT visible at this layer, so its temporal columns keep
+    /// Arrow's own rendering rather than being guessed at. (The old transpose
+    /// also took `edition: None` for the pre-#695 rendering; the door retired
+    /// that option — every host was already passing its edition.)
     #[test]
-    fn without_an_edition_or_a_dictionary_heading_arrow_s_own_rendering_stands() {
-        assert_eq!(
-            cell_for(
-                "TRAN",
-                "TRAN_DATE",
-                Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
-                None,
-            ),
-            Cell::from("2021-08-09T00:00:00"),
-            "no edition: unchanged from before #695"
-        );
+    fn a_heading_outside_the_dictionary_keeps_arrows_own_rendering() {
         assert_eq!(
             cell_for(
                 "ZZZZ",
                 "ZZZZ_WHEN",
                 Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
-                Some(DictVersion::V4_2),
+                DictVersion::V4_2,
             ),
-            Cell::from("2021-08-09T00:00:00"),
+            "2021-08-09T00:00:00",
             "a heading outside the standard dictionary declares no precision here"
         );
     }
@@ -371,9 +400,9 @@ mod tests {
                 "TRAN",
                 "TRAN_DATE",
                 Arc::new(StringArray::from(vec!["2021-08-09T00:00:00"])),
-                Some(DictVersion::V4_2),
+                DictVersion::V4_2,
             ),
-            Cell::from("2021-08-09T00:00:00"),
+            "2021-08-09T00:00:00",
             "a caller-written string stays the caller's"
         );
     }
@@ -480,64 +509,196 @@ mod tests {
         .expect("batch")
     }
 
+    /// The FALLBACK edition, spelled once for these tests: the door always
+    /// resolves against a dictionary now, so the old "units/types left None"
+    /// assertions become assertions about WHAT the dictionary filled.
+    fn dict() -> Dictionary<'static> {
+        Dictionary::bundled(DictVersion::V4_1_1)
+    }
+
     #[test]
-    fn headings_come_from_the_schema_and_rows_are_transposed() {
-        let g = group_from_arrow(
-            "LOCA".into(),
-            &schema2(),
-            &[batch(vec!["A", "B"], vec![1.0, 2.0])],
+    fn headings_come_from_the_schema_and_rows_format_straight_to_wire_strings() {
+        let g = owned_group_from_arrow(
+            arrow_group(
+                "LOCA",
+                schema2(),
+                vec![batch(vec!["A", "B"], vec![1.0, 2.0])],
+            ),
+            &dict(),
         );
         assert_eq!(g.code, "LOCA");
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
-        // Column-major in, row-major out.
+        // Column-major in, row-major out — already formatted: LOCA_GL's
+        // dictionary TYPE is 2DP, so the float is at wire precision here,
+        // where the transpose used to carry `Cell::Float(1.0)` for the
+        // orchestrator to format later. Same bytes, one fewer copy.
         assert_eq!(
             g.rows,
             vec![
-                vec![Cell::from("A"), Cell::from(1.0)],
-                vec![Cell::from("B"), Cell::from(2.0)],
+                vec!["A".to_string(), "1.00".to_string()],
+                vec!["B".to_string(), "2.00".to_string()]
             ]
         );
-        assert!(
-            g.units.is_none() && g.types.is_none(),
-            "left to the dictionary"
-        );
+        assert_eq!(g.types, ["ID", "2DP"], "filled from the dictionary");
+        assert_eq!(g.units, ["", "m"], "filled from the dictionary");
     }
 
     /// Batches concatenate in order — a multi-batch stream is one group, not one
     /// group per batch.
     #[test]
     fn multiple_batches_concatenate() {
-        let g = group_from_arrow(
-            "LOCA".into(),
-            &schema2(),
-            &[batch(vec!["A"], vec![1.0]), batch(vec!["B"], vec![2.0])],
+        let g = owned_group_from_arrow(
+            arrow_group(
+                "LOCA",
+                schema2(),
+                vec![batch(vec!["A"], vec![1.0]), batch(vec!["B"], vec![2.0])],
+            ),
+            &dict(),
         );
         assert_eq!(g.rows.len(), 2);
-        assert_eq!(g.rows[1][0], Cell::from("B"));
+        assert_eq!(g.rows[1][0], "B");
     }
 
-    /// The reason `schema` is a separate argument: a group whose stream carried
-    /// no batches still has to emit its section with the right headings.
+    /// The reason `schema` rides in [`ArrowGroup`] beside the batches: a group
+    /// whose stream carried no batches still has to emit its section with the
+    /// right headings.
     #[test]
     fn zero_batches_still_yields_the_headings() {
-        let g = group_from_arrow("LOCA".into(), &schema2(), &[]);
+        let g = owned_group_from_arrow(arrow_group("LOCA", schema2(), vec![]), &dict());
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
         assert!(g.rows.is_empty());
     }
 
-    /// Overrides align by heading NAME, not column position, and a heading the
-    /// map does not mention gets "" — which the orchestrator reads as "fill from
-    /// the dictionary", not as an empty UNIT.
+    /// Overrides align by heading NAME, not column position; a heading the map
+    /// does not mention gets the dictionary's value — the same hybrid
+    /// resolution as the cell-rows door, via the same `resolved_meta_parts`.
     #[test]
-    fn meta_overrides_align_by_name_and_leave_unnamed_headings_blank() {
-        let units: HashMap<String, String> = [("LOCA_GL".to_string(), "m".to_string())]
+    fn meta_overrides_align_by_name_and_the_dictionary_fills_the_rest() {
+        let units: HashMap<String, String> = [("LOCA_GL".to_string(), "ft".to_string())]
             .into_iter()
             .collect();
-        let g = group_from_arrow_with_meta("LOCA".into(), &schema2(), &[], Some(&units), None);
-        assert_eq!(g.units.expect("units"), ["", "m"]);
+        let mut g = arrow_group("LOCA", schema2(), vec![]);
+        g.units = Some(units);
+        let g = owned_group_from_arrow(g, &dict());
+        assert_eq!(
+            g.units,
+            ["", "ft"],
+            "the named heading takes the override; LOCA_ID has no dict UNIT"
+        );
+        assert_eq!(
+            g.types,
+            ["ID", "2DP"],
+            "None leaves the tier to the dictionary"
+        );
+    }
+
+    /// THE JOIN TEST (#790): the same logical data through the cell-rows door
+    /// ([`crate::emit_ags4`]) and the Arrow door must produce byte-identical
+    /// output. `OwnedGroup` is where the two doors meet, and everything after
+    /// it is one code path — so this equality is exactly the drift surface,
+    /// and the whole reason the streaming rewrite was allowed to split the
+    /// input handling in two.
+    ///
+    /// Report mode on purpose: it emits unmodified, so the bytes compared are
+    /// the doors' own output, not the fixer's.
+    #[test]
+    fn the_two_doors_emit_identical_bytes_for_the_same_data() {
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            ..EmitOpts::default()
+        };
+
+        let via_cells = crate::emit_ags4(
+            &[crate::GroupInput {
+                code: "LOCA".into(),
+                headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+                units: None,
+                types: None,
+                rows: vec![
+                    vec![Cell::from("BH01"), Cell::from(12.5)],
+                    vec![Cell::from("BH02"), Cell::Null],
+                ],
+            }],
+            &opts,
+        )
+        .expect("cell-rows door emits");
+
+        let via_arrow = emit_ags4_from_arrow(
+            vec![arrow_group(
+                "LOCA",
+                schema2(),
+                vec![
+                    RecordBatch::try_new(
+                        Arc::new(schema2()),
+                        vec![
+                            Arc::new(StringArray::from(vec!["BH01", "BH02"])) as ArrayRef,
+                            Arc::new(Float64Array::from(vec![Some(12.5), None])) as ArrayRef,
+                        ],
+                    )
+                    .expect("batch"),
+                ],
+            )],
+            &opts,
+        )
+        .expect("arrow door emits");
+
+        assert_eq!(
+            String::from_utf8_lossy(&via_cells.bytes),
+            String::from_utf8_lossy(&via_arrow.bytes),
+            "the doors drifted — they may only differ before the OwnedGroup join"
+        );
+    }
+
+    /// The one INTENDED divergence, pinned so the join test above can never be
+    /// "fixed" into hiding it: a typed temporal column renders at its
+    /// heading's declared UNIT precision (#695), while the same instant
+    /// arriving as a caller string emits verbatim — a string is the caller's
+    /// own text, and reformatting it would take canonicalisation away from
+    /// the validity mode. Weakening either side of this pair is the failure
+    /// mode the ADR warns about; both behaviours are load-bearing.
+    #[test]
+    fn the_doors_deliberately_diverge_on_typed_temporals() {
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            edition: DictVersion::V4_2,
+            ..EmitOpts::default()
+        };
+
+        // TRAN_DATE declares `yyyy-mm-dd`; MIDNIGHT_MS is that date at 00:00.
+        let schema = Schema::new(vec![Field::new(
+            "TRAN_DATE",
+            arrow::datatypes::DataType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, None),
+            true,
+        )]);
+        let batch = RecordBatch::try_new(
+            Arc::new(schema.clone()),
+            vec![Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])) as ArrayRef],
+        )
+        .expect("batch");
+        let via_arrow = emit_ags4_from_arrow(vec![arrow_group("TRAN", schema, vec![batch])], &opts)
+            .expect("arrow door emits");
+
+        let via_cells = crate::emit_ags4(
+            &[crate::GroupInput {
+                code: "TRAN".into(),
+                headings: vec!["TRAN_DATE".into()],
+                units: None,
+                types: None,
+                rows: vec![vec![Cell::from("2021-08-09T00:00:00")]],
+            }],
+            &opts,
+        )
+        .expect("cell-rows door emits");
+
+        let arrow_text = String::from_utf8_lossy(&via_arrow.bytes).into_owned();
+        let cells_text = String::from_utf8_lossy(&via_cells.bytes).into_owned();
         assert!(
-            g.types.is_none(),
-            "None leaves the whole tier to the dictionary"
+            arrow_text.contains("\"2021-08-09\""),
+            "typed instant renders at the declared date-only precision: {arrow_text}"
+        );
+        assert!(
+            cells_text.contains("\"2021-08-09T00:00:00\""),
+            "a caller's string emits verbatim: {cells_text}"
         );
     }
 }
