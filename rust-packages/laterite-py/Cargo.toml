@@ -89,10 +89,10 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
 # No DuckDB. The DuckDB-bound function module + typed_graph read/write live in
 # the separate `laterite-py-ags5` cdylib, which was decoupled to the dormant
 # `ags5/` holding folder (#177) — the base wheel ships AGS4-only.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.12.0" }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.0" }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.12.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.0" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
 # carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.

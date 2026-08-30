@@ -36,6 +36,7 @@
 use std::collections::HashMap;
 
 use laterite_ags4_parse::{ParseOptions, ParsedFile, parse_bytes_opts};
+use laterite_ags4_reference::effective_dict::FileDict;
 // The certificate records HOW the edition was chosen, not just which one — a cert that
 // said "exact" for a file whose edition was actually guessed (O-42) would misreport the
 // one thing it exists to vouch for. The reference leaf owns the enum; core is already a
@@ -97,6 +98,36 @@ impl GroupIndex {
 /// section, which runs to the next group's start (or EOF). The leaf's offsets are
 /// the real line-starts — the csv reader this replaced recorded the preceding
 /// `\n` for CRLF groups and absorbed leading blank lines (see O-40).
+/// The groups the file's own `DICT` declares, measured from the same bytes the
+/// index locates (#768). Derived from `(bytes, index)` rather than a caller's
+/// parse ON PURPOSE: `index_ags4_bytes` parses `locate_only` (rows dropped),
+/// and a caller-supplied parse could be the same shape — reading DICT rows out
+/// of either would silently yield "declares nothing" for a file that declares
+/// plenty. Slicing the DICT spans the index already located and re-parsing
+/// just those (DICT is small) is profile-independent and cannot be lied to.
+///
+/// Every span, not the first: a redeclared DICT gets the union, matching the
+/// per-occurrence spans the v2 index exists to record. The reader is
+/// [`FileDict`] — the one shared DICT implementation (#777), not a third copy.
+fn file_defines(bytes: &[u8], index: &GroupIndex) -> Result<Vec<String>, CliError> {
+    let mut out = std::collections::BTreeSet::new();
+    for &(start, end) in index.spans("DICT") {
+        // Byte offsets are u64; every shipped target is 64-bit (usize == u64),
+        // so this is a no-op there. Bounds are still checked below via `.get()`.
+        #[allow(clippy::cast_possible_truncation)]
+        let (from, to) = (start as usize, end as usize);
+        let slice = bytes
+            .get(from..to)
+            .ok_or_else(|| CliError::Schema("DICT span exceeds the file".into()))?;
+        // Lean but NOT locate_only — this read needs the rows.
+        let parsed = parse_bytes_opts(slice, ParseOptions::lean())
+            .map_err(crate::ags4_codec::map_parse_err)?;
+        let fd = FileDict::from_parsed(&parsed);
+        out.extend(fd.groups().into_iter().map(str::to_string));
+    }
+    Ok(out.into_iter().collect())
+}
+
 pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
     // Lean profile: no raw-line retention, and reject invalid UTF-8 loudly —
     // mirroring the csv reader this replaced (which also failed on non-UTF-8).
@@ -625,6 +656,21 @@ pub struct Sidecar {
     pub groups: HashMap<String, Vec<Range>>,
     /// Section order as in the source file.
     pub order: Vec<String>,
+    /// The groups the file's own `DICT` declares (#768) — [`FileDict::groups`]
+    /// semantics (touched by a `GROUP`-type row or a heading declaration),
+    /// sorted. One fetch of the cert now says a file carries groups no
+    /// standard dictionary has, instead of the reader fetching and parsing
+    /// `DICT` to discover it; `edition.resolved` beside it is what to diff
+    /// against. Names only, never the definitions — `groups["DICT"]` locates
+    /// those precisely, and duplicating them here is the drift the issue
+    /// weighed and declined.
+    ///
+    /// `Option` for the same reason [`TierCoverage`] is not a bare count:
+    /// `None` means a cert minted before this field existed and MEASURED
+    /// nothing, `Some(vec![])` means measured — the file declares nothing.
+    /// A default would write the second meaning over the first.
+    #[serde(default)]
+    pub defines: Option<Vec<String>>,
 }
 
 /// Verdict of a cheap, I/O-free remote freshness check ([`Sidecar::is_fresh_for_remote`]).
@@ -653,7 +699,7 @@ impl Sidecar {
     /// need a `Sidecar` without a verdict to trust.
     pub fn assemble(bytes: &[u8], validation: ValidationStamp) -> Result<Sidecar, CliError> {
         let index = index_ags4_bytes(bytes)?;
-        Ok(Self::from_index(bytes, index, validation))
+        Self::from_index(bytes, index, validation)
     }
 
     /// Like [`Sidecar::assemble`], but reuses a parse the caller already did
@@ -676,15 +722,20 @@ impl Sidecar {
         } else {
             index_ags4_bytes(bytes)?
         };
-        Ok(Self::from_index(bytes, index, validation))
+        Self::from_index(bytes, index, validation)
     }
 
     /// Assemble a `Sidecar` from a built `GroupIndex` + the caller's stamp,
     /// hashing `bytes` for the freshness check. Shared by [`Sidecar::assemble`]
     /// (which walks to build the index) and [`Sidecar::assemble_from_parsed`]
     /// (which reuses a parse), so the two differ ONLY in how the index is built.
-    fn from_index(bytes: &[u8], index: GroupIndex, validation: ValidationStamp) -> Sidecar {
-        Sidecar {
+    fn from_index(
+        bytes: &[u8],
+        index: GroupIndex,
+        validation: ValidationStamp,
+    ) -> Result<Sidecar, CliError> {
+        let defines = file_defines(bytes, &index)?;
+        Ok(Sidecar {
             version: SIDECAR_VERSION,
             file: FileMeta {
                 size: bytes.len() as u64,
@@ -697,7 +748,8 @@ impl Sidecar {
             validation,
             groups: index.groups,
             order: index.order,
-        }
+            defines: Some(defines),
+        })
     }
 
     /// Record the remote origin's HTTP validators (`ETag` / `Last-Modified`)
@@ -1761,6 +1813,93 @@ mod tests {
         assert!(
             Sidecar::from_json(&sc.to_json().unwrap()).is_err(),
             "an unknown sidecar version is rejected, not silently trusted"
+        );
+    }
+
+    // --- #768: the cert says what the file defines -------------------------
+
+    /// TWO, plus a DICT declaring one bespoke group and extending LOCA with a
+    /// heading — the two ways a file-declared group enters `FileDict::groups`.
+    const WITH_DICT: &str = r#""GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","DICT"
+"HEADING","DICT_TYPE","DICT_GRP","DICT_HDNG","DICT_STAT","DICT_DTYP","DICT_UNIT","DICT_DESC","DICT_PGRP"
+"UNIT","","","","","","","",""
+"TYPE","PA","X","X","X","PT","PU","X","X"
+"DATA","GROUP","MONG","","","","","Monitoring bespoke","PROJ"
+"DATA","HEADING","MONG","MONG_ID","KEY","ID","","Monitoring id",""
+"DATA","HEADING","LOCA","LOCA_CUST","OTHER","X","","Custom remark",""
+
+"GROUP","MONG"
+"HEADING","MONG_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","M1"
+"#;
+
+    #[test]
+    fn a_minted_cert_names_the_groups_the_dict_declares() {
+        let sc = Sidecar::assemble(WITH_DICT.as_bytes(), stamp()).unwrap();
+        assert_eq!(
+            sc.defines.as_deref(),
+            Some(&["LOCA".to_string(), "MONG".to_string()][..]),
+            "sorted union of GROUP-type declarations and heading extensions"
+        );
+    }
+
+    #[test]
+    fn a_file_with_no_dict_measures_an_empty_defines_not_an_absent_one() {
+        // "Looked and found none" — Some(vec![]) — must survive a JSON round
+        // trip distinct from None, or the field re-learns v1's confident-zero
+        // lie one level up.
+        let sc = Sidecar::assemble(TWO.as_bytes(), stamp()).unwrap();
+        assert_eq!(sc.defines.as_deref(), Some(&[][..]));
+        let back = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
+        assert_eq!(back.defines.as_deref(), Some(&[][..]));
+    }
+
+    #[test]
+    fn a_cert_minted_before_the_field_reads_as_unmeasured() {
+        // A pre-#768 v2 cert has no `defines` key at all. It must come back as
+        // None — "nothing was measured" — never as a measured empty.
+        let sc = Sidecar::assemble(WITH_DICT.as_bytes(), stamp()).unwrap();
+        let mut json: serde_json::Value = serde_json::from_slice(&sc.to_json().unwrap()).unwrap();
+        json.as_object_mut().unwrap().remove("defines");
+        let old = Sidecar::from_json(&serde_json::to_vec(&json).unwrap()).unwrap();
+        assert_eq!(old.defines, None);
+    }
+
+    #[test]
+    fn a_redeclared_dict_contributes_every_section() {
+        // The v2 index exists because a redeclared group's later sections were
+        // silently dropped; `defines` must not repeat that with DICT itself.
+        let two_dicts = concat!(
+            "\"GROUP\",\"DICT\"\n",
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\n",
+            "\"UNIT\",\"\",\"\",\"\"\n",
+            "\"TYPE\",\"PA\",\"X\",\"X\"\n",
+            "\"DATA\",\"GROUP\",\"AAAA\",\"\"\n",
+            "\n",
+            "\"GROUP\",\"PROJ\"\n",
+            "\"HEADING\",\"PROJ_ID\"\n",
+            "\"UNIT\",\"\"\n",
+            "\"TYPE\",\"ID\"\n",
+            "\"DATA\",\"P1\"\n",
+            "\n",
+            "\"GROUP\",\"DICT\"\n",
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\n",
+            "\"UNIT\",\"\",\"\",\"\"\n",
+            "\"TYPE\",\"PA\",\"X\",\"X\"\n",
+            "\"DATA\",\"GROUP\",\"BBBB\",\"\"\n",
+        );
+        let sc = Sidecar::assemble(two_dicts.as_bytes(), stamp()).unwrap();
+        assert_eq!(
+            sc.defines.as_deref(),
+            Some(&["AAAA".to_string(), "BBBB".to_string()][..])
         );
     }
 }

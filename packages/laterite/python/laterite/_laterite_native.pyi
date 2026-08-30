@@ -8877,6 +8877,7 @@ def xlsx_bytes_to_ags4(data: Any, format_numeric_columns: Any = ...) -> Any: ...
 class Sidecar:
     checked_at: Any
     compat: Any
+    defines: Any
     edition: Any
     edition_forced: Any
     encoding: Any

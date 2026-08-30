@@ -17,6 +17,9 @@
       },
       {
         "text": "**Each product surface records the engine versions it ships.** The four product surfaces (`laterite-py`, `laterite-node`, `laterite-cli`, `laterite-ags4-wasm`) now declare their published engine dependencies as `{ path, version }` — the path still wins locally, and the version turns the manifest at any product tag into the record of which engine versions that release shipped. `bump_crate.py` moves every member pin with the crate it bumps, a guard test holds the pins equal to each crate's own version, and cargo itself refuses a path crate a pin no longer admits. The last step of #781's per-crate sequence."
+      },
+      {
+        "text": "**The certificate says what the file defines.** A `.ags.idx` now carries `defines` — the sorted group codes the file's own `DICT` declares, read through the shared Rule 18 effective-dictionary implementation at mint time. One fetch of a remote file's cert tells a reader it carries non-standard groups and that `DICT` (which the byte index locates precisely) is where they are declared; the definitions themselves are deliberately not duplicated. Old certificates read back as \"not measured\" rather than \"declares nothing\" — the same honesty rule the per-tier coverage states follow. Exposed as `Sidecar.defines` on the Python and Node surfaces."
       }
     ],
     "changed": [

@@ -1428,6 +1428,15 @@ impl PySidecar {
         self.inner.order.clone()
     }
 
+    /// The groups the file's own DICT declares (#768), sorted. `None` means the
+    /// cert predates the field (nothing measured); `[]` means measured and the
+    /// file declares nothing. Names only — the definitions stay in `DICT`,
+    /// which `index` locates.
+    #[getter]
+    fn defines(&self) -> Option<Vec<String>> {
+        self.inner.defines.clone()
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "<Sidecar v{} {} groups {} bytes edition={:?} by {} engine {}>",
