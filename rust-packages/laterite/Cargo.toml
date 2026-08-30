@@ -59,3 +59,9 @@ serde_json = "1"
 
 [lints]
 workspace = true
+
+# Which release train cuts this crate (#806): `product` — excluded from the
+# nightly engine cut until it reaches parity (dec-facade-parity), then it
+# rides the product trains.
+[package.metadata.laterite]
+release_tier = "product"

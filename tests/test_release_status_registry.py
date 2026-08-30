@@ -64,6 +64,14 @@ def _status(*crates: dict) -> dict:
                 "api_removed": 0,
                 "api_removed_names": [],
                 "verdict": c.get("verdict", "none"),
+                "tier": c.get("tier", "engine"),
+                "published_live": c.get("published_live", "0.11.0"),
+                "delta_baseline": c.get("delta_baseline", "publish 0.11.0"),
+                "code_changed": c.get("code_changed", False),
+                "deps_behind": c.get("deps_behind", []),
+                "part_required": c.get("part_required", "none"),
+                "cut_action": c.get("cut_action", "none"),
+                "cut_why": c.get("cut_why", ""),
             }
             for c in crates
         ],

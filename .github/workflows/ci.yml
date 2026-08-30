@@ -431,6 +431,18 @@ jobs:
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
 
+      # The #809 class, caught at the PR instead of by the next nightly: a
+      # `[workspace.dependencies]` floor moving past a pin some PUBLISHED crate
+      # carries strands that crate — in-tree the laterite deps are path deps
+      # and always unify, so no build, lint or test in this repo can see it;
+      # the fault exists only in the shape of the published manifests. Reads
+      # the crates.io sparse index. Only debt this PR INTRODUCES relative to
+      # main fails (standing debt is the nightly cut's to fix, and a gate that
+      # reddens innocent PRs over it would get skipped); an unreachable
+      # registry concludes nothing, says so, and fails nothing.
+      - name: published-crate coherence (floors vs the pins crates.io froze)
+        run: uv run --no-project python tools/release/release_status.py --check-coherence --base origin/main
+
       # The buildless HALF of #588's gate. The other half is in the `docs` job,
       # runs `--built` over what mkdocs just produced, and is the authority:
       # three of this site's page families have no Markdown for this step to

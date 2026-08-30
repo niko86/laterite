@@ -176,9 +176,37 @@ earlier consequence could be struck through, and nothing here reopens it.
   which `laterite-ags4-emit` 0.12.0 sat in unnoticed — is reported rather than
   invisible. That is evidence for the build-vs-adopt question above, not an answer
   to it: it closes the detection gap, and says nothing about who should run the cut.
-- **If this is revisited, start from #216's spike comment, not from that issue's
-  body** — the body was written before any of it was checked against the source,
-  and several of its premises did not survive contact.
+- **Built, 2026-08-30.** The cut ships as `repo:tools/release/engine_cut.py`
+  over `repo:tools/release/release_status.py`'s derivation, run by the
+  nightly's `engine-cut` job (which replaced `release-owed`, keeping its
+  reporting duty). Three things the build settled beyond the design table:
+  - **The baseline is the published tarball's own commit**
+    (`.cargo_vcs_info.json` from static.crates.io), not the stamp commit — the
+    prerequisite's first cut used the stamp and immediately over-reported emit
+    (+7 −4 already on the registry). When the tarball's commit cannot be
+    placed in history, an API/code delta is reported but never acted on.
+  - **A fourth signal existed that no crate-local reading has**: a
+    `[workspace.dependencies]` floor moved past the pins a published sibling
+    carries (#809 — three crates stranded with every local gate green). The
+    sparse-index rows carry each version's requirement ranges, so the cut
+    derives it, and ci.yml's repo-gates run the same check per PR,
+    failing only debt the PR introduces.
+  - **Publish dispatch is automatic nightly** for stamped-but-absent crates,
+    cancelling any stale pending run first — a pending approval publishes
+    `main` as of *approval* time, so nightly re-dispatch bounds that staleness
+    to one night. The `crates` environment approval is unchanged.
+- **Rollout state: answer-only, as the design row requires.** The PR-opening
+  path is built and armed behind the repo variable `ENGINE_CUT_MODE=pr`;
+  promotion is that one variable, plus `ENGINE_CUT_TOKEN` (a fine-grained PAT,
+  contents + pull-requests write) — with the default `github.token` a
+  bot-created PR triggers **no** workflows, its required checks never report,
+  and it cannot merge. That answers the spike's "can a bot PR satisfy every
+  required check" unverified item: not with the default token, by design.
+- **Pre-upload build verification is wired** (`check_package_contents.py
+  --verify-buildable` in publish-crates.yml, before the first upload): a
+  wave-3 compile failure no longer strands waves 1–2 on the append-only
+  registry. Its stated ceiling stands — a crate whose deps' new floors are not
+  yet on the registry is unverifiable before its wave, and the skip prints.
 
 ## Unverified
 

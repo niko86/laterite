@@ -239,46 +239,148 @@ jobs:
         working-directory: rust-packages
         run: cargo deny check
 
-  # Is a release owed? Both tiers only move when someone runs bump-version.sh,
-  # which is right — a release is a decision, not a side effect of merging. But
-  # nothing SAID one was owed, and the two drifted: the product shipped three
-  # times between engine 0.9.0 (#184) and #716 while the engine stayed put, so
-  # crates.io consumers and `laterite-duckdb` sat four figures of public API
-  # behind what every wheel user was running.
+  # The engine cut (#806) — grown out of the read-only release-owed report
+  # (#716). Both tiers only move when someone runs a bump tool, which is right —
+  # a release is a decision, not a side effect of merging. But nothing DID the
+  # deciding on a clock: emit 0.12.0 sat stamped-and-unpublished with a green
+  # step summary nobody read, and #809 stranded three published crates on pins
+  # their deps' floors had left, with every crate-local signal green.
   #
-  # Read-only and never fails the run. A nag that can go red would start being
-  # silenced, and "you have unreleased work" is not a defect — it is a state
-  # somebody has to decide about. It writes to the step summary so the answer is
-  # visible without opening a log.
+  # So this derives, nightly, per engine crate, what release act is owed —
+  # bump / publish / needs-a-human — from ONE registry sweep, and then:
+  #   * drives its own tracking issue (`issue_tracker.py --tracker release`) —
+  #     an owed act opens an issue that a human sees, not a summary they don't;
+  #   * dispatches the approval-gated publish for anything stamped but absent,
+  #     cancelling any stale pending run first so there is exactly one pending
+  #     approval and it is never more than a night old;
+  #   * in PR mode (`vars.ENGINE_CUT_MODE == 'pr'`) applies the owed bumps and
+  #     opens/updates ONE cut PR on a fixed branch. Until that variable is set
+  #     the cut is answer-only, per the rollout row on
+  #     ags-wiki/design/dec-engine-publish-automation.md — it must be seen to
+  #     agree with a human across real cuts before it acts.
   #
-  # It IS in `notify`'s needs even though its verdict never fails the run: the
-  # step can still fail by crashing, and a report that has silently stopped
-  # reporting is the failure most worth hearing about. `TRACKER_EXCLUDED` in
-  # tests/test_nightly_wiring.py stays empty. (#716)
-  release-owed:
+  # `needs: [coverage]` is the design's "no clean build, no cut": coverage
+  # compiles the whole workspace, so a night the tree does not build skips the
+  # cut (and coverage's own failure is what the nightly tracker reports).
+  #
+  # The derivation itself never fails the run. A nag that can go red would
+  # start being silenced, and "you have unreleased work" is not a defect — it
+  # is a state somebody has to decide about. The job can still fail by
+  # crashing, and it IS in `notify`'s needs so a derivation that has silently
+  # stopped deriving is heard. `TRACKER_EXCLUDED` in
+  # tests/test_nightly_wiring.py stays empty. (#716, #806)
+  engine-cut:
+    needs: [coverage]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      contents: write # PR mode pushes the cut branch
+      pull-requests: write # PR mode opens/updates the cut PR
+      issues: write # the release tracking issue
+      actions: write # cancel the stale pending publish run, dispatch a fresh one
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The API delta is measured from the last version stamp, which is an
-          # arbitrary distance back — a shallow clone would silently measure
-          # from whatever the cutoff happened to be and report a smaller number
-          # with no indication it had been truncated.
+          # Baselines are the published tarballs' commits, an arbitrary distance
+          # back — a shallow clone would silently fail to place them and the
+          # cut would conclude nothing, with no indication why.
           fetch-depth: 0
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: false
-      - name: release status
+      # ONE registry sweep; every later step reads this file, so the tracker,
+      # the dispatch and the cut PR cannot act on answers that disagree.
+      - name: release status + the derived cut
         run: |
-          uv run --no-project python tools/release/release_status.py | tee /tmp/status.txt
+          uv run --no-project python tools/release/release_status.py --json > /tmp/status.json
+          uv run --no-project python tools/release/engine_cut.py --render /tmp/status.json | tee /tmp/report.txt
           {
-            echo "### Release status"
+            echo "### Release status + engine cut"
             echo '```'
-            cat /tmp/status.txt
+            cat /tmp/report.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: drive the release tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          uv run --no-project python tools/release/engine_cut.py --items /tmp/status.json > /tmp/items.txt
+          code=$?
+          set -e
+          if [ "$code" = "3" ]; then
+            echo "registry partially unreachable and nothing owed elsewhere — tracker left as it stands"
+            exit 0
+          fi
+          [ "$code" = "0" ] || exit "$code"
+          ITEMS="$(cat /tmp/items.txt)" python3 tools/issue_tracker.py --tracker release
+      - name: publish owed -> exactly one pending approval, never older than tonight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project python tools/release/engine_cut.py --publish-owed /tmp/status.json > /tmp/publish.txt
+          if [ ! -s /tmp/publish.txt ]; then
+            echo "no publish owed"
+            exit 0
+          fi
+          echo "publish owed for: $(tr '\n' ' ' < /tmp/publish.txt)"
+          # A pending approval publishes main AS OF APPROVAL TIME, not dispatch
+          # time — the stale run cancelled by hand on 2026-08-30 would have
+          # published a tree the rehearsal never saw. Cancelling nightly bounds
+          # that staleness to one night.
+          for id in $(gh run list --workflow publish-crates.yml --status waiting --json databaseId --jq '.[].databaseId'); do
+            echo "cancelling stale pending publish run $id"
+            gh run cancel "$id"
+          done
+          gh workflow run publish-crates.yml --ref main -f execute=true
+          echo "dispatched publish-crates (execute=true) — now waiting on the crates environment approval"
+      - name: Install Rust toolchain (PR mode — bump_crate regenerates the lock)
+        if: vars.ENGINE_CUT_MODE == 'pr'
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+      - name: apply the owed bumps (PR mode)
+        id: bumps
+        if: vars.ENGINE_CUT_MODE == 'pr'
+        run: |
+          uv run --no-project python tools/release/engine_cut.py --bumps /tmp/status.json > /tmp/bumps.txt
+          if [ ! -s /tmp/bumps.txt ]; then
+            echo "no bumps owed"
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "any=true" >> "$GITHUB_OUTPUT"
+          while read -r crate part; do
+            uv run --no-project python tools/release/bump_crate.py "$crate" "$part"
+          done < /tmp/bumps.txt
+          {
+            echo "✅ Based on \`main\` — safe to merge."
+            echo ""
+            echo "The nightly engine cut (#806), derived from tonight's registry sweep:"
+            echo ""
+            echo '```'
+            cat /tmp/report.txt
+            echo '```'
+            echo ""
+            echo "One PR for the whole owed set, rebuilt from current main each night."
+          } > /tmp/pr-body.md
+      # With the default github.token the created PR triggers NO workflows, so
+      # its required checks never report and it cannot merge — set
+      # ENGINE_CUT_TOKEN (fine-grained PAT: contents + pull-requests write)
+      # when promoting to PR mode. Recorded on dec-engine-publish-automation.md.
+      - name: open or update the cut PR
+        if: vars.ENGINE_CUT_MODE == 'pr' && steps.bumps.outputs.any == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.ENGINE_CUT_TOKEN || github.token }}
+          branch: nightly/engine-cut
+          title: "release: the nightly engine cut (#806)"
+          commit-message: "release: the nightly engine cut (#806)"
+          labels: no-changelog
+          add-paths: rust-packages/**
+          body-path: /tmp/pr-body.md
 
   # Link + badge health check. ci.yml's `docs` job runs `mkdocs build --strict`,
   # which only validates INTERNAL links — this catches dead EXTERNAL links + dead
@@ -1344,7 +1446,7 @@ jobs:
       - coverage
       - deny
       - links
-      - release-owed
+      - engine-cut
       - wheel-smoke
       - docs-vs-released-wheel
       - docs-example-headers

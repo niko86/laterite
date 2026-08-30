@@ -247,3 +247,59 @@ def test_a_lost_marker_costs_one_comment_never_a_swallowed_transition() -> None:
     action = plan_items(["other/y"], ext_tracker("hand-edited, marker gone"), RUN, EXT)
     assert action["action"] == "update"
     assert "now also missing: other/y" in action["comment"]
+
+
+# --- the release channel (#806): the engine cut's tracking issue -------------
+#
+# Same state machine, third vocabulary. What is channel-specific and therefore
+# worth pinning: the items are TOKENS (space-free — the state marker's regex
+# stops at whitespace, so a space would truncate the stored set and every later
+# night would read as a change), and the body is where they become sentences.
+
+REL = nt.RELEASE
+
+
+def rel_tracker(body: str, number: int = 811) -> dict[str, object]:
+    return {"number": number, "title": REL.title, "body": body}
+
+
+def test_release_opens_translating_tokens_into_sentences() -> None:
+    action = plan_items(
+        ["laterite-ags4-diff:bump-minor", "laterite-ags4-emit:publish-0.13.0"],
+        None,
+        RUN,
+        REL,
+    )
+    assert action["action"] == "create"
+    assert action["title"] == "Engine release work owed"
+    assert "`laterite-ags4-diff` — a **minor bump** is owed" in action["body"]
+    assert "**publish 0.13.0**" in action["body"]
+
+
+def test_release_tokens_round_trip_through_the_marker() -> None:
+    """The reason items are tokens at all: the stored set must come back equal,
+    or a quiet night reads as a transition and comments."""
+    items = ["laterite-ags4-diff:bump-minor", "laterite-ags4-trust:human"]
+    body = REL.body(items, RUN, 1)
+    assert nt.read_state(body, nt.RELEASE_MARKER) == (sorted(items), 1)
+
+
+def test_release_quiet_night_rewrites_without_commenting() -> None:
+    body = REL.body(["laterite-ags4-diff:bump-minor"], RUN, 1)
+    action = plan_items(["laterite-ags4-diff:bump-minor"], rel_tracker(body), RUN, REL)
+    assert action["action"] == "update"
+    assert "comment" not in action
+    assert "owed 2 nights running" in action["body"]
+
+
+def test_release_closes_when_the_registry_is_level() -> None:
+    body = REL.body(["laterite-ags4-diff:bump-minor"], RUN, 3)
+    action = plan_items([], rel_tracker(body), RUN, REL)
+    assert action["action"] == "close"
+    assert RUN in action["comment"]
+
+
+def test_release_an_unknown_token_renders_verbatim_never_dropped() -> None:
+    """The tracker must never report on less than it holds."""
+    body = REL.body(["laterite-ags4-x:someday-new-act"], RUN, 1)
+    assert "laterite-ags4-x:someday-new-act" in body

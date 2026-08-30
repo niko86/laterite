@@ -48,13 +48,18 @@ expected, and a version bump means something happened in that crate.
 uv run --no-sync python tools/release/release_status.py
 ```
 
-Prints every published crate (own version, API delta since its own last stamp,
-derived part) and the product tier. Each crate's verdict comes from ITS
-committed `cargo-public-api` snapshot in
-`tools/release/public-api/` — the only source that can see an addition, since
-`cargo semver-checks` has no `function_added` lint and skips every `minor` lint
-between releases. The product verdict comes from the `changelog.json` sections
-every PR is already forced to fill in.
+Prints every published crate (own version, API delta, derived part) and the
+product tier. Each crate's verdict comes from ITS committed `cargo-public-api`
+snapshot in `tools/release/public-api/` — the only source that can see an
+addition, since `cargo semver-checks` has no `function_added` lint and skips
+every `minor` lint between releases. The product verdict comes from the
+`changelog.json` sections every PR is already forced to fill in.
+
+The engine baseline is the last **published** version — the exact commit the
+crates.io tarball records in its `.cargo_vcs_info.json` — never a stamp that
+went nowhere (#806). `--cut` prints the actionable view: per engine crate, the
+bump / publish / needs-a-human act the nightly derives, with the exact
+`bump_crate.py` commands.
 
 Read what it says it cannot see. The product's own API surface is **not**
 measured — no committed snapshot exists for the Python or Node surface — so that
@@ -66,8 +71,15 @@ never as unpublished, and the count of crates that went unasked prints on every
 run. The **product** tier is not checked: nothing here asks PyPI or npm, so a
 stamped product version whose tag was never cut is still invisible (the
 0.8.1/0.8.2 failure above). `--no-registry` skips the lookup for an offline run.
-The same report runs nightly and lands in the run's step summary, so drift
-surfaces without anyone asking.
+The same derivation runs nightly as the **engine cut** (#806): anything owed
+opens (and keeps current) an `Engine release work owed` tracking issue — an
+issue a human sees, where the step summary that recorded emit 0.12.0's missing
+publish was a summary nobody read — and a stamped-but-unpublished crate gets
+the approval-gated publish dispatched automatically, any stale pending run
+cancelled first. Owed *bumps* are answer-only until the repo variable
+`ENGINE_CUT_MODE` is set to `pr`, at which point the nightly also opens one cut
+PR for the whole owed set (a human still reviews, merges, and approves the
+publish environment).
 
 ### Cutting a product release
 
@@ -249,6 +261,17 @@ records: a crate whose content changed at an unchanged version silently stays
 stale on the registry. `check_semver` is the other half of the discipline: a
 crate LEVEL with the registry has every lint enforced, so a break demands its
 bump before it merges.
+
+Two automations stand behind the by-hand flow above (#806). The **PR gate**
+(`release_status.py --check-coherence`, in ci.yml's repo-gates): a floor moved
+past a pin some published crate carries fails the PR that moves it and names
+the crates to bump alongside — the #809 class, which no build or test can see
+because in-tree the laterite deps are path deps and always unify. The
+**nightly cut** derives the owed set every night, tracks it on the
+`Engine release work owed` issue, dispatches the publish for anything stamped
+but absent from the registry, and — once `ENGINE_CUT_MODE=pr` — opens the cut
+PR itself. Forgetting a bump is therefore recoverable by morning; the by-hand
+flow is for not wanting to wait.
 
 Then **approve the `crates` environment** in the resulting Actions run, the same
 way `pypi` and `npm` are approved.
