@@ -89,7 +89,7 @@ encoding_rs = "0.8"
 # napi in transport_fns.rs; laterite-ags4-core binds the same leaf (behind its
 # `transport` feature), so a transport dep bump is one migration, not two. The
 # age envelope stays interoperable with the Python side (pyrage).
-laterite-transport = { path = "../laterite-transport", version = "0.11.0" }
+laterite-transport = { path = "../laterite-transport", version = "0.11.1" }
 # `preserve_order` MUST mirror laterite-ags4-validator / laterite-py: the validator's
 # `--json`/`--ndjson` insertion order is load-bearing (byte-faithful to the
 # `lat` binary), and `Report.toJson()` re-exposes it verbatim.
