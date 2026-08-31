@@ -1,11 +1,14 @@
 {
  "schema": "laterite-python-lane-bench/1",
- "generated": "2026-08-31T13:27:34+00:00",
- "commit": "5fefb980809997bdb09236b5b6f1dc064d79f53c",
+ "generated": "2026-08-31T16:39:35+00:00",
+ "commit": "2e4367b21f7a3dae06321d31c28d08fafa26c873",
  "invocation": {
   "rungs": [],
   "mem_rungs": [
-   "524MB"
+   "5MB",
+   "25MB",
+   "100MB",
+   "265MB"
   ],
   "runs": 5
  },
@@ -15,9 +18,9 @@
   "cpu_count": 10,
   "mem_total_bytes": 25769803776,
   "load_avg_start": [
-   1.39501953125,
-   1.79248046875,
-   1.94384765625
+   1.6669921875,
+   1.33203125,
+   1.41455078125
   ]
  },
  "versions": {
@@ -25,7 +28,8 @@
   "python-ags4": "1.2.0",
   "laterite": "0.12.0",
   "pandas": "2.3.3",
-  "polars": "1.43.2"
+  "polars": "1.43.2",
+  "pyarrow": "25.0.1"
  },
  "protocol": {
   "time": "mean of N warm in-process runs, first run discarded",
@@ -288,41 +292,41 @@
   "validate": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 169852928,
+     "peak_rss_bytes": 169836544,
      "x_output": 34.9
     },
     "laterite": {
-     "peak_rss_bytes": 111067136,
-     "x_output": 22.82
+     "peak_rss_bytes": 111099904,
+     "x_output": 22.83
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 340443136,
-     "x_output": 13.67
+     "peak_rss_bytes": 342065152,
+     "x_output": 13.73
     },
     "laterite": {
-     "peak_rss_bytes": 263258112,
+     "peak_rss_bytes": 263274496,
      "x_output": 10.57
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 1007910912,
-     "x_output": 9.82
+     "peak_rss_bytes": 1008566272,
+     "x_output": 9.83
     },
     "laterite": {
-     "peak_rss_bytes": 847953920,
+     "peak_rss_bytes": 848003072,
      "x_output": 8.26
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2668724224,
+     "peak_rss_bytes": 2669527040,
      "x_output": 9.69
     },
     "laterite": {
-     "peak_rss_bytes": 2087665664,
+     "peak_rss_bytes": 2087632896,
      "x_output": 7.58
     }
    },
@@ -340,42 +344,42 @@
   "read_strings": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 148684800,
-     "x_output": 30.55
+     "peak_rss_bytes": 148750336,
+     "x_output": 30.56
     },
     "laterite_compat": {
-     "peak_rss_bytes": 214663168,
-     "x_output": 44.11
+     "peak_rss_bytes": 214581248,
+     "x_output": 44.09
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 312721408,
+     "peak_rss_bytes": 312754176,
      "x_output": 12.55
     },
     "laterite_compat": {
-     "peak_rss_bytes": 476053504,
+     "peak_rss_bytes": 476102656,
      "x_output": 19.11
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 914538496,
+     "peak_rss_bytes": 914898944,
      "x_output": 8.91
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1470562304,
-     "x_output": 14.33
+     "peak_rss_bytes": 1469906944,
+     "x_output": 14.32
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2202812416,
+     "peak_rss_bytes": 2202763264,
      "x_output": 8.0
     },
     "laterite_compat": {
-     "peak_rss_bytes": 3514712064,
-     "x_output": 12.76
+     "peak_rss_bytes": 3522592768,
+     "x_output": 12.79
     }
    },
    "524MB": {
@@ -392,41 +396,41 @@
   "read_typed": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 155074560,
+     "peak_rss_bytes": 155041792,
      "x_output": 31.86
     },
     "laterite": {
-     "peak_rss_bytes": 111525888,
-     "x_output": 22.92
+     "peak_rss_bytes": 111738880,
+     "x_output": 22.96
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 314114048,
+     "peak_rss_bytes": 314064896,
      "x_output": 12.61
     },
     "laterite": {
-     "peak_rss_bytes": 269451264,
+     "peak_rss_bytes": 269434880,
      "x_output": 10.82
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 934559744,
+     "peak_rss_bytes": 934363136,
      "x_output": 9.1
     },
     "laterite": {
-     "peak_rss_bytes": 872054784,
+     "peak_rss_bytes": 872120320,
      "x_output": 8.5
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2444427264,
+     "peak_rss_bytes": 2444689408,
      "x_output": 8.87
     },
     "laterite": {
-     "peak_rss_bytes": 2262581248,
+     "peak_rss_bytes": 2262564864,
      "x_output": 8.21
     }
    },
@@ -444,57 +448,57 @@
   "write": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 156958720,
-     "x_output": 32.25
+     "peak_rss_bytes": 157614080,
+     "x_output": 32.39
     },
     "laterite_compat": {
-     "peak_rss_bytes": 237109248,
-     "x_output": 48.72
+     "peak_rss_bytes": 237076480,
+     "x_output": 48.71
     },
     "laterite": {
-     "peak_rss_bytes": 185958400,
-     "x_output": 38.21
+     "peak_rss_bytes": 186056704,
+     "x_output": 38.23
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 317095936,
+     "peak_rss_bytes": 317194240,
      "x_output": 12.73
     },
     "laterite_compat": {
-     "peak_rss_bytes": 537608192,
-     "x_output": 21.58
+     "peak_rss_bytes": 537755648,
+     "x_output": 21.59
     },
     "laterite": {
-     "peak_rss_bytes": 568459264,
+     "peak_rss_bytes": 568393728,
      "x_output": 22.82
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 937459712,
+     "peak_rss_bytes": 937279488,
      "x_output": 9.13
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1637548032,
-     "x_output": 15.95
+     "peak_rss_bytes": 1642135552,
+     "x_output": 16.0
     },
     "laterite": {
-     "peak_rss_bytes": 2047967232,
-     "x_output": 19.95
+     "peak_rss_bytes": 2047246336,
+     "x_output": 19.94
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2443919360,
+     "peak_rss_bytes": 2443853824,
      "x_output": 8.87
     },
     "laterite_compat": {
-     "peak_rss_bytes": 3913285632,
-     "x_output": 14.2
+     "peak_rss_bytes": 3914235904,
+     "x_output": 14.21
     },
     "laterite": {
-     "peak_rss_bytes": 5171789824,
+     "peak_rss_bytes": 5171527680,
      "x_output": 18.77
     }
    },
@@ -516,13 +520,15 @@
  },
  "import_baselines": {
   "python_ags4": {
-   "peak_rss_bytes": 31932416
+   "peak_rss_bytes": 31899648
   },
   "laterite": {
-   "peak_rss_bytes": 72794112
+   "peak_rss_bytes": 72613888
   }
  },
- "notes": [],
+ "notes": [
+  "compat pandas cells measured the pyarrow hop this run; the shipped default [compat] install is pyarrow-free (DuckDB hop) \u2014 see the memory queue's M5 row (#834)"
+ ],
  "runs": [
   {
    "generated": "2026-08-31T12:53:04+00:00",
@@ -572,6 +578,20 @@
     "rungs": [],
     "mem_rungs": [
      "524MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T16:39:35+00:00",
+   "commit": "2e4367b21f7a3dae06321d31c28d08fafa26c873",
+   "invocation": {
+    "rungs": [],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
     ],
     "runs": 5
    }
