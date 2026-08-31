@@ -167,7 +167,7 @@ pub fn tran_ags_of(parsed: &parse::ParsedFile) -> Option<String> {
     let tran = parsed.groups.get("TRAN")?;
     let ci = tran.headings.iter().position(|h| h == "TRAN_AGS")?;
     let v = tran.rows.first()?.values.get(ci)?;
-    let t = v.trim();
+    let t = v.slice(tran.text()).trim();
     (!t.is_empty()).then(|| t.to_string())
 }
 

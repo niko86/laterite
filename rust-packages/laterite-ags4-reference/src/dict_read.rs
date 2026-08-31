@@ -58,7 +58,8 @@ pub(crate) fn read_ags_dict(
 
     for row in &dict.rows {
         let cell = |ci: Option<usize>| -> &str {
-            ci.and_then(|i| row.values.get(i)).map_or("", |s| s.trim())
+            ci.and_then(|i| row.values.get(i))
+                .map_or("", |s| s.slice(dict.text()).trim())
         };
         let grp = cell(Some(ci_grp));
         if grp.is_empty() {

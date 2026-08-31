@@ -103,6 +103,9 @@ impl From<laterite_ags4_parse::ParseError> for ValidatorError {
         match e {
             P::UnsupportedEdition { found } => ValidatorError::UnsupportedEdition { found },
             P::NotUtf8 => ValidatorError::NotAgs4("file is not valid UTF-8".to_string()),
+            P::TooLarge => ValidatorError::NotAgs4(
+                "file too large: decoded text exceeds the 4 GiB span space".to_string(),
+            ),
             P::NotAgs4(msg) | P::Structure(msg) => ValidatorError::NotAgs4(msg),
         }
     }

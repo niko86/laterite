@@ -153,7 +153,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
     let line_text: HashMap<u32, &str> = parsed
         .raw_lines
         .iter()
-        .map(|rl| (rl.number, rl.text.as_str()))
+        .map(|rl| (rl.number, parsed.line_text(rl)))
         .collect();
 
     let mut fixes: Fixes = Vec::new();
@@ -312,7 +312,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     // finding fired). field_span gives the inner span — for
                     // an empty `""` field that's a zero-width point just
                     // inside the quotes, exactly where the value belongs.
-                    let cur = data.values.get(ci).map_or("", String::as_str);
+                    let cur = data.values.get(ci).map_or("", |s| s.slice(tran.text()));
                     if !cur.is_empty() {
                         return;
                     }
@@ -1336,7 +1336,7 @@ mod tests {
         let parsed = parse_str(&src).unwrap();
         // Hand-built fixes: edit field 0 (AA→aa) and field 1 (BB→bb) on
         // line 5. field_span on the raw line gives the inner spans.
-        let raw = &parsed.raw_lines[4].text;
+        let raw = parsed.line_text(&parsed.raw_lines[4]);
         let (s0, e0) = field_span(raw, 0).unwrap();
         let (s1, e1) = field_span(raw, 1).unwrap();
         let fixes = vec![
@@ -1423,7 +1423,7 @@ mod tests {
         let src = "\"GROUP\",\"X\"\r\n\"HEADING\",\"P\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"HELLO\"\r\n";
         let parsed = parse_str(src).unwrap();
-        let raw = &parsed.raw_lines[4].text;
+        let raw = parsed.line_text(&parsed.raw_lines[4]);
         let (s, e) = field_span(raw, 0).unwrap(); // "HELLO"
         // Edit A: [s, e) HELLO→hi. Edit B: [s, s+2) HE→XX overlaps A.
         let fixes = vec![Fix {
@@ -1548,10 +1548,11 @@ mod tests {
         let row = proj
             .rows
             .iter()
-            .find(|r| r.values.first().map(String::as_str) == Some("P1"))
+            .find(|r| r.values.first().map(|s| s.slice(proj.text())) == Some("P1"))
             .expect("the P1 DATA row");
         assert_eq!(
-            row.values[1], "say \"hi\" now",
+            row.values[1].slice(proj.text()),
+            "say \"hi\" now",
             "cell truncated / mis-escaped"
         );
     }

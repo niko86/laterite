@@ -388,7 +388,7 @@ mod tests {
             g.rows
                 .get(row)
                 .and_then(|r| r.values.get(col))
-                .map(String::as_str)
+                .map(|s| s.slice(g.text()))
         })
     }
 

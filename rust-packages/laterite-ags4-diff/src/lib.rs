@@ -99,6 +99,7 @@ fn heading_index(headings: &[String]) -> std::collections::HashMap<&str, usize> 
 /// the whole row tuple (unkeyed fallback).
 fn row_key(
     row: &DataRow,
+    buf: &str,
     idx: &std::collections::HashMap<&str, usize>,
     key_headings: &[String],
     keyed: bool,
@@ -109,12 +110,11 @@ fn row_key(
             .map(|h| {
                 idx.get(h.as_str())
                     .and_then(|&i| row.values.get(i))
-                    .cloned()
-                    .unwrap_or_default()
+                    .map_or_else(String::new, |s| s.slice(buf).to_string())
             })
             .collect()
     } else {
-        row.values.clone()
+        row.values.iter().map(|s| s.slice(buf).to_string()).collect()
     }
 }
 
@@ -128,9 +128,11 @@ fn changed_cells(
     code: &str,
     common: &[String],
     row_a: &DataRow,
+    buf_a: &str,
     idx_a: &std::collections::HashMap<&str, usize>,
     types_a: &[String],
     row_b: &DataRow,
+    buf_b: &str,
     idx_b: &std::collections::HashMap<&str, usize>,
     types_b: &[String],
     dict: &Dictionary,
@@ -140,11 +142,11 @@ fn changed_cells(
         let a = idx_a
             .get(h.as_str())
             .and_then(|&i| row_a.values.get(i))
-            .map(String::as_str);
+            .map(|s| s.slice(buf_a));
         let b = idx_b
             .get(h.as_str())
             .and_then(|&i| row_b.values.get(i))
-            .map(String::as_str);
+            .map(|s| s.slice(buf_b));
         // AGS type, resolved INDEPENDENTLY per side (own file TYPE row, then the
         // dictionary, then opaque "X"), so a heading two files typed differently is
         // compared on each side's real type rather than cross-contaminating through
@@ -229,7 +231,7 @@ fn diff_group(
         std::collections::HashMap::new();
     for (i, row) in gb.rows.iter().enumerate() {
         b_by_key
-            .entry(row_key(row, &idx_b, &key_headings, keyed))
+            .entry(row_key(row, gb.text(), &idx_b, &key_headings, keyed))
             .or_default()
             .push_back(i);
     }
@@ -242,7 +244,7 @@ fn diff_group(
     let under_cap = |rows: &Vec<RowDelta>| cap.is_none_or(|c| rows.len() < c);
 
     for row_a in &ga.rows {
-        let k = row_key(row_a, &idx_a, &key_headings, keyed);
+        let k = row_key(row_a, ga.text(), &idx_a, &key_headings, keyed);
         if let Some(bi) = b_by_key
             .get_mut(&k)
             .and_then(std::collections::VecDeque::pop_front)
@@ -250,7 +252,17 @@ fn diff_group(
             matched_b[bi] = true;
             let row_b = &gb.rows[bi];
             let cells = changed_cells(
-                code, &common, row_a, &idx_a, &ga.types, row_b, &idx_b, &gb.types, dict,
+                code,
+                &common,
+                row_a,
+                ga.text(),
+                &idx_a,
+                &ga.types,
+                row_b,
+                gb.text(),
+                &idx_b,
+                &gb.types,
+                dict,
             );
             if !cells.is_empty() {
                 changed += 1;
@@ -283,7 +295,7 @@ fn diff_group(
             if under_cap(&rows) {
                 rows.push(RowDelta {
                     kind: "added",
-                    key: row_key(row_b, &idx_b, &key_headings, keyed),
+                    key: row_key(row_b, gb.text(), &idx_b, &key_headings, keyed),
                     line_a: None,
                     line_b: Some(row_b.line),
                     cells: Vec::new(),

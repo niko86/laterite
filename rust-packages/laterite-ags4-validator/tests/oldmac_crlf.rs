@@ -48,9 +48,18 @@ fn oldmac_parses_into_the_same_rows_as_crlf() {
         let m = &mac.groups[code];
         let c = &crlf.groups[code];
         assert_eq!(m.headings, c.headings, "{code}: headings");
-        let mv: Vec<&Vec<String>> = m.rows.iter().map(|r| &r.values).collect();
-        let cv: Vec<&Vec<String>> = c.rows.iter().map(|r| &r.values).collect();
-        assert_eq!(mv, cv, "{code}: row values");
+        let vals = |g: &laterite_ags4_validator::parse::ParsedGroup| -> Vec<Vec<String>> {
+            g.rows
+                .iter()
+                .map(|r| {
+                    r.values
+                        .iter()
+                        .map(|s| s.slice(g.text()).to_string())
+                        .collect()
+                })
+                .collect()
+        };
+        assert_eq!(vals(m), vals(c), "{code}: row values");
     }
 }
 
@@ -84,5 +93,5 @@ fn a_cr_inside_a_quoted_field_is_embedded_not_a_terminator() {
         1,
         "embedded CR must not split the row"
     );
-    assert_eq!(p.groups["LOCA"].rows[0].values, vec!["a\rb".to_string()]);
+    assert_eq!(p.groups["LOCA"].cell(0, 0), Some("a\rb"));
 }

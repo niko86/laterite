@@ -23,8 +23,39 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 // --- output types (§3.3) --------------------------------------------
+
+/// A byte span into [`ParsedFile::text`] — the retained DECODED buffer, a
+/// second coordinate system beside the original-byte `byte_offset` fields
+/// (`dec-parse-cell-representation`). The two genuinely diverge for non-UTF-8
+/// encodings and lossy replacement; never read one with the other's offsets.
+/// Also distinct from [`field_span`], which returns CHAR offsets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl Span {
+    /// The spanned text. `buf` must be the [`ParsedFile::text`] this span was
+    /// parsed into ([`ParsedGroup::text`] is the same buffer).
+    #[must_use]
+    pub fn slice<'a>(&self, buf: &'a str) -> &'a str {
+        &buf[self.start as usize..self.end as usize]
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        (self.end - self.start) as usize
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.start == self.end
+    }
+}
 
 /// One physical source line (rich overlay; retained only when
 /// [`ParseOptions::retain_raw_lines`]).
@@ -32,8 +63,9 @@ use std::collections::BTreeMap;
 pub struct RawLine {
     /// 1-indexed, matching how editors + the AGS4 validator report.
     pub number: u32,
-    /// Line content with the trailing CR/LF stripped.
-    pub text: String,
+    /// Line content with the trailing CR/LF stripped: a span into
+    /// [`ParsedFile::text`] (read via [`ParsedFile::line_text`]).
+    pub text: Span,
     /// Whether the line was CR+LF terminated (the `text` loses the CR, so
     /// the evidence is captured here — Rule 2a).
     pub had_crlf: bool,
@@ -49,14 +81,21 @@ pub struct DataRow {
     pub line: u32,
     /// Record start byte offset in source bytes (record-granular index).
     pub byte_offset: u64,
-    /// Field values after the leading tag, unquoted + unescaped,
-    /// positionally aligned with [`ParsedGroup::headings`]. RAW (untrimmed).
-    pub values: Vec<String>,
+    /// Field values after the leading tag, unquoted + unescaped, positionally
+    /// aligned with [`ParsedGroup::headings`]. RAW (untrimmed). Spans into the
+    /// shared decoded buffer — a cell whose source carried `""` escapes was
+    /// unescaped ONCE at parse into the buffer's fix-up region, so every span
+    /// reads as a plain `&str` ([`ParsedGroup::cell`]).
+    pub values: Vec<Span>,
 }
 
 /// One GROUP and its descriptor rows + data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedGroup {
+    /// The shared decoded buffer — the same `Arc` as [`ParsedFile::text`],
+    /// cloned in so a group handed out alone (the three long-lived FFI
+    /// holders) can still resolve its rows' spans.
+    buf: Arc<str>,
     pub code: String,
     pub group_line: u32,
     /// THE cert datum: byte offset of the `"GROUP",…` record start.
@@ -65,7 +104,7 @@ pub struct ParsedGroup {
     pub unit_line: Option<u32>,
     pub type_line: Option<u32>,
     pub headings: Vec<String>,
-    /// NOT padded — raw `rest()` (Rule 4/8 arity needs the real length).
+    /// NOT padded — the raw descriptor tail (Rule 4/8 arity needs the real length).
     pub units: Vec<String>,
     /// NOT padded.
     pub types: Vec<String>,
@@ -80,7 +119,7 @@ impl ParsedGroup {
         self.rows
             .get(row)
             .and_then(|r| r.values.get(col))
-            .map(String::as_str)
+            .map(|s| s.slice(&self.buf))
     }
 
     /// Column index of a heading by name (de-dups the `position()` dance
@@ -88,6 +127,19 @@ impl ParsedGroup {
     #[must_use]
     pub fn col(&self, name: &str) -> Option<usize> {
         self.headings.iter().position(|h| h == name)
+    }
+
+    /// The decoded buffer this group's [`DataRow::values`] spans index —
+    /// the slicing base for direct `row.values` reads.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.buf
+    }
+
+    /// The shared buffer by refcount (for holders that outlive `&self`).
+    #[must_use]
+    pub fn shared_text(&self) -> &Arc<str> {
+        &self.buf
     }
 }
 
@@ -113,6 +165,12 @@ pub struct GroupRecord {
 /// `total_bytes`, and `byte_offsets_source_true`.
 #[derive(Debug, Clone)]
 pub struct ParsedFile {
+    /// The retained decoded text, ONE copy for the whole file: every line's
+    /// body (terminators dropped — [`RawLine::had_crlf`] keeps the evidence),
+    /// then a fix-up region holding the once-unescaped value of every cell
+    /// whose source carried `""` escapes. Every [`Span`] indexes this buffer;
+    /// each [`ParsedGroup`] shares it by refcount.
+    pub text: Arc<str>,
     /// First-seen wins on duplicate GROUP codes.
     pub groups: BTreeMap<String, ParsedGroup>,
     /// GROUP codes in appearance order.
@@ -133,6 +191,15 @@ pub struct ParsedFile {
     /// against corruption — note: NOT gated on `!has_bom` (the BOM's bytes
     /// are counted, so offsets stay true through it).
     pub byte_offsets_source_true: bool,
+}
+
+impl ParsedFile {
+    /// A retained line's text ([`RawLine::text`] resolved against the shared
+    /// decoded buffer).
+    #[must_use]
+    pub fn line_text<'a>(&'a self, line: &RawLine) -> &'a str {
+        line.text.slice(&self.text)
+    }
 }
 
 // --- options + errors (§3.2) ----------------------------------------
@@ -220,6 +287,9 @@ pub enum ParseError {
     /// pins these). The lenient default never raises this — the validator keeps
     /// parsing so its rule engine can report *every* problem as a finding.
     Structure(String),
+    /// The retained decoded buffer would exceed the `u32` span space (≈4 GiB
+    /// of decoded text). Raised instead of silently truncating an offset.
+    TooLarge,
 }
 
 // --- legacy entry points (signatures preserved verbatim) -------------
@@ -534,21 +604,35 @@ pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
     }
 }
 
-/// The unified parser. Drives [`split_ags_line`] over the raw bytes,
-/// decoding each line, so every record carries its absolute source-byte
-/// offset while line/char positions are against the decoded text.
-/// Take everything after the leading tag, MOVING the values out of `fields`.
-///
-/// This used to be `fields[1..].to_vec()`, which clones every `String` the
-/// tokenizer just allocated — so each cell was heap-allocated twice, once by
-/// `split_ags_line` and once here, on every descriptor and DATA row. Nothing
-/// reads `fields` after its arm, so the tail can simply be handed over.
-fn rest(fields: &mut Vec<String>) -> Vec<String> {
-    if fields.len() > 1 {
-        fields.split_off(1)
-    } else {
-        Vec::new()
+/// Append one run of decoded text to the retained buffer, returning the
+/// offset it landed at. The ONE site that guards the `u32` span space — past
+/// it, an offset would silently truncate, so the parse refuses instead.
+fn append_text(buf: &mut String, s: &str) -> Result<u32, ParseError> {
+    let base = buf.len();
+    if base + s.len() > u32::MAX as usize {
+        return Err(ParseError::TooLarge);
     }
+    buf.push_str(s);
+    Ok(base as u32)
+}
+
+/// One field's logical value materialised: the span's slice, unescaped only
+/// when the tokenizer flagged a `""` (the rare case pays; the common one is
+/// a plain copy).
+fn owned_field(line: &str, f: &FieldSpan) -> String {
+    let s = &line[f.start..f.end];
+    if f.has_escape {
+        unescape_doubled(s)
+    } else {
+        s.to_string()
+    }
+}
+
+/// Everything after the leading tag, as owned unescaped values — the
+/// descriptor rows (HEADING/UNIT/TYPE) stay `Vec<String>`: one line per
+/// group, nowhere near the cell hold the span rewrite exists to kill.
+fn owned_rest(line: &str, spans: &[FieldSpan]) -> Vec<String> {
+    spans.iter().skip(1).map(|f| owned_field(line, f)).collect()
 }
 
 pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, ParseError> {
@@ -562,6 +646,17 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     let mut current: Option<String> = None;
     let mut looks_ags3 = false;
     let mut source_true = true;
+
+    // The retained decoded buffer (`ParsedFile::text`). Reserved at the
+    // source size once: decoded output tracks it closely for the
+    // ASCII-compatible encodings this walk accepts, and the locate-only
+    // profile retains nothing so reserves nothing.
+    let mut buf = String::new();
+    if !opts.locate_only {
+        buf.reserve(bytes.len());
+    }
+    // Tokenizer scratch, reused across lines — bounds, not Strings.
+    let mut fspans: Vec<FieldSpan> = Vec::new();
 
     let mut number = 0u32;
     for span in line_spans(bytes) {
@@ -582,6 +677,16 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         if had_repl || !borrowed {
             source_true = false;
         }
+
+        // Retain the line body up front when the raw-line overlay wants it;
+        // the DATA arm below reuses the same copy for its value spans, so a
+        // line's bytes are resident ONCE (the doubled residency the old
+        // `text.into_owned()` overlay paid is gone).
+        let line_base: Option<u32> = if opts.retain_raw_lines {
+            Some(append_text(&mut buf, &text)?)
+        } else {
+            None
+        };
 
         // No phantom trailing blank: `line_spans` stops when the buffer ends
         // exactly at a terminator (a file ending in `\r\n`/`\n`/`\r` yields no
@@ -610,14 +715,17 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" | "UNIT" | "TYPE" | "DATA" => !opts.locate_only,
                     _ => false,
                 };
-                let mut fields = if needs_fields {
-                    split_ags_line(&text)
+                if needs_fields {
+                    split_ags_line_spans(&text, &mut fspans);
                 } else {
-                    Vec::new()
-                };
+                    fspans.clear();
+                }
                 match tag {
                     "GROUP" => {
-                        let code = fields.get(1).cloned().unwrap_or_default();
+                        let code = fspans
+                            .get(1)
+                            .map(|f| owned_field(&text, f))
+                            .unwrap_or_default();
                         if opts.strict_structure && code.is_empty() {
                             return Err(ParseError::Structure(
                                 "GROUP row missing group code".into(),
@@ -633,6 +741,10 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                         groups.entry(code.clone()).or_insert_with(|| {
                             group_order.push(code.clone());
                             ParsedGroup {
+                                // Placeholder until the buffer is complete —
+                                // every group is re-pointed at the shared Arc
+                                // in the final fix-up below.
+                                buf: Arc::default(),
                                 code: code.clone(),
                                 group_line: number,
                                 group_byte: byte_offset,
@@ -671,7 +783,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.heading_line = Some(number);
-                            g.headings = rest(&mut fields);
+                            g.headings = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure(
                                 "HEADING row before any GROUP".into(),
@@ -681,7 +793,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "UNIT" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.unit_line = Some(number);
-                            g.units = rest(&mut fields);
+                            g.units = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("UNIT row before any GROUP".into()));
                         }
@@ -689,17 +801,46 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "TYPE" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.type_line = Some(number);
-                            g.types = rest(&mut fields);
+                            g.types = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("TYPE row before any GROUP".into()));
                         }
                     }
                     "DATA" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
+                            // The lean profile has no raw-line overlay, so the
+                            // body lands in the buffer here instead — and only
+                            // for a row that is actually kept (an orphan row's
+                            // text is never retained).
+                            let base = if let Some(b) = line_base {
+                                b
+                            } else {
+                                append_text(&mut buf, &text)?
+                            };
+                            let mut values: Vec<Span> =
+                                Vec::with_capacity(fspans.len().saturating_sub(1));
+                            for f in fspans.iter().skip(1) {
+                                if f.has_escape {
+                                    // Unescaped ONCE, here, into the buffer's
+                                    // fix-up region; every later read of this
+                                    // cell is a plain `&str` slice.
+                                    let fixed = unescape_doubled(&text[f.start..f.end]);
+                                    let start = append_text(&mut buf, &fixed)?;
+                                    values.push(Span {
+                                        start,
+                                        end: start + fixed.len() as u32,
+                                    });
+                                } else {
+                                    values.push(Span {
+                                        start: base + f.start as u32,
+                                        end: base + f.end as u32,
+                                    });
+                                }
+                            }
                             g.rows.push(DataRow {
                                 line: number,
                                 byte_offset,
-                                values: rest(&mut fields),
+                                values,
                             });
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("DATA row before any GROUP".into()));
@@ -714,12 +855,13 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             }
         }
 
-        if opts.retain_raw_lines {
+        if let Some(base) = line_base {
             raw_lines.push(RawLine {
                 number,
-                // The one site that genuinely needs ownership — so it is the
-                // one site that pays for it.
-                text: text.into_owned(),
+                text: Span {
+                    start: base,
+                    end: base + text.len() as u32,
+                },
                 had_crlf,
                 byte_offset,
             });
@@ -736,7 +878,14 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     }
 
     let total_lines = number; // every line counted (raw_lines may be empty)
+    // ONE copy of the decoded text for the whole file, shared into each group
+    // by refcount so a group handed out alone can still resolve its spans.
+    let text: Arc<str> = buf.into();
+    for g in groups.values_mut() {
+        g.buf = Arc::clone(&text);
+    }
     Ok(ParsedFile {
+        text,
         groups,
         group_order,
         group_records,
@@ -756,66 +905,118 @@ pub mod scan;
 /// and doubles embedded quotes (`""`). Tolerant: an unquoted field is read
 /// up to the next comma; an unterminated quote consumes to end-of-line.
 /// Returns owned, unescaped values.
+///
+/// A thin adapter over [`split_ags_line_spans`] — ONE state machine decides
+/// the field bounds, and this materialises them. The two cannot disagree by
+/// construction, which is what lets the parser keep cells as spans while
+/// every legacy caller keeps its owned `Vec<String>`.
 #[must_use]
 pub fn split_ags_line(line: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut chars = line.chars().peekable();
+    let mut spans: Vec<FieldSpan> = Vec::new();
+    split_ags_line_spans(line, &mut spans);
+    spans.iter().map(|f| owned_field(line, f)).collect()
+}
 
+/// One field's LOGICAL-value bounds within a line, in BYTE offsets relative
+/// to the line start (the quotes excluded; junk between a closing quote and
+/// the next comma excluded). `has_escape` marks a quoted value that still
+/// carries doubled `""` escapes, so a span alone cannot represent it — the
+/// reader must unescape (the parser does, once, into the buffer's fix-up
+/// region).
+///
+/// Distinct from `scan::RawField`, which is the display/judging scanner with
+/// its own policy axis; THIS is the tolerant reader's tokenizer
+/// ([`split_ags_line`] semantics, exactly — mid-field quotes read verbatim
+/// in unquoted fields, unterminated quotes salvage to end-of-line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldSpan {
+    pub start: usize,
+    pub end: usize,
+    pub has_escape: bool,
+}
+
+/// Collapse doubled quotes (`""` → `"`), left to right — the unescape
+/// [`split_ags_line`] has always applied to quoted fields.
+fn unescape_doubled(s: &str) -> String {
+    s.replace("\"\"", "\"")
+}
+
+/// The tokenizer's span core: [`split_ags_line`]'s exact state machine, in
+/// bytes, yielding bounds instead of allocating. `out` is cleared and reused
+/// so a caller walking many lines allocates nothing in the steady state.
+/// Byte offsets are safe to slice with: every bound lands on an ASCII
+/// delimiter or the position after one, which UTF-8 guarantees is a char
+/// boundary.
+pub fn split_ags_line_spans(line: &str, out: &mut Vec<FieldSpan>) {
+    out.clear();
+    let b = line.as_bytes();
+    let n = b.len();
+    let mut i = 0usize;
     loop {
-        match chars.peek() {
-            None => break,
-            Some('"') => {
-                chars.next(); // consume opening quote
-                let mut field = String::new();
-                loop {
-                    match chars.next() {
-                        None => break, // unterminated — tolerate
-                        Some('"') => {
-                            if chars.peek() == Some(&'"') {
-                                chars.next();
-                                field.push('"'); // escaped quote
-                            } else {
-                                break; // closing quote
-                            }
-                        }
-                        Some(c) => field.push(c),
-                    }
+        if i >= n {
+            break;
+        }
+        if b[i] == b'"' {
+            i += 1; // consume opening quote
+            let start = i;
+            let mut has_escape = false;
+            let end;
+            loop {
+                if i >= n {
+                    end = i; // unterminated — tolerate, salvage to end-of-line
+                    break;
                 }
-                out.push(field);
-                if let Some(',') = chars.peek() {
-                    chars.next();
-                    continue;
-                }
-                while let Some(&c) = chars.peek() {
-                    if c == ',' {
-                        chars.next();
+                if b[i] == b'"' {
+                    if b.get(i + 1) == Some(&b'"') {
+                        has_escape = true; // escaped quote
+                        i += 2;
+                    } else {
+                        end = i; // closing quote
+                        i += 1;
                         break;
                     }
-                    chars.next();
+                } else {
+                    i += 1;
                 }
-                if chars.peek().is_none() {
+            }
+            out.push(FieldSpan {
+                start,
+                end,
+                has_escape,
+            });
+            if i < n && b[i] == b',' {
+                i += 1;
+                continue;
+            }
+            // Junk between a closing quote and the next comma is skipped,
+            // exactly as the owned splitter always has.
+            while i < n {
+                let c = b[i];
+                i += 1;
+                if c == b',' {
                     break;
                 }
             }
-            Some(_) => {
-                let mut field = String::new();
-                while let Some(&c) = chars.peek() {
-                    if c == ',' {
-                        break;
-                    }
-                    field.push(c);
-                    chars.next();
-                }
-                out.push(field);
-                if chars.peek() == Some(&',') {
-                    chars.next();
-                    continue;
-                }
+            if i >= n {
                 break;
             }
+        } else {
+            let start = i;
+            while i < n && b[i] != b',' {
+                i += 1;
+            }
+            out.push(FieldSpan {
+                start,
+                end: i,
+                has_escape: false,
+            });
+            if i < n && b[i] == b',' {
+                i += 1;
+                continue;
+            }
+            break;
         }
     }
-    out
 }
 
 /// Char-offset span of the content INSIDE the quotes of the raw-line field

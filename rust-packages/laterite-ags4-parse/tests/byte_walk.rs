@@ -29,7 +29,7 @@ fn line_numbers_and_total() {
     assert_eq!(proj.heading_line, Some(2));
     assert_eq!(proj.headings, vec!["X_ID"]);
     assert_eq!(proj.rows[0].line, 5);
-    assert_eq!(proj.rows[0].values, vec!["v"]);
+    assert_eq!(proj.cell(0, 0), Some("v"));
     // PROJ(5) + blank(1) + TRAN(5) = 11; no phantom trailing line.
     assert_eq!(pf.total_lines, 11);
     assert_eq!(pf.groups["TRAN"].group_line, 7);
@@ -48,7 +48,7 @@ fn tracks_crlf_vs_lf_per_line() {
 fn final_line_without_newline_is_not_crlf() {
     let pf = parse_str("\"GROUP\",\"PROJ\"\r\n\"DATA\",\"P1\"").unwrap();
     let last = pf.raw_lines.last().unwrap();
-    assert_eq!(last.text, "\"DATA\",\"P1\"");
+    assert_eq!(pf.line_text(last), "\"DATA\",\"P1\"");
     assert!(!last.had_crlf);
 }
 
@@ -75,7 +75,7 @@ fn invalid_utf8_lossy_vs_reject() {
     bytes.push(0xB0);
     bytes.extend_from_slice(b"\"\r\n");
     let pf = parse_bytes(&bytes, encoding_rs::UTF_8).unwrap(); // validating = lossy
-    assert_eq!(pf.groups["PROJ"].rows[0].values[0], "P1\u{FFFD}");
+    assert_eq!(pf.groups["PROJ"].cell(0, 0), Some("P1\u{FFFD}"));
     assert!(
         !pf.byte_offsets_source_true,
         "a replacement clears source-true"
@@ -149,7 +149,7 @@ fn slice_reparse_recovers_the_group() {
     );
     let re = parse_bytes(&bytes[s..e], encoding_rs::UTF_8).unwrap();
     assert_eq!(re.group_order, vec!["PROJ"]);
-    assert_eq!(re.groups["PROJ"].rows[0].values, vec!["v"]);
+    assert_eq!(re.groups["PROJ"].cell(0, 0), Some("v"));
 }
 
 #[test]
@@ -179,7 +179,17 @@ fn lean_drops_raw_lines_but_keeps_byte_offsets() {
         lean.groups["TRAN"].group_byte,
         rich.groups["TRAN"].group_byte
     );
-    assert_eq!(lean.groups["PROJ"].rows, rich.groups["PROJ"].rows);
+    // Rows agree by VALUE; the span offsets legitimately differ (the rich
+    // profile's buffer holds every line, the lean one only the DATA bodies).
+    let (lp, rp) = (&lean.groups["PROJ"], &rich.groups["PROJ"]);
+    assert_eq!(lp.rows.len(), rp.rows.len());
+    for (r, (lr, rr)) in lp.rows.iter().zip(&rp.rows).enumerate() {
+        assert_eq!((lr.line, lr.byte_offset), (rr.line, rr.byte_offset));
+        assert_eq!(lr.values.len(), rr.values.len());
+        for c in 0..lr.values.len() {
+            assert_eq!(lp.cell(c, r), rp.cell(c, r));
+        }
+    }
 }
 
 #[test]

@@ -129,7 +129,7 @@ impl FileDict {
         }
         for row in &dictg.rows {
             let get =
-                |i: Option<usize>| i.and_then(|i| row.values.get(i)).map_or("", String::as_str);
+                |i: Option<usize>| i.and_then(|i| row.values.get(i)).map_or("", |s| s.slice(dictg.text()));
             out.insert(&DictRow {
                 dict_type: get(ti),
                 group: get(gi),

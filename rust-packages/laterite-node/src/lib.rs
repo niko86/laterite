@@ -295,7 +295,11 @@ impl Reading {
                         .iter()
                         .map(|r| {
                             (0..n)
-                                .map(|i| r.values.get(i).cloned().unwrap_or_default())
+                                .map(|i| {
+                                    r.values
+                                        .get(i)
+                                        .map_or_else(String::new, |s| s.slice(g.text()).to_string())
+                                })
                                 .collect()
                         })
                         .collect(),
