@@ -95,7 +95,7 @@ pub struct ParsedGroup {
     /// The shared decoded buffer — the same `Arc` as [`ParsedFile::text`],
     /// cloned in so a group handed out alone (the three long-lived FFI
     /// holders) can still resolve its rows' spans.
-    buf: Arc<str>,
+    buf: Arc<String>,
     pub code: String,
     pub group_line: u32,
     /// THE cert datum: byte offset of the `"GROUP",…` record start.
@@ -138,7 +138,7 @@ impl ParsedGroup {
 
     /// The shared buffer by refcount (for holders that outlive `&self`).
     #[must_use]
-    pub fn shared_text(&self) -> &Arc<str> {
+    pub fn shared_text(&self) -> &Arc<String> {
         &self.buf
     }
 }
@@ -170,7 +170,13 @@ pub struct ParsedFile {
     /// then a fix-up region holding the once-unescaped value of every cell
     /// whose source carried `""` escapes. Every [`Span`] indexes this buffer;
     /// each [`ParsedGroup`] shares it by refcount.
-    pub text: Arc<str>,
+    ///
+    /// `Arc<String>` rather than `Arc<str>` deliberately: `Arc<str>::from`
+    /// COPIES the buffer, and that whole-file transient sat exactly at the
+    /// operation peak the M4 spike was minted to lower — `Arc::new(String)`
+    /// adopts the built buffer zero-copy. The capacity slack it keeps is the
+    /// dropped terminators, ~a few % of the file.
+    pub text: Arc<String>,
     /// First-seen wins on duplicate GROUP codes.
     pub groups: BTreeMap<String, ParsedGroup>,
     /// GROUP codes in appearance order.
@@ -878,9 +884,10 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     }
 
     let total_lines = number; // every line counted (raw_lines may be empty)
-    // ONE copy of the decoded text for the whole file, shared into each group
-    // by refcount so a group handed out alone can still resolve its spans.
-    let text: Arc<str> = buf.into();
+    // ONE buffer of decoded text for the whole file, ADOPTED (not copied)
+    // into the Arc and shared into each group by refcount so a group handed
+    // out alone can still resolve its spans.
+    let text = Arc::new(buf);
     for g in groups.values_mut() {
         g.buf = Arc::clone(&text);
     }
