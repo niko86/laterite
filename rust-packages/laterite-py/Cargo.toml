@@ -77,22 +77,22 @@ crate-type = ["cdylib"]
 # v2 and v3 are indistinguishable while the system allocator is 36% (Linux) and
 # 53-63% (Windows) slower. See #448.
 mimalloc = { version = "0.1", features = ["v2"] }
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.1" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
 # the leaf directly (the validator is no longer on the parse hot-path); its
 # `ParseError` is converted to ValidatorError via the Phase-2 `From` bridge so
 # the exit-code/message map stays byte-identical. The validator dep stays for
 # the FS entry (`parse_file_with_encoding`), the rule engine, and ValidatorError.
-laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
 # S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-ags4-core —
 # registry, ags_types, transport, ddl, ags4_codec, ags4_writer, error.
 # No DuckDB. The DuckDB-bound function module + typed_graph read/write live in
 # the separate `laterite-py-ags5` cdylib, which was decoupled to the dormant
 # `ags5/` holding folder (#177) — the base wheel ships AGS4-only.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.1" }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.2" }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.1" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.2" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
 # carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.
@@ -105,11 +105,11 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.14.0", features = ["arrow"] }
 # The KEY-aware/type-aware revision-diff leaf (#204): `diff_parsed` over two
 # parsed files + a Dictionary — the same diff wasm + the CLI use.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.1" }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `merge()` — reconcile N deliveries of one project into a single file, KEY-aware
 # with argument-order recency and widen-to-X. The same leaf `lat merge` uses;
 # it pulls parse + emit (emit re-validates its output) but stays wasm-safe.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.1" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.2" }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.
@@ -157,7 +157,7 @@ encoding_rs = "0.8"
 # third independent reader of ags_dictionary.json (laterite-dev#475 follow-up). No direct
 # JSON parsing here any more, so serde_json is no longer a build-dependency.
 [build-dependencies]
-laterite-ags4-reference = { path = "../laterite-ags4-reference", version = "0.13.0" }
+laterite-ags4-reference = { path = "../laterite-ags4-reference", version = "0.13.1" }
 
 [lints]
 workspace = true

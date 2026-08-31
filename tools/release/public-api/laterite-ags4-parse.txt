@@ -265,10 +265,9 @@ impl core::clone::Clone for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> laterite_ags4_parse::ParsedGroup
 impl core::cmp::Eq for laterite_ags4_parse::ParsedGroup
 impl core::cmp::PartialEq for laterite_ags4_parse::ParsedGroup
-pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &laterite_ags4_parse::ParsedGroup) -> bool
+pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::StructuralPartialEq for laterite_ags4_parse::ParsedGroup
 impl core::marker::Freeze for laterite_ags4_parse::ParsedGroup
 impl core::marker::Send for laterite_ags4_parse::ParsedGroup
 impl core::marker::Sync for laterite_ags4_parse::ParsedGroup
