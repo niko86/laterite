@@ -166,30 +166,26 @@ fn embedded_quoted_newline_does_not_split_record() {
 }
 
 #[test]
-fn lean_drops_raw_lines_but_keeps_byte_offsets() {
-    // 6e: lean ↔ rich differ ONLY in raw_lines retention; group/row byte
-    // offsets + structure are identical.
+fn lean_and_validating_agree_on_the_whole_model_for_clean_input() {
+    // The profiles collapsed with the span rewrite: lean vs validating is now
+    // ONLY a decode policy (Reject vs LossyReplace), so on clean UTF-8 the two
+    // produce the SAME model — raw lines included, span for span. Only
+    // locate_only skips retention (pinned in tests/locate_only.rs).
     let bytes = lf();
     let rich = parse_bytes_opts(&bytes, ParseOptions::validating()).unwrap();
     let lean = parse_bytes_opts(&bytes, ParseOptions::lean()).unwrap();
-    assert!(lean.raw_lines.is_empty());
-    assert!(!rich.raw_lines.is_empty());
+    assert!(
+        !lean.raw_lines.is_empty(),
+        "raw lines are part of the base model now"
+    );
+    assert_eq!(lean.raw_lines, rich.raw_lines);
     assert_eq!(lean.total_lines, rich.total_lines);
+    assert_eq!(lean.text, rich.text, "one retained buffer, same both ways");
     assert_eq!(
         lean.groups["TRAN"].group_byte,
         rich.groups["TRAN"].group_byte
     );
-    // Rows agree by VALUE; the span offsets legitimately differ (the rich
-    // profile's buffer holds every line, the lean one only the DATA bodies).
-    let (lp, rp) = (&lean.groups["PROJ"], &rich.groups["PROJ"]);
-    assert_eq!(lp.rows.len(), rp.rows.len());
-    for (r, (lr, rr)) in lp.rows.iter().zip(&rp.rows).enumerate() {
-        assert_eq!((lr.line, lr.byte_offset), (rr.line, rr.byte_offset));
-        assert_eq!(lr.values.len(), rr.values.len());
-        for c in 0..lr.values.len() {
-            assert_eq!(lp.cell(c, r), rp.cell(c, r));
-        }
-    }
+    assert_eq!(lean.groups["PROJ"].rows, rich.groups["PROJ"].rows);
 }
 
 #[test]

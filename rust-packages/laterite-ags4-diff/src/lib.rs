@@ -114,7 +114,10 @@ fn row_key(
             })
             .collect()
     } else {
-        row.values.iter().map(|s| s.slice(buf).to_string()).collect()
+        row.values
+            .iter()
+            .map(|s| s.slice(buf).to_string())
+            .collect()
     }
 }
 

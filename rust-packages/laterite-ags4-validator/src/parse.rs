@@ -13,8 +13,9 @@
 //! `From<ParseError> for ValidatorError`), so every caller's error handling
 //! is unchanged. The two `parse_file*` wrappers additionally do the `fs::read`
 //! the leaf deliberately doesn't. Validator callers parse via the leaf's
-//! VALIDATING profile (retain raw lines + lossy decode), preserving the rich
-//! 420 MB line profile and O-32's lossy-not-reject behaviour.
+//! VALIDATING profile (lossy decode — O-32's lossy-not-reject behaviour);
+//! since the span rewrite every profile retains the same one-buffer line
+//! model, so the profiles differ only in decode policy.
 
 use std::fs;
 use std::path::Path;
@@ -22,7 +23,8 @@ use std::path::Path;
 use crate::error::ValidatorError;
 
 pub use laterite_ags4_parse::{
-    DataRow, ParseError, ParsedFile, ParsedGroup, RawLine, field_span, line_spans, split_ags_line,
+    DataRow, FieldSpan, ParseError, ParsedFile, ParsedGroup, RawLine, Span, field_span, line_spans,
+    split_ags_line, split_ags_line_spans,
 };
 
 /// Parse an AGS4 file from disk (UTF-8). Invalid UTF-8 is decoded lossily

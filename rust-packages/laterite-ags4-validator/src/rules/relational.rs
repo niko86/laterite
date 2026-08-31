@@ -144,7 +144,10 @@ fn cols(g: &ParsedGroup, names: &[String]) -> Vec<Option<usize>> {
 /// own the text, so the clone bought nothing.
 fn tuple_at<'a>(idx: &[Option<usize>], row: &crate::parse::DataRow, buf: &'a str) -> Vec<&'a str> {
     idx.iter()
-        .map(|i| i.and_then(|i| row.values.get(i)).map_or("", |s| s.slice(buf)))
+        .map(|i| {
+            i.and_then(|i| row.values.get(i))
+                .map_or("", |s| s.slice(buf))
+        })
         .collect()
 }
 
@@ -246,13 +249,11 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
         .collect();
 
     for (ri, row) in g.rows.iter().enumerate() {
-        let any_empty = req_cols
-            .iter()
-            .any(|(i, _)| {
-                row.values
-                    .get(*i)
-                    .is_none_or(|v| v.slice(g.text()).trim().is_empty())
-            });
+        let any_empty = req_cols.iter().any(|(i, _)| {
+            row.values
+                .get(*i)
+                .is_none_or(|v| v.slice(g.text()).trim().is_empty())
+        });
         if !any_empty {
             continue;
         }
@@ -395,7 +396,10 @@ fn rule_10c<'p>(
     let cidx = cols(g, &pkeys);
     let ptuples = parent_tuples.entry(parent.to_string()).or_insert_with(|| {
         let pidx = cols(pg, &pkeys);
-        pg.rows.iter().map(|r| tuple_at(&pidx, r, pg.text())).collect()
+        pg.rows
+            .iter()
+            .map(|r| tuple_at(&pidx, r, pg.text()))
+            .collect()
     });
     for (ri, row) in g.rows.iter().enumerate() {
         let t = tuple_at(&cidx, row, g.text());

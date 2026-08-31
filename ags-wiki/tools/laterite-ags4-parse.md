@@ -47,38 +47,67 @@ stay filesystem-free and wasm-clean, so it returns raw strings and leaves typing
 to [[laterite-ags4-types]]. Anything that would drag in DuckDB, `age`, or an
 allocator-heavy dependency belongs above it.
 
-## The two coordinate systems
+## The coordinate systems
 
-The leaf carries **both** in a single pass, neither back-derived from the other:
+The leaf carries them in a single pass, none back-derived from another:
 
 - each record's absolute **byte** offset in the original buffer (what the
   `.ags.idx` certificate indexes — see `O-40`);
-- its 1-indexed **line** number (what findings and fixes join on).
+- its 1-indexed **line** number (what findings and fixes join on);
+- since [[dec-parse-cell-representation]], every line and cell is also a
+  `u32` `Span` into the **retained decoded buffer** (`ParsedFile::text`) — a
+  third space, in *decoded-buffer bytes*.
 
-`byte_offsets_source_true` is the guard: if decoding ever substituted bytes and
-shifted a record start, the flag goes false and the cert path refuses to mint an
-index. A certificate that points at the wrong bytes while reporting success is
-worse than no certificate.
+`byte_offsets_source_true` is the guard on the first: if decoding ever
+substituted bytes and shifted a record start, the flag goes false and the cert
+path refuses to mint an index. A certificate that points at the wrong bytes
+while reporting success is worse than no certificate. For non-UTF-8 encodings
+and lossy replacement the original-byte and decoded-buffer spaces genuinely
+diverge — both are kept, and neither substitutes for the other.
+
+> [!warning] **The units trap.** Three spellings of "span" live here and they do
+> not mix: record `byte_offset`s are ORIGINAL bytes, `Span`s are DECODED-buffer
+> bytes, and `field_span` returns **char** offsets (a display convenience).
+> Reading one with another's offsets is silent corruption, not an error.
+
+## The representation: spans over one retained buffer
+
+`ParsedFile` retains the whole file's decoded text ONCE — line bodies with
+terminators dropped (`RawLine::had_crlf` keeps the evidence), then a **fix-up
+region** holding the once-unescaped value of every cell whose source carried
+`""` escapes — and shares it into each `ParsedGroup` by refcount, so a group
+handed out alone (the three long-lived FFI holders) still resolves its rows.
+`RawLine::text` and `DataRow::values` are `u32` spans into that buffer; every
+read comes back a plain `&str` (`ParsedGroup::cell`, `ParsedFile::line_text`).
+The buffer is an `Arc<String>` rather than the design page's literal
+`Arc<str>`: the `Arc<str>` materialisation *copies* the buffer, and the M4
+spike measured that whole-file transient sitting exactly at the operation
+peak — adopting the built `String` zero-copy is what cleared the campaign's
+invasive floor at the 25 MB rung (the record is on #838).
 
 ## Trim policy
 
 Values, units, types and headings come back **RAW (untrimmed)** — the
 validator's semantics, because on an unquoted field the surrounding whitespace
-*is* the Rule 5 violation and trimming it would hide the finding. Core's lean
-projection re-applies its own trims in `from_shared`; see
-[[laterite-ags4-core]].
+*is* the Rule 5 violation and trimming it would hide the finding. The span
+representation changes nothing here: a span bounds the raw value, and the
+fix-up region unescapes without trimming. Core's lean projection re-applies
+its own trims in `from_shared`; see [[laterite-ags4-core]].
 
 ## Parse profiles
 
-`ParseOptions` selects how much of the model to build. All three walk the file
-identically — same line spans, same decode, same UTF-8 handling, same AGS3
-sniff — and differ only in what they retain:
+The old `retain_raw_lines` knob is **dead** — a raw line is a span over a
+buffer the parse keeps anyway, so the overlay collapsed into the base model
+([[dec-parse-cell-representation]]). What remains is decode policy plus the
+explicit opt-ins (`strict_structure`, `locate_only`). Every profile walks the
+file identically — same line spans, same decode, same UTF-8 handling, same
+AGS3 sniff:
 
-| profile | retains | used by |
+| profile | is | used by |
 |---|---|---|
-| `validating()` | everything, including `raw_lines` | the rule engine |
-| `lean()` | no raw lines | the read codec |
-| `lean()` + `locate_only` | GROUP records only | the certificate index |
+| `validating()` | lossy decode | the rule engine |
+| `lean()` | reject invalid bytes | the read codec (+ `strict_structure`) |
+| `lean()` + `locate_only` | retains no text: GROUP records only | the certificate index |
 
 `locate_only` exists because the index reads `group_records`, `group_order` and
 `total_bytes` and nothing else, but used to pay for the whole row model and
@@ -121,9 +150,20 @@ from string suffixes now read it directly.
 > because `""`→`"` yields a value shorter than its source. `has_escape` flags it,
 > so a caller can borrow the common case and allocate only for the rare one.
 
-**Two implementations remain** (`split_ags_line`, `field_span`), deliberately.
-Folding `field_span` would cost its short-circuit — it stops at the field it
-wants (48.7 ns) where a full scan is 147.3 ns plus a `Vec`.
+**Two state machines remain** (`split_ags_line`'s, `field_span`'s),
+deliberately. Folding `field_span` would cost its short-circuit — it stops at
+the field it wants where a full scan pays for the line plus a `Vec`.
+
+`split_ags_line` itself no longer allocates its own machine: the M4 rewrite
+extracted it to **`split_ags_line_spans`** (byte bounds + a `has_escape` flag
+per field), and the owned splitter is now its adapter — one machine, agreement
+by construction. The parser's DATA cells are built from the same span core.
+This mattered because `scan_line` could NOT serve that role: the tolerant
+reader and the scanner genuinely disagree on a mid-field quote in an unquoted
+field (`x"y",z` — the scanner opens a quoted section, `split_ags_line` takes
+the bytes verbatim), so building cells on `scan_line` would have changed
+validated values. The tolerant grammar and the display/judging grammar are
+different grammars, and each keeps its own machine.
 
 ## Line terminators
 

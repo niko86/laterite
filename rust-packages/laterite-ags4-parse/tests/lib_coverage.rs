@@ -152,5 +152,8 @@ fn escaped_cells_read_unescaped_through_the_fixup_region() {
     let vals: Vec<&str> = (0..owned.len() - 1)
         .map(|c| g.cell(c, 0).unwrap())
         .collect();
-    assert_eq!(vals, owned[1..].iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(
+        vals,
+        owned[1..].iter().map(String::as_str).collect::<Vec<_>>()
+    );
 }

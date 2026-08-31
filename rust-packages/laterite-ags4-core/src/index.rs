@@ -129,9 +129,9 @@ fn file_defines(bytes: &[u8], index: &GroupIndex) -> Result<Vec<String>, CliErro
 }
 
 pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
-    // Lean profile: no raw-line retention, and reject invalid UTF-8 loudly —
-    // mirroring the csv reader this replaced (which also failed on non-UTF-8).
-    // `lean()` never substitutes bytes, so the offsets index the original buffer.
+    // Lean profile: reject invalid UTF-8 loudly — mirroring the csv reader
+    // this replaced (which also failed on non-UTF-8). `lean()` never
+    // substitutes bytes, so the offsets index the original buffer.
     // Locate-only: this function reads `group_records`, `group_order` and
     // `total_bytes`, and nothing else. Under the plain lean profile the walk
     // still tokenised every line into owned Strings and materialised every DATA

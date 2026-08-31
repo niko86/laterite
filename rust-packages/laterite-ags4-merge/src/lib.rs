@@ -812,7 +812,11 @@ fn reconcile_rows(
             let row_key = || -> Vec<String> {
                 id_headings
                     .iter()
-                    .map(|k| cell(&idx, &row.values, g.text(), k).unwrap_or("").to_string())
+                    .map(|k| {
+                        cell(&idx, &row.values, g.text(), k)
+                            .unwrap_or("")
+                            .to_string()
+                    })
                     .collect()
             };
 
@@ -849,9 +853,10 @@ fn reconcile_rows(
             // Overwrite every cell THIS file carries (later wins); leave the rest.
             let mut changed: Vec<String> = Vec::new();
             for h in &g.headings {
-                let (Some(&ui), Some(v)) =
-                    (union_idx.get(h.as_str()), cell(&idx, &row.values, g.text(), h))
-                else {
+                let (Some(&ui), Some(v)) = (
+                    union_idx.get(h.as_str()),
+                    cell(&idx, &row.values, g.text(), h),
+                ) else {
                     continue;
                 };
                 let nt = type_of(h);

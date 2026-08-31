@@ -81,8 +81,14 @@ gated on a measured spike (below).
 
 ## Decision
 
-**Shape.** `ParsedFile` retains the whole file's decoded text once, as an
-`Arc<str>`, shared into each `ParsedGroup`. `RawLine.text` and
+**Shape.** `ParsedFile` retains the whole file's decoded text once, in one
+atomically-refcounted buffer shared into each `ParsedGroup`. (Written as
+`Arc<str>` when this page was decided; the spike measured `Arc<str>`'s
+materialisation — a whole-file *copy* — sitting exactly at the operation
+peak, and the landed form is `Arc<String>`, which adopts the built buffer
+zero-copy. Every other property argued here — one buffer, refcount sharing,
+plain `&str` reads, no lifetimes — is unchanged; the A/B/A record is on
+#838.) `RawLine.text` and
 `DataRow.values` become `u32` span pairs into that buffer. A cell the
 tokenizer found escapes in is unescaped **once, at parse**, into a fix-up
 tail appended to the same buffer, and its span points there — so there is
@@ -161,6 +167,15 @@ queue's M4 row one-at-a-time as usual, whose work order is
   time would be on its most invasive candidate. The floors are the
   campaign's own (cited by rule, not restated here), so the bar cannot
   drift apart from the ledger that owns it.
+
+**Outcome (2026-08-31).** The mint condition was met and the arc landed:
+the spike's A/B/A cleared rule 10's invasive floor on every cell — validate
+−29.0% / read_typed −28.4% of peak at the 25 MB rung, −36.5% / −35.5% at
+100 MB, A-legs bracketing within 0.05% — and the paired criterion benches
+took `parse_bytes` down 43–47% while `check_parsed` stayed inside the 5%
+resolution floor. The verdict record with both findings (the `Arc<str>`
+transient above, and why `scan_line` could not serve as the span tokenizer)
+lives on #838; the ledger's M4 row carries the claim.
 
 ## Consequences
 

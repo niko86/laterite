@@ -11,6 +11,14 @@
 //! 1-indexed **line** number, and (via [`field_span`]) **char** spans —
 //! none back-derived from another.
 //!
+//! **Representation** (`dec-parse-cell-representation`): the decoded text is
+//! retained ONCE, in [`ParsedFile::text`], and every line and cell is a
+//! `u32` [`Span`] into it — a THIRD coordinate space (decoded-buffer bytes),
+//! distinct from both the original-byte offsets above and `field_span`'s
+//! char spans. A cell whose source carried `""` escapes is unescaped once at
+//! parse into a fix-up region of the same buffer, so every read stays a
+//! plain `&str`.
+//!
 //! Both consumers adopted it: the validator re-exports the leaf's types from
 //! its own `parse` module, and core's `ags4_codec` builds its lean projection
 //! on the same walk. The legacy [`parse_bytes`] / [`parse_str`] signatures are
@@ -57,8 +65,10 @@ impl Span {
     }
 }
 
-/// One physical source line (rich overlay; retained only when
-/// [`ParseOptions::retain_raw_lines`]).
+/// One physical source line. Always retained — a line is a [`Span`] over a
+/// buffer the parse keeps anyway, so the old opt-in overlay collapsed into
+/// the base model — except under [`ParseOptions::locate_only`], which
+/// retains no text at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawLine {
     /// 1-indexed, matching how editors + the AGS4 validator report.
@@ -185,7 +195,7 @@ pub struct ParsedFile {
     /// is the de-duplicated view of this; anything that needs to LOCATE bytes must
     /// read this instead (see [`GroupRecord`]).
     pub group_records: Vec<GroupRecord>,
-    /// Every line — empty unless [`ParseOptions::retain_raw_lines`].
+    /// Every line — empty only under [`ParseOptions::locate_only`].
     pub raw_lines: Vec<RawLine>,
     pub total_lines: u32,
     /// File began with a UTF-8 BOM (`EF BB BF`).
@@ -224,9 +234,6 @@ pub enum InvalidUtf8 {
 /// the lean profile.
 #[derive(Debug, Clone, Copy)]
 pub struct ParseOptions {
-    /// Retain `raw_lines` (the heavy per-line `String` overlay). Off in the
-    /// lean cert/sliced-read path.
-    pub retain_raw_lines: bool,
     pub encoding: &'static encoding_rs::Encoding,
     pub on_invalid_utf8: InvalidUtf8,
     /// Hard-fail on a structural violation — a HEADING/UNIT/TYPE/DATA row before
@@ -250,28 +257,27 @@ pub struct ParseOptions {
 }
 
 impl ParseOptions {
-    /// Lean: no raw-line retention, UTF-8, reject invalid bytes loudly, lenient
-    /// structure (the caller opts into `strict_structure` if it wants hard-fails).
+    /// Lean: UTF-8, reject invalid bytes loudly, lenient structure (the
+    /// caller opts into `strict_structure` if it wants hard-fails). Since the
+    /// span rewrite the profiles differ ONLY in decode policy — the old
+    /// raw-line-retention knob died with the representation that made it
+    /// expensive (a retained line costs ~a span).
     #[must_use]
     pub fn lean() -> Self {
         ParseOptions {
-            retain_raw_lines: false,
             encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::Reject,
             strict_structure: false,
             locate_only: false,
         }
     }
-    /// Validating: keep raw lines, UTF-8, lossy-replace, lenient structure (the
-    /// validator twin — never crashes, reports problems as findings).
+    /// Validating: UTF-8, lossy-replace, lenient structure (the validator
+    /// twin — never crashes, reports problems as findings).
     #[must_use]
     pub fn validating() -> Self {
         ParseOptions {
-            retain_raw_lines: true,
-            encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::LossyReplace,
-            strict_structure: false,
-            locate_only: false,
+            ..ParseOptions::lean()
         }
     }
 }
@@ -381,8 +387,8 @@ fn decode_line<'a>(
     let borrowed = matches!(cow, Cow::Borrowed(_));
     // Deliberately NOT `into_owned()`. Every line used to allocate a String
     // here even when the caller only needed a `&str` to tokenize and then
-    // dropped it — 418k allocations on a 25 MB file. The one caller that
-    // genuinely needs ownership (`retain_raw_lines`) takes it at the push.
+    // dropped it. Retention is one append into the shared buffer now, so no
+    // per-line ownership exists anywhere.
     Ok((cow, had_repl, borrowed))
 }
 
@@ -619,7 +625,19 @@ fn append_text(buf: &mut String, s: &str) -> Result<u32, ParseError> {
         return Err(ParseError::TooLarge);
     }
     buf.push_str(s);
+    // In range by the guard two lines up — the one place that proves it.
+    #[allow(clippy::cast_possible_truncation)]
     Ok(base as u32)
+}
+
+/// Build a [`Span`] from `usize` bounds already proven in range: every bound
+/// here is ≤ a buffer length [`append_text`] guarded against `u32::MAX`.
+#[allow(clippy::cast_possible_truncation)]
+fn span_at(start: usize, end: usize) -> Span {
+    Span {
+        start: start as u32,
+        end: end as u32,
+    }
 }
 
 /// One field's logical value materialised: the span's slice, unescaped only
@@ -684,14 +702,14 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             source_true = false;
         }
 
-        // Retain the line body up front when the raw-line overlay wants it;
-        // the DATA arm below reuses the same copy for its value spans, so a
-        // line's bytes are resident ONCE (the doubled residency the old
-        // `text.into_owned()` overlay paid is gone).
-        let line_base: Option<u32> = if opts.retain_raw_lines {
-            Some(append_text(&mut buf, &text)?)
-        } else {
+        // Retain the line body up front; the DATA arm below reuses the same
+        // copy for its value spans, so a line's bytes are resident ONCE (the
+        // doubled residency the old owned overlay paid is gone). The locator
+        // profile retains no text at all.
+        let line_base: Option<u32> = if opts.locate_only {
             None
+        } else {
+            Some(append_text(&mut buf, &text)?)
         };
 
         // No phantom trailing blank: `line_spans` stops when the buffer ends
@@ -814,15 +832,9 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     }
                     "DATA" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
-                            // The lean profile has no raw-line overlay, so the
-                            // body lands in the buffer here instead — and only
-                            // for a row that is actually kept (an orphan row's
-                            // text is never retained).
-                            let base = if let Some(b) = line_base {
-                                b
-                            } else {
-                                append_text(&mut buf, &text)?
-                            };
+                            // locate_only is the only profile that skips the
+                            // buffer, and it never reaches this arm.
+                            let base = line_base.expect("DATA arm implies a retained line");
                             let mut values: Vec<Span> =
                                 Vec::with_capacity(fspans.len().saturating_sub(1));
                             for f in fspans.iter().skip(1) {
@@ -831,16 +843,11 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                                     // fix-up region; every later read of this
                                     // cell is a plain `&str` slice.
                                     let fixed = unescape_doubled(&text[f.start..f.end]);
-                                    let start = append_text(&mut buf, &fixed)?;
-                                    values.push(Span {
-                                        start,
-                                        end: start + fixed.len() as u32,
-                                    });
+                                    let start = append_text(&mut buf, &fixed)? as usize;
+                                    values.push(span_at(start, start + fixed.len()));
                                 } else {
-                                    values.push(Span {
-                                        start: base + f.start as u32,
-                                        end: base + f.end as u32,
-                                    });
+                                    let base = base as usize;
+                                    values.push(span_at(base + f.start, base + f.end));
                                 }
                             }
                             g.rows.push(DataRow {
@@ -864,10 +871,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         if let Some(base) = line_base {
             raw_lines.push(RawLine {
                 number,
-                text: Span {
-                    start: base,
-                    end: base + text.len() as u32,
-                },
+                text: span_at(base as usize, base as usize + text.len()),
                 had_crlf,
                 byte_offset,
             });
