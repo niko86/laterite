@@ -860,6 +860,13 @@ nothing more.
   module plus engine imports) — per-side floors are recorded in the results
   file's `import_baselines`, and they are why the small rungs' factors
   overstate everything: rank from the big rungs.
+- The compat pandas cells measure **whichever hop the harness venv admits**
+  — the pyarrow-accelerated one when pyarrow is importable (this table's
+  committed cells), the shipped pyarrow-free DuckDB hop otherwise, and the
+  two differ by whole ×-of-output (queue M5). Since #833's round the
+  harness names the hop in the results file's `versions.pyarrow` + `notes`,
+  so the next reader cannot mistake the accelerated cells for the shipped
+  default.
 
 ### The memory queue — ranked, big-cheap first
 
@@ -869,11 +876,11 @@ time** (epic decision 8) and never pre-written.
 
 | # | candidate | axis | prize (ceiling) | mechanism, as read | cost |
 |---|---|---|---|---|---|
-| M1 | compat read holds two whole-file representations at peak | read_strings | was priced at **~4.8×-of-output** at the 265 MB rung; **DECLINED 2026-08-31 (#831)** — the measured ceiling of the contained fix on this instrument is **~0** (held vs released diagnosis children agree within 0.4% across the whole memory ladder, 5–265 MB; the released+forced-purge variant matches at 25/100 MB) | the seam-read mechanism was RIGHT and the presumed fix still does nothing here: releasing per group genuinely frees each table (heap reuse proven — a second parse lands in the freed pages; mimalloc's own stats report the freed heap purged after one forced collect), but darwin hands pages back only on `munmap` — `MADV_FREE` and `MADV_FREE_REUSABLE` both leave `ps`-RSS **and** `ru_maxrss` unmoved, raw-syscall probe — so the sum-peak is physically real on the measuring machine. Where the OS does reclaim (Linux `MADV_DONTNEED`; darwin under memory pressure) the release pays, but the lane's instrument cannot see that. Full diagnosis below | was `contained`; **revisit when** the lane gains a Linux or pressure-aware memory column, the allocator config moves for its own reasons (#294/#448 territory), or M4 reshapes the holds |
+| M1 | compat read holds two whole-file representations at peak | read_strings | was priced at **~4.8×-of-output** at the 265 MB rung; **DECLINED 2026-08-31 (#831)** — the measured ceiling of the contained fix on this instrument is **~0** (held vs released diagnosis children agree within 0.4% across the whole memory ladder, 5–265 MB; the released+forced-purge variant matches at 25/100 MB) | the seam-read mechanism was RIGHT and the presumed fix still does nothing here: releasing per group genuinely frees each table (heap reuse proven — a second parse lands in the freed pages; mimalloc's own stats report the freed heap purged after one forced collect), but darwin hands pages back only on `munmap` — `MADV_FREE` and `MADV_FREE_REUSABLE` both leave `ps`-RSS **and** `ru_maxrss` unmoved, raw-syscall probe — so the sum-peak is physically real on the measuring machine. Where the OS does reclaim (Linux `MADV_DONTNEED`; darwin under memory pressure) the release pays, but the lane's instrument cannot see that. Full diagnosis below | was `contained`; **revisit IN MOTION — #833** (owner's fork call, 2026-08-31): the release is being measured where users actually run — the self-hosted Linux pool + hosted Windows — with the campaign's 5% floor as the go/no-go; a go lands the fix under #833 as a third-family claim. The other revisit doors (allocator config, #294/#448 territory; M4 reshaping the holds) stay open |
 | M2 | the `build_ags4` workflow peak stacks held input + the per-cell emit hold + materialised output | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×); the rust leg corroborates with no Python in the room (write 13.6× vs parse-to-typed 7.6×, first #822-harness run, 2026-08-31) | **Attributed (2026-08-31 pass, below): the Arrow-door emit slice is itself per-cell-bound** — `arrow_in.rs` collects every group's formatted `OwnedGroup` before `emit_owned_groups` runs, and AutoFix's validating parse-back adds a second string per cell, so the whole file's cells are live twice at peak. On top, `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim). The adds-~nothing-over-input property belongs to the compat *stream* door (#805/#818) — M3's evidence — not to this door. A fix is two separable pieces: stream `OwnedGroup`s through the writer, and a format-to-disk door (an API addition mirrored on three surfaces) | **invasive** — attribution done; the premium clears the 20% gate several times over at ceiling; needs the to-disk-door design decision before a ticket |
 | M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | **inherits M1's #831 verdict** — falls with M1 wherever M1's release can be seen, and stalls with it here; still not a separate candidate | — |
 | M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; needs its own design page before a ticket |
-| M5 | the shipped pyarrow-free pandas hop pays a whole-file polars intermediate | read_strings (the default `[compat]` install only) | **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children: the same held loop, hop swapped). The lane's committed cells measure the **pyarrow** hop — the dev venv has the accelerator installed — so this premium is invisible in the baseline table and stacks on top of the 12.8× for every default `pip install laterite[compat]` user | `_frames.compat_materializer`'s DuckDB fallback copies each group's Arrow table into polars (`frame_from_arrow`; classic Utf8 re-encoded into polars' own memory) purely to rename positional columns before registering into DuckDB. The premium is sum-like, so the per-group copies are never returned either — the #831 finding again. Registering the native table's own `__arrow_c_stream__` and renaming in the SQL projection would skip the copy entirely: an **avoided** allocation, visible on any OS | contained — probed in #831's diagnosis; awaits its mint (epic decision 8, one ticket at a time) |
+| M5 | the shipped pyarrow-free pandas hop pays a whole-file polars intermediate | read_strings (the default `[compat]` install only) | **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children: the same held loop, hop swapped). The lane's committed cells measure the **pyarrow** hop — the dev venv has the accelerator installed — so this premium is invisible in the baseline table and stacks on top of the 12.8× for every default `pip install laterite[compat]` user | `_frames.compat_materializer`'s DuckDB fallback copies each group's Arrow table into polars (`frame_from_arrow`; classic Utf8 re-encoded into polars' own memory) purely to rename positional columns before registering into DuckDB. The premium is sum-like, so the per-group copies are never returned either — the #831 finding again. Registering the native table's own `__arrow_c_stream__` and renaming in the SQL projection would skip the copy entirely: an **avoided** allocation, visible on any OS | contained — probed in #831's diagnosis; **minted as #834** (2026-08-31, taking the queue slot #831 vacated). Its ticket also carries the owner's evidence trigger on the `[compat]` pyarrow-free default: if the shipped hop still trails the pyarrow hop substantially after the fix, that finding opens a dep-shape question — evidence to decide, never a standing plan to add pyarrow |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
@@ -958,13 +965,32 @@ can be claimed** — avoidance (M4, M5) over release. Where the OS does
 reclaim — Linux purges with `MADV_DONTNEED`, darwin under real memory
 pressure prefers reusable pages — the per-group release genuinely pays;
 both ends of that chain are verified but the composition is unmeasured
-here, and landing it on that argument is the owner's call, recorded on
-#831 with the fork.
+here. The fork was put to the owner on #831 and resolved the same day:
+**measure where users run before landing** (most are hosted Linux or
+Windows) — that measurement is #833, and the probe instrument it runs is
+`tools/perf_probe_m1.py` via the dispatch-only `perf-probe` workflow.
 
 ## Decisions taken
 
 Recorded here so the next session does not re-open them. Each was a genuine fork
 with consequences both ways; none is a default that fell out of the code.
+
+**The M1 fork — measure where users run, land on evidence (owner,
+2026-08-31, grilled).** #831's diagnosis left a fix that is real but
+invisible to the ledger machine's instrument. Rather than landing it blind
+or burying it, the owner chose to measure it on the OSes users actually run
+— hosted Linux and Windows — before deciding (#833): a trimmed go/no-go
+probe against the campaign's own 5% floor, on the self-hosted Linux pool
+plus GitHub-hosted `windows-2022` (`ags5-win11` stays release-only; in
+reserve only if hosted Windows proves unworkable). Cross-OS numbers are a
+**third labelled claim family** that never shares a table with the darwin
+lane. Paired with it, a measurement-honesty rule: the lane's results file
+now names WHICH pandas hop its compat cells measured, because the dev
+venv's pyarrow silently put the accelerated hop in the table while the
+shipped `[compat]` default takes the DuckDB hop. And a scoped non-decision:
+the pyarrow-free `[compat]` default is NOT being re-opened — M5 (#834)
+gathers the evidence, and only a recorded finding that the shipped hop
+still trails substantially puts the dep shape back on the owner's desk.
 
 **Sequencing — correctness and measurement debt first, then T1.** C2 and M1 land
 before the validator tranche. The reasoning is the exemption above: untested code
