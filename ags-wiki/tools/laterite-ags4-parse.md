@@ -12,7 +12,7 @@ repo_refs:
   lib: "repo:rust-packages/laterite-ags4-parse/src/lib.rs"
   scan: "repo:rust-packages/laterite-ags4-parse/src/scan.rs"
   benches: "repo:rust-packages/laterite-ags4-parse/benches/parse.rs"
-related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-types, core-perf-baseline, testing-strategy]
+related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-types, core-perf-baseline, testing-strategy, dec-parse-cell-representation]
 sources: []
 ---
 # laterite-ags4-parse
