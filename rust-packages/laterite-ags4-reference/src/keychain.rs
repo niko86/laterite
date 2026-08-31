@@ -32,6 +32,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::effective_dict::FileDict;
 use crate::union::{GroupDescriptor, Registry};
 
 /// The KEY heading names of `g`, in declaration order — the ONE definition of
@@ -175,6 +176,81 @@ where
     (0..n_rows)
         .map(|row| {
             let id = row_id_streamed(&mut hasher, &g.code, &own, row, &cell);
+            let parent_id = parent
+                .as_ref()
+                .map(|(pcode, pspec)| row_id_streamed(&mut hasher, pcode, pspec, row, &cell));
+            (id.to_string(), parent_id.map(|u| u.to_string()))
+        })
+        .collect()
+}
+
+/// [`group_row_ids`] with the Rule 18 effective dictionary as the identity
+/// authority for a group the standard registry does not know (#815).
+///
+/// A REGISTRY group delegates to [`group_row_ids`] untouched — spec keys,
+/// byte-identical ids. The file's own `DICT` never re-keys a standard group:
+/// row identity must not fork per delivery file, and the validator's Rule 10a
+/// tuple for a standard group comes from the spec side of the union for the
+/// same reason.
+///
+/// A FILE-DECLARED group mints from its declared KEY headings (`DICT_STAT`,
+/// via [`FileDict::key_headings`] — the same predicate the validator keys
+/// Rule 10a off), with its declared parent (`DICT_PGRP`, `-`/empty = none)
+/// resolved by the same precedence: a standard parent contributes its spec
+/// keys, a file-declared parent its declared ones. A group — or parent —
+/// declaring NO key headings mints nothing (an empty vec → the caller's
+/// unkeyed batch): [`content_id`] over an empty chain would stamp every row
+/// with the same id, which is worse than none.
+pub fn group_row_ids_effective<'a, F>(
+    reg: &Registry,
+    fd: &FileDict,
+    code: &str,
+    headings: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Vec<(String, Option<String>)>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    if reg.get(code).is_some() {
+        return group_row_ids(reg, code, headings, n_rows, cell);
+    }
+    // KEY headings → column indices, effective precedence per group. Same
+    // positional resolution as `group_row_ids`: `rposition` (last match) for a
+    // malformed duplicate heading, an absent KEY heading → always-"" cell.
+    let key_cols = |gcode: &str| -> Vec<(String, Option<usize>)> {
+        if let Some(desc) = reg.get(gcode) {
+            return desc
+                .key_headings()
+                .map(|h| (h.name.clone(), headings.iter().rposition(|x| x == &h.name)))
+                .collect();
+        }
+        fd.key_headings(gcode)
+            .map(|h| {
+                (
+                    h.heading.clone(),
+                    headings.iter().rposition(|x| x == &h.heading),
+                )
+            })
+            .collect()
+    };
+    let own = key_cols(code);
+    if own.is_empty() {
+        return Vec::new();
+    }
+    let parent = fd
+        .parent(code)
+        .map(|p| if p == "-" { "" } else { p })
+        .filter(|p| !p.is_empty())
+        .map(|pcode| (pcode.to_string(), key_cols(pcode)))
+        .filter(|(_, spec)| !spec.is_empty());
+
+    // The same streamed loop as `group_row_ids` — one reused hasher, borrowed
+    // KEY cells, the identical `canonical_encode_into` bytes.
+    let mut hasher = Sha256::new();
+    (0..n_rows)
+        .map(|row| {
+            let id = row_id_streamed(&mut hasher, code, &own, row, &cell);
             let parent_id = parent
                 .as_ref()
                 .map(|(pcode, pspec)| row_id_streamed(&mut hasher, pcode, pspec, row, &cell));
@@ -1040,5 +1116,151 @@ mod tests {
             h("X", "10.00"),
             "typed-vs-X on identical bytes does NOT dedup — use `lat merge` for that case"
         );
+    }
+
+    /// A `FileDict` declaring bespoke `XMON` (KEY `PROJ_ID` + `XMON_ID`,
+    /// parent `PROJ`) and keyless `XNOT` — the #815 fixtures.
+    fn bespoke_fd() -> FileDict {
+        use crate::effective_dict::DictRow;
+        FileDict::from_rows([
+            DictRow {
+                dict_type: "GROUP",
+                group: "XMON",
+                heading: "",
+                status: "",
+                ags_type: "",
+                unit: "",
+                parent: "PROJ",
+                desc: "",
+            },
+            DictRow {
+                dict_type: "HEADING",
+                group: "XMON",
+                heading: "PROJ_ID",
+                status: "KEY",
+                ags_type: "ID",
+                unit: "",
+                parent: "",
+                desc: "",
+            },
+            DictRow {
+                dict_type: "HEADING",
+                group: "XMON",
+                heading: "XMON_ID",
+                status: "key+required",
+                ags_type: "ID",
+                unit: "",
+                parent: "",
+                desc: "",
+            },
+            DictRow {
+                dict_type: "HEADING",
+                group: "XMON",
+                heading: "XMON_DESC",
+                status: "OTHER",
+                ags_type: "X",
+                unit: "",
+                parent: "",
+                desc: "",
+            },
+            DictRow {
+                dict_type: "GROUP",
+                group: "XNOT",
+                heading: "",
+                status: "",
+                ags_type: "",
+                unit: "",
+                parent: "-",
+                desc: "",
+            },
+            DictRow {
+                dict_type: "HEADING",
+                group: "XNOT",
+                heading: "XNOT_TXT",
+                status: "OTHER",
+                ags_type: "X",
+                unit: "",
+                parent: "",
+                desc: "",
+            },
+        ])
+    }
+
+    /// A registry group through the effective door is EXACTLY `group_row_ids`
+    /// — byte-identical ids, whatever the file's DICT says (identity must not
+    /// fork per delivery file, so a re-declared standard group changes nothing).
+    #[test]
+    fn effective_door_is_identical_for_a_registry_group() {
+        let reg = registry();
+        let fd = bespoke_fd();
+        let headings = vec!["LOCA_ID".to_string(), "LOCA_TYPE".to_string()];
+        let cells = [["BH01", "TP"], ["BH02", "RC"]];
+        let cell = |c: usize, r: usize| Some(cells[r][c]);
+        let std = group_row_ids(reg, "LOCA", &headings, 2, cell);
+        let eff = group_row_ids_effective(reg, &fd, "LOCA", &headings, 2, cell);
+        assert_eq!(std, eff);
+        assert_eq!(std.len(), 2);
+    }
+
+    /// A file-declared group mints from its declared KEY tuple — same rows,
+    /// same declared keys ⇒ same id; a differing KEY cell ⇒ a different id;
+    /// the OTHER column contributes nothing.
+    #[test]
+    fn a_file_declared_group_mints_from_its_declared_keys() {
+        let reg = registry();
+        let fd = bespoke_fd();
+        let headings: Vec<String> = ["PROJ_ID", "XMON_ID", "XMON_DESC"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let cells = [["P1", "M1", "Standpipe"], ["P1", "M2", "Piezometer"]];
+        let cell = |c: usize, r: usize| Some(cells[r][c]);
+        let ids = group_row_ids_effective(reg, &fd, "XMON", &headings, 2, cell);
+        assert_eq!(ids.len(), 2);
+        assert_ne!(ids[0].0, ids[1].0, "differing XMON_ID must differ");
+        // The id is the plain content_id over the declared KEY chain — the
+        // same function every spec-keyed row goes through.
+        let want = content_id("XMON", &chain(&[("PROJ_ID", "P1"), ("XMON_ID", "M1")]));
+        assert_eq!(ids[0].0, want.to_string());
+        // OTHER column is not identity: a changed description keeps the id.
+        let cells2 = [["P1", "M1", "Renamed"], ["P1", "M2", "Piezometer"]];
+        let cell2 = |c: usize, r: usize| Some(cells2[r][c]);
+        let again = group_row_ids_effective(reg, &fd, "XMON", &headings, 2, cell2);
+        assert_eq!(ids[0].0, again[0].0);
+    }
+
+    /// The declared parent chain reconstructs the STANDARD parent's id from
+    /// the child's denormalised row — `child._parent_id == parent._id` holds
+    /// across the registry/file boundary.
+    #[test]
+    fn a_declared_parent_chain_reaches_the_standard_parent() {
+        let reg = registry();
+        let fd = bespoke_fd();
+        let headings: Vec<String> = ["PROJ_ID", "XMON_ID"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let cells = [["P1", "M1"]];
+        let cell = |c: usize, r: usize| Some(cells[r][c]);
+        let ids = group_row_ids_effective(reg, &fd, "XMON", &headings, 1, cell);
+        // PROJ's spec key is PROJ_ID; its id for P1 comes from the std door.
+        let proj_headings = vec!["PROJ_ID".to_string()];
+        let proj_cells = [["P1"]];
+        let proj_cell = |c: usize, r: usize| Some(proj_cells[r][c]);
+        let proj = group_row_ids(reg, "PROJ", &proj_headings, 1, proj_cell);
+        assert_eq!(ids[0].1.as_deref(), Some(proj[0].0.as_str()));
+    }
+
+    /// No declared KEY headings ⇒ no ids (the caller's unkeyed batch): an
+    /// empty chain would stamp every row identically, which is worse than
+    /// none. Unknown-everywhere groups also stay unkeyed.
+    #[test]
+    fn keyless_and_undeclared_groups_stay_unkeyed() {
+        let reg = registry();
+        let fd = bespoke_fd();
+        let headings = vec!["XNOT_TXT".to_string()];
+        let cell = |_c: usize, _r: usize| Some("x");
+        assert!(group_row_ids_effective(reg, &fd, "XNOT", &headings, 1, cell).is_empty());
+        assert!(group_row_ids_effective(reg, &fd, "ZZZZ", &headings, 1, cell).is_empty());
     }
 }

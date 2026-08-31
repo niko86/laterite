@@ -213,15 +213,29 @@ impl Reading {
         // mirrors laterite-py's `Reading::table_for`.
         let reg = laterite_ags4_core::registry::registry();
         let ids = if with_keys.unwrap_or(true) {
-            reg.get(&code).map(|_| {
-                laterite_ags4_core::keychain::group_row_ids(
+            if reg.get(&code).is_some() {
+                Some(laterite_ags4_core::keychain::group_row_ids(
                     reg,
                     &code,
                     &group.headings,
                     group.rows.len(),
                     |col, row| group.cell(col, row),
-                )
-            })
+                ))
+            } else {
+                // Rule 18 (#815): a file-declared group mints from its declared
+                // KEY tuple + parent; declared keyless (or undeclared) stays
+                // unkeyed. The DICT walk is paid only on this rare branch.
+                let fd = laterite_ags4_core::effective_dict::FileDict::from_parsed(&self.parsed);
+                let v = laterite_ags4_core::keychain::group_row_ids_effective(
+                    reg,
+                    &fd,
+                    &code,
+                    &group.headings,
+                    group.rows.len(),
+                    |col, row| group.cell(col, row),
+                );
+                (!v.is_empty()).then_some(v)
+            }
         } else {
             None
         };

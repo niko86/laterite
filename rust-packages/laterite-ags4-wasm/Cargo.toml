@@ -118,7 +118,7 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13
 # Optional because only two surfaces reach it directly: the keychain (`arrow`)
 # and the AGS4 read codec `ags4_to_xlsx` configures (`excel`). Validation and
 # the JSON read path go through the parse leaf, never core.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.0", default-features = false, optional = true }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.1", default-features = false, optional = true }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
 laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.1", optional = true }
@@ -140,7 +140,7 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.14.0" }
 # out of this crate as a wasm-safe leaf so the same engine-consistent diff
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
 # validator dict + laterite-ags4-types, all already pulled here — no new weight.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.0", optional = true }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.1", optional = true }
 # `merge()` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
 # already here — the same leaf PyO3 + Node + the CLI reuse.

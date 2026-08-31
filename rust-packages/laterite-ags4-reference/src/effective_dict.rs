@@ -37,6 +37,15 @@ use laterite_ags4_parse::ParsedFile;
 
 use crate::dict::{Dictionary, HeadingRef};
 
+/// The one `DICT_STAT` classification predicate: case-insensitive containment,
+/// so `KEY`, `key` and `KEY+REQUIRED` all count as KEY. Every reader of the
+/// file half's status — the union's `fields_with_status`, `FileDict::
+/// key_headings`, and through them the keychain's effective minting — goes
+/// through here, so "what counts as a KEY declaration" exists exactly once.
+pub(crate) fn status_contains(status: &str, want: &str) -> bool {
+    status.to_ascii_uppercase().contains(want)
+}
+
 /// One heading declared by the delivery file's own DICT group, with every
 /// column a `HEADING`-carrying row can contribute. Field vocabulary mirrors
 /// [`crate::dict::DictEntry`] so union lookups read the same either side.
@@ -204,6 +213,18 @@ impl FileDict {
         self.headings.is_empty() && self.parents.is_empty()
     }
 
+    /// The group's declared KEY headings, in declaration order — `DICT_STAT`
+    /// matched by the one shared predicate (`status_contains`), so
+    /// `KEY+REQUIRED` counts. The file half of `EffectiveDict::key_fields`,
+    /// exposed on its own for the keychain's effective-dictionary minting
+    /// (#815), where only a group the standard registry does not know ever
+    /// reads it.
+    pub fn key_headings(&self, group: &str) -> impl Iterator<Item = &FileHeading> {
+        self.headings(group)
+            .iter()
+            .filter(|h| status_contains(&h.status, "KEY"))
+    }
+
     /// Every file-declared heading name, across all groups (duplicates
     /// across groups possible — collect into a set for membership).
     pub fn all_heading_names(&self) -> impl Iterator<Item = &str> {
@@ -297,7 +318,7 @@ impl<'a> EffectiveDict<'a> {
             }
         }
         for h in self.file.headings(group) {
-            if h.status.to_ascii_uppercase().contains(want) && !out.contains(&h.heading) {
+            if status_contains(&h.status, want) && !out.contains(&h.heading) {
                 out.push(h.heading.clone());
             }
         }

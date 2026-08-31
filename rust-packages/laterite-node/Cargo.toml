@@ -60,7 +60,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
 # The shared revision-diff leaf (#294 Batch E / #4): the KEY-aware, type-aware
 # comparison PyO3 + the CLI + wasm already reuse. This wrapper only parses,
 # resolves the dictionary edition, and serialises the `RevisionDelta` to JSON.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.0" }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.1" }
 # `merge()` — reconcile N deliveries of one project into one file (KEY-aware,
 # argument-order recency, widen-to-X). The same leaf PyO3 + the CLI reuse.
 laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.1" }
@@ -78,7 +78,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 # light dep now — sha2 + uuid + the dictionary. `default-features = false` drops
 # core's `transport` feature (we bind the leaf directly below), so core pulls
 # neither age nor zstd for us.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.0", default-features = false }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.1", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
 laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.1" }

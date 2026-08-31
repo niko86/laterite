@@ -24,7 +24,7 @@
 
 [package]
 name = "laterite-ags4-diff"
-version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.12.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "AGS4 revision diff — KEY-aware/type-aware comparison of two files, DuckDB-free + wasm-safe"
