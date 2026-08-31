@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-08-29
 supersedes: []
 from_gap: []
-related: [ags4-output, laterite-ags4-emit, laterite-ags4-types, dec-laterite-ags4-types-leaf, dec-rust-api-crates-io, dec-facade-parity, crate-map, reliquary]
+related: [ags4-output, laterite-ags4-emit, laterite-ags4-types, dec-laterite-ags4-types-leaf, dec-rust-api-crates-io, dec-facade-parity, crate-map, reliquary, dec-parse-cell-representation]
 sources: []
 ---
 
