@@ -13,8 +13,9 @@
 //! `From<ParseError> for ValidatorError`), so every caller's error handling
 //! is unchanged. The two `parse_file*` wrappers additionally do the `fs::read`
 //! the leaf deliberately doesn't. Validator callers parse via the leaf's
-//! VALIDATING profile (retain raw lines + lossy decode), preserving the rich
-//! 420 MB line profile and O-32's lossy-not-reject behaviour.
+//! VALIDATING profile (lossy decode — O-32's lossy-not-reject behaviour);
+//! since the span rewrite every profile retains the same one-buffer line
+//! model, so the profiles differ only in decode policy.
 
 use std::fs;
 use std::path::Path;
@@ -22,7 +23,8 @@ use std::path::Path;
 use crate::error::ValidatorError;
 
 pub use laterite_ags4_parse::{
-    DataRow, ParseError, ParsedFile, ParsedGroup, RawLine, field_span, line_spans, split_ags_line,
+    DataRow, FieldSpan, ParseError, ParsedFile, ParsedGroup, RawLine, Span, field_span, line_spans,
+    split_ags_line, split_ags_line_spans,
 };
 
 /// Parse an AGS4 file from disk (UTF-8). Invalid UTF-8 is decoded lossily
@@ -90,7 +92,7 @@ mod tests {
         assert_eq!(proj.headings, vec!["PROJ_ID"]);
         assert_eq!(proj.rows.len(), 1);
         assert_eq!(proj.rows[0].line, 5);
-        assert_eq!(proj.rows[0].values, vec!["P1"]);
+        assert_eq!(proj.cell(0, 0), Some("P1"));
         let loca = &pf.groups["LOCA"];
         assert_eq!(loca.group_line, 7);
         assert_eq!(loca.rows[0].line, 11);
@@ -111,7 +113,7 @@ mod tests {
         let src = "\"GROUP\",\"PROJ\"\r\n\"DATA\",\"P1\""; // no trailing newline
         let pf = parse_str(src).unwrap();
         let last = pf.raw_lines.last().unwrap();
-        assert_eq!(last.text, "\"DATA\",\"P1\"");
+        assert_eq!(pf.line_text(last), "\"DATA\",\"P1\"");
         assert!(!last.had_crlf, "unterminated final line is a Rule 2a miss");
     }
 
@@ -172,7 +174,7 @@ mod tests {
         // MUST still parse so every later rule runs.
         let pf = parse_bytes_via_file(&minimal_proj(&[0xB0])).expect("must not hard-error");
         assert_eq!(pf.group_order, vec!["PROJ"]);
-        let v = &pf.groups["PROJ"].rows[0].values[0];
+        let v = pf.groups["PROJ"].cell(0, 0).unwrap();
         assert_eq!(v, "P1\u{FFFD}", "lone 0xB0 → U+FFFD (not U+00B0)");
         assert!(!v.contains('\u{00B0}'), "must NOT be Latin-1-decoded");
     }
@@ -180,7 +182,7 @@ mod tests {
     #[test]
     fn valid_utf8_extended_char_is_byte_faithful() {
         let pf = parse_bytes_via_file(&minimal_proj("°".as_bytes())).unwrap();
-        let v = &pf.groups["PROJ"].rows[0].values[0];
+        let v = pf.groups["PROJ"].cell(0, 0).unwrap();
         assert_eq!(v, "P1\u{00B0}");
         assert!(!v.contains('\u{FFFD}'), "valid UTF-8 must not be mangled");
     }

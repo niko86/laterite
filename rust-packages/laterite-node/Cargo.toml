@@ -51,19 +51,19 @@ napi-derive = "3"
 # The engine — all DuckDB-free, pure Rust (same crates laterite-py + laterite-ags4-wasm
 # wrap). laterite-ags4-types `arrow` feature pulls the shared typed-Arrow builder
 # (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.1" }
 # The shared parse leaf (#168 Phase 3): text/bytes parse through the leaf
 # directly; its `ParseError` → ValidatorError via the Phase-2 `From` bridge so
 # the `thrown`/`classify` exit-code map is unchanged. Validator dep stays for
 # the FS entry (`parse_file_with_encoding`), rules, and ValidatorError.
-laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
 # The shared revision-diff leaf (#294 Batch E / #4): the KEY-aware, type-aware
 # comparison PyO3 + the CLI + wasm already reuse. This wrapper only parses,
 # resolves the dictionary edition, and serialises the `RevisionDelta` to JSON.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.1" }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `merge()` — reconcile N deliveries of one project into one file (KEY-aware,
 # argument-order recency, widen-to-X). The same leaf PyO3 + the CLI reuse.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.1" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.2" }
 laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.12.0", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.
@@ -78,10 +78,10 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 # light dep now — sha2 + uuid + the dictionary. `default-features = false` drops
 # core's `transport` feature (we bind the leaf directly below), so core pulls
 # neither age nor zstd for us.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.1", default-features = false }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.2", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.1" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.2" }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
 # Transport (pack/unpack/lock/unlock) — zstd + age passphrase, the shared

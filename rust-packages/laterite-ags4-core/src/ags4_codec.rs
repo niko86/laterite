@@ -257,6 +257,9 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         let Some(pg) = pgroups.remove(raw_code) else {
             continue; // group_order and groups are built together; defensive.
         };
+        // The shared decoded buffer the row spans index — cloned out so the
+        // rows can be moved while cells are still read through it.
+        let buf = Arc::clone(pg.shared_text());
         let headings: Vec<String> = pg.headings.into_iter().map(trim_owned).collect();
         // Resolve BEFORE the UNIT/TYPE pad below, so those still align with the
         // heading count — `Recover` renames headings, it never adds or drops one.
@@ -287,7 +290,9 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
                 for key in &keys {
                     // A short/ragged row yields "" for the missing tail, as
                     // before — the positional contract is unchanged.
-                    let v = values.next().map_or_else(String::new, trim_owned);
+                    let v = values
+                        .next()
+                        .map_or_else(String::new, |s| s.slice(&buf).trim().to_string());
                     row.insert(Arc::clone(key), v);
                 }
                 // Whatever is LEFT in `values` bound to no heading. Dropping it
@@ -347,6 +352,9 @@ pub(crate) fn map_parse_err(e: ParseError) -> CliError {
         ParseError::NotAgs4(m) | ParseError::Structure(m) => m,
         ParseError::UnsupportedEdition { found } => format!("unsupported AGS edition {found:?}"),
         ParseError::NotUtf8 => "input is not valid UTF-8".to_string(),
+        ParseError::TooLarge => {
+            "file too large: decoded text exceeds the 4 GiB span space".to_string()
+        }
     };
     CliError::Schema(msg)
 }

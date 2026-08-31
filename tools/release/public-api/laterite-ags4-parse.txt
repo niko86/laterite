@@ -94,6 +94,7 @@ pub enum laterite_ags4_parse::ParseError
 pub laterite_ags4_parse::ParseError::NotAgs4(alloc::string::String)
 pub laterite_ags4_parse::ParseError::NotUtf8
 pub laterite_ags4_parse::ParseError::Structure(alloc::string::String)
+pub laterite_ags4_parse::ParseError::TooLarge
 pub laterite_ags4_parse::ParseError::UnsupportedEdition
 pub laterite_ags4_parse::ParseError::UnsupportedEdition::found: alloc::string::String
 impl core::clone::Clone for laterite_ags4_parse::ParseError
@@ -114,7 +115,7 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::ParseError
 pub struct laterite_ags4_parse::DataRow
 pub laterite_ags4_parse::DataRow::byte_offset: u64
 pub laterite_ags4_parse::DataRow::line: u32
-pub laterite_ags4_parse::DataRow::values: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parse::DataRow::values: alloc::vec::Vec<laterite_ags4_parse::Span>
 impl core::clone::Clone for laterite_ags4_parse::DataRow
 pub fn laterite_ags4_parse::DataRow::clone(&self) -> laterite_ags4_parse::DataRow
 impl core::cmp::Eq for laterite_ags4_parse::DataRow
@@ -130,6 +131,26 @@ impl core::marker::Unpin for laterite_ags4_parse::DataRow
 impl core::marker::UnsafeUnpin for laterite_ags4_parse::DataRow
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::DataRow
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::DataRow
+pub struct laterite_ags4_parse::FieldSpan
+pub laterite_ags4_parse::FieldSpan::end: usize
+pub laterite_ags4_parse::FieldSpan::has_escape: bool
+pub laterite_ags4_parse::FieldSpan::start: usize
+impl core::clone::Clone for laterite_ags4_parse::FieldSpan
+pub fn laterite_ags4_parse::FieldSpan::clone(&self) -> laterite_ags4_parse::FieldSpan
+impl core::cmp::Eq for laterite_ags4_parse::FieldSpan
+impl core::cmp::PartialEq for laterite_ags4_parse::FieldSpan
+pub fn laterite_ags4_parse::FieldSpan::eq(&self, &laterite_ags4_parse::FieldSpan) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::FieldSpan
+pub fn laterite_ags4_parse::FieldSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::FieldSpan
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::FieldSpan
+impl core::marker::Freeze for laterite_ags4_parse::FieldSpan
+impl core::marker::Send for laterite_ags4_parse::FieldSpan
+impl core::marker::Sync for laterite_ags4_parse::FieldSpan
+impl core::marker::Unpin for laterite_ags4_parse::FieldSpan
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::FieldSpan
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::FieldSpan
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::FieldSpan
 pub struct laterite_ags4_parse::GroupRecord
 pub laterite_ags4_parse::GroupRecord::byte_offset: u64
 pub laterite_ags4_parse::GroupRecord::code: alloc::string::String
@@ -185,7 +206,6 @@ pub struct laterite_ags4_parse::ParseOptions
 pub laterite_ags4_parse::ParseOptions::encoding: &'static encoding_rs::Encoding
 pub laterite_ags4_parse::ParseOptions::locate_only: bool
 pub laterite_ags4_parse::ParseOptions::on_invalid_utf8: laterite_ags4_parse::InvalidUtf8
-pub laterite_ags4_parse::ParseOptions::retain_raw_lines: bool
 pub laterite_ags4_parse::ParseOptions::strict_structure: bool
 impl laterite_ags4_parse::ParseOptions
 pub fn laterite_ags4_parse::ParseOptions::lean() -> Self
@@ -209,8 +229,11 @@ pub laterite_ags4_parse::ParsedFile::group_records: alloc::vec::Vec<laterite_ags
 pub laterite_ags4_parse::ParsedFile::groups: alloc::collections::btree::map::BTreeMap<alloc::string::String, laterite_ags4_parse::ParsedGroup>
 pub laterite_ags4_parse::ParsedFile::has_bom: bool
 pub laterite_ags4_parse::ParsedFile::raw_lines: alloc::vec::Vec<laterite_ags4_parse::RawLine>
+pub laterite_ags4_parse::ParsedFile::text: alloc::sync::Arc<alloc::string::String>
 pub laterite_ags4_parse::ParsedFile::total_bytes: u64
 pub laterite_ags4_parse::ParsedFile::total_lines: u32
+impl laterite_ags4_parse::ParsedFile
+pub fn laterite_ags4_parse::ParsedFile::line_text<'a>(&'a self, &laterite_ags4_parse::RawLine) -> &'a str
 impl core::clone::Clone for laterite_ags4_parse::ParsedFile
 pub fn laterite_ags4_parse::ParsedFile::clone(&self) -> laterite_ags4_parse::ParsedFile
 impl core::fmt::Debug for laterite_ags4_parse::ParsedFile
@@ -236,14 +259,15 @@ pub laterite_ags4_parse::ParsedGroup::units: alloc::vec::Vec<alloc::string::Stri
 impl laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::cell(&self, usize, usize) -> core::option::Option<&str>
 pub fn laterite_ags4_parse::ParsedGroup::col(&self, &str) -> core::option::Option<usize>
+pub fn laterite_ags4_parse::ParsedGroup::shared_text(&self) -> &alloc::sync::Arc<alloc::string::String>
+pub fn laterite_ags4_parse::ParsedGroup::text(&self) -> &str
 impl core::clone::Clone for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> laterite_ags4_parse::ParsedGroup
 impl core::cmp::Eq for laterite_ags4_parse::ParsedGroup
 impl core::cmp::PartialEq for laterite_ags4_parse::ParsedGroup
-pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &laterite_ags4_parse::ParsedGroup) -> bool
+pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::StructuralPartialEq for laterite_ags4_parse::ParsedGroup
 impl core::marker::Freeze for laterite_ags4_parse::ParsedGroup
 impl core::marker::Send for laterite_ags4_parse::ParsedGroup
 impl core::marker::Sync for laterite_ags4_parse::ParsedGroup
@@ -255,7 +279,7 @@ pub struct laterite_ags4_parse::RawLine
 pub laterite_ags4_parse::RawLine::byte_offset: u64
 pub laterite_ags4_parse::RawLine::had_crlf: bool
 pub laterite_ags4_parse::RawLine::number: u32
-pub laterite_ags4_parse::RawLine::text: alloc::string::String
+pub laterite_ags4_parse::RawLine::text: laterite_ags4_parse::Span
 impl core::clone::Clone for laterite_ags4_parse::RawLine
 pub fn laterite_ags4_parse::RawLine::clone(&self) -> laterite_ags4_parse::RawLine
 impl core::cmp::Eq for laterite_ags4_parse::RawLine
@@ -271,6 +295,29 @@ impl core::marker::Unpin for laterite_ags4_parse::RawLine
 impl core::marker::UnsafeUnpin for laterite_ags4_parse::RawLine
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::RawLine
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::RawLine
+pub struct laterite_ags4_parse::Span
+pub laterite_ags4_parse::Span::end: u32
+pub laterite_ags4_parse::Span::start: u32
+impl laterite_ags4_parse::Span
+pub fn laterite_ags4_parse::Span::is_empty(&self) -> bool
+pub fn laterite_ags4_parse::Span::len(&self) -> usize
+pub fn laterite_ags4_parse::Span::slice<'a>(&self, &'a str) -> &'a str
+impl core::clone::Clone for laterite_ags4_parse::Span
+pub fn laterite_ags4_parse::Span::clone(&self) -> laterite_ags4_parse::Span
+impl core::cmp::Eq for laterite_ags4_parse::Span
+impl core::cmp::PartialEq for laterite_ags4_parse::Span
+pub fn laterite_ags4_parse::Span::eq(&self, &laterite_ags4_parse::Span) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::Span
+pub fn laterite_ags4_parse::Span::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::Span
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::Span
+impl core::marker::Freeze for laterite_ags4_parse::Span
+impl core::marker::Send for laterite_ags4_parse::Span
+impl core::marker::Sync for laterite_ags4_parse::Span
+impl core::marker::Unpin for laterite_ags4_parse::Span
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::Span
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::Span
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::Span
 pub fn laterite_ags4_parse::field_span(&str, u32) -> core::option::Option<(u32, u32)>
 pub fn laterite_ags4_parse::line_spans(&[u8]) -> laterite_ags4_parse::LineSpans<'_>
 pub fn laterite_ags4_parse::parse_bytes(&[u8], &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
@@ -278,3 +325,4 @@ pub fn laterite_ags4_parse::parse_bytes_opts(&[u8], laterite_ags4_parse::ParseOp
 pub fn laterite_ags4_parse::parse_str(&str) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
 pub fn laterite_ags4_parse::resolve_encoding(core::option::Option<&str>) -> core::option::Option<&'static encoding_rs::Encoding>
 pub fn laterite_ags4_parse::split_ags_line(&str) -> alloc::vec::Vec<alloc::string::String>
+pub fn laterite_ags4_parse::split_ags_line_spans(&str, &mut alloc::vec::Vec<laterite_ags4_parse::FieldSpan>)

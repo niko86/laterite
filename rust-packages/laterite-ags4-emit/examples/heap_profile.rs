@@ -11,7 +11,9 @@
 //! The pipeline it measures is the post-#790 one: the Arrow door streams
 //! each cell straight off its array into the formatted string, so the copies
 //! left to see are the formatted `OwnedGroup` rows, the written bytes, and
-//! the validating parse-back (`DataRow.values` in `laterite-ags4-parse`).
+//! the validating parse-back's retained buffer (since the M4 span rewrite,
+//! `laterite-ags4-parse` holds one decoded buffer and per-cell spans, not
+//! per-cell `String`s).
 //! The input transpose this example used to attribute — one `Cell`
 //! (previously a `serde_json::Value`) per cell, the peak's largest slice —
 //! no longer exists; its retirement is what #790's ladder priced.

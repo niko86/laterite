@@ -462,8 +462,13 @@ fn heading_index(headings: &[String]) -> HashMap<&str, usize> {
 
 /// A cell of a parsed group's row by heading name; `None` if the group doesn't
 /// carry that heading, `Some("")` for a short/ragged row (carried-but-empty).
-fn cell<'a>(idx: &HashMap<&str, usize>, row: &'a [String], h: &str) -> Option<&'a str> {
-    idx.get(h).map(|&i| row.get(i).map_or("", String::as_str))
+fn cell<'a>(
+    idx: &HashMap<&str, usize>,
+    row: &[laterite_ags4_parse::Span],
+    buf: &'a str,
+    h: &str,
+) -> Option<&'a str> {
+    idx.get(h).map(|&i| row.get(i).map_or("", |s| s.slice(buf)))
 }
 
 /// Warn when a file later in argument order carries an earlier `TRAN_DATE` than
@@ -507,7 +512,7 @@ fn tran_field(f: &ParsedFile, heading: &str) -> Option<String> {
     let g = f.groups.get("TRAN")?;
     let idx = heading_index(&g.headings);
     let row = g.rows.first()?;
-    cell(&idx, &row.values, heading).map(str::to_string)
+    cell(&idx, &row.values, g.text(), heading).map(str::to_string)
 }
 
 /// The merged UNIT for a heading. **A genuine disagreement is fatal in EVERY
@@ -807,7 +812,11 @@ fn reconcile_rows(
             let row_key = || -> Vec<String> {
                 id_headings
                     .iter()
-                    .map(|k| cell(&idx, &row.values, k).unwrap_or("").to_string())
+                    .map(|k| {
+                        cell(&idx, &row.values, g.text(), k)
+                            .unwrap_or("")
+                            .to_string()
+                    })
                     .collect()
             };
 
@@ -844,8 +853,10 @@ fn reconcile_rows(
             // Overwrite every cell THIS file carries (later wins); leave the rest.
             let mut changed: Vec<String> = Vec::new();
             for h in &g.headings {
-                let (Some(&ui), Some(v)) = (union_idx.get(h.as_str()), cell(&idx, &row.values, h))
-                else {
+                let (Some(&ui), Some(v)) = (
+                    union_idx.get(h.as_str()),
+                    cell(&idx, &row.values, g.text(), h),
+                ) else {
                     continue;
                 };
                 let nt = type_of(h);

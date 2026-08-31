@@ -416,8 +416,9 @@ fn rank(op: &Op) -> u8 {
 /// the canonical order [`rank`] describes, so the result does not depend on
 /// which order they were listed in.
 pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
-    // `validating()` is the profile that retains `raw_lines`, which is the whole
-    // basis of the byte-verbatim guarantee: no raw lines, no untouched lines.
+    // `validating()` for its lossy decode — this walk must never hard-fail.
+    // (Every profile retains `raw_lines` since the span rewrite; the
+    // byte-verbatim guarantee no longer hangs on the profile choice.)
     let parsed = parse_bytes_opts(text.as_bytes(), ParseOptions::validating())
         .map_err(|e| EditError::Parse(format!("{e:?}")))?;
 
@@ -459,7 +460,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
             .raw_lines
             .iter()
             .find(|l| l.number == n)
-            .map(|l| l.text.clone())
+            .map(|l| parsed.line_text(l).to_string())
             .unwrap_or_default()
     };
     // A line already edited by an earlier op must be edited FURTHER, not from
@@ -844,7 +845,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 out.push_str(terminator);
             }
             None => {
-                out.push_str(&line.text);
+                out.push_str(parsed.line_text(line));
                 out.push_str(terminator);
             }
         }

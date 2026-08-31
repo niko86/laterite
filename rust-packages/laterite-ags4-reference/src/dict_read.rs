@@ -28,7 +28,6 @@ pub(crate) fn read_ags_dict(
     enc: &'static encoding_rs::Encoding,
 ) -> Result<DictionaryFile, DictError> {
     let opts = ParseOptions {
-        retain_raw_lines: false,
         encoding: enc,
         on_invalid_utf8: InvalidUtf8::LossyReplace,
         strict_structure: false,
@@ -58,7 +57,8 @@ pub(crate) fn read_ags_dict(
 
     for row in &dict.rows {
         let cell = |ci: Option<usize>| -> &str {
-            ci.and_then(|i| row.values.get(i)).map_or("", |s| s.trim())
+            ci.and_then(|i| row.values.get(i))
+                .map_or("", |s| s.slice(dict.text()).trim())
         };
         let grp = cell(Some(ci_grp));
         if grp.is_empty() {

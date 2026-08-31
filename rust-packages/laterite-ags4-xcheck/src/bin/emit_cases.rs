@@ -69,7 +69,12 @@ fn reemit_canonical(input_path: &PathBuf) -> Observation {
             matrix.push(pad("UNIT", &g.units));
             matrix.push(pad("TYPE", &g.types));
             for r in &g.rows {
-                matrix.push(pad("DATA", &r.values));
+                let vals: Vec<String> = r
+                    .values
+                    .iter()
+                    .map(|s| s.slice(g.text()).to_string())
+                    .collect();
+                matrix.push(pad("DATA", &vals));
             }
             Some((code.clone(), matrix))
         })

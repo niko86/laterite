@@ -27,12 +27,12 @@ fn row_by_key<'a>(g: &'a ParsedGroup, key_h: &str, key_v: &str) -> Option<&'a Da
     let ci = g.headings.iter().position(|h| h == key_h)?;
     g.rows
         .iter()
-        .find(|r| r.values.get(ci).map(String::as_str) == Some(key_v))
+        .find(|r| r.values.get(ci).map(|s| s.slice(g.text())) == Some(key_v))
 }
 
 fn cell(g: &ParsedGroup, r: &DataRow, h: &str) -> Option<String> {
     let ci = g.headings.iter().position(|x| x == h)?;
-    r.values.get(ci).cloned()
+    r.values.get(ci).map(|s| s.slice(g.text()).to_string())
 }
 
 fn type_of(g: &ParsedGroup, h: &str) -> Option<String> {

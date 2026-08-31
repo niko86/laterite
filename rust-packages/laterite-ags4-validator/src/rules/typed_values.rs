@@ -116,7 +116,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
             }
 
             for (ri, row) in g.rows.iter().enumerate() {
-                let Some(v) = row.values.get(ci) else {
+                let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) else {
                     continue;
                 };
                 if v.is_empty() {
@@ -138,7 +138,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                             Ok(0.0) => false,
                             Ok(f) => {
                                 let ref_form = format_nsf(f, *n);
-                                if ref_form == *v {
+                                if ref_form == v {
                                     false
                                 } else {
                                     sf_expected = Some(ref_form);
@@ -149,7 +149,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                         }
                     }
                     Check::U => v.trim().parse::<f64>().is_err(),
-                    Check::Yn => !matches!(v.as_str(), "Y" | "N" | "y" | "n"),
+                    Check::Yn => !matches!(v, "Y" | "N" | "y" | "n"),
                     Check::Dms => !is_dms(v),
                     Check::T => !is_elapsed_time(v, unit),
                     Check::Dt => !structural_dt_match(v, unit) || !dt_semantic_ok(v, unit),
@@ -207,15 +207,15 @@ fn flag_duplicate_ids(
     use std::collections::HashMap;
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for row in &g.rows {
-        if let Some(v) = row.values.get(ci) {
+        if let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) {
             if !v.is_empty() {
-                *counts.entry(v.as_str()).or_default() += 1;
+                *counts.entry(v).or_default() += 1;
             }
         }
     }
     for (ri, row) in g.rows.iter().enumerate() {
-        if let Some(v) = row.values.get(ci) {
-            if !v.is_empty() && counts.get(v.as_str()).copied().unwrap_or(0) > 1 {
+        if let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) {
+            if !v.is_empty() && counts.get(v).copied().unwrap_or(0) > 1 {
                 add_at(
                     found,
                     RULE_8,

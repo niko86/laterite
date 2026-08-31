@@ -64,10 +64,11 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
 /// GROUP, so a well-formed file (GROUP on line 1) pays one comparison.
 fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut Findings) {
     for rl in &parsed.raw_lines {
-        if rl.text.trim().is_empty() {
+        let text = parsed.line_text(rl);
+        if text.trim().is_empty() {
             continue; // blank separators are not rows (the parse walk skips them)
         }
-        let fields = split_ags_line(&rl.text);
+        let fields = split_ags_line(text);
         match fields.first().map_or("", String::as_str) {
             "GROUP" => break, // first GROUP reached — every later row is in-group
             tag @ ("HEADING" | "UNIT" | "TYPE" | "DATA") => add(
@@ -174,7 +175,7 @@ fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut Findin
     // Re-split the raw GROUP line (raw_lines is line-ordered, 1-indexed
     // contiguous, so index = line-1).
     if let Some(rl) = parsed.raw_lines.get((g.group_line - 1) as usize) {
-        let fields = split_ags_line(&rl.text);
+        let fields = split_ags_line(parsed.line_text(rl));
         if fields.len() > 2 {
             add(
                 found,
