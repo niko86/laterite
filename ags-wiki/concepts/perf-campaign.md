@@ -4,12 +4,13 @@ title: "perf campaign: the strategy, the stopping rule and the ledger"
 status: drafted
 tags: [concept, performance, process, register]
 volatile: [timings, status]
-volatile_asof: 2026-08-03
+volatile_asof: 2026-08-31
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
   fixtures: "repo:tools/gen-bench-fixtures.sh"
   readme_bench: "repo:tools/bench-vs-python-ags4.py"
+  results: "repo:tools/perf-results/python-lane.json"
 related: [core-perf-baseline, abi3-perf, testing-strategy, coverage-campaign, crate-map, reliquary]
 sources: []
 ---
@@ -56,6 +57,43 @@ attribution is a guess with a number attached** — this ledger marks them as su
    without a test is a latent bug with better timing. If the area has a coverage
    gap, close it *in the same change* — see the coverage column below, and the
    coverage sibling of this ledger, [[coverage-campaign]].
+7. **A/B/A, on a quiet machine.** An end-to-end claim (anything measured
+   outside criterion's own pairing — `/usr/bin/time -l`, the Python-lane
+   harness, a wheel-level probe) runs baseline, candidate, baseline again in
+   one sitting. The two A legs price the machine's drift *during that
+   session*; a delta inside their spread is not a result, because the
+   instrument cannot resolve it. Quiet machine means nothing heavy sharing
+   the box — no builds, no indexers — and the harness records the starting
+   load average so a noisy run indicts itself. (This discipline ran the
+   #788–#790 emit ladder from the issue bodies; #821 moved it here.)
+8. **Peak RSS is the cross-library instrument; dhat/tracemalloc are
+   diagnosis.** Any number comparing two libraries is the **peak RSS of a
+   fresh subprocess** running one end-to-end operation through each
+   library's public API — the only instrument both sides pay identically.
+   `dhat` (Rust) and `tracemalloc` (Python) attribute allocations *inside*
+   our own code once a gap is found. These are different claims — what the
+   process cost the machine, versus who allocated what — and they **never
+   share a table**. The precedent is
+   `laterite-ags4-emit/examples/heap_profile.rs`, whose header draws exactly
+   this line; the harness is `tools/bench-vs-python-ags4.py`, which declares
+   the results schema.
+9. **The memory headline is ×-of-output.** Peak RSS quoted as a multiple of
+   the operation's file size — size-independent, so rungs and workloads stay
+   comparable. Absolute MB stays in the committed results file
+   (`tools/perf-results/python-lane.json`), where re-running the harness
+   updates it; a MB figure in prose goes stale the next time anything moves.
+10. **The memory floors are the time floors, denominated in peak RSS.**
+    Candidate ≥ 5% of the enclosing operation's peak; a tranche that has not
+    moved its headline operation 10% is finished; an invasive change needs a
+    measured 20%. Same thresholds, same reasoning — below the floor a claim
+    cannot be told from run-to-run noise, and the invasive gate must clear
+    the number the campaign has already declined once.
+11. **Rungs have a memory cap, and a refusal is a recorded result.** Memory
+    columns stop at the 265 MB rung (epic #820 decision 7): a run that
+    pushes the machine into swap measures the pager, not the library. The
+    524 MB rung is time-only. A rung a side cannot run without swapping —
+    or at all — is recorded in the results file as a refusal with its
+    reason, never skipped: a skip is a blind spot, a refusal is a verdict.
 
 ## Order of attack
 
@@ -240,6 +278,18 @@ second pass. Prize cells quote the **measured ceiling** from
 [[core-perf-baseline]] wherever one exists; static allocation counts are marked
 as such, because they are counts, not timings.
 
+> [!note] **Re-baselined 2026-08-31 (#821, absorbing #807).** Every stage on
+> the baseline table was re-measured in one session because three landed
+> changes (#790/#804 emit streaming, #803 cell enum, #777/#800 effective
+> dictionary) postdated the numbers the queue's arithmetic rests on. Verdict:
+> the read/validate stages moved 6–22% **with the machine** (one direction,
+> ns-scale benches flat — [[core-perf-baseline]] has the reasoning), the emit
+> orchestrator moved **down** 16–25% against that tide (#790's arc landing),
+> and the stage *shape* is unchanged. No queue row's ranking changes; no new
+> time candidate cleared the 5% floor; the validator band stays closed at
+> 0.80×. The time queue below therefore stands as the record of a finished
+> layer — the campaign's open front is the **memory lane** (see below).
+
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
@@ -284,6 +334,25 @@ Below the floor, measured out — recorded so they are not rediscovered:
 > untimed edits is exactly what the "free riders, not sweeps" rule forbids once
 > there is no longer a ranked candidate opening the file. They retire with the
 > band; reopen only if a future change is in these functions for another reason.
+
+> [!note] **Two of these were re-verified against the current tree in the
+> 2026-08-31 re-baseline (#821), because #807 flagged that the code under them
+> had moved.** Both stay retired:
+>
+> - `fields_with_status` migrated from the validator's `relational.rs` to
+>   `laterite-ags4-reference::effective_dict` in #800 and is now private
+>   behind `key_fields`/`required_fields`. The allocation is still there
+>   (`to_ascii_uppercase()` plus a `to_string()` per matching heading). #807
+>   worried it now sat on five rule families' path; read against the live
+>   tree, its only consumers are the **relational** family's six call sites,
+>   and every one is per-*group*, not per-row. The `dictionary` family — the
+>   whole Rule 7/9 surface that also moved onto the shared module — measures
+>   ~0.11 ms, and `relational` (99.3 ms) moved with the session's drift, not
+>   ahead of it. A per-group allocation inside a stage whose 5% floor is
+>   ~5 ms stays below measurement resolution.
+> - `references::check` still builds a `HashSet<String>` per borrowed heading
+>   after the #800 rewire (the `merged` closure), and the whole `references`
+>   family still measures **0.42 ms** — the ceiling is the family.
 
 ### Correctness and measurement — outside the ranking, not subject to the floor
 
@@ -749,6 +818,56 @@ out to dominate there.
   at `field_index + 1`", so `field_span(line, 0)` returns the field *after* the
   descriptor, and it returns **char** offsets. `scan::first_field` is the answer.
 
+## The memory lane (#820)
+
+Opened 2026-08-31 by #821 — the first cross-library memory measurement this
+repo has made (the earlier showcase table was laterite-only). Everything in
+this section is the **peak-RSS instrument** (rule of engagement 8); absolute
+MB and the per-rung series live in `tools/perf-results/python-lane.json`, and
+the tables quote the **×-of-output headline** (rule 9) at the **265 MB rung**
+— the top memory rung (rule 11), where the interpreters' import floors have
+washed out. python-ags4 is the **baseline measure** for the Python lane,
+nothing more.
+
+### The memory baseline (peak RSS ÷ file size, 265 MB rung)
+
+| axis | baseline | ours | our door | verdict (epic decision 5) |
+|---|---|---|---|---|
+| validate | 9.7× | **7.6×** | `laterite.validate` | ratio ≤ 1.0 at every rung — **done** |
+| read → typed | 8.9× | **8.2×** | `laterite.read` | ratio ≤ 1.0 at every rung — **done**, narrowly (0.93 at the top two rungs); re-check when the read path next moves |
+| read → strings | 8.0× | **12.8×** | compat `AGS4_to_dataframe` | **~1.6× baseline at every rung — queue M1** |
+| write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — queue M3 |
+| write | 8.9× | **18.8×** | `build_ags4(...).save()` | **queue M2** |
+
+- **No refusals were needed**: every cell up to the 265 MB rung ran without
+  swap growth or a death, so the table above is fully populated. The 524 MB
+  rung is time-only by rule 11.
+- The write cells include materialising the input through the same library's
+  own read door (you cannot write what you do not hold) — attribute a write
+  number by subtracting the same door's read cell, which is how M3's verdict
+  below was reached.
+- The laterite **import floor** is about double python-ags4's (the native
+  module plus engine imports) — per-side floors are recorded in the results
+  file's `import_baselines`, and they are why the small rungs' factors
+  overstate everything: rank from the big rungs.
+
+### The memory queue — ranked, big-cheap first
+
+Same ranking function, same floors (rules 9–10), denominated in the
+operation's peak RSS. Fix tickets are minted from this queue **one at a
+time** (epic decision 8) and never pre-written.
+
+| # | candidate | axis | prize (ceiling) | mechanism, as read | cost |
+|---|---|---|---|---|---|
+| M1 | compat read holds two whole-file representations at peak | read_strings | the gap to baseline is **~4.8×-of-output** at the 265 MB rung (12.8× vs 8.0×) ≈ 1.3 GB there | `AGS4_to_dataframe` materialises every group to its backend frame while `p["groups"]` — the native Arrow tables for the **whole** file — stays live until the last group crosses (`compat/_impl.py`); releasing each group's Arrow table as it materialises would break the double-hold. Seam-read; not yet dhat/tracemalloc-attributed | contained |
+| M2 | the `build_ags4` workflow peak stacks held input + materialised output + the crossing | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×) | `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim), and the Arrow crossing adds copies; the emit engine itself adds ~nothing over its input (the #788–#790 ladder). A format-to-disk door is an API addition mirrored on three surfaces | **invasive** — needs a dhat attribution of the output-side slice first, and then the 20% gate |
+| M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | falls with M1 — not a separate candidate | — |
+
+> [!note] The time queue and this one never share a table, and neither do the
+> instruments behind them (rule 8). When an M-row is opened, the diagnosis
+> step is `dhat`/`tracemalloc` on our own side — those numbers go on the fix
+> ticket, not in the baseline table above.
+
 ## Decisions taken
 
 Recorded here so the next session does not re-open them. Each was a genuine fork
@@ -841,7 +960,14 @@ in its own lane (not part of the unit suite): `laterite-node/bench/read.bench.ts
 the built browser cdylib from its `.wasm` bytes). For attribution rather than
 timing, `laterite-ags4-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
 `dhat` heap profile of the read stages — it says whether a stage is
-allocation-bound (fixable) or a compute/bandwidth wall.
+allocation-bound (fixable) or a compute/bandwidth wall; its write-side sibling is
+`laterite-ags4-emit/examples/heap_profile.rs`.
+
+Since #821, `tools/bench-vs-python-ags4.py` is also the **memory harness** for
+the Python lane (rule of engagement 8) and every run writes the machine-readable
+record the ledger's memory tables summarise —
+`tools/perf-results/python-lane.json`, whose schema the tool declares in its
+docstring.
 
 > [!note] An absent fixture SKIPS rather than fails, so a clean checkout still
 > works — but a skipped bench measures nothing, which is exactly how the

@@ -32,11 +32,64 @@ check runs against the UNPACKED bytes, so every benchmark run is also a
 byte-exact round-trip test of `pack`/`unpack`. A lossy round trip would fail as
 fixture drift.
 
+Memory — peak RSS, fresh subprocess (#821)
+------------------------------------------
+Time is measured warm and in-process; memory is not, because an in-process
+number inherits every allocation the harness made before the operation ran.
+Each (library, axis, rung) memory cell is one FRESH subprocess running one
+end-to-end operation through that library's public API, and the cell is the
+child's own `ru_maxrss` at exit — the same instrument on both sides, which is
+the whole fairness argument. Cross-library memory numbers come ONLY from this
+harness; `dhat`/`tracemalloc` are diagnosis instruments on our own code, and
+the two kinds of number never share a table (the campaign's rule — see
+`ags-wiki/concepts/perf-campaign.md`).
+
+Two verdicts a memory cell can hold instead of a number, both RECORDED rather
+than skipped — a skip is a blind spot, a refusal is a result:
+
+- `swapped` — system swap grew while the child ran. A run that pushes the
+  machine into swap measures the pager, not the library.
+- `failed` — the child died (OOM kill, MemoryError, crash).
+
+Memory rungs stop at the 265MB rung (epic #820 decision 7); the 524MB rung is
+time-only. `mem_rung_allowed` enforces the cap; a rung past it is recorded as
+a `beyond-mem-cap` refusal.
+
+The results file
+----------------
+Every run writes a machine-readable record (default
+`tools/perf-results/python-lane.json`, committed — the campaign ledger's
+machine-readable half). Schema `laterite-python-lane-bench/1`:
+
+    schema            the string above; bump on shape changes
+    generated         UTC timestamp of the run
+    commit            `git rev-parse HEAD` of the measured tree
+    invocation        the rungs/runs arguments that produced this record
+    machine           platform, arch, cpu_count, mem_total_bytes, load_avg_start
+    versions          python, python-ags4, laterite, pandas, polars
+    protocol          prose: what each instrument is, so the file self-describes
+    rungs             {name: {bytes, sha256}} — the pinned fixtures measured
+    time              {axis: {rung: {door: {seconds, runs}}}} — mean of warm runs
+    memory            {axis: {rung: {door: {peak_rss_bytes, x_output}
+                                     | {refusal, detail}}}}
+    import_baselines  {door: {peak_rss_bytes}} — an import-only child per
+                      library: the interpreter+import floor under every cell
+    notes             free-form caveats recorded by the run
+
+Axes: `validate`, `read_strings`, `read_typed`, `write`. Doors: `python_ags4`
+(the baseline measure), `laterite` (native), `laterite_compat`. The write
+axis has three doors — baseline `dataframe_to_AGS4`, compat
+`dataframe_to_AGS4` (the streaming door), native `build_ags4().save()` — and
+a write cell's peak includes materialising the input through that library's
+own read door, because you cannot write what you do not hold; attribute a
+write number by comparing it against the same door's read cell.
+
 Usage
 -----
     uv run python tools/bench-vs-python-ags4.py                 # default rungs
     uv run python tools/bench-vs-python-ags4.py --rungs 5MB,25MB
     uv run python tools/bench-vs-python-ags4.py --runs 10
+    uv run python tools/bench-vs-python-ags4.py --skip-mem      # time only
     uv run python tools/bench-vs-python-ags4.py --update-manifest
 
 Needs `python-ags4` importable (the comparison target) and the release `lat`
@@ -46,17 +99,23 @@ toolchain built; both are checked before any timing starts.
 from __future__ import annotations
 
 import argparse
+import datetime
+import gc
 import hashlib
 import json
+import os
 import pathlib
+import platform
+import re
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -72,6 +131,27 @@ FORGE = REPO / "rust-packages" / "target" / "release" / "laterite-ags4-forge"
 DEFAULT_RUNGS = ["5MB", "25MB", "100MB"]
 SEED = 0
 SCAFFOLD = "wide"
+
+RESULTS_SCHEMA = "laterite-python-lane-bench/1"
+DEFAULT_OUT = REPO / "tools" / "perf-results" / "python-lane.json"
+DEFAULT_MEM_RUNGS = ["5MB", "25MB", "100MB", "265MB"]
+
+# Epic #820 decision 7: memory columns stop at the 265MB rung — a bigger run
+# pushes a 24 GB machine into swap, and a swapping run measures the pager, not
+# the library. The threshold admits the pinned 265MB rung and refuses 524MB;
+# tests/test_bench_python_lane.py holds it against the committed manifest so
+# it cannot drift apart from the rungs it exists to judge.
+MEM_CAP_BYTES = 300_000_000
+
+# Swap growth past this during a child's run marks the cell `swapped`. Small
+# enough to catch a real spill, large enough that unrelated background paging
+# does not veto a clean run.
+SWAP_REFUSAL_BYTES = 64 * 1024 * 1024
+
+# Door identifiers — the results file's vocabulary, shared by every axis.
+UPSTREAM_DOOR = "python_ags4"
+NATIVE_DOOR = "laterite"
+COMPAT_DOOR = "laterite_compat"
 
 
 def die(msg: str) -> None:
@@ -130,7 +210,7 @@ def fixture(size: str) -> Path:
     return path
 
 
-def check_manifest(paths: dict[str, Path], update: bool) -> None:
+def check_manifest(paths: dict[str, Path], update: bool) -> dict[str, Any]:
     """Pin each rung's bytes, so generator drift is loud rather than silent."""
     recorded = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     actual = {
@@ -142,7 +222,7 @@ def check_manifest(paths: dict[str, Path], update: bool) -> None:
         recorded.update(actual)
         MANIFEST.write_text(json.dumps(recorded, indent=2, sort_keys=True) + "\n")
         print(f"manifest updated: {MANIFEST.relative_to(REPO)}")
-        return
+        return actual
 
     drifted = [
         size
@@ -164,6 +244,7 @@ def check_manifest(paths: dict[str, Path], update: bool) -> None:
             f"note: no pinned hash yet for {', '.join(missing)} "
             f"(run --update-manifest to pin)"
         )
+    return actual
 
 
 def repack(paths: dict[str, Path]) -> None:
@@ -237,6 +318,327 @@ def fmt(seconds: float) -> str:
     return f"{seconds * 1000:.0f} ms" if seconds < 1 else f"{seconds:.1f} s"
 
 
+def fmt_mb(n_bytes: int) -> str:
+    return f"{n_bytes / 1e6:.0f} MB"
+
+
+# --- memory plumbing (pure, pinned by tests/test_bench_python_lane.py) -----
+
+
+def maxrss_to_bytes(raw: int, sysname: str) -> int:
+    """`ru_maxrss` is bytes on Darwin, kibibytes on Linux — getrusage(2)
+    differs by lineage, and a unit slip here moves every cell by 1024×."""
+    return raw if sysname == "darwin" else raw * 1024
+
+
+def mem_rung_allowed(rung_bytes: int) -> bool:
+    """The epic-#820 cap: memory measurement stops at the 265MB rung."""
+    return rung_bytes <= MEM_CAP_BYTES
+
+
+def mem_cell(peak_bytes: int, denom_bytes: int) -> dict[str, Any]:
+    """One measured memory cell. `x_output` is the campaign's headline unit —
+    peak as a multiple of the operation's file size, which stays comparable
+    across rungs where raw MB does not."""
+    return {
+        "peak_rss_bytes": peak_bytes,
+        "x_output": round(peak_bytes / denom_bytes, 2),
+    }
+
+
+def refusal_cell(reason: str, detail: str) -> dict[str, Any]:
+    """A recorded refusal — distinguishable from a measurement by shape, so a
+    reader (human or script) cannot mistake a vetoed run for a small number."""
+    return {"refusal": reason, "detail": detail}
+
+
+def parse_swap_used(text: str) -> int:
+    """The `used = 512.50M` field of Darwin's `vm.swapusage` sysctl, in bytes."""
+    m = re.search(r"used\s*=\s*([0-9.]+)([KMG])", text)
+    if not m:
+        raise ValueError(f"unrecognised vm.swapusage output: {text!r}")
+    scale = {"K": 1024, "M": 1024**2, "G": 1024**3}[m.group(2)]
+    return int(float(m.group(1)) * scale)
+
+
+def swap_used_bytes() -> int | None:
+    """Current swap in use, or None where no instrument exists. Read before
+    and after each child: growth means the child's number includes the pager."""
+    if sys.platform == "darwin":
+        out = subprocess.run(
+            ["sysctl", "-n", "vm.swapusage"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return parse_swap_used(out.stdout) if out.returncode == 0 else None
+    meminfo = Path("/proc/meminfo")
+    if meminfo.exists():
+        fields = {
+            line.split(":")[0]: line.split()[1]
+            for line in meminfo.read_text().splitlines()
+            if ":" in line
+        }
+        try:
+            return (int(fields["SwapTotal"]) - int(fields["SwapFree"])) * 1024
+        except KeyError:
+            return None
+    return None
+
+
+def mem_total_bytes() -> int | None:
+    if sys.platform == "darwin":
+        out = subprocess.run(
+            ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, check=False
+        )
+        return int(out.stdout.strip()) if out.returncode == 0 else None
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError):
+        return None
+
+
+def build_results(
+    *,
+    rungs: dict[str, Any],
+    time_cells: dict[str, Any],
+    mem_cells: dict[str, Any],
+    baselines: dict[str, Any],
+    versions: dict[str, str],
+    notes: list[str],
+    invocation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assemble the committed results document (schema in the module docstring)."""
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=REPO,
+    )
+    return {
+        "schema": RESULTS_SCHEMA,
+        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "commit": commit.stdout.strip() if commit.returncode == 0 else "unknown",
+        "invocation": invocation or {},
+        "machine": {
+            "platform": platform.platform(),
+            "arch": platform.machine(),
+            "cpu_count": os.cpu_count(),
+            "mem_total_bytes": mem_total_bytes(),
+            "load_avg_start": list(os.getloadavg()),
+        },
+        "versions": versions,
+        "protocol": {
+            "time": "mean of N warm in-process runs, first run discarded",
+            "memory": (
+                "peak RSS (ru_maxrss) of a fresh subprocess running one "
+                "end-to-end operation through the library's public API — the "
+                "same instrument both sides; dhat/tracemalloc numbers are a "
+                "different claim and never share a table with these"
+            ),
+            "refusals": (
+                "a cell whose run swapped, died, or sits past the memory cap "
+                "is recorded as {refusal, detail}, never skipped"
+            ),
+        },
+        "rungs": rungs,
+        "time": time_cells,
+        "memory": mem_cells,
+        "import_baselines": baselines,
+        "notes": notes,
+    }
+
+
+def _run_header(doc: dict[str, Any]) -> dict[str, Any]:
+    """The per-run provenance a merged document keeps for each contributor."""
+    return {
+        "generated": doc.get("generated"),
+        "commit": doc.get("commit"),
+        "invocation": doc.get("invocation", {}),
+    }
+
+
+def merge_results(existing: dict[str, Any], fresh: dict[str, Any]) -> dict[str, Any]:
+    """Fold a (possibly partial) fresh run into an existing results document.
+
+    Cells the fresh run measured win; cells it did not touch survive from the
+    existing document; the `runs` list keeps every contributing invocation's
+    provenance. This is what lets a killed run keep its finished rungs and a
+    re-run name only the rungs it needs to redo.
+    """
+    merged = dict(fresh)
+    merged["rungs"] = {**existing.get("rungs", {}), **fresh.get("rungs", {})}
+    for section in ("time", "memory"):
+        out: dict[str, Any] = {k: dict(v) for k, v in existing.get(section, {}).items()}
+        for axis, per_rung in fresh.get(section, {}).items():
+            out.setdefault(axis, {}).update(per_rung)
+        merged[section] = out
+    merged["import_baselines"] = {
+        **existing.get("import_baselines", {}),
+        **fresh.get("import_baselines", {}),
+    }
+    merged["notes"] = list(
+        dict.fromkeys(existing.get("notes", []) + fresh.get("notes", []))
+    )
+    merged["runs"] = [
+        *existing.get("runs", [_run_header(existing)]),
+        _run_header(fresh),
+    ]
+    return merged
+
+
+# --- the worker: one operation, one fresh process --------------------------
+#
+# Each op imports only its own library so the child's footprint is that
+# library's, not the union of both sides. The parent talks to the child via a
+# JSON spec (argv) and a JSON result (a temp file — stdout is not used, so a
+# library that prints cannot corrupt the channel).
+
+
+def _op_baseline_upstream(path: str, out: str | None) -> None:
+    import python_ags4  # noqa: F401
+
+
+def _op_baseline_native(path: str, out: str | None) -> None:
+    import laterite  # noqa: F401
+
+
+def _op_validate_upstream(path: str, out: str | None) -> None:
+    from python_ags4 import AGS4
+
+    AGS4.check_file(path)
+
+
+def _op_validate_native(path: str, out: str | None) -> None:
+    import laterite
+
+    laterite.validate(path)
+
+
+def _op_read_strings_upstream(path: str, out: str | None) -> None:
+    from python_ags4 import AGS4
+
+    AGS4.AGS4_to_dataframe(path)
+
+
+def _op_read_strings_compat(path: str, out: str | None) -> None:
+    from laterite import compat
+
+    compat.AGS4_to_dataframe(path)
+
+
+def _op_read_typed_upstream(path: str, out: str | None) -> None:
+    from python_ags4 import AGS4
+
+    tables, _ = AGS4.AGS4_to_dataframe(path)
+    for key in tables:
+        AGS4.convert_to_numeric(tables[key])
+
+
+def _op_read_typed_native(path: str, out: str | None) -> None:
+    import laterite
+
+    laterite.read(path)
+
+
+def _op_write_upstream(path: str, out: str | None) -> None:
+    from python_ags4 import AGS4
+
+    tables, headings = AGS4.AGS4_to_dataframe(path)
+    AGS4.dataframe_to_AGS4(tables, headings, out)
+
+
+def _op_write_compat(path: str, out: str | None) -> None:
+    from laterite import compat
+
+    assert out is not None  # the write plan always supplies a destination
+    tables, headings = compat.AGS4_to_dataframe(path)
+    compat.dataframe_to_AGS4(tables, headings, out)
+
+
+def _op_write_native(path: str, out: str | None) -> None:
+    import laterite
+
+    assert out is not None  # the write plan always supplies a destination
+    handle = laterite.read(path)
+    frames = {code: handle[code] for code in handle.groups}
+    laterite.build_ags4(frames).save(out)
+
+
+WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
+    "baseline_upstream": _op_baseline_upstream,
+    "baseline_native": _op_baseline_native,
+    "validate_upstream": _op_validate_upstream,
+    "validate_native": _op_validate_native,
+    "read_strings_upstream": _op_read_strings_upstream,
+    "read_strings_compat": _op_read_strings_compat,
+    "read_typed_upstream": _op_read_typed_upstream,
+    "read_typed_native": _op_read_typed_native,
+    "write_upstream": _op_write_upstream,
+    "write_compat": _op_write_compat,
+    "write_native": _op_write_native,
+}
+
+
+def worker_main(spec_json: str) -> int:
+    import resource
+
+    spec = json.loads(spec_json)
+    WORKER_OPS[spec["op"]](spec.get("path", ""), spec.get("out"))
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    out = spec.get("out")
+    result = {
+        "ok": True,
+        "maxrss_bytes": maxrss_to_bytes(raw, sys.platform),
+        "out_bytes": Path(out).stat().st_size if out and Path(out).exists() else None,
+    }
+    Path(spec["result_path"]).write_text(json.dumps(result))
+    return 0
+
+
+def measure_mem(op: str, path: Path | None, out: Path | None) -> dict[str, Any]:
+    """One (op, rung) memory cell: fresh child, swap watched across the run."""
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, dir=OUT_DIR) as tf:
+        result_path = Path(tf.name)
+    spec = {
+        "op": op,
+        "path": str(path) if path else "",
+        "out": str(out) if out else None,
+        "result_path": str(result_path),
+    }
+    swap_before = swap_used_bytes()
+    proc = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve()), "--worker", json.dumps(spec)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    swap_after = swap_used_bytes()
+    try:
+        if proc.returncode != 0:
+            tail = (proc.stderr or "").strip().splitlines()[-3:]
+            return refusal_cell("failed", " | ".join(tail) or f"exit {proc.returncode}")
+        if (
+            swap_before is not None
+            and swap_after is not None
+            and swap_after - swap_before > SWAP_REFUSAL_BYTES
+        ):
+            grew = (swap_after - swap_before) / 1e6
+            return refusal_cell("swapped", f"swap grew {grew:.1f} MB during the run")
+        payload = json.loads(result_path.read_text())
+        denom = payload["out_bytes"] if payload.get("out_bytes") else None
+        if denom is None and path is not None:
+            denom = path.stat().st_size
+        if denom:
+            return mem_cell(payload["maxrss_bytes"], denom)
+        return {"peak_rss_bytes": payload["maxrss_bytes"]}
+    finally:
+        result_path.unlink(missing_ok=True)
+        if out is not None:
+            Path(out).unlink(missing_ok=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -255,7 +657,29 @@ def main() -> int:
         action="store_true",
         help="skip the post-run repack (faster repeat runs, ~900 MB on disk)",
     )
+    ap.add_argument(
+        "--mem-rungs",
+        default=",".join(DEFAULT_MEM_RUNGS),
+        help="rungs for the peak-RSS harness (default: %(default)s; capped "
+        "at the 265MB rung — a bigger rung is recorded as a refusal)",
+    )
+    ap.add_argument(
+        "--skip-mem", action="store_true", help="time only, no subprocess harness"
+    )
+    ap.add_argument(
+        "--skip-time", action="store_true", help="memory only, no warm timing"
+    )
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=DEFAULT_OUT,
+        help="results file to write (default: %(default)s)",
+    )
+    ap.add_argument("--worker", help=argparse.SUPPRESS)
     args = ap.parse_args()
+
+    if args.worker:
+        return worker_main(args.worker)
 
     try:
         from python_ags4 import AGS4 as UPSTREAM
@@ -276,22 +700,44 @@ def main() -> int:
 
     warn_if_debug_build(laterite)
 
-    sizes = [s.strip() for s in args.rungs.split(",") if s.strip()]
-    paths = {s: fixture(s) for s in sizes}
-    check_manifest(paths, args.update_manifest)
+    time_sizes = (
+        []
+        if args.skip_time
+        else [s.strip() for s in args.rungs.split(",") if s.strip()]
+    )
+    mem_sizes = (
+        []
+        if args.skip_mem
+        else [s.strip() for s in args.mem_rungs.split(",") if s.strip()]
+    )
+    # One fixture pass over the union, so a rung shared by both harnesses is
+    # unpacked and hash-checked once.
+    all_sizes = list(dict.fromkeys(time_sizes + mem_sizes))
+    paths = {s: fixture(s) for s in all_sizes}
+    rung_pins = check_manifest(paths, args.update_manifest)
 
+    versions = {
+        "python": platform.python_version(),
+        "python-ags4": dist_version("python-ags4"),
+        "laterite": dist_version("laterite"),
+        "pandas": dist_version("pandas"),
+        "polars": dist_version("polars"),
+    }
     # Report both versions: a speedup is meaningless without knowing what it
     # was measured against, and neither package exposes __version__ reliably.
     print(
-        f"\npython-ags4 {dist_version('python-ags4')} vs "
-        f"laterite {dist_version('laterite')} — mean of {args.runs} warm runs\n"
+        f"\npython-ags4 {versions['python-ags4']} vs "
+        f"laterite {versions['laterite']} — mean of {args.runs} warm runs\n"
     )
 
-    rows: dict[str, list[tuple[str, float, float]]] = {
+    rows: dict[str, list[tuple]] = {
         "validate": [],
         "read_strings": [],
         "read_typed": [],
+        "write": [],
     }
+    time_cells: dict[str, dict[str, dict[str, Any]]] = {k: {} for k in rows}
+    labels: dict[str, str] = {}
 
     def upstream_typed(target: str) -> None:
         """python-ags4's route to typed columns: read, then convert per group."""
@@ -299,35 +745,209 @@ def main() -> int:
         for key in tables:
             UPSTREAM.convert_to_numeric(tables[key])
 
+    write_out = OUT_DIR / "write-bench.ags"
+
+    def timed_write_upstream(target: str) -> float:
+        tables, headings = UPSTREAM.AGS4_to_dataframe(target)
+        return best_of(
+            partial(UPSTREAM.dataframe_to_AGS4, tables, headings, str(write_out)),
+            args.runs,
+        )
+
+    def timed_write_compat(target: str) -> float:
+        tables, headings = COMPAT.AGS4_to_dataframe(target)
+        return best_of(
+            partial(COMPAT.dataframe_to_AGS4, tables, headings, str(write_out)),
+            args.runs,
+        )
+
+    def timed_write_native(target: str) -> float:
+        handle = laterite.read(target)
+        frames = {code: handle[code] for code in handle.groups}
+        return best_of(
+            lambda: laterite.build_ags4(frames).save(str(write_out)), args.runs
+        )
+
+    def record_time(axis: str, size: str, door: str, seconds: float) -> None:
+        time_cells[axis].setdefault(size, {})[door] = {
+            "seconds": round(seconds, 4),
+            "runs": args.runs,
+        }
+
+    for size in all_sizes:
+        labels[size] = f"{paths[size].stat().st_size / 1e6:.1f} MB"
+
+    mem_cells: dict[str, dict[str, dict[str, Any]]] = {}
+    baselines: dict[str, Any] = {}
+
+    # A killed run must keep its finished rungs: checkpoint the results file
+    # after every rung, merging into whatever document is already there. The
+    # existing file is read ONCE — merging against a moving target would
+    # append this run's provenance to the history at every flush.
+    base_doc: dict[str, Any] | None = None
+    if args.out.exists():
+        prior = json.loads(args.out.read_text())
+        if prior.get("schema") == RESULTS_SCHEMA:
+            base_doc = prior
+        else:
+            print(f"note: {args.out} has schema {prior.get('schema')!r}; replacing")
+
+    def flush() -> None:
+        doc = build_results(
+            rungs={s: rung_pins[s] for s in all_sizes if s in rung_pins},
+            time_cells=time_cells,
+            mem_cells=mem_cells,
+            baselines=baselines,
+            versions=versions,
+            notes=[],
+            invocation={
+                "rungs": time_sizes,
+                "mem_rungs": mem_sizes,
+                "runs": args.runs,
+            },
+        )
+        if base_doc is not None:
+            doc = merge_results(base_doc, doc)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = args.out.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(doc, indent=1) + "\n")
+        tmp.replace(args.out)
+
     # `partial` rather than a lambda: a closure over the loop variable would
     # bind late, so every rung would end up timing the last file.
-    for path in paths.values():
-        mb = path.stat().st_size / 1e6
-        label = f"{mb:.1f} MB"
+    for size in time_sizes:
+        path = paths[size]
+        label = labels[size]
         p = str(path)
         print(f"[{label}] timing ...", flush=True)
 
-        rows["validate"].append(
+        cells = [
             (
-                label,
+                "validate",
+                UPSTREAM_DOOR,
                 best_of(partial(UPSTREAM.check_file, p), args.runs),
+            ),
+            (
+                "validate",
+                NATIVE_DOOR,
                 best_of(partial(laterite.validate, p), args.runs),
-            )
-        )
-        rows["read_strings"].append(
+            ),
             (
-                label,
+                "read_strings",
+                UPSTREAM_DOOR,
                 best_of(partial(UPSTREAM.AGS4_to_dataframe, p), args.runs),
-                best_of(partial(COMPAT.AGS4_to_dataframe, p), args.runs),
-            )
-        )
-        rows["read_typed"].append(
+            ),
             (
-                label,
+                "read_strings",
+                COMPAT_DOOR,
+                best_of(partial(COMPAT.AGS4_to_dataframe, p), args.runs),
+            ),
+            (
+                "read_typed",
+                UPSTREAM_DOOR,
                 best_of(partial(upstream_typed, p), args.runs),
-                best_of(partial(laterite.read, p), args.runs),
-            )
+            ),
+            ("read_typed", NATIVE_DOOR, best_of(partial(laterite.read, p), args.runs)),
+        ]
+        for axis, door, seconds in cells:
+            record_time(axis, size, door, seconds)
+        rows["validate"].append((label, cells[0][2], cells[1][2]))
+        rows["read_strings"].append((label, cells[2][2], cells[3][2]))
+        rows["read_typed"].append((label, cells[4][2], cells[5][2]))
+
+        # The write doors hold a full read's tables while timing, so run them
+        # one door at a time and collect between doors — three inputs at once
+        # would stack three whole-file materialisations in one process.
+        w_up = timed_write_upstream(p)
+        gc.collect()
+        w_compat = timed_write_compat(p)
+        gc.collect()
+        w_native = timed_write_native(p)
+        gc.collect()
+        write_out.unlink(missing_ok=True)
+        for door, seconds in (
+            (UPSTREAM_DOOR, w_up),
+            (COMPAT_DOOR, w_compat),
+            (NATIVE_DOOR, w_native),
+        ):
+            record_time("write", size, door, seconds)
+        rows["write"].append((label, w_up, w_compat, w_native))
+        flush()
+        print(
+            f"  [{label}] done — validate {fmt(cells[0][2])}/{fmt(cells[1][2])}, "
+            f"read {fmt(cells[2][2])}/{fmt(cells[3][2])}, "
+            f"typed {fmt(cells[4][2])}/{fmt(cells[5][2])}, "
+            f"write {fmt(w_up)}/{fmt(w_compat)}/{fmt(w_native)} "
+            f"(upstream/ours) — checkpointed",
+            flush=True,
         )
+
+    # --- the peak-RSS harness (#821) — fresh subprocess per cell -----------
+
+    MEM_PLAN: list[tuple[str, list[tuple[str, str, bool]]]] = [
+        (
+            "validate",
+            [
+                (UPSTREAM_DOOR, "validate_upstream", False),
+                (NATIVE_DOOR, "validate_native", False),
+            ],
+        ),
+        (
+            "read_strings",
+            [
+                (UPSTREAM_DOOR, "read_strings_upstream", False),
+                (COMPAT_DOOR, "read_strings_compat", False),
+            ],
+        ),
+        (
+            "read_typed",
+            [
+                (UPSTREAM_DOOR, "read_typed_upstream", False),
+                (NATIVE_DOOR, "read_typed_native", False),
+            ],
+        ),
+        (
+            "write",
+            [
+                (UPSTREAM_DOOR, "write_upstream", True),
+                (COMPAT_DOOR, "write_compat", True),
+                (NATIVE_DOOR, "write_native", True),
+            ],
+        ),
+    ]
+    if mem_sizes:
+        print("\nmeasuring peak RSS (one fresh subprocess per cell) ...", flush=True)
+        for door, op in (
+            (UPSTREAM_DOOR, "baseline_upstream"),
+            (NATIVE_DOOR, "baseline_native"),
+        ):
+            baselines[door] = measure_mem(op, None, None)
+        for size in mem_sizes:
+            path = paths[size]
+            capped = not mem_rung_allowed(path.stat().st_size)
+            for axis, doors in MEM_PLAN:
+                for door, op, needs_out in doors:
+                    if capped:
+                        cell = refusal_cell(
+                            "beyond-mem-cap",
+                            "memory columns stop at the 265MB rung "
+                            "(epic #820 decision 7); this rung is time-only",
+                        )
+                    else:
+                        out = OUT_DIR / f"mem-write-{door}.ags" if needs_out else None
+                        cell = measure_mem(op, path, out)
+                    mem_cells.setdefault(axis, {}).setdefault(size, {})[door] = cell
+                    shown = (
+                        f"REFUSED ({cell['refusal']})"
+                        if "refusal" in cell
+                        else f"{fmt_mb(cell['peak_rss_bytes'])} · {cell.get('x_output', '?')}×"
+                    )
+                    print(
+                        f"  [{labels[size]}] {axis:12s} {door:16s} {shown}", flush=True
+                    )
+            flush()
+
+    # --- output -------------------------------------------------------------
 
     def table(title: str, left: str, right: str, key: str) -> None:
         print(f"\n**{title}**\n")
@@ -336,14 +956,35 @@ def main() -> int:
         for label, a, b in rows[key]:
             print(f"| {label} | {fmt(a)} | {fmt(b)} | **{a / b:.1f}×** |")
 
-    print("\n" + "=" * 62)
-    print("README-format tables — paste into the Performance section")
-    print("=" * 62)
-    table("Validation", "python-ags4 check_file", "laterite.validate", "validate")
-    table("Read, strings", "python-ags4 AGS4_to_dataframe", "compat", "read_strings")
-    table(
-        "Read, typed", "python-ags4 + convert_to_numeric", "laterite.read", "read_typed"
-    )
+    if time_sizes:
+        print("\n" + "=" * 62)
+        print("README-format tables — paste into the Performance section")
+        print("=" * 62)
+        table("Validation", "python-ags4 check_file", "laterite.validate", "validate")
+        table(
+            "Read, strings", "python-ags4 AGS4_to_dataframe", "compat", "read_strings"
+        )
+        table(
+            "Read, typed",
+            "python-ags4 + convert_to_numeric",
+            "laterite.read",
+            "read_typed",
+        )
+        print("\n**Write**\n")
+        print(
+            "| File | `python-ags4 dataframe_to_AGS4` | `compat` | speedup "
+            "| `build_ags4` | speedup |"
+        )
+        print("|---:|---:|---:|:---:|---:|:---:|")
+        for label, a, b, c in rows["write"]:
+            print(
+                f"| {label} | {fmt(a)} | {fmt(b)} | **{a / b:.1f}×** "
+                f"| {fmt(c)} | **{a / c:.1f}×** |"
+            )
+
+    flush()
+    print(f"\nresults written: {args.out}")
+
     if not args.keep_plain:
         repack(paths)
     print()
