@@ -77,6 +77,12 @@ crate-type = ["cdylib"]
 # v2 and v3 are indistinguishable while the system allocator is 36% (Linux) and
 # 53-63% (Windows) slower. See #448.
 mimalloc = { version = "0.1", features = ["v2"] }
+# TEMPORARY — this branch is #833's measurement vehicle and never merges.
+# `mi_collect` for the probe's forced-purge cell: the `mimalloc` crate wraps
+# the allocator but does not re-export the collection API (libmimalloc-sys
+# puts it behind `extended`). Same version + the v2 feature as the pin above
+# resolves to the ONE vendored copy `mimalloc` already links.
+libmimalloc-sys = { version = "0.1", features = ["v2", "extended"] }
 laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.0" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
 # the leaf directly (the validator is no longer on the parse hot-path); its

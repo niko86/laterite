@@ -1684,6 +1684,16 @@ fn engine_version() -> &'static str {
     laterite_ags4_validator::VERSION
 }
 
+/// TEMPORARY (#833's probe branch — never merges): force mimalloc to purge
+/// freed heap now (`mi_collect(force)`), so the probe's `purge` cell can
+/// measure whether a deterministic return beats the deferred purge on OSes
+/// whose decommit primitives actually leave RSS (Linux `MADV_DONTNEED`,
+/// Windows `MEM_DECOMMIT`). On darwin this is proven invisible (#831).
+#[pyfunction]
+fn purge_native_heap() {
+    unsafe { libmimalloc_sys::mi_collect(true) }
+}
+
 /// The identity of the engine that produces verdicts — a build-time digest over
 /// every rule source, the dictionary, and the rules catalogue.
 ///
@@ -1701,6 +1711,7 @@ fn engine_fingerprint() -> &'static str {
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_version, m)?)?;
     m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(purge_native_heap, m)?)?;
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
     m.add_function(wrap_pyfunction!(list_rules, m)?)?;
