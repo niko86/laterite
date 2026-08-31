@@ -269,12 +269,28 @@ def compat_materializer(
 
         con = duckdb.connect()
 
+        def _ident(name: str) -> str:
+            # A heading name is file-supplied text; doubling `"` keeps it an
+            # identifier however hostile the file.
+            return '"' + name.replace('"', '""') + '"'
+
         def _pandas_duckdb(table: Any, cols: list[str]) -> Any:
-            f = frame_from_arrow(table)
-            f = f.rename(dict(zip(f.columns, cols, strict=True)))
-            con.register("__f", ArrowStream(f))
+            # The native table's own capsule goes straight into the engine — a
+            # polars intermediate here would copy every group's data purely to
+            # rename positional columns, and those sum-like copies were the
+            # shipped default's whole memory premium over the pyarrow hop
+            # (#834). The rename rides the projection instead; source names
+            # come from the engine's own view of the registration, so they
+            # cannot fail to resolve, and the strict zip keeps the
+            # column-count-mismatch ValueError.
+            con.register("__f", ArrowStream(table))
             try:
-                return con.sql("SELECT * FROM __f").df()
+                src = con.sql("SELECT * FROM __f").columns
+                sel = ", ".join(
+                    f"{_ident(s)} AS {_ident(c)}"
+                    for s, c in zip(src, cols, strict=True)
+                )
+                return con.sql(f"SELECT {sel} FROM __f").df()
             finally:
                 con.unregister("__f")
 
