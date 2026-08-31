@@ -26,6 +26,9 @@
    },
    {
     "text": "**File-declared groups mint `_id`/`_parent_id` from their own DICT declarations** (#815). The Rule 18 effective dictionary is now the READ side's identity authority for a group the standard registry does not know: `keychain::group_row_ids_effective` builds the id from the declared KEY tuple (`DICT_STAT`, the same declarations the validator keys Rule 10a off) and the declared parent (`DICT_PGRP`), so `child._parent_id == parent._id` holds across the registry/file boundary — adopted by the Python, Node and browser read surfaces together, so no surface invents identity alone. A standard group's ids are byte-identical to before (the file's DICT never re-keys it: identity must not fork per delivery file), and a group declaring no KEY headings stays unkeyed rather than stamping every row with the empty-chain id. `laterite-ags4-reference` 0.13.0 (the additive API), core 0.13.1 and diff 0.12.1 ride the moved floor."
+   },
+   {
+    "text": "**The Python-lane benchmark measures memory, and writes** (#821). `tools/bench-vs-python-ags4.py` grows a peak-RSS harness — each (library, axis, rung) memory cell is a fresh subprocess running one end-to-end operation through that library's public API, the same instrument on both sides — and a fourth axis: **write** (baseline `dataframe_to_AGS4`; ours through both doors, compat's streaming `dataframe_to_AGS4` and native `build_ags4`). Every run writes a machine-readable results file (`tools/perf-results/python-lane.json`, schema declared in the tool) carrying times, peak-RSS cells, the ×-of-output headline factor, the import-floor baselines and any refusals — a rung a side cannot run without swapping is recorded as a refusal, never skipped. Memory columns stop at the 265 MB rung; the 524 MB rung stays time-only (epic #820, decision 7)."
    }
   ],
   "changed": [

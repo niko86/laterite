@@ -4,7 +4,7 @@ title: "core perf baseline: where the time actually goes"
 status: drafted
 tags: [concept, architecture, performance, benchmark]
 volatile: [timings]
-volatile_asof: 2026-07-25
+volatile_asof: 2026-08-31
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
@@ -46,24 +46,49 @@ on any machine and in CI, carrying no real delivery data.
 
 ## The baseline (25 MB rung, release)
 
-| path | time | throughput | Δ since #71 opened |
+| path | time | throughput | Δ vs the 2026-07-25 refresh |
 |---|---|---|---|
-| `parse_bytes` | 142 ms | 167 MiB/s | **−14%** (was 165 ms) — DATA-cell double-alloc |
-| `index_ags4_bytes` | 45 ms | 528 MiB/s | **−73%** (was 165 ms — it *was* a full parse) |
-| `read_ags4_bytes` | 165 ms | 144 MiB/s | **−40%** (was 276 ms) — `from_shared` row projection |
-| `typed_read_file` (build_record_batch, T3) | **16.7 ms** | 1.39 GiB/s | **−78%** (was 75.9 ms) — T3 |
-| `check_parsed` (rules only) | 122 ms | 195 MiB/s | **−64%** (was 343 ms) — T1 line_format + relational |
-| `check_file` (I/O + parse + rules) | 269 ms | 88 MiB/s | **−48%** (was 516 ms) — the parse + rules wins combined |
-| `mint` (validate + certify, T4/#5) | **280 ms** | 85 MiB/s | **−14%** (was 324 ms) — T4/#5 |
+| `parse_bytes` | 169 ms | 141 MiB/s | +19% |
+| `index_ags4_bytes` | 48 ms | 496 MiB/s | +6% |
+| `read_ags4_bytes` | 189 ms | 126 MiB/s | +14% |
+| `typed_read_file` (build_record_batch, T3) | 19.2 ms | 1.21 GiB/s | +15% |
+| `check_parsed` (rules only) | 134 ms | 177 MiB/s | +10% |
+| `check_file` (I/O + parse + rules) | 300 ms | 79 MiB/s | +12% |
+| `mint` (validate + certify, T4/#5) | 341 ms | 70 MiB/s | +22% |
 
-> [!note] **Refreshed 2026-07-25** on current `main`. Every row except `mint` was
-> re-measured this pass (25 MB rung, release); `mint` keeps its T4/#5 paired figure
-> (not re-run). The `Δ` column is against the establishing snapshot when #71 opened
-> (2026-07-24) — so the `index`/`read`/`check_*` fixes documented below, previously
-> visible only in the prose, now land in the headline numbers. Criterion's own
-> `change:` deltas are NOT used here: the stored per-bench baselines on the runner
-> are of mixed pre/post-tranche provenance, so each `Δ` is absolute-now vs the
-> recorded original, and every one is far above the ~20% run-to-run drift.
+> [!note] **Refreshed 2026-08-31 (#821, absorbing #807).** Every row re-measured
+> in one session on current `main` (25 MB rung, release), `mint` included this
+> time. The `Δ` column is against the 2026-07-25 refresh values; the −14%/−73%/…
+> story against the #71 establishing snapshot is preserved in the prose below and
+> in [[perf-campaign]]'s Claimed table.
+>
+> **Read the Δ column as one environmental shift, not seven findings.** Every
+> allocation-heavy stage moved up 6–22% — one direction, all within (or, for
+> `mint`, at the edge of) the ~20% run-to-run drift band this page warns about —
+> while the pure-compute per-line benches did not move at all (`first_field` and
+> `field_span` reproduced to within 1%). A code regression does not shift every
+> crate uniformly while leaving the ns-scale scans untouched; changed machine
+> state does. `mint`'s +22% is the composite of components that each moved the
+> same direction, not a signal of its own.
+>
+> **What the re-run was for, and what it answers.** #807 flagged that the emit
+> streaming door (#790/#804), the cell-enum change (#803) and the effective-
+> dictionary consolidation (#777/#800) had all landed since the last refresh, so
+> every ranking derived from this table rested on stale inputs. Answer: **no
+> read/validate stage moved resolvably** — the shape of the table is unchanged —
+> and the emit orchestrator got *faster* (see the emit ladder below). Two
+> structural checks re-fired cleanly:
+>
+> - the July note flagged a ~38 ms residual in `check_file` ≈ `parse_bytes` +
+>   `check_parsed` for re-derivation. Re-derived this session: 300.3 vs 168.8 +
+>   134.5 = 303.3 — a residual of ~3 ms. The flag is closed; the split is
+>   self-consistent again.
+> - the validator band's structural stop still holds: `check_parsed` /
+>   `parse_bytes` = 134.5 / 168.8 = **0.80×**.
+>
+> The Cumulative section further down keeps its 2026-07 values deliberately —
+> it is the historical series of what each fix claimed when it landed, and
+> history does not drift.
 
 > [!note] **The typed read landed on the axis in T2** (2026-07-24,
 > `types/typed_read_file/large`). This is `build_record_batch` — AGS4 strings →
@@ -86,10 +111,10 @@ on any machine and in CI, carrying no real delivery data.
 > arms. Byte-parity with the per-cell build is pinned cell-for-cell over the
 > fixture in `laterite-ags4-types/tests/typed_build_parity.rs`.
 
-`check_file` ≈ `parse_bytes` + `check_parsed` (264 ms), so I/O plus dictionary
-resolution is only ~5 ms and the split is self-consistent. That arithmetic is the
-point of benching the layers separately: the old single number could not say
-which half had moved.
+`check_file` ≈ `parse_bytes` + `check_parsed` (303 ms against 300), so I/O plus
+dictionary resolution is lost in the residual and the split is self-consistent.
+That arithmetic is the point of benching the layers separately: the old single
+number could not say which half had moved.
 
 Two results worth keeping in view:
 
@@ -148,22 +173,25 @@ first cut. On the 25 MB rung:
 
 | family | time | share | rules |
 |---|---|---|---|
-| **relational** | 228.9 → 103.0 → **88.1 ms** (T1) | 67% → 73% | 10a–10c, 11a–11c |
-| **line_format** | 96.8 → 32.5 → **16.3 ms** (T1) | 28% → 14% | 1, 3, 5, 6 |
-| groups | 8.5 ms | 7% | 13–18 |
-| typed_values | 5.1 ms | 4% | 8 |
-| references | 0.46 ms | — | 19b_2/3, 20 |
-| structure | 0.43 ms | — | 2, 2a, 2b, 4 |
+| **relational** | 228.9 → 103.0 → 88.1 → **99.3 ms** | 74% | 10a–10c, 11a–11c |
+| **line_format** | 96.8 → 32.5 → 16.3 → **18.2 ms** | 13% | 1, 3, 5, 6 |
+| groups | 10.4 ms | 8% | 13–18 |
+| typed_values | 6.2 ms | 5% | 8 |
+| references | 0.42 ms | — | 19b_2/3, 20 |
+| structure | 0.37 ms | — | 2, 2a, 2b, 4 |
 | dictionary | 0.11 ms | — | 7, 9 |
 | naming | 0.01 ms | — | 19, 19a, 19b |
 
-The times shown for `relational` and `line_format` are post-T1 (re-measured
-2026-07-24); the other six are the earlier snapshot over unchanged code. They sum
-to ~119 ms against `check_parsed`'s post-T1 120.1 ms, so nothing is unaccounted
-for. **The two families that were 95% of the rules engine are still 87% of it**
-after T1 — the engine got smaller, not differently shaped, which is why the
-validator band is now closed rather than merely dented (see the structural stop
-in [[perf-campaign]]).
+All eight families re-measured in one session (2026-08-31, #821) — the first
+time the attribution has been all-same-provenance since T1. They sum to
+~134.9 ms against `check_parsed`'s 134.5 ms, so nothing is unaccounted for.
+**The two families that were 95% of the rules engine are still 87% of it** —
+the engine drifted with the machine, not in shape. The #800 rewire that put
+five rule families onto `laterite-ags4-reference::effective_dict` shows up
+nowhere: the `dictionary` family (Rule 7/9, now entirely on the shared module)
+is unchanged at ~0.11 ms, and `relational` moved with the global drift, not
+ahead of it. The validator band stays closed (see the structural stop in
+[[perf-campaign]]).
 
 ## The two hotspots — mechanism, not slow code
 
@@ -352,13 +380,25 @@ synthesis added 2026-06-25). 20k rows:
 
 | stage | time | adds |
 |---|---|---|
-| `write_ags4` | 2.9 ms | the bytes |
-| `report` | 30.6 → **22.4 ms** | + dictionary fill + `ags4_str` + validate |
-| `autofix-no-synth` | 45.4 → **23.1 ms** | + `compute_fixes` / `apply_fixes` |
-| `autofix-with-synth` | 45.5 → **23.8 ms** | + metadata synthesis |
+| `write_ags4` | 2.9 → **3.0 ms** | the bytes |
+| `report` | 30.6 → 22.4 → **18.7 ms** | + dictionary fill + `ags4_str` + validate |
+| `autofix-no-synth` | 45.4 → 23.1 → **19.5 ms** | + `compute_fixes` / `apply_fixes` |
+| `autofix-with-synth` | 45.5 → 23.8 → **18.0 ms** | + metadata synthesis |
 
 The writer is a few percent of export cost — **the bytes are not the problem** —
-and metadata synthesis is ~0.13 ms, **0.3%**.
+and the three orchestrator rungs now measure within each other's noise, so the
+ladder subtraction no longer resolves either the fix premium or the synthesis
+premium: both are ~nil.
+
+> [!note] **Refreshed 2026-08-31 (#821): the emit orchestrator is the one stage
+> that moved, and it moved DOWN.** Against the same session's uniform upward
+> drift on every read/validate stage, `report`/`autofix` fell 16–25% from their
+> 2026-08-03 figures — so the underlying improvement is at least that large.
+> This is the #790 arc landing in the committed bench: the cell became its own
+> scalar enum rather than a `serde_json::Value` (#803) and the Arrow door
+> streams (#804). `autofix-with-synth` measuring *below* `report` is
+> within-noise inversion at this sample size, not synthesis being free-er than
+> free.
 
 > [!warning] This page previously read: "the 48% `AutoFix` premium is entirely
 > validate-and-fix, i.e. the original 2026-06-12 decision, not the later

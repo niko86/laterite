@@ -1,0 +1,580 @@
+{
+ "schema": "laterite-python-lane-bench/1",
+ "generated": "2026-08-31T13:27:34+00:00",
+ "commit": "5fefb980809997bdb09236b5b6f1dc064d79f53c",
+ "invocation": {
+  "rungs": [],
+  "mem_rungs": [
+   "524MB"
+  ],
+  "runs": 5
+ },
+ "machine": {
+  "platform": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+  "arch": "arm64",
+  "cpu_count": 10,
+  "mem_total_bytes": 25769803776,
+  "load_avg_start": [
+   1.39501953125,
+   1.79248046875,
+   1.94384765625
+  ]
+ },
+ "versions": {
+  "python": "3.14.3",
+  "python-ags4": "1.2.0",
+  "laterite": "0.12.0",
+  "pandas": "2.3.3",
+  "polars": "1.43.2"
+ },
+ "protocol": {
+  "time": "mean of N warm in-process runs, first run discarded",
+  "memory": "peak RSS (ru_maxrss) of a fresh subprocess running one end-to-end operation through the library's public API \u2014 the same instrument both sides; dhat/tracemalloc numbers are a different claim and never share a table with these",
+  "refusals": "a cell whose run swapped, died, or sits past the memory cap is recorded as {refusal, detail}, never skipped"
+ },
+ "rungs": {
+  "5MB": {
+   "sha256": "a8358c5d0eb67948b7393205f9391691d97f7e4ca84975c06f37f18b7c9e41c1",
+   "bytes": 4866777
+  },
+  "25MB": {
+   "sha256": "8f60617e4e66947f47bdc8c61c51b12b321eec797d99d7f0a49fc142f5dbf615",
+   "bytes": 24912584
+  },
+  "100MB": {
+   "sha256": "4e3a873b82435305a8d1b98c6ec4c5e5ce54c0f4cdd8934bfb4deb69c50856e9",
+   "bytes": 102653016
+  },
+  "265MB": {
+   "sha256": "a8f5fb5df9b907e82e21f919e38dc87df3db9372159c0dde374a662989cd8323",
+   "bytes": 275510179
+  },
+  "524MB": {
+   "sha256": "30b720ec517fdd867f5c4818775e1518e28731a1631bb0d47553ec119339a8ec",
+   "bytes": 549703139
+  }
+ },
+ "time": {
+  "validate": {
+   "5MB": {
+    "python_ags4": {
+     "seconds": 1.4956,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.0483,
+     "runs": 5
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "seconds": 3.6743,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.2258,
+     "runs": 5
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "seconds": 12.1034,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.932,
+     "runs": 5
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "seconds": 31.5353,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 2.4409,
+     "runs": 5
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "seconds": 66.2865,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 5.1104,
+     "runs": 5
+    }
+   }
+  },
+  "read_strings": {
+   "5MB": {
+    "python_ags4": {
+     "seconds": 0.1404,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.0467,
+     "runs": 5
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "seconds": 0.6739,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.1904,
+     "runs": 5
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "seconds": 2.6961,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.7605,
+     "runs": 5
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "seconds": 7.1,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 1.9872,
+     "runs": 5
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "seconds": 15.4808,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 4.2785,
+     "runs": 5
+    }
+   }
+  },
+  "read_typed": {
+   "5MB": {
+    "python_ags4": {
+     "seconds": 0.1845,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.0239,
+     "runs": 5
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "seconds": 0.764,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.1175,
+     "runs": 5
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "seconds": 3.1789,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.477,
+     "runs": 5
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "seconds": 8.0631,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 1.2939,
+     "runs": 5
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "seconds": 18.8173,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 2.7199,
+     "runs": 5
+    }
+   }
+  },
+  "write": {
+   "5MB": {
+    "python_ags4": {
+     "seconds": 0.2107,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.0593,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.0745,
+     "runs": 5
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "seconds": 0.5834,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.2001,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 0.3554,
+     "runs": 5
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "seconds": 1.9166,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 0.7194,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 1.4626,
+     "runs": 5
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "seconds": 5.4237,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 1.8859,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 3.8571,
+     "runs": 5
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "seconds": 13.8304,
+     "runs": 5
+    },
+    "laterite_compat": {
+     "seconds": 3.7166,
+     "runs": 5
+    },
+    "laterite": {
+     "seconds": 7.8655,
+     "runs": 5
+    }
+   }
+  }
+ },
+ "memory": {
+  "validate": {
+   "5MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 169852928,
+     "x_output": 34.9
+    },
+    "laterite": {
+     "peak_rss_bytes": 111067136,
+     "x_output": 22.82
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 340443136,
+     "x_output": 13.67
+    },
+    "laterite": {
+     "peak_rss_bytes": 263258112,
+     "x_output": 10.57
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 1007910912,
+     "x_output": 9.82
+    },
+    "laterite": {
+     "peak_rss_bytes": 847953920,
+     "x_output": 8.26
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 2668724224,
+     "x_output": 9.69
+    },
+    "laterite": {
+     "peak_rss_bytes": 2087665664,
+     "x_output": 7.58
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
+   }
+  },
+  "read_strings": {
+   "5MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 148684800,
+     "x_output": 30.55
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 214663168,
+     "x_output": 44.11
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 312721408,
+     "x_output": 12.55
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 476053504,
+     "x_output": 19.11
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 914538496,
+     "x_output": 8.91
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 1470562304,
+     "x_output": 14.33
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 2202812416,
+     "x_output": 8.0
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 3514712064,
+     "x_output": 12.76
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite_compat": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
+   }
+  },
+  "read_typed": {
+   "5MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 155074560,
+     "x_output": 31.86
+    },
+    "laterite": {
+     "peak_rss_bytes": 111525888,
+     "x_output": 22.92
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 314114048,
+     "x_output": 12.61
+    },
+    "laterite": {
+     "peak_rss_bytes": 269451264,
+     "x_output": 10.82
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 934559744,
+     "x_output": 9.1
+    },
+    "laterite": {
+     "peak_rss_bytes": 872054784,
+     "x_output": 8.5
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 2444427264,
+     "x_output": 8.87
+    },
+    "laterite": {
+     "peak_rss_bytes": 2262581248,
+     "x_output": 8.21
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
+   }
+  },
+  "write": {
+   "5MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 156958720,
+     "x_output": 32.25
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 237109248,
+     "x_output": 48.72
+    },
+    "laterite": {
+     "peak_rss_bytes": 185958400,
+     "x_output": 38.21
+    }
+   },
+   "25MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 317095936,
+     "x_output": 12.73
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 537608192,
+     "x_output": 21.58
+    },
+    "laterite": {
+     "peak_rss_bytes": 568459264,
+     "x_output": 22.82
+    }
+   },
+   "100MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 937459712,
+     "x_output": 9.13
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 1637548032,
+     "x_output": 15.95
+    },
+    "laterite": {
+     "peak_rss_bytes": 2047967232,
+     "x_output": 19.95
+    }
+   },
+   "265MB": {
+    "python_ags4": {
+     "peak_rss_bytes": 2443919360,
+     "x_output": 8.87
+    },
+    "laterite_compat": {
+     "peak_rss_bytes": 3913285632,
+     "x_output": 14.2
+    },
+    "laterite": {
+     "peak_rss_bytes": 5171789824,
+     "x_output": 18.77
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite_compat": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
+   }
+  }
+ },
+ "import_baselines": {
+  "python_ags4": {
+   "peak_rss_bytes": 31932416
+  },
+  "laterite": {
+   "peak_rss_bytes": 72794112
+  }
+ },
+ "notes": [],
+ "runs": [
+  {
+   "generated": "2026-08-31T12:53:04+00:00",
+   "commit": "ee95b9cf40b225ef47163bcde71396e2830ebd87",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T13:00:59+00:00",
+   "commit": "ee95b9cf40b225ef47163bcde71396e2830ebd87",
+   "invocation": {
+    "rungs": [
+     "265MB"
+    ],
+    "mem_rungs": [
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T13:15:19+00:00",
+   "commit": "ee95b9cf40b225ef47163bcde71396e2830ebd87",
+   "invocation": {
+    "rungs": [
+     "524MB"
+    ],
+    "mem_rungs": [],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T13:27:34+00:00",
+   "commit": "5fefb980809997bdb09236b5b6f1dc064d79f53c",
+   "invocation": {
+    "rungs": [],
+    "mem_rungs": [
+     "524MB"
+    ],
+    "runs": 5
+   }
+  }
+ ]
+}
