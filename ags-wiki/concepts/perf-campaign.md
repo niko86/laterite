@@ -843,8 +843,8 @@ nothing more.
 |---|---|---|---|---|
 | validate | 9.7× | **7.6×** | `laterite.validate` | floor cleared (ratio ≤ 1.0 at every rung); **open in absolute terms — the parse hold, queue M4** |
 | read → typed | 8.9× | **8.2×** | `laterite.read` | floor cleared (ratio ≤ 1.0 at every rung, 0.93 at the top two); **open in absolute terms — queue M4**; re-check the ratio when the read path next moves |
-| read → strings | 8.0× | **12.8×** | compat `AGS4_to_dataframe` | **~1.6× baseline at every rung — queue M1** |
-| write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — queue M3 |
+| read → strings | 8.0× | **12.8×** | compat `AGS4_to_dataframe` | ~1.6× baseline at every rung; **M1 diagnosed & declined on this instrument (#831** — the release is real but invisible to darwin peak RSS; diagnosis below). Residual attributed: the parse hold (**M4** — a parse-only diagnosis child peaks at ~9.2×-of-file at the 100 MB rung) plus the frames, which ARE the product. On this machine only **avoided** allocations can move the cell — M4 is the axis's live candidate, M5 the shipped-default one |
+| write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — M3, which **inherits M1's #831 verdict** |
 | write | 8.9× | **18.8×** | `build_ags4(...).save()` | **queue M2** |
 
 - **Every cell up to the 265 MB rung measured** — no swap growth, no deaths —
@@ -869,10 +869,11 @@ time** (epic decision 8) and never pre-written.
 
 | # | candidate | axis | prize (ceiling) | mechanism, as read | cost |
 |---|---|---|---|---|---|
-| M1 | compat read holds two whole-file representations at peak | read_strings | the gap to baseline is **~4.8×-of-output** at the 265 MB rung (12.8× vs 8.0×) ≈ 1.3 GB there | `AGS4_to_dataframe` materialises every group to its backend frame while `p["groups"]` — the native Arrow tables for the **whole** file — stays live until the last group crosses (`compat/_impl.py`); releasing each group's Arrow table as it materialises would break the double-hold. Seam-read; not yet dhat/tracemalloc-attributed | contained |
+| M1 | compat read holds two whole-file representations at peak | read_strings | was priced at **~4.8×-of-output** at the 265 MB rung; **DECLINED 2026-08-31 (#831)** — the measured ceiling of the contained fix on this instrument is **~0** (held vs released vs released+forced-purge diagnosis children agree within 0.4% at the 25/100 MB rungs) | the seam-read mechanism was RIGHT and the presumed fix still does nothing here: releasing per group genuinely frees each table (heap reuse proven — a second parse lands in the freed pages; mimalloc's own stats report the freed heap purged after one forced collect), but darwin hands pages back only on `munmap` — `MADV_FREE` and `MADV_FREE_REUSABLE` both leave `ps`-RSS **and** `ru_maxrss` unmoved, raw-syscall probe — so the sum-peak is physically real on the measuring machine. Where the OS does reclaim (Linux `MADV_DONTNEED`; darwin under memory pressure) the release pays, but the lane's instrument cannot see that. Full diagnosis below | was `contained`; **revisit when** the lane gains a Linux or pressure-aware memory column, the allocator config moves for its own reasons (#294/#448 territory), or M4 reshapes the holds |
 | M2 | the `build_ags4` workflow peak stacks held input + the per-cell emit hold + materialised output | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×); the rust leg corroborates with no Python in the room (write 13.6× vs parse-to-typed 7.6×, first #822-harness run, 2026-08-31) | **Attributed (2026-08-31 pass, below): the Arrow-door emit slice is itself per-cell-bound** — `arrow_in.rs` collects every group's formatted `OwnedGroup` before `emit_owned_groups` runs, and AutoFix's validating parse-back adds a second string per cell, so the whole file's cells are live twice at peak. On top, `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim). The adds-~nothing-over-input property belongs to the compat *stream* door (#805/#818) — M3's evidence — not to this door. A fix is two separable pieces: stream `OwnedGroup`s through the writer, and a format-to-disk door (an API addition mirrored on three surfaces) | **invasive** — attribution done; the premium clears the 20% gate several times over at ceiling; needs the to-disk-door design decision before a ticket |
-| M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | falls with M1 — not a separate candidate | — |
+| M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | **inherits M1's #831 verdict** — falls with M1 wherever M1's release can be seen, and stalls with it here; still not a separate candidate | — |
 | M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; needs its own design page before a ticket |
+| M5 | the shipped pyarrow-free pandas hop pays a whole-file polars intermediate | read_strings (the default `[compat]` install only) | **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children: the same held loop, hop swapped). The lane's committed cells measure the **pyarrow** hop — the dev venv has the accelerator installed — so this premium is invisible in the baseline table and stacks on top of the 12.8× for every default `pip install laterite[compat]` user | `_frames.compat_materializer`'s DuckDB fallback copies each group's Arrow table into polars (`frame_from_arrow`; classic Utf8 re-encoded into polars' own memory) purely to rename positional columns before registering into DuckDB. The premium is sum-like, so the per-group copies are never returned either — the #831 finding again. Registering the native table's own `__arrow_c_stream__` and renaming in the SQL projection would skip the copy entirely: an **avoided** allocation, visible on any OS | contained — probed in #831's diagnosis; awaits its mint (epic decision 8, one ticket at a time) |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
@@ -899,8 +900,61 @@ mechanism cell was **corrected** — the "emit adds ~nothing over its input"
 claim belonged to the compat stream door (M3's evidence), not the Arrow
 door. M4 entered the queue: the same span rewrite the time campaign declined
 at ~9.9 ms is worth roughly half of every read-shaped operation's peak on
-the memory axis. Working order stays **M1 (contained) → M4 → M2**, one
-minted ticket at a time.
+the memory axis. Working order after #831: **M4 → M2** (M1 declined by the
+diagnosis below, which also added M5 to the queue), one minted ticket at a
+time.
+
+### The 2026-08-31 M1 diagnosis (#831): the release is real, darwin never takes the pages back
+
+The ticket's own first step — "a probe confirming each group's Arrow buffers
+actually return on release" — failed, and the failure re-prices the whole
+memory queue's strategy on this machine. Everything here is the **diagnosis
+instrument family** (never the lane's cross-library table): `ps`-RSS
+step-probes, mimalloc's own exit stats, one raw-`madvise` syscall probe, and
+per-op `ru_maxrss` children running loop-equivalent code. The held-loop
+children reproduce the lane's committed compat cells within 0.3% at the
+25 MB and 100 MB rungs — the instrument-stability check the A/B/A protocol
+wants — and the released-loop children sit on top of them within 0.4%, so
+the full-ladder re-measure was not run: there was no B to pair.
+
+The finding has three layers, each verified separately:
+
+1. **The release works.** Dropping each group's `table` frees the Arrow
+   buffers to the wheel's mimalloc: after a full release, a second parse
+   lands almost entirely in the freed pages instead of growing the process
+   (heap-reuse probe), and a forced `mi_collect(true)` reports the whole
+   freed hold purged in mimalloc's own stats. The seam-read mechanism in
+   M1's row was correct; [[arrow-c-ffi-allocator-ownership]]'s
+   producer-frees contract held exactly.
+2. **The purge is invisible.** mimalloc's purge decommits with
+   `MADV_FREE_REUSABLE` on darwin — and on this machine (Darwin 25.4) a raw
+   syscall probe shows both `MADV_FREE` and `MADV_FREE_REUSABLE` succeed
+   while leaving `ps`-RSS and `ru_maxrss` exactly where they were; a second
+   large mapping then takes both to the sum. Absent system memory pressure,
+   the kernel keeps madvised pages resident and gives new allocations fresh
+   ones. **Only `munmap` moves the instrument**, and mimalloc munmaps only
+   whole-free non-arena segments: env-forcing `MIMALLOC_ARENA_RESERVE=0`
+   recovers roughly a quarter of the hold at the 25 MB rung (fragmentation
+   keeps segments partial) and is in any case an allocator-config decision
+   in #294/#448's territory, not a compat-loop edit.
+3. **So the sum-peak is physical, not an accounting artefact.** The frames
+   are allocated by numpy/CPython's allocator and cannot reuse mimalloc's
+   retained pages, so held/released/released-plus-forced-purge peaks are
+   indistinguishable. A 12-line native hook exposing `mi_collect(true)` was
+   built, probed and reverted in the same session.
+
+What still bounds the axis: a parse-only child peaks at ~9.2×-of-file at the
+100 MB rung before any frame exists — the ParsedFile `String`-per-cell hold
+(M4's row, ~6.5× the input by dhat) co-resident with the Arrow build — so
+even a perfectly-collected release would leave compat read near ~9.5×
+against today's 14.3× at that rung. The operative rule this diagnosis
+leaves behind: **on this instrument, only allocations that are never made
+can be claimed** — avoidance (M4, M5) over release. Where the OS does
+reclaim — Linux purges with `MADV_DONTNEED`, darwin under real memory
+pressure prefers reusable pages — the per-group release genuinely pays;
+both ends of that chain are verified but the composition is unmeasured
+here, and landing it on that argument is the owner's call, recorded on
+#831 with the fork.
 
 ## Decisions taken
 
