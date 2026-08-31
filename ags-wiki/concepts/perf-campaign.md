@@ -842,11 +842,11 @@ nothing more.
 
 | axis | baseline | ours | our door | verdict (epic decision 5, as amended — rule 12) |
 |---|---|---|---|---|
-| validate | 9.7× | **7.6×** | `laterite.validate` | floor cleared (ratio ≤ 1.0 at every rung); **open in absolute terms — the parse hold, queue M4** |
-| read → typed | 8.9× | **8.2×** | `laterite.read` | floor cleared (ratio ≤ 1.0 at every rung, 0.93 at the top two); **open in absolute terms — queue M4**; re-check the ratio when the read path next moves |
-| read → strings | 8.0× | **12.8×** | compat `AGS4_to_dataframe` | ~1.6× baseline at every rung; **M1 diagnosed & declined on this instrument (#831** — the release is real but invisible to darwin peak RSS; diagnosis below, where the parse-floor and ladder-pair figures also live). Residual attributed: the parse hold (**M4**) plus the frames, which ARE the product. On this machine only **avoided** allocations can move the cell — M4 is the axis's live candidate; M5 landed 2026-08-31 (#834) and returned ~1% of the shipped hop's peak here — the shipped-default premium was misattributed to it and survives, unattributed (the queue's M5 row carries the correction) |
-| write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — M3, which **inherits M1's #831 verdict** |
-| write | 8.9× | **18.8×** | `build_ags4(...).save()` | **queue M2** |
+| validate | 9.7× | **4.6×** (was 7.6× pre-M4) | `laterite.validate` | **M4 claimed 2026-08-31 (#838)** — the span rewrite took the whole-operation peak down 36.5% at the 100 MB rung (A/B/A on the queue row); now ~0.5× the baseline. Open only if a fresh attribution finds a mechanism clearing rule 10's floors against the smaller hold |
+| read → typed | 8.9× | **5.2×** (was 8.2× pre-M4) | `laterite.read` | **M4 claimed 2026-08-31 (#838)** — down 35.5% of peak at the 100 MB rung; ~0.6× the baseline. Same posture as validate |
+| read → strings | 8.0× | **9.8×** (was 12.8× pre-M4) | compat `AGS4_to_dataframe` | M4's landing moved this cell too (the parse hold under the frames); the residual over baseline is the frames — which ARE the product — plus the shipped-hop DuckDB-bridge premium the M5 row records as unattributed. **M1 diagnosed & declined on this instrument (#831**; the release is real but invisible to darwin peak RSS — diagnosis below); the Linux/Windows fork (#833) is still the axis's open door |
+| write | 8.9× | **11.2×** (was 14.2× pre-M4) | compat `dataframe_to_AGS4` | rode M4's input half; the rest is M3, which **inherits M1's #831 verdict** |
+| write | 8.9× | **14.5×** (was 18.8× pre-M4) | `build_ags4(...).save()` | **queue M2** — re-priced against this post-M4 lane before its ticket (its input half now rides the span buffer) |
 
 - **Every cell up to the 265 MB rung measured** — no swap growth, no deaths —
   so the table above is fully populated. The 524 MB rung is time-only by
