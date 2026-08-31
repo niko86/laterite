@@ -1,12 +1,12 @@
 {
  "schema": "laterite-python-lane-bench/1",
- "generated": "2026-08-31T13:15:19+00:00",
- "commit": "ee95b9cf40b225ef47163bcde71396e2830ebd87",
+ "generated": "2026-08-31T13:27:34+00:00",
+ "commit": "5fefb980809997bdb09236b5b6f1dc064d79f53c",
  "invocation": {
-  "rungs": [
+  "rungs": [],
+  "mem_rungs": [
    "524MB"
   ],
-  "mem_rungs": [],
   "runs": 5
  },
  "machine": {
@@ -15,9 +15,9 @@
   "cpu_count": 10,
   "mem_total_bytes": 25769803776,
   "load_avg_start": [
-   2.37841796875,
-   2.623046875,
-   2.14013671875
+   1.39501953125,
+   1.79248046875,
+   1.94384765625
   ]
  },
  "versions": {
@@ -325,6 +325,16 @@
      "peak_rss_bytes": 2087665664,
      "x_output": 7.58
     }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
    }
   },
   "read_strings": {
@@ -367,6 +377,16 @@
      "peak_rss_bytes": 3514712064,
      "x_output": 12.76
     }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite_compat": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
    }
   },
   "read_typed": {
@@ -408,6 +428,16 @@
     "laterite": {
      "peak_rss_bytes": 2262581248,
      "x_output": 8.21
+    }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
     }
    }
   },
@@ -467,15 +497,29 @@
      "peak_rss_bytes": 5171789824,
      "x_output": 18.77
     }
+   },
+   "524MB": {
+    "python_ags4": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite_compat": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    },
+    "laterite": {
+     "refusal": "beyond-mem-cap",
+     "detail": "memory columns stop at the 265MB rung (epic #820 decision 7); this rung is time-only"
+    }
    }
   }
  },
  "import_baselines": {
   "python_ags4": {
-   "peak_rss_bytes": 31899648
+   "peak_rss_bytes": 31932416
   },
   "laterite": {
-   "peak_rss_bytes": 72712192
+   "peak_rss_bytes": 72794112
   }
  },
  "notes": [],
@@ -518,6 +562,17 @@
      "524MB"
     ],
     "mem_rungs": [],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T13:27:34+00:00",
+   "commit": "5fefb980809997bdb09236b5b6f1dc064d79f53c",
+   "invocation": {
+    "rungs": [],
+    "mem_rungs": [
+     "524MB"
+    ],
     "runs": 5
    }
   }

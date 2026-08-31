@@ -839,9 +839,11 @@ nothing more.
 | write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — queue M3 |
 | write | 8.9× | **18.8×** | `build_ags4(...).save()` | **queue M2** |
 
-- **No refusals were needed**: every cell up to the 265 MB rung ran without
-  swap growth or a death, so the table above is fully populated. The 524 MB
-  rung is time-only by rule 11.
+- **Every cell up to the 265 MB rung measured** — no swap growth, no deaths —
+  so the table above is fully populated. The 524 MB rung is time-only by
+  rule 11, and the results file records that as eleven `beyond-mem-cap`
+  **refusal cells** rather than silence: the rung was run through the
+  harness and refused, not skipped.
 - The write cells include materialising the input through the same library's
   own read door (you cannot write what you do not hold) — attribute a write
   number by subtracting the same door's read cell, which is how M3's verdict

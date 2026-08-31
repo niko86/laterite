@@ -137,10 +137,11 @@ DEFAULT_OUT = REPO / "tools" / "perf-results" / "python-lane.json"
 DEFAULT_MEM_RUNGS = ["5MB", "25MB", "100MB", "265MB"]
 
 # Epic #820 decision 7: memory columns stop at the 265MB rung — a bigger run
-# pushes a 24 GB machine into swap, and a swapping run measures the pager, not
-# the library. The threshold admits the pinned 265MB rung and refuses 524MB;
-# tests/test_bench_python_lane.py holds it against the committed manifest so
-# it cannot drift apart from the rungs it exists to judge.
+# pushes the measuring machine into swap, and a swapping run measures the
+# pager, not the library (each run's actual RAM is recorded in the results
+# file's machine block). The threshold admits the pinned 265MB rung and
+# refuses 524MB; tests/test_bench_python_lane.py holds it against the
+# committed manifest so it cannot drift apart from the rungs it judges.
 MEM_CAP_BYTES = 300_000_000
 
 # Swap growth past this during a child's run marks the cell `swapped`. Small
