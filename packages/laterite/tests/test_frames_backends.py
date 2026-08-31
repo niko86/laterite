@@ -184,6 +184,114 @@ def test_compat_materializer_pandas_duckdb_fallback(monkeypatch: Any) -> None:
     assert out["LOCA_ID"].tolist() == ["BH1", "BH2"]
 
 
+def test_compat_materializer_pandas_duckdb_skips_polars_intermediate(
+    monkeypatch: Any,
+) -> None:
+    """The shipped pyarrow-free hop must register the native table's own Arrow
+    capsule — never copy it into polars just to rename (#834): the copy was
+    per-group avoidable work the fix removed. (The shipped hop's larger memory
+    premium over the pyarrow hop proved to live in the DuckDB bridge leg
+    itself — the perf ledger's M5 row carries the attribution.)"""
+    monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
+    monkeypatch.setattr(
+        _frames,
+        "frame_from_arrow",
+        lambda table: pytest.fail("the duckdb hop took the polars intermediate"),
+    )
+    tbl, cols = _native_like()
+    fn = _frames.compat_materializer("pandas", "object")
+    out = fn(tbl, cols)
+    assert list(out.columns) == cols
+    assert out["LOCA_ID"].tolist() == ["BH1", "BH2"]
+
+
+def test_compat_materializer_pandas_duckdb_hostile_heading_names(
+    monkeypatch: Any,
+) -> None:
+    """A heading name is file-supplied text. An embedded `"` must land in the
+    output verbatim rather than terminate the projection's quoted identifier —
+    the rename happens in SQL now, so the label is an identifier, not data."""
+    monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
+    import pyarrow as pa
+
+    tbl = pa.table({"c0": ["DATA"], "c1": ["x"]})
+    cols = ["HEADING", 'WEIRD"NAME, "c0" --']
+    fn = _frames.compat_materializer("pandas", "object")
+    out = fn(tbl, cols)
+    assert list(out.columns) == cols
+    assert out[cols[1]].tolist() == ["x"]
+
+
+def test_compat_materializer_pandas_duckdb_col_count_mismatch_raises(
+    monkeypatch: Any,
+) -> None:
+    """A label list that doesn't match the table's column count keeps raising
+    ValueError (the strict zip), never silently dropping or padding columns."""
+    monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
+    tbl, _ = _native_like()
+    fn = _frames.compat_materializer("pandas", "object")
+    with pytest.raises(ValueError, match="shorter"):
+        fn(tbl, ["HEADING"])
+
+
+def test_pandas_hops_agree(monkeypatch: Any) -> None:
+    """The shipped pyarrow-free hop and the accelerated pyarrow hop hand back
+    the same pandas frame — the dev venv has pyarrow, so the wider compat suite
+    only ever exercises the fast hop; this is the cross-hop pin."""
+    import pandas.testing as pdt
+
+    tbl, cols = _native_like()
+    fast = _frames.compat_materializer("pandas", "object")(tbl, cols)
+    monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
+    shipped = _frames.compat_materializer("pandas", "object")(tbl, cols)
+    pdt.assert_frame_equal(fast, shipped)
+
+
+def test_pandas_hops_agree_on_native_tables(monkeypatch: Any) -> None:
+    """Both hops, fed the REAL native compat tables — positional source names,
+    a TYPE pseudo-row, a ragged short DATA row (tail filled ``\"\"`` by the Rust
+    builder), a heading carrying an embedded ``\"``, and a zero-DATA group —
+    hand back identical frames. The committed form of #834's step-1 diagnosis:
+    the wider compat suite runs the pyarrow hop in this venv, so without this
+    pin the shipped hop never sees these shapes."""
+    import pandas.testing as pdt
+    from laterite import _laterite_native as native
+
+    ags = (
+        '"GROUP","PROJ"\r\n'
+        '"HEADING","PROJ_ID","PROJ_NAME"\r\n'
+        '"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\n'
+        '"DATA","P1","Site ""A"""\r\n'
+        "\r\n"
+        '"GROUP","LOCA"\r\n'
+        '"HEADING","LOCA_ID","WEIRD""NAME"\r\n'
+        '"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\n'
+        '"DATA","BH1","x"\r\n'
+        '"DATA","BH2"\r\n'
+        "\r\n"
+        '"GROUP","EMPT"\r\n'
+        '"HEADING","EMPT_ID"\r\n'
+        '"UNIT",""\r\n'
+        '"TYPE","ID"\r\n'
+        "\r\n"
+    )
+    p = native.parse_compat_arrow(text=ags)
+    assert p["ok"], p
+    cases = {
+        "PROJ": ["HEADING", "PROJ_ID", "PROJ_NAME"],
+        "LOCA": ["HEADING", "LOCA_ID", 'WEIRD"NAME'],
+        "EMPT": ["HEADING", "EMPT_ID"],
+    }
+    fast = _frames.compat_materializer("pandas", "object")
+    monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
+    shipped = _frames.compat_materializer("pandas", "object")
+    for code, cols in cases.items():
+        tbl = p["groups"][code]["table"]
+        pdt.assert_frame_equal(fast(tbl, cols), shipped(tbl, cols))
+
+
 def test_string_dtype_string_without_pyarrow_raises(monkeypatch: Any) -> None:
     monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
     with pytest.raises(ModuleNotFoundError, match="pyarrow"):
