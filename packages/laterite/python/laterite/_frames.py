@@ -276,13 +276,15 @@ def compat_materializer(
 
         def _pandas_duckdb(table: Any, cols: list[str]) -> Any:
             # The native table's own capsule goes straight into the engine — a
-            # polars intermediate here would copy every group's data purely to
-            # rename positional columns, and those sum-like copies were the
-            # shipped default's whole memory premium over the pyarrow hop
-            # (#834). The rename rides the projection instead; source names
-            # come from the engine's own view of the registration, so they
-            # cannot fail to resolve, and the strict zip keeps the
-            # column-count-mismatch ValueError.
+            # frame-library intermediate here would copy every group's data
+            # purely to rename positional columns, avoidable work #834
+            # removed. (The shipped hop's larger memory premium over the
+            # pyarrow hop proved to live in the DuckDB bridge leg itself —
+            # the perf ledger's M5 row carries that attribution.) The rename
+            # rides the projection instead; source names come from the
+            # engine's own view of the registration, so they cannot fail to
+            # resolve, and the strict zip keeps the column-count-mismatch
+            # ValueError.
             con.register("__f", ArrowStream(table))
             try:
                 src = con.sql("SELECT * FROM __f").columns

@@ -188,9 +188,10 @@ def test_compat_materializer_pandas_duckdb_skips_polars_intermediate(
     monkeypatch: Any,
 ) -> None:
     """The shipped pyarrow-free hop must register the native table's own Arrow
-    capsule — never copy it into polars just to rename (#834): that per-group
-    copy was the default `[compat]` install's whole memory premium over the
-    pyarrow hop, and it is sum-like (the copies are never returned)."""
+    capsule — never copy it into polars just to rename (#834): the copy was
+    per-group avoidable work the fix removed. (The shipped hop's larger memory
+    premium over the pyarrow hop proved to live in the DuckDB bridge leg
+    itself — the perf ledger's M5 row carries the attribution.)"""
     monkeypatch.setattr(_frames, "_pyarrow_available", lambda: False)
     monkeypatch.setattr(
         _frames,
