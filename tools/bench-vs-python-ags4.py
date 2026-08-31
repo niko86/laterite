@@ -723,7 +723,21 @@ def main() -> int:
         "laterite": dist_version("laterite"),
         "pandas": dist_version("pandas"),
         "polars": dist_version("polars"),
+        # pyarrow decides WHICH pandas hop the compat cells measure (the
+        # accelerated pyarrow hop when importable, the shipped pyarrow-free
+        # DuckDB hop otherwise) — #831 found the two differ by whole
+        # ×-of-output on the memory axis, so a results file that doesn't name
+        # the hop misdescribes what it measured. "?" means absent.
+        "pyarrow": dist_version("pyarrow"),
     }
+    hop = (
+        "pyarrow" if dist_version("pyarrow") != "?" else "duckdb (the shipped default)"
+    )
+    run_notes = [
+        f"compat pandas cells measured the {hop} hop this run; the shipped "
+        f"default [compat] install is pyarrow-free (DuckDB hop) — see the "
+        f"memory queue's M5 row (#834)"
+    ]
     # Report both versions: a speedup is meaningless without knowing what it
     # was measured against, and neither package exposes __version__ reliably.
     print(
@@ -800,7 +814,7 @@ def main() -> int:
             mem_cells=mem_cells,
             baselines=baselines,
             versions=versions,
-            notes=[],
+            notes=run_notes,
             invocation={
                 "rungs": time_sizes,
                 "mem_rungs": mem_sizes,
