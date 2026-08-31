@@ -9,9 +9,10 @@ artifact: laterite-ags4-perf
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-perf"
+  ladder_gen: "repo:tools/perf-ladder.py"
   manifest_in: "output/perf-ladder/manifest.json"
-  aggregator: "tools/perf-matrix.py"
-related: [laterite-ags4-forge, laterite-ags4-validator, crate-map]
+  aggregator: "repo:tools/perf-matrix.py"
+related: [laterite-ags4-forge, laterite-ags4-validator, perf-campaign, crate-map]
 sources: []
 ---
 # laterite-ags4-perf
@@ -24,48 +25,68 @@ sources: []
 ## What it is
 > [!quote] **Implemented** (`repo:rust-packages/laterite-ags4-perf`). The rust
 > leg of the cross-surface performance matrix — a **dev/QA bin, never
-> shipped** (`publish = false`). It times the two read operations every
-> shipped surface performs — `validate` and `parse-to-typed` — over the
-> [[laterite-ags4-forge]]-generated size ladder, so the rust path can be
-> compared like-for-like against the python/node/wasm hosts.
+> shipped** (`publish = false`). It measures the three operations every
+> shipped surface performs — `validate`, `parse-to-typed` and `write` — over
+> the [[laterite-ags4-forge]]-generated size ladder, in both of the
+> [[perf-campaign]]'s instruments (wall time, and peak RSS of a fresh
+> subprocess), so the rust path can be compared like-for-like against the
+> python/node/wasm hosts.
 
 It lives in its own crate rather than the validator's `benches/` because a
 *bin* pulls regular `[dependencies]` (the data parser + the Arrow typing
-leaf) that the validator's deliberately lean runtime dep-graph must not
-gain — a Criterion bench's dev-deps wouldn't, but a bin would. The
-validator's own `validate_large_fixture` Criterion bench stays put as the
-rust *regression* guard; this crate is the *comparison* matrix.
+leaf + the emit engine) that the validator's deliberately lean runtime
+dep-graph must not gain — a Criterion bench's dev-deps wouldn't, but a bin
+would. The validator's own `validate_large_fixture` Criterion bench stays
+put as the rust *regression* guard; this crate is the *comparison* matrix.
 
 ## Inputs / outputs
 > [!quote] In: the forge ladder manifest
-> (`output/perf-ladder/manifest.json`, produced by `tools/perf-ladder.py`).
-> Out: the matrix's *uniform* result schema
-> `{surface, results:[{op, rung, median_ms, throughput_mb_s}]}` that
-> `tools/perf-matrix.py` merges with the other surfaces — so the aggregator
-> is a dumb merger rather than a pile of per-tool format parsers.
+> (`output/perf-ladder/manifest.json`, written by `tools/perf-ladder.py`,
+> which materialises the python lane's SHA-pinned rungs — one fixture set on
+> disk serves every harness). Out: the matrix's *uniform* result schema
+> (schema 2)
+> `{surface, results:[{op, rung, bytes, median_ms, throughput_mb_s, mem?}]}`
+> that `tools/perf-matrix.py` merges with the other surfaces — so the
+> aggregator is a dumb merger rather than a pile of per-tool format parsers.
 
 `parse-to-typed` reads the file bytes once *outside* the timed loop and
 measures parse + materialise-every-group-to-Arrow — the same work the
 wasm/node/python hosts do on in-memory bytes. `validate` goes through the
 validator's public `check_file(path)` (the OS page cache makes the repeated
-read negligible, noted as a caveat in the report).
+read negligible, noted as a caveat in the report). `write` drives the shared
+Arrow emit door (`emit_ags4_from_arrow` — the one the py/node/wasm hosts all
+drive) with the typed input prepared outside the timed loop, so its time is
+the emit engine's, given held input.
+
+The `mem` column is the campaign's cross-surface memory instrument (epic
+#820 decision 1): each (op, rung) cell is one fresh `--mem-worker` child —
+this same bin — running the operation once end-to-end and reporting its own
+`ru_maxrss` at exit. The semantics are the python-lane harness's, shared
+deliberately: the same 265 MB rung cap, and a cell the harness vetoes is a
+**recorded refusal** (`beyond-mem-cap` / `swapped` / `failed`), never a
+silent skip. A write cell's peak includes reading and typing the input — you
+cannot write what you do not hold — so it is attributed against the same
+rung's `parse-to-typed` cell. `--skip-mem` omits the column entirely.
 
 ## Where it lives
 `repo:rust-packages/laterite-ags4-perf` (`[[bin]]` `laterite-ags4-perf`).
-Deps only [[laterite-ags4-validator]] + `laterite-ags4-parse` + `laterite-ags4-types`
-(the `arrow` feature) — all already public, none of them the DuckDB-ingest
-codec — so the harness materialises types on the **same path the shipped
+Deps [[laterite-ags4-validator]] + `laterite-ags4-parse` +
+`laterite-ags4-types` (the `arrow` feature) + [[laterite-ags4-emit]] (the
+`arrow` door) — all already public, none of them the DuckDB-ingest codec —
+so the harness materialises types and emits on the **same paths the shipped
 bindings take**.
 
 ## Relationship to other components
 ```mermaid
 flowchart LR
-  forge[laterite-ags4-forge] -->|size ladder| perf[laterite-ags4-perf]
+  forge[laterite-ags4-forge] -->|size ladder| ladder[tools/perf-ladder.py]
+  ladder -->|manifest.json| perf[laterite-ags4-perf]
   val[laterite-ags4-validator lib] --> perf
   parse[laterite-ags4-parse] --> perf
   types[laterite-ags4-types arrow] --> perf
+  emit[laterite-ags4-emit arrow] --> perf
   perf -->|rust.json| matrix[tools/perf-matrix.py]
 ```
 
 ## Related
-[[laterite-ags4-forge]] · [[laterite-ags4-validator]] · [[crate-map]]
+[[laterite-ags4-forge]] · [[laterite-ags4-validator]] · [[perf-campaign]] · [[crate-map]]

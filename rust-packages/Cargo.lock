@@ -2266,9 +2266,12 @@ dependencies = [
 name = "laterite-ags4-perf"
 version = "0.11.0"
 dependencies = [
+ "arrow",
+ "laterite-ags4-emit",
  "laterite-ags4-parse",
  "laterite-ags4-types",
  "laterite-ags4-validator",
+ "libc",
  "serde",
  "serde_json",
 ]

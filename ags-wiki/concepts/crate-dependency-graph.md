@@ -107,6 +107,7 @@ flowchart TD
   laterite_ags4_merge --> laterite_ags4_reference
   laterite_ags4_merge --> laterite_ags4_types
   laterite_ags4_parity --> laterite_ags4_validator
+  laterite_ags4_perf --> laterite_ags4_emit
   laterite_ags4_perf --> laterite_ags4_parse
   laterite_ags4_perf --> laterite_ags4_types
   laterite_ags4_perf --> laterite_ags4_validator
@@ -178,7 +179,7 @@ flowchart TD
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
-| `laterite-ags4-emit` | L2 | 2 | 7 | 4 |
+| `laterite-ags4-emit` | L2 | 2 | 8 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-excel` | L2 | 2 | 4 | 7 |
@@ -188,7 +189,7 @@ flowchart TD
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
 | `laterite-ags4-corpus-qa` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-forge` | L3 | 5 | 0 | 6 |
-| `laterite-ags4-perf` | L3 | 3 | 0 | 4 |
+| `laterite-ags4-perf` | L3 | 4 | 0 | 5 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
 | `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
@@ -206,7 +207,7 @@ flowchart TD
   - `laterite-ags4-types` (in-degree 13)
   - `laterite-ags4-validator` (in-degree 13)
   - `laterite-ags4-core` (in-degree 9)
-  - `laterite-ags4-emit` (in-degree 7)
+  - `laterite-ags4-emit` (in-degree 8)
   - `laterite-ags4-reference` (in-degree 7)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**
   - `laterite`

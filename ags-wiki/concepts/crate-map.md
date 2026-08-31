@@ -366,7 +366,7 @@ as stable):
   [[dec-duckdb-extension]].
 
 **Dev / QA — never shipped:**
-- `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), [[laterite-ags4-compliance]] (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface and fails on a regression; deps `laterite-ags4-{parity,validator,core}` only), and [[laterite-ags4-xcheck]] (the separate lean **output-value** gate — `xcheck`/`emit-cases` + the case manifest, kept its own crate so the gate builds without the harness's deps).
+- `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — measures validate + parse-to-typed + write, time and peak RSS, over the forge size ladder via the shipped validator-parse-emit paths, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), [[laterite-ags4-compliance]] (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface and fails on a regression; deps `laterite-ags4-{parity,validator,core}` only), and [[laterite-ags4-xcheck]] (the separate lean **output-value** gate — `xcheck`/`emit-cases` + the case manifest, kept its own crate so the gate builds without the harness's deps).
 
 **Decoupled AGS5 — dormant, and not in this repo** (preserved elsewhere, out of
 the workspace; not built or shipped; a future AGS5 strand re-links them). Named
@@ -448,6 +448,7 @@ flowchart LR
   core --> xcheck
   parse --> xcheck
   validator --> perf[laterite-ags4-perf]
+  emit --> perf
   cliutil[laterite-cliutil] --> check
   cliutil --> corpusqa
   cliutil --> forge

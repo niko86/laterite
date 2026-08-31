@@ -19,7 +19,7 @@ sources: []
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
 > [!note] **Cleared for crates.io** — `laterite-ags4-emit` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
-> **Used by** — [[laterite]], [[laterite-ags4-excel]], [[laterite-ags4-merge]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-node]], [[laterite-py]].
+> **Used by** — [[laterite]], [[laterite-ags4-excel]], [[laterite-ags4-merge]], [[laterite-ags4-perf]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 
 > [!note] The published faces are the wheel's `build_ags4` ([[laterite]]),
