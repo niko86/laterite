@@ -4,7 +4,8 @@
 //! `parse-to-typed` and `write` — over the forge-generated size ladder
 //! (`tools/perf-ladder.py` → `output/perf-ladder/manifest.json`), and
 //! writes the matrix's *uniform* result schema (schema 2:
-//! `{surface, results:[{op, rung, bytes, median_ms, throughput_mb_s, mem?}]}`)
+//! `{surface, results:[{op, rung, bytes, median_ms, throughput_mb_s, mem?}],
+//! skipped:[{rung, reason}]}`)
 //! that `tools/perf-matrix.py` merges with the other surfaces. Every surface
 //! emits this same shape, so the aggregator is a dumb merger rather than a
 //! pile of per-tool format parsers.
@@ -78,6 +79,17 @@ struct Output {
     tool: &'static str,
     iters: usize,
     results: Vec<Measurement>,
+    /// Rungs the run could not measure at all (missing from disk) — recorded
+    /// in the artifact, not only on stderr, because the artifact outlives the
+    /// run and a filter nobody can see is a blind spot. Always serialised: an
+    /// empty list is a positive statement that nothing was dropped.
+    skipped: Vec<SkippedRung>,
+}
+
+#[derive(Serialize)]
+struct SkippedRung {
+    rung: String,
+    reason: String,
 }
 
 #[derive(Serialize)]
@@ -247,23 +259,29 @@ fn bench_validate(path: &Path, bytes: u64, label: &str, iters: usize) -> Measure
     }
 }
 
-/// Time `parse-to-typed` on a rung — the EXACT path the shipped bindings
-/// (py/node/wasm) take: the validator's parser + the shared
+/// The `parse-to-typed` operation, defined once — the EXACT path the shipped
+/// bindings (py/node/wasm) take: the validator's parser + the shared
 /// `build_record_batch` fed the positional `ParsedGroup::cell` accessor. So
 /// the rust surface materialises types identically to the hosts it's compared
-/// against (not the DuckDB-ingest codec in `laterite-ags4-core`). The file is
-/// read to a `String` once, outside the timed loop.
+/// against (not the DuckDB-ingest codec in `laterite-ags4-core`). One
+/// definition, shared by the timed loop and the memory worker: the two
+/// instruments measure the same work by construction, not by keeping two
+/// copies in step.
+fn type_all_groups(text: &str) {
+    let parsed = laterite_ags4_parse::parse_str(text).expect("ladder file parses");
+    for g in parsed.groups.values() {
+        let batch = build_record_batch(&g.headings, &g.types, g.rows.len(), |col, row| {
+            g.cell(col, row)
+        })
+        .expect("typed batch");
+        black_box(&batch);
+    }
+}
+
+/// Time `parse-to-typed` on a rung. The file is read to a `String` once,
+/// outside the timed loop.
 fn bench_parse_typed(text: &str, bytes: u64, label: &str, iters: usize) -> Measurement {
-    let ms = median_ms(2, iters, || {
-        let parsed = laterite_ags4_parse::parse_str(text).expect("ladder file parses");
-        for g in parsed.groups.values() {
-            let batch = build_record_batch(&g.headings, &g.types, g.rows.len(), |col, row| {
-                g.cell(col, row)
-            })
-            .expect("typed batch");
-            black_box(&batch);
-        }
-    });
+    let ms = median_ms(2, iters, || type_all_groups(text));
     Measurement {
         op: "parse-to-typed",
         rung: label.to_string(),
@@ -372,14 +390,7 @@ fn mem_worker(op: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         }
         "parse-to-typed" => {
             let text = std::fs::read_to_string(path)?;
-            let parsed = laterite_ags4_parse::parse_str(&text).expect("ladder file parses");
-            for g in parsed.groups.values() {
-                let batch = build_record_batch(&g.headings, &g.types, g.rows.len(), |col, row| {
-                    g.cell(col, row)
-                })
-                .expect("typed batch");
-                black_box(&batch);
-            }
+            type_all_groups(&text);
             None
         }
         // Read + type + emit: you cannot write what you do not hold, so the
@@ -501,13 +512,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?)?;
 
     let mut results = Vec::new();
+    let mut skipped = Vec::new();
     for rung in &manifest.rungs {
         let path = Path::new(&rung.path);
         let Ok(meta) = std::fs::metadata(path) else {
             eprintln!(
-                "laterite-ags4-perf: rung {} missing ({}) — skipping",
+                "laterite-ags4-perf: rung {} missing ({}) — skipping \
+                 (re-run `uv run python tools/perf-ladder.py`)",
                 rung.label, rung.path
             );
+            skipped.push(SkippedRung {
+                rung: rung.label.clone(),
+                reason: format!("missing on disk: {}", rung.path),
+            });
             continue;
         };
         let bytes = meta.len();
@@ -540,14 +557,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tool: "laterite-ags4-perf",
         iters,
         results,
+        skipped,
     };
     if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&out_path, serde_json::to_vec_pretty(&output)?)?;
     eprintln!(
-        "laterite-ags4-perf: wrote {} measurements → {}",
+        "laterite-ags4-perf: wrote {} measurements ({} rung(s) skipped) → {}",
         output.results.len(),
+        output.skipped.len(),
         out_path.display()
     );
     Ok(())
@@ -622,6 +641,29 @@ mod tests {
             serde_json::to_value(refusal_cell("beyond-mem-cap", "too big".into())).unwrap();
         assert_eq!(refused["refusal"], "beyond-mem-cap");
         assert!(refused.get("peak_rss_bytes").is_none());
+    }
+
+    #[test]
+    fn dropped_rungs_are_recorded_in_the_artifact() {
+        // The skipped list serialises even when empty — the artifact states
+        // "nothing was dropped" positively rather than by omission.
+        let out = Output {
+            schema: 2,
+            surface: "rust",
+            tool: "t",
+            iters: 1,
+            results: vec![],
+            skipped: vec![],
+        };
+        let v = serde_json::to_value(&out).unwrap();
+        assert_eq!(v["skipped"], serde_json::json!([]));
+
+        let one = serde_json::to_value(&SkippedRung {
+            rung: "265MB".into(),
+            reason: "missing on disk: x".into(),
+        })
+        .unwrap();
+        assert_eq!(one["rung"], "265MB");
     }
 
     #[test]

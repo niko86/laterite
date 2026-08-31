@@ -82,6 +82,9 @@ def merge(docs: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "tool": doc.get("tool"),
             "iters": doc.get("iters"),
             "schema": doc.get("schema"),
+            # Carried through, never summarised away: a rung a harness dropped
+            # must stay visible in the merged document too.
+            "skipped": doc.get("skipped", []),
         }
         for row in doc["results"]:
             cell = {k: v for k, v in row.items() if k not in ("op", "rung")}

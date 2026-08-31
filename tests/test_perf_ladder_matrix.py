@@ -96,11 +96,14 @@ def surface_doc(surface: str, **cell) -> dict:
 
 
 def test_merge_nests_op_rung_surface() -> None:
-    doc = matrix.merge(
-        {"rust.json": surface_doc("rust"), "node.json": surface_doc("node")}
-    )
+    rust = surface_doc("rust")
+    rust["skipped"] = [{"rung": "524MB", "reason": "missing on disk: x"}]
+    doc = matrix.merge({"rust.json": rust, "node.json": surface_doc("node")})
     assert doc["schema"] == matrix.MATRIX_SCHEMA
     assert set(doc["surfaces"]) == {"rust", "node"}
+    # A rung a harness dropped stays visible in the merged document.
+    assert doc["surfaces"]["rust"]["skipped"][0]["rung"] == "524MB"
+    assert doc["surfaces"]["node"]["skipped"] == []
     cell = doc["cells"]["validate"]["5MB"]["rust"]
     assert cell["median_ms"] == 10.0
     # op/rung are the nesting keys, not duplicated inside the cell.
