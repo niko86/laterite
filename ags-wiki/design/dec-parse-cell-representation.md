@@ -109,7 +109,11 @@ that documents the leaf ([[laterite-ags4-parse]]) already has a "two
 coordinate systems" section; this decision widens it rather than
 replacing it.
 
-**Scope.** The representation, plus the one collapse it makes honest:
+**Scope.** The representation covers the per-cell holds — `DataRow.values`
+and `RawLine.text`. The descriptor rows (HEADING/UNIT/TYPE) **stay owned
+`Vec<String>` deliberately**: one line per group, nowhere near the cell hold
+this rewrite exists to kill, and not worth the churn of a third span
+consumer. Plus the one collapse the representation makes honest:
 `retain_raw_lines` dies (a raw line as a span over a buffer that is
 retained anyway costs ~a span), so the `lean()`/`validating()` profile
 split reduces to encoding policy and the explicit opt-ins

@@ -40,6 +40,11 @@ use std::sync::Arc;
 /// (`dec-parse-cell-representation`). The two genuinely diverge for non-UTF-8
 /// encodings and lossy replacement; never read one with the other's offsets.
 /// Also distinct from [`field_span`], which returns CHAR offsets.
+///
+/// Equality compares COORDINATES, not text: two spans (and therefore two
+/// [`DataRow`]s or [`RawLine`]s) are equal when they point at the same
+/// offsets, which is meaningful within one parse, or across parses of
+/// byte-identical input — never as a cross-file text comparison.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start: u32,
@@ -100,7 +105,12 @@ pub struct DataRow {
 }
 
 /// One GROUP and its descriptor rows + data.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Equality compares the MODEL — code, lines, descriptor values and span
+/// coordinates — and deliberately not the shared buffer: comparing it would
+/// make byte-identical groups from different files unequal and cost an
+/// O(file) memcmp per comparison. Span-coordinate caveat as on [`Span`].
+#[derive(Clone)]
 pub struct ParsedGroup {
     /// The shared decoded buffer — the same `Arc` as [`ParsedFile::text`],
     /// cloned in so a group handed out alone (the three long-lived FFI
@@ -153,6 +163,47 @@ impl ParsedGroup {
     }
 }
 
+impl PartialEq for ParsedGroup {
+    fn eq(&self, other: &Self) -> bool {
+        // `buf` deliberately excluded — see the type doc.
+        self.code == other.code
+            && self.group_line == other.group_line
+            && self.group_byte == other.group_byte
+            && self.heading_line == other.heading_line
+            && self.unit_line == other.unit_line
+            && self.type_line == other.type_line
+            && self.headings == other.headings
+            && self.units == other.units
+            && self.types == other.types
+            && self.rows == other.rows
+    }
+}
+
+impl Eq for ParsedGroup {}
+
+impl std::fmt::Debug for ParsedGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Manual: the derive would print the WHOLE shared buffer once per
+        // group (a 25 MB file floods a test-failure message group_count times).
+        f.debug_struct("ParsedGroup")
+            .field(
+                "buf",
+                &format_args!("Arc<String>({} bytes)", self.buf.len()),
+            )
+            .field("code", &self.code)
+            .field("group_line", &self.group_line)
+            .field("group_byte", &self.group_byte)
+            .field("heading_line", &self.heading_line)
+            .field("unit_line", &self.unit_line)
+            .field("type_line", &self.type_line)
+            .field("headings", &self.headings)
+            .field("units", &self.units)
+            .field("types", &self.types)
+            .field("rows", &self.rows)
+            .finish()
+    }
+}
+
 /// One `"GROUP",…` record as it appears in the source — EVERY occurrence, including
 /// a code's second and later declarations.
 ///
@@ -173,13 +224,15 @@ pub struct GroupRecord {
 
 /// A parsed AGS4 file. The validator's `ParsedFile` plus byte fields,
 /// `total_bytes`, and `byte_offsets_source_true`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ParsedFile {
     /// The retained decoded text, ONE copy for the whole file: every line's
     /// body (terminators dropped — [`RawLine::had_crlf`] keeps the evidence),
-    /// then a fix-up region holding the once-unescaped value of every cell
-    /// whose source carried `""` escapes. Every [`Span`] indexes this buffer;
-    /// each [`ParsedGroup`] shares it by refcount.
+    /// with the once-unescaped value of every `""`-escaped cell appended as
+    /// a fix-up run directly after its own line's body — fix-ups are
+    /// INTERLEAVED between line bodies, so consecutive [`RawLine`] spans are
+    /// NOT contiguous; slice per span, never across spans. Every [`Span`]
+    /// indexes this buffer; each [`ParsedGroup`] shares it by refcount.
     ///
     /// `Arc<String>` rather than `Arc<str>` deliberately: `Arc<str>::from`
     /// COPIES the buffer, and that whole-file transient sat exactly at the
@@ -215,6 +268,26 @@ impl ParsedFile {
     #[must_use]
     pub fn line_text<'a>(&'a self, line: &RawLine) -> &'a str {
         line.text.slice(&self.text)
+    }
+}
+
+impl std::fmt::Debug for ParsedFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Manual: the derive would print the whole retained buffer.
+        f.debug_struct("ParsedFile")
+            .field(
+                "text",
+                &format_args!("Arc<String>({} bytes)", self.text.len()),
+            )
+            .field("groups", &self.groups)
+            .field("group_order", &self.group_order)
+            .field("group_records", &self.group_records)
+            .field("raw_lines", &self.raw_lines)
+            .field("total_lines", &self.total_lines)
+            .field("has_bom", &self.has_bom)
+            .field("total_bytes", &self.total_bytes)
+            .field("byte_offsets_source_true", &self.byte_offsets_source_true)
+            .finish()
     }
 }
 
@@ -621,8 +694,12 @@ pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
 /// it, an offset would silently truncate, so the parse refuses instead.
 fn append_text(buf: &mut String, s: &str) -> Result<u32, ParseError> {
     let base = buf.len();
-    if base + s.len() > u32::MAX as usize {
-        return Err(ParseError::TooLarge);
+    // checked_add, not `+`: on a 32-bit target (wasm is a shipped surface)
+    // `u32::MAX as usize == usize::MAX`, so a plain addition would wrap
+    // before the comparison could ever refuse.
+    match base.checked_add(s.len()) {
+        Some(end) if u32::try_from(end).is_ok() => {}
+        _ => return Err(ParseError::TooLarge),
     }
     buf.push_str(s);
     // In range by the guard two lines up — the one place that proves it.
@@ -724,9 +801,11 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             // row on lines whose tag alone decides the outcome.
             //
             // `first_field` cannot unescape (a borrowed slice can't shrink), so
-            // it differs from `split_ags_line[0]` only on a tag containing `""`.
-            // No AGS4 descriptor and no AGS3 marker (`**`, `<UNITS>`, `<CONT>`)
-            // contains a quote, so every arm below reads the same either way.
+            // it differs from `split_ags_line[0]` on a tag containing `""` — and
+            // on junk before an opening quote (`junk"DATA"`), where it reads the
+            // quoted content and the splitter keeps the raw field. No AGS4
+            // descriptor and no AGS3 marker (`**`, `<UNITS>`, `<CONT>`) contains
+            // a quote, so every arm below reads the same either way.
             //
             // Non-empty after trim ⇒ non-empty field 0, so this never skips a
             // line the old `!fields.is_empty()` guard would have processed.
@@ -767,7 +846,8 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                             ParsedGroup {
                                 // Placeholder until the buffer is complete —
                                 // every group is re-pointed at the shared Arc
-                                // in the final fix-up below.
+                                // at the end of the walk (unrelated to the
+                                // buffer's escape fix-up runs).
                                 buf: Arc::default(),
                                 code: code.clone(),
                                 group_line: number,

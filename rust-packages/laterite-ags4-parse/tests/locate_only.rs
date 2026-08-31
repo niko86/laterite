@@ -40,6 +40,13 @@ fn locate_only_agrees_with_the_full_walk() {
         )
         .expect("locate walk");
 
+        // The retains-nothing contract: the locator keeps neither the decoded
+        // buffer nor the raw-line overlay — the whole reason the profile exists.
+        assert!(located.text.is_empty(), "locate_only must retain no text");
+        assert!(
+            located.raw_lines.is_empty(),
+            "locate_only must retain no raw lines"
+        );
         assert_eq!(located.group_records, full.group_records, "records");
         assert_eq!(located.group_order, full.group_order, "order");
         assert_eq!(located.total_bytes, full.total_bytes, "total_bytes");

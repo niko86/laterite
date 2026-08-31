@@ -73,9 +73,11 @@ diverge — both are kept, and neither substitutes for the other.
 ## The representation: spans over one retained buffer
 
 `ParsedFile` retains the whole file's decoded text ONCE — line bodies with
-terminators dropped (`RawLine::had_crlf` keeps the evidence), then a **fix-up
-region** holding the once-unescaped value of every cell whose source carried
-`""` escapes — and shares it into each `ParsedGroup` by refcount, so a group
+terminators dropped (`RawLine::had_crlf` keeps the evidence), each line's
+`""`-escaped cells appended once-unescaped as a **fix-up run** directly after
+that line's body (fix-ups are *interleaved*, so consecutive line spans are not
+contiguous — slice per span, never across spans) — and shares it into each
+`ParsedGroup` by refcount, so a group
 handed out alone (the three long-lived FFI holders) still resolves its rows.
 `RawLine::text` and `DataRow::values` are `u32` spans into that buffer; every
 read comes back a plain `&str` (`ParsedGroup::cell`, `ParsedFile::line_text`).
