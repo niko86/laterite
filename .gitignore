@@ -140,3 +140,8 @@ web/docs-site/examples/wasm/node_modules/
 # wiki page or an O-N record, never for writing rule code. Ignored so they
 # cannot be committed by the `git add -A` this repo stages with.
 ags-spec/
+
+# dhat profiler dumps (dhat_read.rs / heap_profile.rs write them to cwd);
+# scratch instrument output, never a committed artifact — ignored so the
+# `git add -A` this repo stages with cannot take one (it did, once).
+dhat-heap.json
