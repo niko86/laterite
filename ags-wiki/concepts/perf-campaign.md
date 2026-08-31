@@ -94,6 +94,14 @@ attribution is a guess with a number attached** — this ledger marks them as su
     524 MB rung is time-only. A rung a side cannot run without swapping —
     or at all — is recorded in the results file as a refusal with its
     reason, never skipped: a skip is a blind spot, a refusal is a verdict.
+12. **Baseline parity is a floor, not the finish line** (epic #820 decision 5
+    as amended 2026-08-31 — an owner call). A cell at ratio ≤ 1.0 has cleared
+    the floor; the axis stays open while any candidate inside it clears the
+    campaign's own floors (rule 10, denominated in the operation's peak RSS),
+    and only a recorded diminishing-returns verdict — argued in absolute
+    terms, against what the operation actually holds — closes it. The
+    baseline says nothing about what the engine *could* hold; the
+    attribution instruments do.
 
 ## Order of attack
 
@@ -265,7 +273,7 @@ condition being met and a fresh measurement, never by someone re-filing it.
 | candidate | prize | why not | revisit when |
 |---|---|---|---|
 | positional row model (`Vec<Vec<String>>` + heading index) | ~25 ms, 13% of the typed read | breaks `r["LOCA_ID"]` at every call site — `lat read`, `laterite-ags4-excel`, node, `read_groups_raw` | a caller reads these rows in a hot loop, **or** `AgsGroup` is being reshaped anyway. Not on the 13% alone. |
-| `raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:35` `pub text: String`, allocated at `:721`) — queue #4, was issue #112 | ~9.9 ms = **6.9% of `parse_bytes`**, 1.9% of `check_file` — and that is the ceiling (a span rewrite keeps the `Vec` push) | **invasive**: needs `ParsedFile<'a>` or whole-file-decode + span, changing the public `RawLine.text` type across `line_format`/`structure`/`fixes`/PyO3. Fails the 20% gate by ~3× | a change is *already* rewriting `RawLine` to borrow (making this contained rather than invasive), **or** `parse_bytes` becomes a materially larger share of a user-facing operation. Re-verified 2026-08-03: mechanism unchanged, no such rewrite in flight |
+| `raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:35` `pub text: String`, allocated at `:721`) — queue #4, was issue #112 | ~9.9 ms = **6.9% of `parse_bytes`**, 1.9% of `check_file` — and that is the ceiling (a span rewrite keeps the `Vec` push) | **invasive**: needs `ParsedFile<'a>` or whole-file-decode + span, changing the public `RawLine.text` type across `line_format`/`structure`/`fixes`/PyO3. Fails the 20% gate by ~3× | a change is *already* rewriting `RawLine` to borrow (making this contained rather than invasive), **or** `parse_bytes` becomes a materially larger share of a user-facing operation. Re-verified 2026-08-03: mechanism unchanged, no such rewrite in flight. **2026-08-31: re-priced on the memory axis as queue M4 (rule 12)** — this time-axis decline stands on its own axis |
 | `EmitGroup` owns `Vec<Vec<String>>`, so `emit.rs:354` deep-clones an already-owned matrix to hand the writer a *view* — queue #9, was issue #113 | **measured 2026-08-03, paired**: `emit_ags4/report` 18.155 → 16.525 ms with the clone removed = **−1.63 ms, −9.0%** (autofix −8.8%, +synth −7.6%) | **invasive**, and more so than when first declined: `laterite-ags4-emit` now **publishes to crates.io** (0.9.0), so changing `EmitGroup.rows`'s type is a breaking change to a published API — an engine MINOR under the pre-1.0 convention. 9% against a 20% gate | the original condition was "node gets a bench harness **and** node's emit dominates there". Half of it is now met — `node/bench/read.bench.ts` + `npm run bench` exist — but it benches **read only**. At 9% on the Rust side a node emit bench would have to find something dramatically different to change the answer, so: only if a node emit bench is written for its own reasons and shows that |
 | keychain S3 — memoise the parent `_id` across a group's rows — was issue #111 | ~5–15% of *id-minting*, which post-S1/S2 is no longer the dominant stage of the keyed read | end-to-end ceiling falls **below the tranche floor**. Contained, but there is nothing left to win here | id-minting becomes the dominant stage of the keyed read again |
 | keychain S4 — fuse UUID→string into the Arrow builder, skipping the per-row 36-char `String` (`keychain.rs:181`) — was issue #111 | **measured 2026-08-03**: with both `to_string()` calls removed outright, `group_row_ids/SAMP-10k` 1.327 → 1.045 ms = **−21.6% of that stage**. That is an over-stated bound (it drops the hyphen formatting too, which S4 keeps); scaled to the keyed read it lands in the estimated **4–8%** band | straddles the 5% candidate floor **from below** once the over-statement is discounted, and it touches the `_id`/`_parent_id` byte-identity contract guarded by the cross-surface golden. Delicate work for a sub-floor prize | the keyed path is being revisited for another reason and this can ride along under the existing golden-pin |
@@ -831,10 +839,10 @@ nothing more.
 
 ### The memory baseline (peak RSS ÷ file size, 265 MB rung)
 
-| axis | baseline | ours | our door | verdict (epic decision 5) |
+| axis | baseline | ours | our door | verdict (epic decision 5, as amended — rule 12) |
 |---|---|---|---|---|
-| validate | 9.7× | **7.6×** | `laterite.validate` | ratio ≤ 1.0 at every rung — **done** |
-| read → typed | 8.9× | **8.2×** | `laterite.read` | ratio ≤ 1.0 at every rung — **done**, narrowly (0.93 at the top two rungs); re-check when the read path next moves |
+| validate | 9.7× | **7.6×** | `laterite.validate` | floor cleared (ratio ≤ 1.0 at every rung); **open in absolute terms — the parse hold, queue M4** |
+| read → typed | 8.9× | **8.2×** | `laterite.read` | floor cleared (ratio ≤ 1.0 at every rung, 0.93 at the top two); **open in absolute terms — queue M4**; re-check the ratio when the read path next moves |
 | read → strings | 8.0× | **12.8×** | compat `AGS4_to_dataframe` | **~1.6× baseline at every rung — queue M1** |
 | write | 8.9× | **14.2×** | compat `dataframe_to_AGS4` | mostly M1's hold carried into the write — queue M3 |
 | write | 8.9× | **18.8×** | `build_ags4(...).save()` | **queue M2** |
@@ -862,13 +870,37 @@ time** (epic decision 8) and never pre-written.
 | # | candidate | axis | prize (ceiling) | mechanism, as read | cost |
 |---|---|---|---|---|---|
 | M1 | compat read holds two whole-file representations at peak | read_strings | the gap to baseline is **~4.8×-of-output** at the 265 MB rung (12.8× vs 8.0×) ≈ 1.3 GB there | `AGS4_to_dataframe` materialises every group to its backend frame while `p["groups"]` — the native Arrow tables for the **whole** file — stays live until the last group crosses (`compat/_impl.py`); releasing each group's Arrow table as it materialises would break the double-hold. Seam-read; not yet dhat/tracemalloc-attributed | contained |
-| M2 | the `build_ags4` workflow peak stacks held input + materialised output + the crossing | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×) | `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim), and the Arrow crossing adds copies; the emit engine itself adds ~nothing over its input (the #788–#790 ladder). A format-to-disk door is an API addition mirrored on three surfaces | **invasive** — needs a dhat attribution of the output-side slice first, and then the 20% gate |
+| M2 | the `build_ags4` workflow peak stacks held input + the per-cell emit hold + materialised output | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×); the rust leg corroborates with no Python in the room (write 13.6× vs parse-to-typed 7.6×, first #822-harness run, 2026-08-31) | **Attributed (2026-08-31 pass, below): the Arrow-door emit slice is itself per-cell-bound** — `arrow_in.rs` collects every group's formatted `OwnedGroup` before `emit_owned_groups` runs, and AutoFix's validating parse-back adds a second string per cell, so the whole file's cells are live twice at peak. On top, `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim). The adds-~nothing-over-input property belongs to the compat *stream* door (#805/#818) — M3's evidence — not to this door. A fix is two separable pieces: stream `OwnedGroup`s through the writer, and a format-to-disk door (an API addition mirrored on three surfaces) | **invasive** — attribution done; the premium clears the 20% gate several times over at ceiling; needs the to-disk-door design decision before a ticket |
 | M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | falls with M1 — not a separate candidate | — |
+| M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; needs its own design page before a ticket |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
 > step is `dhat`/`tracemalloc` on our own side — those numbers go on the fix
 > ticket, not in the baseline table above.
+
+### The 2026-08-31 attribution pass (dhat — requested bytes, never RSS)
+
+Run when rule 12 landed, to price the absolute candidates the parity column
+had been hiding. Everything below is the **diagnosis instrument** (dhat,
+requested bytes live at t-gmax) and shares no table with the peak-RSS
+figures above. Both instruments re-ran their July workloads and reproduced
+them byte-for-byte — the fixtures are pinned and the mechanisms had not
+moved — so these are confirmations with today's date, not new drift.
+
+| instrument, workload | live at peak | reads as |
+|---|---|---|
+| `dhat_read.rs`, parse stage, 25 MB rung | ~6.5× the input, ~1 block per cell (matches T4-followup exactly) | the read/validate hold is the parse leaf's `String`-per-cell — **M4's prize** |
+| `dhat_read.rs`, typed-build stage, 25 MB rung | KB-scale, 27 blocks | the Arrow build holds ~nothing — the typed output itself (~1×) is the only retained slice, and it IS the product |
+| `heap_profile.rs`, the #790 TREL workload, autofix | **8.4× its output, 66.5 bytes/cell** (the #790 ladder's endpoint, reproduced) | the Arrow-door emit slice is per-cell-bound: every group's formatted `OwnedGroup` plus the parse-back live together — **M2's attributed mechanism**; scales with cell density, so the dense TREL shape is the worst case |
+
+What the pass changed: M2's "needs a dhat attribution first" is met, and its
+mechanism cell was **corrected** — the "emit adds ~nothing over its input"
+claim belonged to the compat stream door (M3's evidence), not the Arrow
+door. M4 entered the queue: the same span rewrite the time campaign declined
+at ~9.9 ms is worth roughly half of every read-shaped operation's peak on
+the memory axis. Working order stays **M1 (contained) → M4 → M2**, one
+minted ticket at a time.
 
 ## Decisions taken
 
