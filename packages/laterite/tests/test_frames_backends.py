@@ -14,8 +14,11 @@ takes.
 from __future__ import annotations
 
 import builtins
+import warnings
 from typing import Any
 
+import duckdb
+import laterite as L
 import polars as pl
 import pytest
 from laterite import _frames
@@ -318,3 +321,49 @@ def test_missing_dependency_error_helpers() -> None:
     err = _frames._pyarrow_missing_error("backend='pyarrow'")
     assert isinstance(err, ModuleNotFoundError)
     assert "pyarrow" in str(err)
+
+
+# --- frame_from_arrow: the polars-2-safe construction (#861) ----------------
+#
+# polars 2.0 flips `from_arrow(<ArrowStreamExportable>)` to return a Series;
+# the old union-narrowing fallback (`df.to_frame()`) would then collapse every
+# multi-column group into one column with nothing raising anywhere. The helper
+# must use the vendor-stated `pl.DataFrame(...)` construction instead. These
+# pins feed it BOTH shipped input kinds and turn the announcement's
+# FutureWarning into a failure, so the wrong-shape read can never arrive
+# silently. The per-test `simplefilter("error", FutureWarning)` is NOT
+# redundant with the pyproject `filterwarnings` entry: that entry matches the
+# vendor's exact wording and goes stale silently if polars rephrases it, while
+# this errors on any FutureWarning the call raises.
+
+
+def test_frame_from_arrow_native_table_silent_and_multi_column() -> None:
+    """The fast frame path's real input: the handle's own pyo3-arrow table."""
+    ags = (
+        '"GROUP","PROJ"\r\n'
+        '"HEADING","PROJ_ID","PROJ_NAME"\r\n'
+        '"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\n'
+        '"DATA","P1","Site A"\r\n'
+    )
+    table = L.read(text=ags)._p["_handle"].table_for("PROJ", False, False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        df = _frames.frame_from_arrow(table)
+    assert isinstance(df, pl.DataFrame)
+    assert df.columns == ["PROJ_ID", "PROJ_NAME"]
+    assert df.row(0) == ("P1", "Site A")
+
+
+def test_frame_from_arrow_duckdb_relation_silent_and_multi_column() -> None:
+    """The engine path's real input: a DuckDB relation (``_materialize`` and
+    ``AgsQuery.to_polars`` both finish through the helper)."""
+    rel = duckdb.connect().sql(
+        "SELECT * FROM (VALUES ('BH1', 1.5), ('BH2', 2.5)) t(LOCA_ID, LOCA_GL)"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        df = _frames.frame_from_arrow(rel)
+    assert isinstance(df, pl.DataFrame)
+    assert df.columns == ["LOCA_ID", "LOCA_GL"]
+    assert df.height == 2

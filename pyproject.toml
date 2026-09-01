@@ -134,6 +134,13 @@ docs = [
 # pure wall-clock waste — test_perf only records, never gates). Devs pass
 # --benchmark-enable / --benchmark-only for an actual perf run.
 addopts = "--benchmark-disable"
+filterwarnings = [
+    # polars 2.0 flips `from_arrow(<stream exportable>)` from DataFrame to
+    # Series; the read path migrated to the `pl.DataFrame(...)` construction
+    # (#861). Erroring on the announcement keeps any reintroduction loud —
+    # before this, the warning was cosmetic noise nothing asserted on.
+    'error:from_arrow\(<ArrowStreamExportable>\) will return a Series:FutureWarning',
+]
 markers = [
     "slow: heavy / CI-expensive tests; deselect on the fast path with -m 'not slow'",
     "benchmark: pytest-benchmark perf guards (timings recorded, never gated)",
