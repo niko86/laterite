@@ -460,7 +460,7 @@ class Ags4File:
       (**polars** by default, **pandas** if ``read(..., backend="pandas")``);
       both pyarrow-free. Groups load into the engine on first touch.
     - ``ags.sql("SELECT … WHERE …")`` → a **DuckDB relation** — cross-group
-      joins + filter pushdown; finish with ``.df()`` / ``pl.from_arrow(rel)``.
+      joins + filter pushdown; finish with ``.df()`` / ``pl.DataFrame(rel)``.
     - ``ags.connection`` → the raw duckdb connection (every engine feature).
 
     UNIT/TYPE/HEADING are side metadata, not pseudo-rows (use ``compat`` for the
@@ -680,9 +680,9 @@ class Ags4File:
             self._register(code)
 
     def _materialize(self, rel: duckdb.DuckDBPyRelation) -> Any:
-        # polars via the Arrow capsule (pl.from_arrow) and pandas via DuckDB's
-        # NumPy .df() are BOTH pyarrow-free; rel.pl() and polars->pandas would
-        # both pull pyarrow, so we never take those.
+        # polars via the Arrow capsule (pl.DataFrame(rel)) and pandas via
+        # DuckDB's NumPy .df() are BOTH pyarrow-free; rel.pl() and
+        # polars->pandas would both pull pyarrow, so we never take those.
         if self._backend == "pandas":
             return rel.df()
         return frame_from_arrow(rel)
@@ -739,7 +739,7 @@ class Ags4File:
         ``ags.sql("SELECT * FROM LOCA JOIN SAMP USING (LOCA_ID) WHERE ...")`` —
         returning a **DuckDB relation**. The WHERE/SELECT push into the engine
         (filter a big file down before materialising); finish with ``.df()`` /
-        ``pl.from_arrow(rel)`` or chain more SQL. A query may reference any
+        ``pl.DataFrame(rel)`` or chain more SQL. A query may reference any
         group, so this registers them all."""
         self._register_all()
         return self._engine().sql(query)
@@ -782,7 +782,7 @@ class Ags4File:
     def close(self) -> None:
         """Close the in-memory DuckDB engine if one was created. Idempotent.
         NOTE: relations from ``sql()`` become invalid once closed — materialise
-        (``.df()`` / ``pl.from_arrow``) before closing."""
+        (``.df()`` / ``pl.DataFrame(rel)``) before closing."""
         if self._con is not None:
             self._con.close()
             self._con = None
@@ -1397,7 +1397,7 @@ class AgsQuery:
     # --- single-result terminals (from .query / .filter / .select) ------------
 
     def relation(self) -> duckdb.DuckDBPyRelation:
-        """The built DuckDB relation (lazy — ``.df()`` / ``pl.from_arrow`` to
+        """The built DuckDB relation (lazy — ``.df()`` / ``pl.DataFrame(rel)`` to
         materialise, or chain more SQL). Requires a base set via [`Ags4File.query`][laterite.Ags4File.query]
         / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
         the base's columns narrow it, and ``.select()`` projects."""

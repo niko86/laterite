@@ -87,15 +87,19 @@ def resolve_string_dtype(explicit: str | None) -> str:
 
 
 def frame_from_arrow(table: Any) -> pl.DataFrame:
-    """Ingest a Rust-built Arrow table (the pyo3-arrow ``PyTable`` ``read()``
-    hands back per group) into a polars frame — pyarrow-free and zero-copy via
-    the Arrow PyCapsule interface. Columns arrive already typed from the file's
-    TYPE row (a 2DP heading is ``Float64``, an ID ``String``); a cell the
-    permissive cast rejects lands as null, never an error. Ragged-row safety
-    is handled upstream in the Rust builder (a short row nulls its tail)."""
-    df = pl.from_arrow(table)
-    # from_arrow is typed DataFrame | Series; a table always yields a frame.
-    return df if isinstance(df, pl.DataFrame) else df.to_frame()
+    """Ingest an Arrow stream exportable — the pyo3-arrow ``PyTable`` ``read()``
+    hands back per group, or a DuckDB relation off the engine path — into a
+    polars frame, pyarrow-free and zero-copy via the Arrow PyCapsule interface.
+    Columns arrive already typed from the file's TYPE row (a 2DP heading is
+    ``Float64``, an ID ``String``); a cell the permissive cast rejects lands as
+    null, never an error. Ragged-row safety is handled upstream in the Rust
+    builder (a short row nulls its tail)."""
+    # The `pl.DataFrame(...)` construction, NOT `pl.from_arrow(...)`: polars 2.0
+    # flips from_arrow to return a Series for a stream exportable, which would
+    # turn every multi-column group into a one-column frame with nothing raising
+    # anywhere (#861). This constructor is the vendor-stated way to say "I want
+    # a frame", on both shipped input kinds, at the dependency floor.
+    return pl.DataFrame(table)
 
 
 class ArrowStream:

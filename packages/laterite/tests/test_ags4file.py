@@ -236,13 +236,13 @@ def test_sql_returns_a_duckdb_relation_with_pushdown():
     rel = f.sql("SELECT * FROM LOCA WHERE LOCA_FDEP > 5")
     assert "duckdb" in type(rel).__module__.lower()
     # The WHERE pushed into the engine — only the matching row materialises.
-    assert pl.from_arrow(rel)["LOCA_FDEP"].to_list() == [10.5]
+    assert pl.DataFrame(rel)["LOCA_FDEP"].to_list() == [10.5]
 
 
 def test_sql_one_liner_survives_unbound_handle():
     # No __del__ close: the relation keeps the connection alive, so a one-liner
     # where the handle is never bound to a variable still materialises.
-    df = pl.from_arrow(laterite.read(text=_NUMERIC_SRC).sql("SELECT * FROM LOCA"))
+    df = pl.DataFrame(laterite.read(text=_NUMERIC_SRC).sql("SELECT * FROM LOCA"))
     assert len(df) == 3
 
 
