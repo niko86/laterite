@@ -12,6 +12,14 @@ sources: []
 
 # build-and-judge without the double parse hold — the streamed join + the writer-built verdict
 
+> [!note] **The precondition below is void as written (2026-09-01):**
+> [[dec-parse-structure-layout]]'s spike gate returned a **decline** (#850),
+> so there is no post-layout lane to re-price on. This page's shape was
+> settled and its own #848 spike numbers were measured on the *standing*
+> layout, where the pair cleared at ceiling — whether to re-price and mint
+> on that layout is an owner decision, recorded as open on the M2 row of
+> [[perf-campaign]]. Nothing else on this page changes.
+
 The write-side successor of [[dec-emit-cell-representation]], and
 **conditional on [[dec-parse-structure-layout]]'s spike gate**: this page
 records the settled shape of queue M2's fix, whose ticket is minted only
