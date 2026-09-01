@@ -45,6 +45,11 @@ laterite-ags4-types = { workspace = true }
 # The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
 # rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
 laterite-ags4-validator = { workspace = true }
+# The writer-built verdict's assembly seam (`builder::ParsedFileBuilder`):
+# the recording writer feeds the leaf's own builder instead of re-parsing
+# its own output (dec-emit-streamed-verdict). Already a transitive dep via
+# the validator; direct because this crate names the leaf's types itself.
+laterite-ags4-parse = { workspace = true }
 # NO serde_json here, and that is load-bearing (#790): cells arrive as the
 # laterite-ags4-types `Cell` — a scalar enum immune to the `preserve_order`
 # feature-unification that swells `Value` workspace-wide. The absence is the
