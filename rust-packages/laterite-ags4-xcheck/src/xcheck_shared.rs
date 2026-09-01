@@ -222,19 +222,7 @@ pub fn canonical(text: &str) -> Result<Vec<CanonGroup>, String> {
             headings: g.headings.clone(),
             units: pad(&g.units),
             types: pad(&g.types),
-            rows: g
-                .rows
-                .iter()
-                .map(|r| {
-                    (0..n)
-                        .map(|i| {
-                            r.values
-                                .get(i)
-                                .map_or_else(String::new, |s| s.slice(g.text()).to_string())
-                        })
-                        .collect()
-                })
-                .collect(),
+            rows: g.rows.iter().map(|r| g.padded_row_strings(r, n)).collect(),
         });
     }
     Ok(out)

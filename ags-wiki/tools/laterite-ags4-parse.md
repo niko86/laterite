@@ -80,7 +80,9 @@ contiguous — slice per span, never across spans) — and shares it into each
 `ParsedGroup` by refcount, so a group
 handed out alone (the three long-lived FFI holders) still resolves its rows.
 `RawLine::text` and `DataRow::values` are `u32` spans into that buffer; every
-read comes back a plain `&str` (`ParsedGroup::cell`, `ParsedFile::line_text`).
+read comes back a plain `&str` (`ParsedGroup::cell` and its row-relative
+sibling `value_at`, `ParsedFile::line_text`); `padded_row_strings` is the
+one owning accessor, for the matrix-building emitters.
 The buffer is an `Arc<String>` rather than the design page's literal
 `Arc<str>`: the `Arc<str>` materialisation *copies* the buffer, and the M4
 spike measured that whole-file transient sitting exactly at the operation

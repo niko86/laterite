@@ -142,6 +142,26 @@ impl ParsedGroup {
             .map(|s| s.slice(&self.buf))
     }
 
+    /// Raw value of `row` at `col`, resolved against this group's shared
+    /// buffer — the row-relative sibling of [`Self::cell`] for callers
+    /// already holding a `&DataRow`. Owning the span/buffer pairing here is
+    /// the point: a span read against the wrong buffer is silent corruption,
+    /// not an error, so the group the row came from does the read (#844).
+    #[must_use]
+    pub fn value_at(&self, row: &DataRow, col: usize) -> Option<&str> {
+        row.values.get(col).map(|s| s.slice(&self.buf))
+    }
+
+    /// `row`'s values materialised as owned strings, padded/truncated to
+    /// exactly `n` columns (a ragged row's missing tail fills with `""`) —
+    /// the shape every matrix-building emitter re-implemented by hand (#844).
+    #[must_use]
+    pub fn padded_row_strings(&self, row: &DataRow, n: usize) -> Vec<String> {
+        (0..n)
+            .map(|i| self.value_at(row, i).unwrap_or("").to_string())
+            .collect()
+    }
+
     /// Column index of a heading by name (de-dups the `position()` dance
     /// the rules each inline).
     #[must_use]

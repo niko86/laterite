@@ -99,7 +99,7 @@ fn heading_index(headings: &[String]) -> std::collections::HashMap<&str, usize> 
 /// the whole row tuple (unkeyed fallback).
 fn row_key(
     row: &DataRow,
-    buf: &str,
+    g: &ParsedGroup,
     idx: &std::collections::HashMap<&str, usize>,
     key_headings: &[String],
     keyed: bool,
@@ -109,14 +109,14 @@ fn row_key(
             .iter()
             .map(|h| {
                 idx.get(h.as_str())
-                    .and_then(|&i| row.values.get(i))
-                    .map_or_else(String::new, |s| s.slice(buf).to_string())
+                    .and_then(|&i| g.value_at(row, i))
+                    .map_or_else(String::new, str::to_string)
             })
             .collect()
     } else {
         row.values
             .iter()
-            .map(|s| s.slice(buf).to_string())
+            .map(|s| s.slice(g.text()).to_string())
             .collect()
     }
 }
@@ -131,25 +131,17 @@ fn changed_cells(
     code: &str,
     common: &[String],
     row_a: &DataRow,
-    buf_a: &str,
+    ga: &ParsedGroup,
     idx_a: &std::collections::HashMap<&str, usize>,
-    types_a: &[String],
     row_b: &DataRow,
-    buf_b: &str,
+    gb: &ParsedGroup,
     idx_b: &std::collections::HashMap<&str, usize>,
-    types_b: &[String],
     dict: &Dictionary,
 ) -> Vec<CellDelta> {
     let mut out = Vec::new();
     for h in common {
-        let a = idx_a
-            .get(h.as_str())
-            .and_then(|&i| row_a.values.get(i))
-            .map(|s| s.slice(buf_a));
-        let b = idx_b
-            .get(h.as_str())
-            .and_then(|&i| row_b.values.get(i))
-            .map(|s| s.slice(buf_b));
+        let a = idx_a.get(h.as_str()).and_then(|&i| ga.value_at(row_a, i));
+        let b = idx_b.get(h.as_str()).and_then(|&i| gb.value_at(row_b, i));
         // AGS type, resolved INDEPENDENTLY per side (own file TYPE row, then the
         // dictionary, then opaque "X"), so a heading two files typed differently is
         // compared on each side's real type rather than cross-contaminating through
@@ -163,8 +155,8 @@ fn changed_cells(
                 .unwrap_or("X")
                 .to_string()
         };
-        let ty_a = ty_for(idx_a, types_a);
-        let ty_b = ty_for(idx_b, types_b);
+        let ty_a = ty_for(idx_a, &ga.types);
+        let ty_b = ty_for(idx_b, &gb.types);
         let va = parse_value(a, &ty_a);
         let vb = parse_value(b, &ty_b);
         let typed_equal = !va.is_null() && va == vb;
@@ -234,7 +226,7 @@ fn diff_group(
         std::collections::HashMap::new();
     for (i, row) in gb.rows.iter().enumerate() {
         b_by_key
-            .entry(row_key(row, gb.text(), &idx_b, &key_headings, keyed))
+            .entry(row_key(row, gb, &idx_b, &key_headings, keyed))
             .or_default()
             .push_back(i);
     }
@@ -247,26 +239,14 @@ fn diff_group(
     let under_cap = |rows: &Vec<RowDelta>| cap.is_none_or(|c| rows.len() < c);
 
     for row_a in &ga.rows {
-        let k = row_key(row_a, ga.text(), &idx_a, &key_headings, keyed);
+        let k = row_key(row_a, ga, &idx_a, &key_headings, keyed);
         if let Some(bi) = b_by_key
             .get_mut(&k)
             .and_then(std::collections::VecDeque::pop_front)
         {
             matched_b[bi] = true;
             let row_b = &gb.rows[bi];
-            let cells = changed_cells(
-                code,
-                &common,
-                row_a,
-                ga.text(),
-                &idx_a,
-                &ga.types,
-                row_b,
-                gb.text(),
-                &idx_b,
-                &gb.types,
-                dict,
-            );
+            let cells = changed_cells(code, &common, row_a, ga, &idx_a, row_b, gb, &idx_b, dict);
             if !cells.is_empty() {
                 changed += 1;
                 if under_cap(&rows) {
@@ -298,7 +278,7 @@ fn diff_group(
             if under_cap(&rows) {
                 rows.push(RowDelta {
                     kind: "added",
-                    key: row_key(row_b, gb.text(), &idx_b, &key_headings, keyed),
+                    key: row_key(row_b, gb, &idx_b, &key_headings, keyed),
                     line_a: None,
                     line_b: Some(row_b.line),
                     cells: Vec::new(),
