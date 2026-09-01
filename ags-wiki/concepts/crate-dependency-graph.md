@@ -93,6 +93,7 @@ flowchart TD
   laterite_ags4_diff --> laterite_ags4_parse
   laterite_ags4_diff --> laterite_ags4_reference
   laterite_ags4_diff --> laterite_ags4_types
+  laterite_ags4_emit --> laterite_ags4_parse
   laterite_ags4_emit --> laterite_ags4_types
   laterite_ags4_emit --> laterite_ags4_validator
   laterite_ags4_excel --> laterite_ags4_core
@@ -172,14 +173,14 @@ flowchart TD
 
 | crate | layer | ship-deps (out) | dependents (in) | transitive |
 |---|---|--:|--:|--:|
-| `laterite-ags4-parse` | L0 | 0 | 16 | 0 |
+| `laterite-ags4-parse` | L0 | 0 | 17 | 0 |
 | `laterite-ags4-types` | L0 | 0 | 13 | 0 |
 | `laterite-ags4-reference` | L0 | 2 | 7 | 2 |
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
-| `laterite-ags4-emit` | L2 | 2 | 8 | 4 |
+| `laterite-ags4-emit` | L2 | 3 | 8 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-excel` | L2 | 2 | 4 | 7 |
@@ -203,7 +204,7 @@ flowchart TD
 - **Layering inversions (ship edge to a higher layer):** none — the graph respects its layering.
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
-  - `laterite-ags4-parse` (in-degree 16)
+  - `laterite-ags4-parse` (in-degree 17)
   - `laterite-ags4-types` (in-degree 13)
   - `laterite-ags4-validator` (in-degree 13)
   - `laterite-ags4-core` (in-degree 9)

@@ -12,12 +12,24 @@ sources: []
 
 # build-and-judge without the double parse hold — the streamed join + the writer-built verdict
 
-> [!note] **Precondition status (2026-09-01):** [[dec-parse-structure-layout]]'s
-> spike missed its own floor, and the owner then landed the layout anyway at
-> the measured prize (#850 — a dated waiver of the floor for that row). So
-> the post-layout lane this page's re-price waits on **exists once M6's land
-> PR merges**; the M2 ticket is still minted only after that re-price runs,
-> exactly as written below.
+> [!note] **Gate outcome (2026-09-01, #855): PASSED — landed as designed.**
+> The post-layout re-price ran (record on #855), the ticket was minted, and
+> the land A/B/A on the committed lane instrument measured the real
+> mechanism at **−21.3/−21.9%** of the write peak at the 100/265 MB gate
+> rungs — over rule 10's 20% invasive floor — with the 25 MB cell at
+> −18.0%, recorded as the structural shortfall this page's Gate predicted.
+> Output bytes sha-identical on every leg; the equivalence differential
+> (both definitions below) is a permanent test in the emit crate, plus a
+> corpus leg (`examples/verdict_differential.rs`). Time rider: the emit
+> pipeline −28…−30% on its criterion ladder. The ledger row is
+> [[perf-campaign]]'s M2.
+
+> [!note] **Precondition status (2026-09-01, superseded by the gate outcome
+> above):** [[dec-parse-structure-layout]]'s spike missed its own floor, and
+> the owner then landed the layout anyway at the measured prize (#850 — a
+> dated waiver of the floor for that row). So the post-layout lane this
+> page's re-price waited on came to exist when M6's land PR merged; the M2
+> ticket was minted only after that re-price ran, exactly as written below.
 
 The write-side successor of [[dec-emit-cell-representation]], and
 **conditional on [[dec-parse-structure-layout]]'s spike gate**: this page
