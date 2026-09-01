@@ -846,7 +846,7 @@ nothing more.
 | read → typed | 8.9× | **5.2×** (was 8.2× pre-M4) | `laterite.read` | **M4 claimed 2026-08-31 (#838)** — down 35.5% of peak at the 100 MB rung; ~0.6× the baseline. Same posture as validate |
 | read → strings | 8.0× | **9.8×** (was 12.8× pre-M4) | compat `AGS4_to_dataframe` | M4's landing moved this cell too (the parse hold under the frames); the residual over baseline is the frames — which ARE the product — plus the shipped-hop DuckDB-bridge premium the M5 row records as unattributed. **M1 diagnosed & declined on this instrument (#831**; the release is real but invisible to darwin peak RSS — diagnosis below); the Linux/Windows fork (#833) is still the axis's open door |
 | write | 8.9× | **11.2×** (was 14.2× pre-M4) | compat `dataframe_to_AGS4` | rode M4's input half; the rest is M3, which **inherits M1's #831 verdict** |
-| write | 8.9× | **14.5×** (was 18.8× pre-M4) | `build_ags4(...).save()` | **queue M2** — re-priced against this post-M4 lane before its ticket (its input half now rides the span buffer) |
+| write | 8.9× | **14.5×** (was 18.8× pre-M4) | `build_ags4(...).save()` | **queue M2 — re-priced 2026-09-01 (#848)**: the peak carries the parse hold **twice** (the caller's retained parse + the emit door's own validating parse-back). The mechanism split: the layout row (M6, #850) lands first, and this door's ticket is minted only after a re-price on the post-layout lane ([[dec-emit-streamed-verdict]]) |
 
 - **Every cell up to the 265 MB rung measured** — no swap growth, no deaths —
   so the table above is fully populated. The 524 MB rung is time-only by
@@ -880,10 +880,11 @@ time** (epic decision 8) and never pre-written.
 | # | candidate | axis | prize (ceiling) | mechanism, as read | cost |
 |---|---|---|---|---|---|
 | M1 | compat read holds two whole-file representations at peak | read_strings | was priced at **~4.8×-of-output** at the 265 MB rung; **DECLINED 2026-08-31 (#831)** — the measured ceiling of the contained fix on this instrument is **~0** (held vs released diagnosis children agree within 0.4% across the whole memory ladder, 5–265 MB; the released+forced-purge variant matches at 25/100 MB) | the seam-read mechanism was RIGHT and the presumed fix still does nothing here: releasing per group genuinely frees each table (heap reuse proven — a second parse lands in the freed pages; mimalloc's own stats report the freed heap purged after one forced collect), but darwin hands pages back only on `munmap` — `MADV_FREE` and `MADV_FREE_REUSABLE` both leave `ps`-RSS **and** `ru_maxrss` unmoved, raw-syscall probe — so the sum-peak is physically real on the measuring machine. Where the OS does reclaim (Linux `MADV_DONTNEED`; darwin under memory pressure) the release pays, but the lane's instrument cannot see that. Full diagnosis below | was `contained`; **revisit IN MOTION — #833** (owner's fork call, 2026-08-31): the release is being measured where users actually run — the self-hosted Linux pool + hosted Windows — with the campaign's 5% floor as the go/no-go; a go lands the fix under #833 as a third-family claim. The other revisit doors (allocator config, #294/#448 territory; M4 reshaping the holds) stay open |
-| M2 | the `build_ags4` workflow peak stacks held input + the per-cell emit hold + materialised output | write | **~10.6×-of-output** above its own read peak at the 265 MB rung (18.8× total vs read-typed's 8.2×); the rust leg corroborates with no Python in the room (write 13.6× vs parse-to-typed 7.6×, first #822-harness run, 2026-08-31) | **Attributed (2026-08-31 pass, below): the Arrow-door emit slice is itself per-cell-bound** — `arrow_in.rs` collects every group's formatted `OwnedGroup` before `emit_owned_groups` runs, and AutoFix's validating parse-back adds a second string per cell, so the whole file's cells are live twice at peak. On top, `BuildResult.bytes` holds the whole emitted file **by contract** (build-and-judge together; `save` writes those bytes verbatim). The adds-~nothing-over-input property belongs to the compat *stream* door (#805/#818) — M3's evidence — not to this door. A fix is two separable pieces: stream `OwnedGroup`s through the writer, and a format-to-disk door (an API addition mirrored on three surfaces) | **invasive** — attribution done; the premium clears the 20% gate several times over at ceiling; needs the to-disk-door design decision before a ticket |
+| M2 | the `build_ags4` workflow peak stacks held input + the per-cell emit hold + materialised output | write | was **~10.6×-of-output** above its own read peak at the 265 MB rung pre-M4; post-M4 re-price + spike 2026-09-01 (#848): the **pair** of fixes below clears rule 10's invasive floor at the 100/265 MB gate rungs at ceiling — with the whole margin over the floor being what a real validation mechanism may cost, since the spike's ceiling leg deleted the verdict outright | **Re-attributed (2026-09-01, #848 — the 2026-08-31 reading below is superseded on the lane rungs)**: the `OwnedGroup` slab is *freed before the parse-back* (the #790 drop discipline held — the per-cell-bound reading survives only as the dense-TREL worst case), and the peak instead carries the **parse hold twice**: the caller's retained `ParsedFile` + the door's validating re-parse, standing on co-peak shoulders that back each other up (tail-skip alone moves ~nothing, streaming alone lands under the floor — only the pair clears; shares are not contributions). Fix shape settled by the #848 grill: streamed per-group join on BOTH doors + a **writer-built verdict** on the post-layout structure ([[dec-emit-streamed-verdict]]), plus the `out=` to-disk rider (caller steady-state, explicitly not floor arithmetic) | **invasive** — design page DONE: [[dec-emit-streamed-verdict]] (2026-09-01); **sequenced behind M6 (#850)**: the ticket is minted only after a re-price on the post-layout lane; gate = rule 10 at the 100+265 MB rungs, the 25 MB cell recorded as a structural shortfall |
 | M3 | compat write rides M1 | write | the write itself adds only **~1.5×-of-output** over the compat read's peak (the #805/#818 streaming door doing its job); the rest of the 14.2× **is** M1's hold | **inherits M1's #831 verdict** — falls with M1 wherever M1's release can be seen, and stalls with it here; still not a separate candidate | — |
 | M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; design page DONE: [[dec-parse-cell-representation]] (2026-08-31 — the shape, the scope, and the spike-gated mint conditions); **minted as #838** (2026-08-31, taking the queue slot #834 vacated) |
 | M5 | the shipped pyarrow-free pandas hop paid a whole-file polars intermediate | read_strings (the default `[compat]` install only) | was priced at **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children); **CLAIMED 2026-08-31 (#834) — and the price was misattributed**: removing the copy moved the shipped hop's read peak **−0.9% / −0.6%** at the 100/265 MB rungs (−1.9%/−4.2% at 25/5 MB; write ~0; A-legs bracket ±0.1%, the pyarrow control unmoved) and its read time −3–5%, while the premium itself — **~+2.4–2.6×-of-output at every rung** — survives the fix | the copy existed and is gone: the native table's own `__arrow_c_stream__` registers into DuckDB and the rename rides the SQL projection. But it was never sum-like at peak — each group's freed copy is reused by the next (the same heap-reuse behaviour #831's probe 2 measured), so the intermediate contributed ~one group's worth to peak, not the file's. The surviving premium is the **DuckDB bridge leg itself** (Arrow scan → engine vectors → NumPy `.df()`), sum-like on this instrument and **unattributed** — pricing it is a fresh diagnosis with its own code-reading, not a rider on this row | landed as an avoidance + simplification (#834; tests pin the no-intermediate path, hostile identifiers, the strict-zip raise and cross-hop frame equality). The owner's evidence trigger **FIRED**: post-fix the shipped hop still trails the pyarrow hop by **~+18–19% of the operation's peak** at the top rungs — recorded on #834 for the owner's dep-shape decision, nothing acted on |
+| M6 | the retained parse **structure** — per-row span-vec heap blocks plus source-byte fields the validator never reads | validate + read_typed (and every `ParsedFile` holder: every write door's input half, and M2's constructed verdict once it lands) | the #848 attribution prices the structure as most of the retained hold beyond the buffer, paid once per holder and **twice** on the write peak; the flattening estimate sits *at* rule 10's gate — which is exactly why the mint is spike-gated rather than argued (records on #848 and #850) | per-group **span arena** + slim row index in place of per-row `Vec<Span>` heap blocks (the shape whose RSS cost the requested-bytes instrument undercounts); `DataRow`/`RawLine` source-byte fields **profile-gated on the existing profiles** (validating drops them; certify/read keeps them source-true — consumers: the cert index, forge edit, one xcheck helper); no u16 packing; the #844/#846 accessor seam carries the migration | **invasive** — design page DONE: [[dec-parse-structure-layout]] (2026-09-01, grilled); **minted as #850** (spike-gated, M4's gate verbatim: rule 10 on validate AND read_typed peaks at 25+100 MB, A/B/A, criterion riders within noise) |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
@@ -903,7 +904,7 @@ moved — so these are confirmations with today's date, not new drift.
 |---|---|---|
 | `dhat_read.rs`, parse stage, 25 MB rung | ~6.5× the input, ~1 block per cell (matches T4-followup exactly) | the read/validate hold is the parse leaf's `String`-per-cell — **M4's prize** |
 | `dhat_read.rs`, typed-build stage, 25 MB rung | KB-scale, 27 blocks | the Arrow build holds ~nothing — the typed output itself (~1×) is the only retained slice, and it IS the product |
-| `heap_profile.rs`, the #790 TREL workload, autofix | **8.4× its output, 66.5 bytes/cell** (the #790 ladder's endpoint, reproduced) | the Arrow-door emit slice is per-cell-bound: every group's formatted `OwnedGroup` plus the parse-back live together — **M2's attributed mechanism**; scales with cell density, so the dense TREL shape is the worst case |
+| `heap_profile.rs`, the #790 TREL workload, autofix | **8.4× its output, 66.5 bytes/cell** (the #790 ladder's endpoint, reproduced) | the Arrow-door emit slice is per-cell-bound: every group's formatted `OwnedGroup` plus the parse-back live together — **was M2's attributed mechanism**; superseded on the lane's wide rungs by #848's probe (the slab is freed before t-gmax there — the M2 row above carries the correction), and surviving as the dense-cell worst case the TREL shape represents |
 
 What the pass changed: M2's "needs a dhat attribution first" is met, and its
 mechanism cell was **corrected** — the "emit adds ~nothing over its input"
@@ -972,6 +973,42 @@ here. The fork was put to the owner on #831 and resolved the same day:
 **measure where users run before landing** (most are hosted Linux or
 Windows) — that measurement is #833, and the probe instrument it runs is
 `tools/perf_probe_m1.py` via the dispatch-only `perf-probe` workflow.
+
+### The 2026-09-01 M2 re-price (#848): the write peak carries the parse hold twice, on co-peak shoulders
+
+The owner-directed check-don't-estimate round, probe-first like #831 and
+spike-gated like #838. Everything in it is the **diagnosis instrument
+family** (fresh-child `ru_maxrss` variant children + dhat at t-gmax, never
+the lane's table); the full record — variant ladders, at-peak
+attributions, the spike's A/B/A with byte-identity across every leg —
+lives on #848. What it settled:
+
+- **The attribution.** Post-M4, on the lane rungs, the formatted
+  `OwnedGroup` slab is *freed before the validating parse-back runs* (the
+  #790 drop discipline held), and the peak instead holds **two
+  `ParsedFile`s** — the caller's retained parse and the emit door's
+  re-parse of its own output — beside the typed input and the output
+  bytes. The AutoFix tail contributes ~nothing on this workload (the
+  fixture yields no safe fixes, and the tail reuses the freed slab).
+- **The co-peak lesson** (the #834 lesson, sharpened): a slice's at-peak
+  *share* is not its contribution. The spike removed each shoulder alone
+  and then both: the tail-skip alone moved the peak almost nothing, the
+  streamed slab alone landed under the invasive floor, and **only the
+  pair cleared rule 10 at the 100/265 MB gate rungs**. Price shapes by
+  variant children, alone *and* paired.
+- **The split verdict** (grilled with the owner, 2026-09-01): the
+  mechanism divides into the layout row — **M6, minted as #850**
+  ([[dec-parse-structure-layout]]) — and M2's streamed door + writer-built
+  verdict ([[dec-emit-streamed-verdict]]), sequenced M6-first with M2's
+  ticket minted only after a re-price on the post-layout lane. Gate rungs
+  for the write row are 100+265 MB; the 25 MB cell is recorded as a
+  structural shortfall (the import floor's share of that rung's
+  denominator), never skipped silently.
+- **Caller-side levers stay out of the queue**: dropping the read handle
+  once the frames exist, and feeding the door capsule-bearing tables
+  instead of materialised frames, are measured savings on #848's variant
+  table — but they are the caller's allocations. They ship as a docs
+  recipe on the write door's page, with this note as the ledger's record.
 
 ## Decisions taken
 
