@@ -2497,13 +2497,14 @@ def build_ags4(
     fd, tmp_name = tempfile.mkstemp(
         prefix=".laterite-build-", suffix=".tmp", dir=out_path.parent
     )
+    tmp = Path(tmp_name)
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-        os.replace(tmp_name, out_path)
+        tmp.replace(out_path)
     except BaseException:
         with contextlib.suppress(OSError):
-            os.unlink(tmp_name)
+            tmp.unlink()
         raise
     return BuildSaved(out_path, findings, list(applied))
 
