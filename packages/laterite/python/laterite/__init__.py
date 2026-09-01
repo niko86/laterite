@@ -16,7 +16,7 @@ import dataclasses
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self, overload
 
 import polars as pl
 
@@ -63,6 +63,7 @@ __all__ = [
     "BadDictError",
     "BuildMode",
     "BuildResult",
+    "BuildSaved",
     "Edition",
     "FixResult",
     "FixableRule",
@@ -2048,6 +2049,47 @@ class BuildResult:
         )
 
 
+class BuildSaved:
+    """What ``build_ags4(..., out=path)`` hands back: the verdict on a file already on disk.
+
+    The to-disk twin of [`BuildResult`][laterite.BuildResult] — same
+    [`findings`][laterite.BuildResult.findings] /
+    [`applied`][laterite.BuildResult.applied] /
+    [`fixes_applied`][laterite.BuildResult.fixes_applied] verdict, but the
+    document lives at [`path`][laterite.BuildSaved.path] rather than on the
+    result. There is deliberately no ``bytes`` here: the point of ``out=`` is
+    a long-lived caller that does not want the whole file resident after the
+    call, and a result quietly carrying it anyway would defeat that.
+
+    Build-and-judge survives the trip to disk: the bytes are staged to a
+    temporary file beside the destination and moved into place only after
+    the verdict allows, so ``path`` never holds unjudged output — a
+    ``mode="strict"`` failure raises with nothing written.
+
+    Attributes:
+        path: Where the judged AGS4 document was written.
+        findings: The validator findings on the written bytes — post-fix in
+            ``"autofix"`` mode, the full set in ``"report"`` mode.
+        applied: The ledger of safe mechanical fixes made during the build
+            (empty outside ``"autofix"`` mode).
+        fixes_applied: Count of safe fixes applied — ``len(applied)``.
+    """
+
+    __slots__ = ("applied", "findings", "fixes_applied", "path")
+
+    def __init__(self, path: Path, findings: list[dict], applied: list[dict]) -> None:
+        self.path = path
+        self.findings = findings
+        self.applied = applied
+        self.fixes_applied = len(applied)
+
+    def __repr__(self) -> str:
+        return (
+            f"<BuildSaved {str(self.path)!r}, "
+            f"{len(self.findings)} finding(s), fixes_applied={self.fixes_applied}>"
+        )
+
+
 def _typed_group_code(obj: Any) -> str | None:
     """The AGS group code if ``obj`` is a typed-graph node, else ``None``.
 
@@ -2178,6 +2220,7 @@ def _drop_synth_keys(frame: Any) -> Any:
     return frame.drop(columns=synth)  # pandas
 
 
+@overload
 def build_ags4(
     groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
     *,
@@ -2187,7 +2230,31 @@ def build_ags4(
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
-) -> BuildResult:
+    out: None = None,
+) -> BuildResult: ...
+@overload
+def build_ags4(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    mode: BuildMode = "autofix",
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    synthesise_metadata: bool = False,
+    tran: TranStamp | None = None,
+    out: str | os.PathLike[str],
+) -> BuildSaved: ...
+def build_ags4(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    mode: BuildMode = "autofix",
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    synthesise_metadata: bool = False,
+    tran: TranStamp | None = None,
+    out: str | os.PathLike[str] | None = None,
+) -> BuildResult | BuildSaved:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
 
     Where [`read`][laterite.read] loads an *existing* file, ``build_ags4`` *constructs* a new
@@ -2291,12 +2358,25 @@ def build_ags4(
             recipient no way to tell it from a real transmission record. A missing
             TRAN that reports honestly is strictly better than a present one that
             lies. Same five arguments [`merge`][laterite.merge] takes.
+        out: Destination path — the ``fix(out=)`` idiom for the build door.
+            Given, the judged document is written there and the result is a
+            [`BuildSaved`][laterite.BuildSaved] carrying ``path`` and the
+            verdict but **no** ``bytes`` — for a long-lived caller that wants
+            the file on disk, not a whole-file ``bytes`` held on the result.
+            The write stages to a temporary file in the destination's
+            directory and ``os.replace``s it into place only after the
+            verdict allows, so ``out`` never holds unjudged output: a
+            ``mode="strict"`` failure raises with nothing written, and any
+            autofix rewrite happens before the path exists. ``None``
+            (default) returns the bytes-carrying ``BuildResult`` as always.
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
         ``findings`` on those bytes (post-fix in ``"autofix"`` mode), and
         ``fixes_applied`` — the count of safe fixes made. ``.text`` decodes the
-        bytes; ``.save(path)`` writes them.
+        bytes; ``.save(path)`` writes them. With ``out=`` given, a
+        [`BuildSaved`][laterite.BuildSaved] instead — the same verdict fields
+        plus the ``path`` written, and no ``bytes``.
 
     Raises:
         TypeError: If a typed-graph node isn't a known AGS group instance, or its
@@ -2403,7 +2483,30 @@ def build_ags4(
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
-    return BuildResult(data, findings, list(applied))
+    if out is None:
+        return BuildResult(data, findings, list(applied))
+    # The to-disk rider (dec-emit-streamed-verdict): the engine has already
+    # judged `data` (a strict failure raised above, autofix rewrote in
+    # memory), so stage it beside the destination and move it into place —
+    # same-directory os.replace keeps the move atomic on one filesystem, and
+    # the destination path never holds unjudged bytes.
+    import contextlib
+    import tempfile
+
+    out_path = Path(out)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=".laterite-build-", suffix=".tmp", dir=out_path.parent
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        tmp.replace(out_path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+    return BuildSaved(out_path, findings, list(applied))
 
 
 class FixResult:

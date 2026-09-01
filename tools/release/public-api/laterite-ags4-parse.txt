@@ -1,4 +1,64 @@
 pub mod laterite_ags4_parse
+pub mod laterite_ags4_parse::builder
+pub enum laterite_ags4_parse::builder::RowTag
+pub laterite_ags4_parse::builder::RowTag::Blank
+pub laterite_ags4_parse::builder::RowTag::Data
+pub laterite_ags4_parse::builder::RowTag::Group
+pub laterite_ags4_parse::builder::RowTag::Heading
+pub laterite_ags4_parse::builder::RowTag::Type
+pub laterite_ags4_parse::builder::RowTag::Unit
+impl core::clone::Clone for laterite_ags4_parse::builder::RowTag
+pub fn laterite_ags4_parse::builder::RowTag::clone(&self) -> laterite_ags4_parse::builder::RowTag
+impl core::cmp::Eq for laterite_ags4_parse::builder::RowTag
+impl core::cmp::PartialEq for laterite_ags4_parse::builder::RowTag
+pub fn laterite_ags4_parse::builder::RowTag::eq(&self, &laterite_ags4_parse::builder::RowTag) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::builder::RowTag
+pub fn laterite_ags4_parse::builder::RowTag::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::builder::RowTag
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::builder::RowTag
+impl core::marker::Freeze for laterite_ags4_parse::builder::RowTag
+impl core::marker::Send for laterite_ags4_parse::builder::RowTag
+impl core::marker::Sync for laterite_ags4_parse::builder::RowTag
+impl core::marker::Unpin for laterite_ags4_parse::builder::RowTag
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::builder::RowTag
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::builder::RowTag
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::builder::RowTag
+pub struct laterite_ags4_parse::builder::ParsedFileBuilder
+impl laterite_ags4_parse::builder::ParsedFileBuilder
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::buf(&mut self) -> &mut alloc::vec::Vec<u8>
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::finish(self) -> core::result::Result<(laterite_ags4_parse::ParsedFile, usize), laterite_ags4_parse::ParseError>
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::new() -> Self
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::record_row(&mut self, laterite_ags4_parse::builder::RowTag, core::ops::range::Range<usize>, &[laterite_ags4_parse::builder::RecordedCell]) -> core::result::Result<(), laterite_ags4_parse::ParseError>
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::written(&self) -> usize
+impl core::default::Default for laterite_ags4_parse::builder::ParsedFileBuilder
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::default() -> laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::marker::Freeze for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::marker::Send for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::marker::Sync for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::marker::Unpin for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::builder::ParsedFileBuilder
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::builder::ParsedFileBuilder
+pub struct laterite_ags4_parse::builder::RecordedCell
+pub laterite_ags4_parse::builder::RecordedCell::end: usize
+pub laterite_ags4_parse::builder::RecordedCell::has_escape: bool
+pub laterite_ags4_parse::builder::RecordedCell::start: usize
+impl core::clone::Clone for laterite_ags4_parse::builder::RecordedCell
+pub fn laterite_ags4_parse::builder::RecordedCell::clone(&self) -> laterite_ags4_parse::builder::RecordedCell
+impl core::cmp::Eq for laterite_ags4_parse::builder::RecordedCell
+impl core::cmp::PartialEq for laterite_ags4_parse::builder::RecordedCell
+pub fn laterite_ags4_parse::builder::RecordedCell::eq(&self, &laterite_ags4_parse::builder::RecordedCell) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::builder::RecordedCell
+pub fn laterite_ags4_parse::builder::RecordedCell::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::Freeze for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::Send for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::Sync for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::Unpin for laterite_ags4_parse::builder::RecordedCell
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::builder::RecordedCell
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::builder::RecordedCell
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::builder::RecordedCell
 pub mod laterite_ags4_parse::scan
 pub struct laterite_ags4_parse::scan::RawField
 pub laterite_ags4_parse::scan::RawField::had_comma: bool

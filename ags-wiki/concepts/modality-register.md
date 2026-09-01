@@ -149,7 +149,9 @@ _Notes:_
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
-*Offered anywhere — in: bytes, handle, text, value · out: bytes, value*
+*Offered anywhere — in: bytes, handle, text, value · out: bytes, file, value*
+
+*Below the facade floor — the Rust crate does not yet offer out: file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -164,19 +166,21 @@ _Notes:_
 
 **Output**
 
-| surface (spelling) | bytes | value |
-|---|---|---|
-| python (free) |   | ✓ |
-| node (free) |   | ✓ |
-| browser (free) | ✓ |   |
-| rust (chained) |   | ✓ |
-| duckdb (n/a) | — | — |
-| cli (absent) |   |   |
+| surface (spelling) | file | bytes | value |
+|---|---|---|---|
+| python (free) | ✓ |   | ✓ |
+| node (free) | ✓ |   | ✓ |
+| browser (free) |   | ✓ |   |
+| rust (chained) |   |   | ✓ |
+| duckdb (n/a) |   | — | — |
+| cli (absent) |   |   |   |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
 _Notes:_
+- _python_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
+- _node_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
 - _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 - _cli_: **by-design.** "Construct from caller-supplied data" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.

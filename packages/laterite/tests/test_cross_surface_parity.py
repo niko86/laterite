@@ -66,7 +66,12 @@ _MATRIX: dict[str, tuple] = {
         {},
     ),
     "diff": (L.diff, {"a", "b"}, "DiffOptions", {}),
-    "build": (L.build_ags4, {"groups"}, "EmitOptions", {}),
+    # `out` joins the drop set for the same reason fix's does (and `_NODE_IO`
+    # already excludes Node's twin): a write-back destination is an IO
+    # selector, not a behavioural knob — the #855 to-disk rider changes where
+    # the judged bytes land, never what they are. wasm has no filesystem, so
+    # on that surface the whole knob is a modality gap, not drift.
+    "build": (L.build_ags4, {"groups", "out"}, "EmitOptions", {}),
     # merge joined when wasm did: it was never compared on ANY axis before, so
     # `dict_version` being reachable from Python and the CLI but not the browser
     # went unnoticed for as long as the browser had a merge door.

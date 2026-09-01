@@ -18,16 +18,20 @@
 //! Steps 1–3 are pure formatting; step 4 reuses the validator's shipped
 //! parse / `run_all` / `compute_fixes` / `apply_fixes` — no new fix logic.
 
+use laterite_ags4_parse::builder::ParsedFileBuilder;
 use laterite_ags4_types::{Cell, ags4_str};
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
-use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
+use laterite_ags4_validator::{
+    CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed,
+};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use crate::error::EmitError;
-use crate::writer::{EmitGroup, write_ags4};
+use crate::writer::{EmitGroup, write_section_recorded};
 
 /// One group's data to emit. `units` / `types` are optional per-heading
 /// overrides — `None` (or a blank entry) means "fill from the dictionary".
@@ -316,8 +320,14 @@ pub struct EmitResult {
 /// Build valid AGS4 bytes from typed/string group data per `opts`.
 pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
-    let owned: Vec<OwnedGroup> = groups.iter().map(|g| owned_group(g, &dict)).collect();
-    emit_owned_groups(owned, opts, &dict)
+    let mut stream = EmitStream::new(opts, &dict);
+    for g in groups {
+        // Per-group: the formatted copy is written and dropped before the
+        // next group formats — no whole-file OwnedGroup slab exists
+        // (dec-emit-streamed-verdict).
+        stream.push(owned_group(g, &dict))?;
+    }
+    stream.finish()
 }
 
 /// Like [`emit_ags4`], but consuming its input, group by group.
@@ -332,12 +342,14 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
 /// input copy was the single largest slice of the emit's live-at-peak bytes.
 pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
-    let owned: Vec<OwnedGroup> = groups
-        .into_iter()
-        // `g` is consumed per iteration: its cell rows free here, not at return.
-        .map(|g| owned_group_consuming(g, &dict))
-        .collect();
-    emit_owned_groups(owned, opts, &dict)
+    let mut stream = EmitStream::new(opts, &dict);
+    for g in groups {
+        // `g` is consumed per iteration: its cell rows free here, not at
+        // return — and the formatted copy drops inside `push`, so input,
+        // formatted copy and verdict never peak together.
+        stream.push(owned_group_consuming(g, &dict))?;
+    }
+    stream.finish()
 }
 
 /// Steps 1–2 for one group: resolve UNIT/TYPE (hybrid) + format every cell.
@@ -412,53 +424,112 @@ fn format_row(row: &[Cell], types: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// Steps 2.5–4, from formatted groups: synthesize missing metadata, write,
-/// validate the bytes, apply the validity mode.
-pub(crate) fn emit_owned_groups(
-    mut owned: Vec<OwnedGroup>,
-    opts: &EmitOpts,
-    dict: &Dictionary,
-) -> Result<EmitResult, EmitError> {
-    // --- step 2.5: synthesize missing mandatory metadata groups -------
-    // AutoFix only: a data-only build (notably a typed PROJ graph, which
-    // can't reach the parentless root-metadata groups) still yields a valid
-    // file — mint UNIT/TYPE (derived from the data) and ABBR (when PA codes are
-    // used) for whichever are absent, plus TRAN when the caller stamped one.
-    // PROJ is never synthesized (real project identity), so a missing PROJ stays
-    // a Rule 13 finding.
-    if opts.mode == EmitMode::AutoFix && opts.synthesise_metadata {
-        let synth = synthesise_metadata(&owned, dict, opts.tran.as_ref());
-        owned.extend(synth);
+/// Steps 2.5–4 as a STREAM: each formatted group is written (and its
+/// verdict structure recorded) the moment it arrives, then dropped — for
+/// both doors, so no whole-file `OwnedGroup` slab ever exists — and the
+/// verdict is assembled from the writer's own records instead of a
+/// `parse_bytes` of the bytes it just wrote (`dec-emit-streamed-verdict`).
+/// The old pipeline held the parse hold TWICE at the peak: the caller's
+/// retained `ParsedFile` plus the validating parse-back, co-peak shoulders
+/// that backed each other up (#848 — only fixing both moved the peak).
+pub(crate) struct EmitStream<'a> {
+    builder: ParsedFileBuilder,
+    opts: &'a EmitOpts,
+    dict: &'a Dictionary<'a>,
+    /// step 2.5's catalogues, filled as the groups stream — `Some` only when
+    /// synthesis is on (`AutoFix` + opt-in), exactly the old batch condition.
+    synth: Option<SynthAccumulator>,
+    wrote_any: bool,
+}
+
+impl<'a> EmitStream<'a> {
+    pub(crate) fn new(opts: &'a EmitOpts, dict: &'a Dictionary<'a>) -> Self {
+        // AutoFix only: a data-only build (notably a typed PROJ graph, which
+        // can't reach the parentless root-metadata groups) still yields a
+        // valid file — mint UNIT/TYPE (derived from the data) and ABBR (when
+        // PA codes are used) for whichever are absent, plus TRAN when the
+        // caller stamped one. PROJ is never synthesized (real project
+        // identity), so a missing PROJ stays a Rule 13 finding.
+        let synth = (opts.mode == EmitMode::AutoFix && opts.synthesise_metadata)
+            .then(SynthAccumulator::default);
+        EmitStream {
+            builder: ParsedFileBuilder::new(),
+            opts,
+            dict,
+            synth,
+            wrote_any: false,
+        }
     }
 
-    // --- step 3: write the sections -----------------------------------
-    let mut bytes: Vec<u8> = Vec::new();
-    {
-        let views: Vec<EmitGroup<'_>> = owned
-            .iter()
-            .map(|g| EmitGroup {
-                code: &g.code,
-                headings: g.headings.iter().map(String::as_str).collect(),
-                units: g.units.iter().map(String::as_str).collect(),
-                types: g.types.iter().map(String::as_str).collect(),
-                rows: &g.rows,
-            })
-            .collect();
-        write_ags4(&mut bytes, &views)?;
+    /// Write one formatted group's section and record its verdict structure.
+    /// Consumes the group ON PURPOSE (the streamed join's whole point): its
+    /// cells free when this returns, not at finish — by-reference would let a
+    /// caller keep the formatted slab alive across the stream.
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
+        if let Some(acc) = &mut self.synth {
+            acc.fold(&og);
+        }
+        let view = EmitGroup {
+            code: &og.code,
+            headings: og.headings.iter().map(String::as_str).collect(),
+            units: og.units.iter().map(String::as_str).collect(),
+            types: og.types.iter().map(String::as_str).collect(),
+            rows: &og.rows,
+        };
+        write_section_recorded(&mut self.builder, &view, !self.wrote_any)?;
+        self.wrote_any = true;
+        Ok(())
     }
-    // The formatted copy is dead once written: everything past here reads the
-    // BYTES (validate, compute_fixes, apply_fixes), so holding `owned` across
-    // the re-parse would keep a whole extra copy of every cell at the peak
-    // for nothing.
-    drop(owned);
 
-    // --- step 4: apply the validity mode ------------------------------
-    // Keep the ParsedFile: `AutoFix` needs it for `compute_fixes`, and it used
-    // to re-parse the SAME bytes to get a second copy of it.
-    let (parsed, found) = validate(&bytes, opts.edition)?;
+    /// Write the synthesised groups (last, preserving the batch pipeline's
+    /// byte order) and assemble the writer-built verdict: the emitted bytes
+    /// adopted as the verdict's buffer, no `parse_bytes` run.
+    pub(crate) fn assemble(mut self) -> Result<(ParsedFile, usize), EmitError> {
+        if let Some(acc) = self.synth.take() {
+            for og in acc.synthesised(self.dict, self.opts.tran.as_ref()) {
+                let view = EmitGroup {
+                    code: &og.code,
+                    headings: og.headings.iter().map(String::as_str).collect(),
+                    units: og.units.iter().map(String::as_str).collect(),
+                    types: og.types.iter().map(String::as_str).collect(),
+                    rows: &og.rows,
+                };
+                write_section_recorded(&mut self.builder, &view, !self.wrote_any)?;
+                self.wrote_any = true;
+            }
+        }
+        // A zero-group build fails exactly as the parse-back used to:
+        // through the walk's own NotAgs4, worded identically.
+        self.builder
+            .finish()
+            .map_err(|e| EmitError::Reparse(ValidatorError::from(e).to_string()))
+    }
+
+    /// Assemble, judge, apply the validity mode.
+    pub(crate) fn finish(self) -> Result<EmitResult, EmitError> {
+        let opts = self.opts;
+        let (parsed, emitted_len) = self.assemble()?;
+        judge(parsed, emitted_len, opts)
+    }
+}
+
+/// Step 4, over the CONSTRUCTED verdict: run the rule engine, apply the
+/// validity mode. The happy path never parses — the bytes leave through
+/// [`reclaim_bytes`], zero-copy out of the verdict's buffer.
+fn judge(parsed: ParsedFile, emitted_len: usize, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
+    let dict = Dictionary::bundled(opts.edition);
+    let copts = CheckOptions {
+        dict_version: Some(opts.edition),
+        ..CheckOptions::default()
+    };
+    // Content-only by construction: bytes produced in memory have no
+    // directory to sit beside, so there is no world to look at.
+    let found = check_parsed(&parsed, &dict, &copts, &WorldScope::None)
+        .map_err(|e| EmitError::Reparse(e.to_string()))?;
     match opts.mode {
         EmitMode::Report => Ok(EmitResult {
-            bytes,
+            bytes: reclaim_bytes(parsed, emitted_len),
             findings: found,
             applied: Vec::new(),
             fixes_applied: 0,
@@ -473,7 +544,7 @@ pub(crate) fn emit_owned_groups(
                 Err(EmitError::Invalid(found))
             } else {
                 Ok(EmitResult {
-                    bytes,
+                    bytes: reclaim_bytes(parsed, emitted_len),
                     findings: found,
                     applied: Vec::new(),
                     fixes_applied: 0,
@@ -481,29 +552,28 @@ pub(crate) fn emit_owned_groups(
             }
         }
         EmitMode::AutoFix => {
-            // `parsed` comes from step 4's validate — these are the very bytes
-            // it just parsed, so re-parsing them produced an identical
-            // ParsedFile at full cost. Borrowed, not owned: `apply_fixes` wants
-            // `&str`, so an all-ASCII emit (the normal case) does not copy the
-            // whole output either.
-            let text = String::from_utf8_lossy(&bytes);
+            // `compute_fixes` reads exactly the inventory the constructed
+            // verdict populates (#848), so no parse runs to price the fixes.
             let safe: Vec<_> = compute_fixes(&parsed, &found)
                 .into_iter()
                 .filter(|f| f.risk == FixRisk::Safe)
                 .collect();
             if safe.is_empty() {
                 return Ok(EmitResult {
-                    bytes,
+                    bytes: reclaim_bytes(parsed, emitted_len),
                     findings: found,
                     applied: Vec::new(),
                     fixes_applied: 0,
                 });
             }
-            // The emitter never writes a BOM, so has_bom = false.
-            let fixed = apply_fixes(&text, false, &safe);
+            // The rare path — actual safe fixes exist. The verdict buffer's
+            // emitted prefix IS the text (`apply_fixes` wants `&str`); the
+            // emitter never writes a BOM, so has_bom = false.
+            let fixed = apply_fixes(&parsed.text[..emitted_len], false, &safe);
+            drop(parsed);
             let fixed_bytes = fixed.into_bytes();
             // Residual findings on the *fixed* output — a genuinely different
-            // document, so this parse is real work, not a repeat.
+            // document, so this bounded re-parse is real work, not a repeat.
             let (_, residual) = validate(&fixed_bytes, opts.edition)?;
             Ok(EmitResult {
                 bytes: fixed_bytes,
@@ -513,6 +583,19 @@ pub(crate) fn emit_owned_groups(
             })
         }
     }
+}
+
+/// Take the emitted bytes back out of the verdict's buffer: drop the parse
+/// (each group holds a refcount on the buffer), unwrap it at refcount 1,
+/// truncate the fix-up tail. Zero-copy on the invariant path — the
+/// `unwrap_or_else` copy is a defensive fallback for a leaked refcount, not
+/// a code path anything is expected to take.
+fn reclaim_bytes(parsed: ParsedFile, emitted_len: usize) -> Vec<u8> {
+    let text = Arc::clone(&parsed.text);
+    drop(parsed);
+    let mut s = Arc::try_unwrap(text).unwrap_or_else(|a| (*a).clone());
+    s.truncate(emitted_len);
+    s.into_bytes()
 }
 
 /// Owned mirror of an emit group — `EmitGroup` borrows `&str`s, so we
@@ -569,10 +652,11 @@ fn format_cell(value: &Cell, ags_type: &str) -> String {
     }
 }
 
-/// Parse bytes + run all rules at the given edition, returning the parse AND
-/// the findings. Handing back the `ParsedFile` is the point: it is the exact
-/// input the rules ran against, so a caller that needs it (`AutoFix`, for
-/// `compute_fixes`) reuses it instead of re-deriving it from the same bytes.
+/// Parse bytes + run all rules at the given edition. Since the writer-built
+/// verdict (`dec-emit-streamed-verdict`) this runs on ONE path only: the
+/// residual validation of `apply_fixes`' output — a genuinely different
+/// document from the one the writer recorded, so the parse is real work.
+/// The happy path's verdict is constructed by the writer and never parses.
 ///
 /// Content-only by construction: the emitter re-validates bytes it just produced
 /// in memory, which have no directory to sit beside, so there is no world to look
@@ -590,69 +674,101 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings)
     Ok((parsed, found))
 }
 
-/// Under `AutoFix`, synthesize whichever mandatory metadata catalog group is
-/// absent so a data-only build still yields a valid file. UNIT and TYPE are
-/// pure derivations of the data; ABBR is minted when (and only when) the data
-/// uses PA picklist codes (Rule 16); TRAN is written only from a caller-supplied
-/// `TranStamp`, never invented. PROJ is deliberately never synthesized — it
-/// carries real project identity, not derivable metadata, so a missing PROJ
-/// stays a Rule 13 finding.
-fn synthesise_metadata(
-    owned: &[OwnedGroup],
-    dict: &Dictionary,
-    tran: Option<&TranStamp>,
-) -> Vec<OwnedGroup> {
-    let present: BTreeSet<&str> = owned.iter().map(|g| g.code.as_str()).collect();
-    let mut synth: Vec<OwnedGroup> = Vec::new();
+/// Step 2.5's catalogues, accumulated as the groups STREAM — the batch
+/// `synthesise_metadata(&[OwnedGroup], …)` walked the whole formatted set,
+/// which no longer exists ([`EmitStream`] drops each group after writing
+/// it). Same derivations, same order, same output (the differential test
+/// pins the accumulator against the batch computation): UNIT and TYPE are
+/// pure derivations of the data; ABBR is minted when (and only when) the
+/// data uses PA picklist codes (Rule 16); TRAN is written only from a
+/// caller-supplied `TranStamp`, never invented. PROJ is deliberately never
+/// synthesized — it carries real project identity, not derivable metadata,
+/// so a missing PROJ stays a Rule 13 finding.
+#[derive(Default)]
+struct SynthAccumulator {
+    present: BTreeSet<String>,
+    units: BTreeSet<String>,
+    types: BTreeSet<String>,
+    /// Distinct `(heading, raw cell)` pairs from PA-typed columns. RAW —
+    /// the concatenator that splits them can arrive in a later group's
+    /// `TRAN_RCON`, so splitting waits for `synthesised`.
+    pa_cells: BTreeSet<(String, String)>,
+    /// The first non-blank `TRAN_RCON` seen (Rule 16a's concatenator).
+    rcon: Option<String>,
+}
 
-    // TRAN first: its DT `TRAN_DATE` introduces the `yyyy-mm-dd` unit and the
-    // `DT` type that the UNIT/TYPE catalogs below must then cover.
-    //
-    // Only when the caller supplied one. Without a stamp we emit NO TRAN and let
-    // Rule 14 report it — see `EmitOpts::tran` for why a placeholder is worse
-    // than an absence.
-    //
-    // `filter` rather than the `&& let` chain this obviously wants to be: let
-    // chains stabilised in 1.88, and this crate's `rust-version` promises 1.85.
-    // The nested-`if` alternative reads better but trips clippy's
-    // `collapsible_if`, whose suggested fix is the let chain again. Don't
-    // "simplify" this back — `msrv` in CI will catch it, which is how it was
-    // found.
-    if let Some(t) = tran.filter(|_| !present.contains("TRAN")) {
-        synth.push(synth_tran(dict, t));
-    }
-    // UNIT: one row per distinct unit used across all groups (Rule 15).
-    //
-    // Skipped when nothing uses a unit. An empty catalog is not a neutral
-    // no-op — a group with no DATA rows is itself a Rule 2 error, so minting
-    // one would trade a Rule 15 finding for a Rule 2 finding and call it
-    // synthesis. This became reachable when TRAN stopped being minted
-    // unconditionally: its `yyyy-mm-dd` on TRAN_DATE was quietly the thing
-    // guaranteeing at least one unit existed.
-    if !present.contains("UNIT") {
-        let units = collect_units(owned.iter().chain(synth.iter()));
-        if !units.is_empty() {
-            synth.push(synth_catalog("UNIT", "UNIT_UNIT", "UNIT_DESC", &units));
+impl SynthAccumulator {
+    /// Fold one streamed group's contribution into the catalogues, via the
+    /// same collectors the batch path used one group at a time.
+    fn fold(&mut self, g: &OwnedGroup) {
+        self.present.insert(g.code.clone());
+        self.units.extend(collect_units(std::iter::once(g)));
+        self.types.extend(collect_types(std::iter::once(g)));
+        collect_pa_cells(g, &mut self.pa_cells);
+        if self.rcon.is_none() {
+            self.rcon = tran_rcon(g);
         }
     }
-    // TYPE: one row per distinct type code used (Rule 17). Force `X` — every
-    // synthesized metadata group is all-`X`, so the catalog must self-cover.
-    if !present.contains("TYPE") {
-        let mut types = collect_types(owned.iter().chain(synth.iter()));
-        types.insert("X".to_string());
-        synth.push(synth_catalog("TYPE", "TYPE_TYPE", "TYPE_DESC", &types));
-    }
-    // ABBR: only when the data uses PA picklist codes (Rule 16) — one row per
-    // distinct (heading, code), description from the standard ABBR table
-    // (fallback: the code itself). PA values are split on the concatenator the
-    // same way Rule 16 reads it (the file's `TRAN_RCON`, else the AGS `+`).
-    if !present.contains("ABBR") {
-        let abbrs = collect_abbreviations(owned, dict, &concatenator(owned));
-        if !abbrs.is_empty() {
-            synth.push(synth_abbr(abbrs));
+
+    /// The synthesised groups, in the batch pipeline's order — each folded
+    /// into the catalogues the NEXT one derives from, reproducing the batch
+    /// `chain(owned, synth)` reads.
+    fn synthesised(mut self, dict: &Dictionary, tran: Option<&TranStamp>) -> Vec<OwnedGroup> {
+        let mut synth: Vec<OwnedGroup> = Vec::new();
+
+        // TRAN first: its DT `TRAN_DATE` introduces the `yyyy-mm-dd` unit and
+        // the `DT` type that the UNIT/TYPE catalogs below must then cover.
+        //
+        // Only when the caller supplied one. Without a stamp we emit NO TRAN
+        // and let Rule 14 report it — see `EmitOpts::tran` for why a
+        // placeholder is worse than an absence.
+        //
+        // `filter` rather than the `&& let` chain this obviously wants to be:
+        // let chains stabilised in 1.88, and this crate's `rust-version`
+        // promises 1.85. The nested-`if` alternative reads better but trips
+        // clippy's `collapsible_if`, whose suggested fix is the let chain
+        // again. Don't "simplify" this back — `msrv` in CI will catch it,
+        // which is how it was found.
+        if let Some(t) = tran.filter(|_| !self.present.contains("TRAN")) {
+            let g = synth_tran(dict, t);
+            self.units.extend(collect_units(std::iter::once(&g)));
+            self.types.extend(collect_types(std::iter::once(&g)));
+            synth.push(g);
         }
+        // UNIT: one row per distinct unit used across all groups (Rule 15).
+        //
+        // Skipped when nothing uses a unit. An empty catalog is not a neutral
+        // no-op — a group with no DATA rows is itself a Rule 2 error, so
+        // minting one would trade a Rule 15 finding for a Rule 2 finding and
+        // call it synthesis. This became reachable when TRAN stopped being
+        // minted unconditionally: its `yyyy-mm-dd` on TRAN_DATE was quietly
+        // the thing guaranteeing at least one unit existed.
+        if !self.present.contains("UNIT") && !self.units.is_empty() {
+            synth.push(synth_catalog("UNIT", "UNIT_UNIT", "UNIT_DESC", &self.units));
+        }
+        // TYPE: one row per distinct type code used (Rule 17). Force `X` —
+        // every synthesized metadata group is all-`X`, so the catalog must
+        // self-cover (which also covers the UNIT catalog just minted).
+        if !self.present.contains("TYPE") {
+            let mut types = std::mem::take(&mut self.types);
+            types.insert("X".to_string());
+            synth.push(synth_catalog("TYPE", "TYPE_TYPE", "TYPE_DESC", &types));
+        }
+        // ABBR: only when the data uses PA picklist codes (Rule 16) — one row
+        // per distinct (heading, code), description from the standard ABBR
+        // table (fallback: the code itself). PA values split on the
+        // concatenator the same way Rule 16 reads it (the file's `TRAN_RCON`,
+        // else the AGS `+`) — from the CALLER's groups only, as the batch
+        // computation read them.
+        if !self.present.contains("ABBR") {
+            let concat = self.rcon.as_deref().unwrap_or("+");
+            let abbrs = abbreviations_from_pa_cells(&self.pa_cells, dict, concat);
+            if !abbrs.is_empty() {
+                synth.push(synth_abbr(abbrs));
+            }
+        }
+        synth
     }
-    synth
 }
 
 /// Distinct non-empty units used (Rule 15): every group's UNIT-row value plus
@@ -774,47 +890,52 @@ fn synth_tran(dict: &Dictionary, stamp: &TranStamp) -> OwnedGroup {
     }
 }
 
-/// The PA concatenator (Rule 16a) — the file's `TRAN_RCON` if a TRAN group was
-/// supplied, else the AGS standard `+` (also what `synth_tran` writes).
-fn concatenator(owned: &[OwnedGroup]) -> String {
-    for g in owned {
-        if g.code == "TRAN" {
-            if let Some(ci) = g.headings.iter().position(|h| h == "TRAN_RCON") {
-                if let Some(v) = g.rows.first().and_then(|r| r.get(ci)) {
-                    let v = v.trim();
-                    if !v.is_empty() {
-                        return v.to_string();
+/// One group's contribution to Rule 16a's concatenator: the first row's
+/// non-blank `TRAN_RCON` of a TRAN group, else `None`. The accumulator keeps
+/// the first `Some` it sees — the batch scan's first-non-blank-wins.
+fn tran_rcon(g: &OwnedGroup) -> Option<String> {
+    if g.code != "TRAN" {
+        return None;
+    }
+    let ci = g.headings.iter().position(|h| h == "TRAN_RCON")?;
+    let v = g.rows.first().and_then(|r| r.get(ci))?.trim();
+    (!v.is_empty()).then(|| v.to_string())
+}
+
+/// One group's distinct `(heading, raw cell)` pairs from `PA`-typed columns,
+/// into `seen`. RAW: the concatenator that splits a cell into codes can be
+/// declared by a TRAN group that streams later, so splitting waits until
+/// every group has passed ([`abbreviations_from_pa_cells`]). Distinct pairs
+/// bound the hold to the picklist's vocabulary, not the row count.
+fn collect_pa_cells(g: &OwnedGroup, seen: &mut BTreeSet<(String, String)>) {
+    for (ci, ty) in g.types.iter().enumerate() {
+        if ty.trim() == "PA" {
+            let heading = g.headings.get(ci).map_or("", String::as_str);
+            for row in &g.rows {
+                if let Some(cell) = row.get(ci) {
+                    if !cell.is_empty() {
+                        seen.insert((heading.to_string(), cell.clone()));
                     }
                 }
             }
         }
     }
-    "+".to_string()
 }
 
-/// Distinct `(heading, code, desc)` triples for every abbreviation used in a
-/// `PA`-typed column (Rule 16). Each cell is split on `concat` (matching Rule
-/// 16a); the description is the standard ABBR table's, falling back to the code.
-fn collect_abbreviations(
-    groups: &[OwnedGroup],
+/// Distinct `(heading, code, desc)` triples from the accumulated PA cells
+/// (Rule 16). Each cell splits on `concat` (matching Rule 16a); the
+/// description is the standard ABBR table's, falling back to the code.
+fn abbreviations_from_pa_cells(
+    pa_cells: &BTreeSet<(String, String)>,
     dict: &Dictionary,
     concat: &str,
 ) -> Vec<[String; 3]> {
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
-    for g in groups {
-        for (ci, ty) in g.types.iter().enumerate() {
-            if ty.trim() == "PA" {
-                let heading = g.headings.get(ci).map_or("", String::as_str);
-                for row in &g.rows {
-                    if let Some(cell) = row.get(ci) {
-                        for code in cell.split(concat) {
-                            let code = code.trim();
-                            if !code.is_empty() {
-                                seen.insert((heading.to_string(), code.to_string()));
-                            }
-                        }
-                    }
-                }
+    for (heading, cell) in pa_cells {
+        for code in cell.split(concat) {
+            let code = code.trim();
+            if !code.is_empty() {
+                seen.insert((heading.clone(), code.to_string()));
             }
         }
     }
@@ -850,6 +971,254 @@ mod tests {
     /// Cell shorthand — the role `json!` played before #790.
     fn c(v: impl Into<Cell>) -> Cell {
         v.into()
+    }
+
+    /// THE EQUIVALENCE CONTRACT (dec-emit-streamed-verdict): the writer-built
+    /// verdict must be indistinguishable from a real `parse_bytes` of the
+    /// same bytes, held with BOTH definitions —
+    ///
+    /// 1. **findings equality**: `check_parsed` over the constructed object
+    ///    and over the re-parse yields identical findings;
+    /// 2. **field equality on the read-inventory** (`groups`, `group_order`,
+    ///    `raw_lines`, `has_bom`, line text, descriptor rows/lines, per-row
+    ///    line numbers and values — plus the group-level coordinates), which
+    ///    localises a failure when the first definition fires.
+    ///
+    /// This test is the contract's ENFORCEMENT, not scaffolding — it stays
+    /// for as long as the constructed verdict does. Span COORDINATES are
+    /// deliberately not compared: the two buffers lay out differently
+    /// (terminators, fix-up placement) and only resolved values are claims.
+    fn assert_constructed_verdict_equals_reparse(groups: &[GroupInput], opts: &EmitOpts) {
+        let dict = Dictionary::bundled(opts.edition);
+        let mut stream = EmitStream::new(opts, &dict);
+        for g in groups {
+            stream.push(owned_group(g, &dict)).expect("push");
+        }
+        let (built, emitted_len) = stream.assemble().expect("assemble");
+        let bytes = &built.text.as_bytes()[..emitted_len];
+        let reparsed = parse_bytes(bytes, encoding_rs::UTF_8).expect("re-parse");
+
+        // Definition 2 first: it localises.
+        assert_eq!(built.group_order, reparsed.group_order);
+        assert_eq!(built.total_lines, reparsed.total_lines);
+        assert_eq!(built.has_bom, reparsed.has_bom);
+        assert_eq!(built.total_bytes, reparsed.total_bytes);
+        assert_eq!(built.group_records, reparsed.group_records);
+        assert_eq!(
+            built.byte_offsets_source_true,
+            reparsed.byte_offsets_source_true
+        );
+        assert_eq!(built.raw_lines.len(), reparsed.raw_lines.len());
+        for (bl, pl) in built.raw_lines.iter().zip(&reparsed.raw_lines) {
+            assert_eq!(bl.number, pl.number);
+            assert_eq!(bl.had_crlf, pl.had_crlf, "line {}", pl.number);
+            assert_eq!(
+                built.line_text(bl),
+                reparsed.line_text(pl),
+                "line {}",
+                pl.number
+            );
+        }
+        for code in &reparsed.group_order {
+            let bg = &built.groups[code];
+            let pg = &reparsed.groups[code];
+            assert_eq!(bg.group_line, pg.group_line, "{code}");
+            assert_eq!(bg.group_byte, pg.group_byte, "{code}");
+            assert_eq!(bg.heading_line, pg.heading_line, "{code}");
+            assert_eq!(bg.unit_line, pg.unit_line, "{code}");
+            assert_eq!(bg.type_line, pg.type_line, "{code}");
+            assert_eq!(bg.headings, pg.headings, "{code}");
+            assert_eq!(bg.units, pg.units, "{code}");
+            assert_eq!(bg.types, pg.types, "{code}");
+            assert_eq!(bg.rows.len(), pg.rows.len(), "{code}");
+            for (br, pr) in bg.rows.iter().zip(&pg.rows) {
+                assert_eq!(br.line, pr.line, "{code}");
+                assert_eq!(br.n_values(), pr.n_values(), "{code} line {}", pr.line);
+                for i in 0..pr.n_values() {
+                    assert_eq!(
+                        bg.value_at(br, i),
+                        pg.value_at(pr, i),
+                        "{code} line {} col {i}",
+                        pr.line
+                    );
+                }
+            }
+        }
+
+        // Definition 1: the findings.
+        let copts = CheckOptions {
+            dict_version: Some(opts.edition),
+            ..CheckOptions::default()
+        };
+        let f_built = check_parsed(&built, &dict, &copts, &WorldScope::None).expect("check built");
+        let f_reparsed =
+            check_parsed(&reparsed, &dict, &copts, &WorldScope::None).expect("check reparse");
+        assert_eq!(f_built, f_reparsed, "findings must be identical");
+    }
+
+    /// The differential over the awkward shapes the writer can produce: a
+    /// clean typed build; escaped quotes and non-ASCII; ragged rows both
+    /// short AND long of the headings; a duplicate group code (first-seen-
+    /// wins on the verdict side); an empty group; blank cells.
+    #[test]
+    fn constructed_verdict_matches_a_real_parse_across_awkward_shapes() {
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        // Clean typed build.
+        assert_constructed_verdict_equals_reparse(
+            &[
+                proj(),
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![vec![c("BH01"), c(12.3)], vec![c("BH02"), Cell::Null]],
+                },
+            ],
+            &opts,
+        );
+        // Escapes, non-ASCII, blanks, ragged short + long rows.
+        assert_constructed_verdict_equals_reparse(
+            &[
+                proj(),
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into(), "LOCA_REM".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![
+                        vec![c("BH01"), c("say \"hi\" — 10° ✓")],
+                        vec![c("BH02")],
+                        vec![c("BH03"), c(""), c("extra beyond the headings")],
+                        vec![c("\"\"")],
+                    ],
+                },
+            ],
+            &opts,
+        );
+        // A duplicate group code: the verdict must keep ONE entry whose
+        // descriptor rows are the LAST section's and whose data rows are
+        // both sections' — the walk's first-seen-wins semantics.
+        assert_constructed_verdict_equals_reparse(
+            &[
+                proj(),
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![vec![c("BH01")]],
+                },
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![vec![c("BH02"), c(1.5)]],
+                },
+            ],
+            &opts,
+        );
+        // An empty group (no headings, no rows) beside a real one.
+        assert_constructed_verdict_equals_reparse(
+            &[
+                proj(),
+                GroupInput {
+                    code: "ZZZZ".into(),
+                    headings: vec![],
+                    units: None,
+                    types: None,
+                    rows: vec![],
+                },
+            ],
+            &opts,
+        );
+    }
+
+    /// The differential under SYNTHESIS: the accumulator-derived catalogues
+    /// stream out as sections whose re-parse agrees with the constructed
+    /// verdict — TRAN stamp, UNIT/TYPE catalogues, PA-driven ABBR included.
+    #[test]
+    fn constructed_verdict_matches_a_real_parse_under_synthesis() {
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            tran: Some(stamp()),
+            ..EmitOpts::default()
+        };
+        assert_constructed_verdict_equals_reparse(
+            &[
+                proj(),
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into(), "LOCA_TYPE".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![vec![c("BH01"), c("TP")]],
+                },
+            ],
+            &opts,
+        );
+    }
+
+    /// The streamed accumulator against the batch computation it replaced:
+    /// folding group-at-a-time yields the same synthesised groups as the
+    /// whole-set reads (`chain(owned, synth)`) the batch pipeline made —
+    /// pinned over a shape that exercises every catalogue (units from UNIT
+    /// rows and PU columns, types, PA cells split on a caller `TRAN_RCON`).
+    #[test]
+    fn the_accumulator_reproduces_the_batch_synthesis() {
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let groups = [
+            OwnedGroup {
+                code: "TRAN".into(),
+                headings: vec!["TRAN_RCON".into()],
+                units: vec![String::new()],
+                types: vec!["X".into()],
+                rows: vec![vec!["~".into()]],
+            },
+            OwnedGroup {
+                code: "LOCA".into(),
+                headings: vec!["LOCA_ID".into(), "LOCA_TYPE".into(), "LOCA_XTRA".into()],
+                units: vec![String::new(), String::new(), "m".into()],
+                types: vec!["ID".into(), "PA".into(), "PU".into()],
+                rows: vec![
+                    vec!["BH01".into(), "TP~CP".into(), "kPa".into()],
+                    vec!["BH02".into(), "TP".into(), String::new()],
+                ],
+            },
+        ];
+        let mut acc = SynthAccumulator::default();
+        for g in &groups {
+            acc.fold(g);
+        }
+        let synth = acc.synthesised(&dict, Some(&stamp()));
+
+        // The batch reads, restated inline (the shape synthesise_metadata
+        // had): TRAN present -> no TRAN synth; UNIT from all groups' unit
+        // rows + PU cells; TYPE from all types + forced X; ABBR from PA
+        // cells split on the caller's TRAN_RCON.
+        let codes: Vec<&str> = synth.iter().map(|g| g.code.as_str()).collect();
+        assert_eq!(codes, ["UNIT", "TYPE", "ABBR"], "TRAN present, not minted");
+        let unit_rows: Vec<&str> = synth[0].rows.iter().map(|r| r[0].as_str()).collect();
+        assert_eq!(unit_rows, ["kPa", "m"], "UNIT row + PU column, blanks out");
+        let type_rows: Vec<&str> = synth[1].rows.iter().map(|r| r[0].as_str()).collect();
+        assert_eq!(type_rows, ["ID", "PA", "PU", "X"], "all types + forced X");
+        let abbr_rows: Vec<(String, String)> = synth[2]
+            .rows
+            .iter()
+            .map(|r| (r[0].clone(), r[1].clone()))
+            .collect();
+        assert_eq!(
+            abbr_rows,
+            [
+                ("LOCA_TYPE".to_string(), "CP".to_string()),
+                ("LOCA_TYPE".to_string(), "TP".to_string()),
+            ],
+            "PA cells split on the caller's ~ concatenator, deduped"
+        );
     }
 
     fn proj() -> GroupInput {
@@ -1551,8 +1920,9 @@ mod tests {
     }
 
     #[test]
-    fn concatenator_reads_tran_rcon_else_defaults_to_plus() {
-        // No TRAN group → the AGS standard "+".
+    fn tran_rcon_reads_the_concatenator_else_none() {
+        // Not a TRAN group → no contribution (the accumulator then defaults
+        // to the AGS standard "+").
         let loca = OwnedGroup {
             code: "LOCA".into(),
             headings: vec![],
@@ -1560,10 +1930,10 @@ mod tests {
             types: vec![],
             rows: vec![],
         };
-        assert_eq!(concatenator(&[loca]), "+");
+        assert_eq!(tran_rcon(&loca), None);
         // A TRAN group with an explicit non-blank TRAN_RCON wins — pins the
-        // code=="TRAN" (464), heading=="TRAN_RCON" (465), non-blank (468) and
-        // whole-return (463) all at once.
+        // code=="TRAN", heading=="TRAN_RCON", first-row and non-blank guards
+        // all at once.
         let tran = OwnedGroup {
             code: "TRAN".into(),
             headings: vec!["TRAN_DLIM".into(), "TRAN_RCON".into()],
@@ -1571,6 +1941,16 @@ mod tests {
             types: vec!["X".into(), "X".into()],
             rows: vec![vec!["|".into(), "~".into()]],
         };
-        assert_eq!(concatenator(&[tran]), "~", "explicit TRAN_RCON wins");
+        assert_eq!(tran_rcon(&tran).as_deref(), Some("~"));
+        // A blank TRAN_RCON is no contribution either — the accumulator must
+        // keep looking rather than adopt an empty concatenator.
+        let blank = OwnedGroup {
+            code: "TRAN".into(),
+            headings: vec!["TRAN_RCON".into()],
+            units: vec![String::new()],
+            types: vec!["X".into()],
+            rows: vec![vec!["  ".into()]],
+        };
+        assert_eq!(tran_rcon(&blank), None);
     }
 }

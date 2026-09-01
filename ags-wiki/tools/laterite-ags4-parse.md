@@ -11,15 +11,16 @@ repo_refs:
   root: "repo:rust-packages/laterite-ags4-parse"
   lib: "repo:rust-packages/laterite-ags4-parse/src/lib.rs"
   scan: "repo:rust-packages/laterite-ags4-parse/src/scan.rs"
+  builder: "repo:rust-packages/laterite-ags4-parse/src/builder.rs"
   benches: "repo:rust-packages/laterite-ags4-parse/benches/parse.rs"
-related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-types, core-perf-baseline, testing-strategy, dec-parse-cell-representation]
+related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-types, laterite-ags4-emit, core-perf-baseline, testing-strategy, dec-parse-cell-representation, dec-emit-streamed-verdict]
 sources: []
 ---
 # laterite-ags4-parse
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
 > [!note] **Cleared for crates.io** — `laterite-ags4-parse` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
-> **Used by** — [[laterite]], [[laterite-ags4-censor]], [[laterite-ags4-core]], [[laterite-ags4-diff]], [[laterite-ags4-forge]], [[laterite-ags4-merge]], [[laterite-ags4-perf]], [[laterite-ags4-reference]], [[laterite-ags4-tokenizer-wasm]], [[laterite-ags4-trust]], [[laterite-ags4-validator]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
+> **Used by** — [[laterite]], [[laterite-ags4-censor]], [[laterite-ags4-core]], [[laterite-ags4-diff]], [[laterite-ags4-emit]], [[laterite-ags4-forge]], [[laterite-ags4-merge]], [[laterite-ags4-perf]], [[laterite-ags4-reference]], [[laterite-ags4-tokenizer-wasm]], [[laterite-ags4-trust]], [[laterite-ags4-validator]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 
 > [!note] Nothing in the [[laterite]] wheel re-exports it; it is reached
@@ -98,6 +99,29 @@ The buffer is an `Arc<String>` rather than the design page's literal
 spike measured that whole-file transient sitting exactly at the operation
 peak — adopting the built `String` zero-copy is what cleared the campaign's
 invasive floor at the 25 MB rung (the record is on #838).
+
+## The builder: a ParsedFile from a writer's own records
+
+`builder::ParsedFileBuilder` is the leaf's second way to obtain a
+`ParsedFile` — not by parsing, but by **assembly from a byte-authoring
+writer's records** ([[dec-emit-streamed-verdict]]). An emitter that authors
+every byte already knows everything the walk would re-derive; the builder
+lets it say so: the writer records each row it writes (tag, body span, cell
+spans into its own output), and `finish` assembles the same retained
+structure the walk builds, over the written bytes adopted as the retained
+buffer, returning the emitted length beside the file so a caller can take
+the bytes back zero-copy (truncate the refcount-1 buffer there).
+
+It lives in THIS crate because the pieces it must get right are the walk's
+own — first-seen-wins group identity, descriptor overwrite on a redeclared
+code, the `""` unescape into a fix-up region, the `u32` span-space guard —
+and because `ParsedGroup`'s arena and `DataRow`'s index are private by
+design. The result matches `parse_bytes` of the same bytes under the
+validating profile on every field the rule engine reads; the buffers differ
+only in LAYOUT (the builder keeps terminators and appends fix-ups after the
+end, the walk drops terminators and interleaves), which spans absorb. The
+emit crate's differential test holds that equality permanently — over
+crafted shapes here, and its own recorded writer end-to-end.
 
 ## Trim policy
 

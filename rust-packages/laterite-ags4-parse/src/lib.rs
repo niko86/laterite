@@ -1112,6 +1112,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     })
 }
 
+pub mod builder;
 pub mod scan;
 
 // --- tokenizer + char-span tracker (lifted verbatim from the validator) ---

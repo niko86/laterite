@@ -705,7 +705,8 @@
                 "value"
               ],
               "out_forms": [
-                "value"
+                "value",
+                "file"
               ]
             }
           ],
@@ -714,9 +715,11 @@
             "value": "present"
           },
           "output": {
-            "value": "present"
+            "value": "present",
+            "file": "present"
           },
-          "gaps": []
+          "gaps": [],
+          "note": "The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap."
         },
         {
           "surface": "node",
@@ -729,7 +732,8 @@
                 "value"
               ],
               "out_forms": [
-                "value"
+                "value",
+                "file"
               ]
             }
           ],
@@ -738,9 +742,11 @@
             "value": "present"
           },
           "output": {
-            "value": "present"
+            "value": "present",
+            "file": "present"
           },
-          "gaps": []
+          "gaps": [],
+          "note": "The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap."
         },
         {
           "surface": "browser",

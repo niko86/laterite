@@ -30,7 +30,7 @@ use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_types::{Cell, ags4_str, dt_to_unit_precision};
 use laterite_ags4_validator::Dictionary;
 
-use crate::emit::{OwnedGroup, emit_owned_groups, resolved_meta_parts};
+use crate::emit::{EmitStream, OwnedGroup, resolved_meta_parts};
 use crate::{EmitError, EmitOpts, EmitResult};
 
 /// One cell of an Arrow column → the [`Cell`] the orchestrator formats.
@@ -193,13 +193,15 @@ pub fn emit_ags4_from_arrow(
     opts: &EmitOpts,
 ) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
-    let owned: Vec<OwnedGroup> = groups
-        .into_iter()
+    let mut stream = EmitStream::new(opts, &dict);
+    for g in groups {
         // Consumed per iteration: a group's batches (our refs to them) drop
-        // here, not at return — the same peak discipline as `emit_ags4_owned`.
-        .map(|g| owned_group_from_arrow(g, &dict))
-        .collect();
-    emit_owned_groups(owned, opts, &dict)
+        // here, not at return — and the formatted `OwnedGroup` drops inside
+        // `push` once its section is written, so no whole-file slab of
+        // formatted cells ever exists (dec-emit-streamed-verdict).
+        stream.push(owned_group_from_arrow(g, &dict))?;
+    }
+    stream.finish()
 }
 
 /// One [`ArrowGroup`] → the formatted [`OwnedGroup`] — the Arrow door's half

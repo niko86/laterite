@@ -21,6 +21,8 @@
 
 use std::io::Write;
 
+use laterite_ags4_parse::builder::{ParsedFileBuilder, RecordedCell, RowTag};
+
 use crate::error::EmitError;
 
 /// One group ready to emit. Heading / unit / type / row order match the
@@ -58,9 +60,9 @@ pub fn write_ags4<W: Write>(out: &mut W, groups: &[EmitGroup<'_>]) -> Result<(),
         h_row.extend(g.headings.iter().copied());
         write_row(out, &h_row)?;
         // UNIT row — pad to heading length so column count is stable
-        write_aligned(out, "UNIT", &g.units, g.headings.len())?;
+        write_row(out, &aligned_cells("UNIT", &g.units, g.headings.len(), ""))?;
         // TYPE row — same alignment rule, default missing entries to "X"
-        write_aligned_with_default(out, "TYPE", &g.types, g.headings.len(), "X")?;
+        write_row(out, &aligned_cells("TYPE", &g.types, g.headings.len(), "X"))?;
         // DATA rows
         for row in g.rows {
             let mut cells: Vec<&str> = Vec::with_capacity(row.len() + 1);
@@ -161,34 +163,20 @@ impl<W: Write> MatrixStream<W> {
     }
 }
 
-fn write_aligned<W: Write>(
-    out: &mut W,
-    tag: &str,
-    cells: &[&str],
-    n: usize,
-) -> Result<(), EmitError> {
+/// The ONE padding authority for the aligned descriptor rows: pad `cells` to
+/// `n` entries, `fill` standing in for both a MISSING entry and an EMPTY one
+/// — `""` for UNIT (where the empty-replacement is a no-op) and `"X"` for
+/// TYPE (the free-text default). Shared by the batch loop above and the
+/// recording section writer below, so what lands in the file cannot drift
+/// between them.
+fn aligned_cells<'a>(tag: &'a str, cells: &[&'a str], n: usize, fill: &'a str) -> Vec<&'a str> {
     let mut row: Vec<&str> = Vec::with_capacity(n + 1);
     row.push(tag);
     for i in 0..n {
-        row.push(cells.get(i).copied().unwrap_or(""));
+        let v = cells.get(i).copied().unwrap_or(fill);
+        row.push(if v.is_empty() { fill } else { v });
     }
-    write_row(out, &row)
-}
-
-fn write_aligned_with_default<W: Write>(
-    out: &mut W,
-    tag: &str,
-    cells: &[&str],
-    n: usize,
-    default: &str,
-) -> Result<(), EmitError> {
-    let mut row: Vec<&str> = Vec::with_capacity(n + 1);
-    row.push(tag);
-    for i in 0..n {
-        let v = cells.get(i).copied().unwrap_or(default);
-        row.push(if v.is_empty() { default } else { v });
-    }
-    write_row(out, &row)
+    row
 }
 
 /// Emit one CSV row in AGS4's quote-everything style + CRLF terminator.
@@ -225,6 +213,104 @@ fn write_row<W: Write>(out: &mut W, cells: &[&str]) -> Result<(), EmitError> {
 
 fn io_err(e: &std::io::Error) -> EmitError {
     EmitError::Write(e.to_string())
+}
+
+/// [`write_row`] into a byte buffer, additionally recording where each
+/// cell's LOGICAL value landed (between its quotes — escapes still doubled,
+/// flagged as such). Same #423 guard, same quoting authority
+/// (`write_quoted_field`), and the positions are READ BACK from the buffer
+/// around each write rather than predicted from the escaping rule — the
+/// record observes the writer, it does not model it (the M4 tokenizer
+/// lesson, `dec-parse-cell-representation`). Returns the row body's range
+/// (tag included, CRLF excluded).
+fn write_row_recorded(
+    out: &mut Vec<u8>,
+    cells: &[&str],
+    recs: &mut Vec<RecordedCell>,
+) -> Result<std::ops::Range<usize>, EmitError> {
+    // Row-atomic, as in write_row: scan before any byte lands.
+    if let Some(field) = cells.iter().position(|c| c.contains(['\r', '\n'])) {
+        return Err(EmitError::EmbeddedNewline {
+            tag: cells.first().copied().unwrap_or("").to_string(),
+            field,
+        });
+    }
+    recs.clear();
+    let start = out.len();
+    for (i, c) in cells.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        let quoted_at = out.len();
+        laterite_ags4_types::write_quoted_field(out, c).map_err(|e| io_err(&e))?;
+        recs.push(RecordedCell {
+            start: quoted_at + 1,
+            end: out.len() - 1,
+            has_escape: c.contains('"'),
+        });
+    }
+    let end = out.len();
+    out.extend_from_slice(b"\r\n");
+    Ok(start..end)
+}
+
+/// A builder-side failure surfaced while recording — an internal limit (the
+/// `u32` span space) rather than an io fault, but a Write error is what the
+/// callers' contract already carries for "the output could not be produced".
+/// By value because `map_err` hands one over.
+#[allow(clippy::needless_pass_by_value)]
+fn builder_err(e: laterite_ags4_parse::ParseError) -> EmitError {
+    EmitError::Write(format!("verdict record: {e:?}"))
+}
+
+/// One group's SECTION through the recording writer, into the verdict
+/// builder's buffer: the same bytes `write_ags4` emits for this group — the
+/// `!first` blank separator, the GROUP/HEADING/UNIT/TYPE rows (one padding
+/// authority, `aligned_cells`), the DATA rows — pinned byte-identical by the
+/// differential test below, plus the structural record the writer-built
+/// verdict is assembled from (`dec-emit-streamed-verdict`).
+pub(crate) fn write_section_recorded(
+    b: &mut ParsedFileBuilder,
+    g: &EmitGroup<'_>,
+    first: bool,
+) -> Result<(), EmitError> {
+    let mut recs: Vec<RecordedCell> = Vec::new();
+    if !first {
+        let at = b.written();
+        b.buf().extend_from_slice(b"\r\n");
+        b.record_row(RowTag::Blank, at..at, &[])
+            .map_err(builder_err)?;
+    }
+    let n = g.headings.len();
+
+    let body = write_row_recorded(b.buf(), &["GROUP", g.code], &mut recs)?;
+    b.record_row(RowTag::Group, body, &recs[1..])
+        .map_err(builder_err)?;
+
+    let mut h_row: Vec<&str> = Vec::with_capacity(n + 1);
+    h_row.push("HEADING");
+    h_row.extend(g.headings.iter().copied());
+    let body = write_row_recorded(b.buf(), &h_row, &mut recs)?;
+    b.record_row(RowTag::Heading, body, &recs[1..])
+        .map_err(builder_err)?;
+
+    let body = write_row_recorded(b.buf(), &aligned_cells("UNIT", &g.units, n, ""), &mut recs)?;
+    b.record_row(RowTag::Unit, body, &recs[1..])
+        .map_err(builder_err)?;
+
+    let body = write_row_recorded(b.buf(), &aligned_cells("TYPE", &g.types, n, "X"), &mut recs)?;
+    b.record_row(RowTag::Type, body, &recs[1..])
+        .map_err(builder_err)?;
+
+    for row in g.rows {
+        let mut cells: Vec<&str> = Vec::with_capacity(row.len() + 1);
+        cells.push("DATA");
+        cells.extend(row.iter().map(String::as_str));
+        let body = write_row_recorded(b.buf(), &cells, &mut recs)?;
+        b.record_row(RowTag::Data, body, &recs[1..])
+            .map_err(builder_err)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -492,5 +578,75 @@ mod tests {
         let mut stream = MatrixStream::new(Vec::new(), true);
         let bad = vec![vec!["DATA".into(), "torn\nrow".into()]];
         assert!(stream.group("PROJ", &bad).is_err());
+    }
+
+    /// The recording section writer and `write_ags4` are ONE section shape:
+    /// byte-identical output over every awkward case the shape carries —
+    /// separator discipline, UNIT/TYPE padding + the `X` default, escaped
+    /// quotes, ragged rows, an empty group. This is what licenses the
+    /// streamed pipeline to replace the batch write (dec-emit-streamed-
+    /// verdict); a drift between them is a byte-fidelity bug, not a nit.
+    #[test]
+    fn recorded_sections_match_write_ags4_byte_for_byte() {
+        let rows_a = vec![
+            vec!["P1".into(), "say \"hi\"".into()],
+            vec!["P2".into()], // ragged — shorter than the headings
+        ];
+        let rows_b: Vec<Vec<String>> = vec![];
+        let groups = [
+            EmitGroup {
+                code: "PROJ",
+                headings: vec!["PROJ_ID", "PROJ_NAME"],
+                units: vec![""],       // short: padding fills the tail
+                types: vec!["ID", ""], // empty: the X default fills
+                rows: rows_a.as_slice(),
+            },
+            EmitGroup {
+                code: "ZZZZ",
+                headings: vec![],
+                units: vec![],
+                types: vec![],
+                rows: rows_b.as_slice(),
+            },
+        ];
+        for n in 1..=groups.len() {
+            let mut batch = Vec::new();
+            write_ags4(&mut batch, &groups[..n]).expect("batch door");
+            let mut b = ParsedFileBuilder::new();
+            for (i, g) in groups[..n].iter().enumerate() {
+                write_section_recorded(&mut b, g, i == 0).expect("recorded door");
+            }
+            let (built, emitted_len) = b.finish().expect("assembles");
+            assert_eq!(
+                batch,
+                built.text.as_bytes()[..emitted_len],
+                "the recorded writer drifted from write_ags4 at n={n}"
+            );
+        }
+    }
+
+    /// What the record RESOLVES matches what was written: the escaped cell
+    /// reads back unescaped, the ragged row keeps its own arity, and the
+    /// padded/defaulted descriptor rows carry the padded values.
+    #[test]
+    fn recorded_structure_resolves_to_the_written_values() {
+        let rows = vec![vec!["P1".into(), "say \"hi\"".into()], vec!["P2".into()]];
+        let g = EmitGroup {
+            code: "PROJ",
+            headings: vec!["PROJ_ID", "PROJ_NAME"],
+            units: vec![""],
+            types: vec!["ID", ""],
+            rows: rows.as_slice(),
+        };
+        let mut b = ParsedFileBuilder::new();
+        write_section_recorded(&mut b, &g, true).expect("recorded door");
+        let (built, _) = b.finish().expect("assembles");
+        let pg = &built.groups["PROJ"];
+        assert_eq!(pg.headings, ["PROJ_ID", "PROJ_NAME"]);
+        assert_eq!(pg.units, ["", ""], "padded to heading arity");
+        assert_eq!(pg.types, ["ID", "X"], "empty TYPE defaulted to X");
+        assert_eq!(pg.cell(1, 0), Some("say \"hi\""), "unescaped via fix-up");
+        assert_eq!(pg.rows[1].n_values(), 1, "ragged row keeps its arity");
+        assert_eq!(pg.cell(1, 1), None);
     }
 }
