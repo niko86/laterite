@@ -33,6 +33,9 @@ pub(crate) fn read_ags_dict(
         strict_structure: false,
         // Needs the DICT group's HEADING/DATA rows, not just its location.
         locate_only: false,
+        // A dictionary read consumes cell values only — no source-byte
+        // coordinates.
+        retain_source_offsets: false,
     };
     let parsed = parse_bytes_opts(bytes, opts).map_err(|e| match e {
         // No GROUP rows at all → this isn't a dictionary we can read.
