@@ -1,7 +1,7 @@
 {
  "schema": "laterite-python-lane-bench/1",
- "generated": "2026-09-01T15:57:32+00:00",
- "commit": "8a5d540538c5e74b6180829ac6b75ef46dcc49ab",
+ "generated": "2026-09-01T18:53:32+00:00",
+ "commit": "62fed24589c27ae8d82f663ea48e1cdaae671149",
  "invocation": {
   "rungs": [
    "5MB",
@@ -22,9 +22,9 @@
   "cpu_count": 10,
   "mem_total_bytes": 25769803776,
   "load_avg_start": [
-   2.3798828125,
-   2.568359375,
-   2.64453125
+   3.11962890625,
+   2.93408203125,
+   3.4755859375
   ]
  },
  "versions": {
@@ -66,31 +66,31 @@
   "validate": {
    "5MB": {
     "python_ags4": {
-     "seconds": 1.5217,
+     "seconds": 1.5102,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0415,
+     "seconds": 0.0407,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 3.6955,
+     "seconds": 3.6697,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.1928,
+     "seconds": 0.1891,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 12.3574,
+     "seconds": 12.1026,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.793,
+     "seconds": 0.7774,
      "runs": 5
     }
    },
@@ -118,31 +118,31 @@
   "read_strings": {
    "5MB": {
     "python_ags4": {
-     "seconds": 0.1417,
+     "seconds": 0.1474,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.0387,
+     "seconds": 0.0385,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.6727,
+     "seconds": 0.6693,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.1529,
+     "seconds": 0.1478,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 2.8639,
+     "seconds": 2.6921,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.6085,
+     "seconds": 0.5941,
      "runs": 5
     }
    },
@@ -170,7 +170,7 @@
   "read_typed": {
    "5MB": {
     "python_ags4": {
-     "seconds": 0.1869,
+     "seconds": 0.1846,
      "runs": 5
     },
     "laterite": {
@@ -180,21 +180,21 @@
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.7911,
+     "seconds": 0.7645,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0755,
+     "seconds": 0.0747,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 3.4207,
+     "seconds": 3.1637,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.305,
+     "seconds": 0.2997,
      "runs": 5
     }
    },
@@ -222,43 +222,43 @@
   "write": {
    "5MB": {
     "python_ags4": {
-     "seconds": 0.212,
+     "seconds": 0.2106,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.0602,
+     "seconds": 0.0611,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0688,
+     "seconds": 0.0561,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.5928,
+     "seconds": 0.5831,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.206,
+     "seconds": 0.208,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.3248,
+     "seconds": 0.2636,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 2.2076,
+     "seconds": 1.9443,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.8379,
+     "seconds": 0.7412,
      "runs": 5
     },
     "laterite": {
-     "seconds": 1.4583,
+     "seconds": 1.0762,
      "runs": 5
     }
    },
@@ -296,41 +296,41 @@
   "validate": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 169820160,
+     "peak_rss_bytes": 169787392,
      "x_output": 34.89
     },
     "laterite": {
-     "peak_rss_bytes": 93732864,
-     "x_output": 19.26
+     "peak_rss_bytes": 93765632,
+     "x_output": 19.27
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 341721088,
+     "peak_rss_bytes": 341917696,
      "x_output": 13.72
     },
     "laterite": {
-     "peak_rss_bytes": 174325760,
+     "peak_rss_bytes": 174391296,
      "x_output": 7.0
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 1008451584,
+     "peak_rss_bytes": 1008336896,
      "x_output": 9.82
     },
     "laterite": {
-     "peak_rss_bytes": 468090880,
+     "peak_rss_bytes": 468172800,
      "x_output": 4.56
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2660089856,
-     "x_output": 9.66
+     "peak_rss_bytes": 2668544000,
+     "x_output": 9.69
     },
     "laterite": {
-     "peak_rss_bytes": 1117306880,
+     "peak_rss_bytes": 1117274112,
      "x_output": 4.06
     }
    },
@@ -348,42 +348,42 @@
   "read_strings": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 148537344,
-     "x_output": 30.52
+     "peak_rss_bytes": 148488192,
+     "x_output": 30.51
     },
     "laterite_compat": {
-     "peak_rss_bytes": 196591616,
-     "x_output": 40.39
+     "peak_rss_bytes": 196673536,
+     "x_output": 40.41
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 312819712,
+     "peak_rss_bytes": 312885248,
      "x_output": 12.56
     },
     "laterite_compat": {
-     "peak_rss_bytes": 386334720,
-     "x_output": 15.51
+     "peak_rss_bytes": 387432448,
+     "x_output": 15.55
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 914866176,
+     "peak_rss_bytes": 914817024,
      "x_output": 8.91
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1094238208,
-     "x_output": 10.66
+     "peak_rss_bytes": 1092976640,
+     "x_output": 10.65
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2195292160,
-     "x_output": 7.97
+     "peak_rss_bytes": 2202845184,
+     "x_output": 8.0
     },
     "laterite_compat": {
-     "peak_rss_bytes": 2539552768,
-     "x_output": 9.22
+     "peak_rss_bytes": 2542993408,
+     "x_output": 9.23
     }
    },
    "524MB": {
@@ -400,12 +400,12 @@
   "read_typed": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 155107328,
-     "x_output": 31.87
+     "peak_rss_bytes": 155140096,
+     "x_output": 31.88
     },
     "laterite": {
-     "peak_rss_bytes": 93929472,
-     "x_output": 19.3
+     "peak_rss_bytes": 94109696,
+     "x_output": 19.34
     }
    },
    "25MB": {
@@ -414,27 +414,27 @@
      "x_output": 12.61
     },
     "laterite": {
-     "peak_rss_bytes": 181436416,
+     "peak_rss_bytes": 181469184,
      "x_output": 7.28
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 934313984,
+     "peak_rss_bytes": 934477824,
      "x_output": 9.1
     },
     "laterite": {
-     "peak_rss_bytes": 502661120,
+     "peak_rss_bytes": 502808576,
      "x_output": 4.9
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2444296192,
+     "peak_rss_bytes": 2444476416,
      "x_output": 8.87
     },
     "laterite": {
-     "peak_rss_bytes": 1261731840,
+     "peak_rss_bytes": 1261944832,
      "x_output": 4.58
     }
    },
@@ -452,58 +452,58 @@
   "write": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 157581312,
-     "x_output": 32.38
+     "peak_rss_bytes": 157483008,
+     "x_output": 32.36
     },
     "laterite_compat": {
-     "peak_rss_bytes": 219201536,
-     "x_output": 45.04
+     "peak_rss_bytes": 219365376,
+     "x_output": 45.07
     },
     "laterite": {
-     "peak_rss_bytes": 154435584,
-     "x_output": 31.73
+     "peak_rss_bytes": 134692864,
+     "x_output": 27.68
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 315899904,
-     "x_output": 12.68
+     "peak_rss_bytes": 317128704,
+     "x_output": 12.73
     },
     "laterite_compat": {
-     "peak_rss_bytes": 448790528,
-     "x_output": 18.01
+     "peak_rss_bytes": 449085440,
+     "x_output": 18.03
     },
     "laterite": {
-     "peak_rss_bytes": 425066496,
-     "x_output": 17.06
+     "peak_rss_bytes": 349257728,
+     "x_output": 14.02
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 937525248,
+     "peak_rss_bytes": 937230336,
      "x_output": 9.13
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1262944256,
+     "peak_rss_bytes": 1262190592,
      "x_output": 12.3
     },
     "laterite": {
-     "peak_rss_bytes": 1430798336,
-     "x_output": 13.94
+     "peak_rss_bytes": 1126416384,
+     "x_output": 10.97
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2444427264,
+     "peak_rss_bytes": 2443640832,
      "x_output": 8.87
     },
     "laterite_compat": {
-     "peak_rss_bytes": 2936979456,
-     "x_output": 10.66
+     "peak_rss_bytes": 2929426432,
+     "x_output": 10.63
     },
     "laterite": {
-     "peak_rss_bytes": 3838296064,
-     "x_output": 13.93
+     "peak_rss_bytes": 2998976512,
+     "x_output": 10.89
     }
    },
    "524MB": {
@@ -524,10 +524,10 @@
  },
  "import_baselines": {
   "python_ags4": {
-   "peak_rss_bytes": 31899648
+   "peak_rss_bytes": 31932416
   },
   "laterite": {
-   "peak_rss_bytes": 73252864
+   "peak_rss_bytes": 73416704
   }
  },
  "notes": [
@@ -639,6 +639,24 @@
   {
    "generated": "2026-09-01T15:57:32+00:00",
    "commit": "8a5d540538c5e74b6180829ac6b75ef46dcc49ab",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-01T18:53:32+00:00",
+   "commit": "62fed24589c27ae8d82f663ea48e1cdaae671149",
    "invocation": {
     "rungs": [
      "5MB",
