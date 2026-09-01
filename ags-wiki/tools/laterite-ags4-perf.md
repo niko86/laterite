@@ -81,12 +81,20 @@ bindings take**.
 flowchart LR
   forge[laterite-ags4-forge] -->|size ladder| ladder[tools/perf-ladder.py]
   ladder -->|manifest.json| perf[laterite-ags4-perf]
+  ladder -->|manifest.json| nodelane[laterite-node bench/perf-matrix.mjs]
   val[laterite-ags4-validator lib] --> perf
   parse[laterite-ags4-parse] --> perf
   types[laterite-ags4-types arrow] --> perf
   emit[laterite-ags4-emit arrow] --> perf
   perf -->|rust.json| matrix[tools/perf-matrix.py]
+  nodelane -->|node.json| matrix
 ```
+
+The Node lane (#823) is this bin's sibling, not a consumer: the same three
+ops, the same fresh-child peak-RSS instrument and refusal semantics, driven
+through the npm package's public API (napi marshalling and arrow-js decode
+included) — see [[laterite-node]]. The wasm/CLI lanes (#824/#825) follow the
+same shape.
 
 ## Related
 [[laterite-ags4-forge]] · [[laterite-ags4-validator]] · [[perf-campaign]] · [[crate-map]]
