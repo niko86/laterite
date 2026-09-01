@@ -57,3 +57,32 @@ export class BuildResult {
     return `<BuildResult ${this.bytes.length} bytes, ${this.findings.length} finding(s), fixesApplied=${this.fixesApplied}>`;
   }
 }
+
+/**
+ * What `buildAgs4(..., { out })` hands back: the verdict on a file already on
+ * disk — the to-disk twin of {@link BuildResult}, mirroring laterite-py's
+ * `BuildSaved`. Same `findings` / `applied` / `fixesApplied` verdict, but the
+ * document lives at {@link BuildSaved.path | `path`} and there is deliberately
+ * no `bytes`: the point of `out` is a long-lived caller that does not want the
+ * whole file resident after the call, and a result quietly carrying it anyway
+ * would defeat that.
+ *
+ * Build-and-judge survives the trip to disk: the bytes are staged to a
+ * temporary file beside the destination and renamed into place only after the
+ * verdict allows, so `path` never holds unjudged output — a `"strict"` failure
+ * throws with nothing written.
+ */
+export class BuildSaved {
+  constructor(
+    /** Where the judged AGS4 document was written. */
+    readonly path: string,
+    readonly findings: BuildFinding[],
+    /** The safe fixes AutoFix applied (`{kind, label, rule, line?, risk}`); empty outside `"autofix"`. */
+    readonly applied: AppliedFix[],
+    readonly fixesApplied: number,
+  ) {}
+
+  toString(): string {
+    return `<BuildSaved ${JSON.stringify(this.path)}, ${this.findings.length} finding(s), fixesApplied=${this.fixesApplied}>`;
+  }
+}

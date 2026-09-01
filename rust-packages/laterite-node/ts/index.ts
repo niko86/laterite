@@ -1,10 +1,11 @@
 // The `laterite` package surface — the Node port of laterite-py's `__init__.py`.
 // P2 is the engine-free read/validate/emit core (Arrow-direct); the optional
 // DuckDB `sql()`/`at()` layer + typed-graph + transport land in P3.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
-import { BuildResult } from "./build-result";
+import { BuildResult, BuildSaved } from "./build-result";
 import { type DuckdbStats, stripSynthKeys } from "./duckdb";
 import {
   Ags4Error,
@@ -309,6 +310,15 @@ export interface EmitOptions {
    *  Rule 14 reports the gap, rather than a placeholder that would *satisfy*
    *  Rule 14 while asserting a transmission that never happened. */
   tran?: TranStamp;
+  /** Destination path — the to-disk rider (mirrors laterite-py's
+   *  `build_ags4(out=)`). Given, the judged document is written there and the
+   *  result is a {@link BuildSaved} carrying `path` and the verdict but **no**
+   *  `bytes`. The write stages to a temporary file in the destination's
+   *  directory and renames it into place only after the verdict allows, so
+   *  `out` never holds unjudged output: a `"strict"` failure throws with
+   *  nothing written, and any autofix rewrite happens before the path
+   *  exists. */
+  out?: string;
 }
 
 /** Transpose row objects → an arrow-js Table (column types inferred from the
@@ -433,8 +443,16 @@ function checkMeta(
  */
 export function buildAgs4(
   groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+  opts: EmitOptions & { out: string },
+): BuildSaved;
+export function buildAgs4(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+  opts?: EmitOptions & { out?: undefined },
+): BuildResult;
+export function buildAgs4(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
   opts: EmitOptions = {},
-): BuildResult {
+): BuildResult | BuildSaved {
   const items: Array<[string, GroupData]> =
     groups instanceof AgsGroup
       ? walkTree(groups)
@@ -471,7 +489,29 @@ export function buildAgs4(
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),
   );
-  return new BuildResult(res.bytes, findings, res.applied, res.fixesApplied);
+  if (opts.out === undefined) {
+    return new BuildResult(res.bytes, findings, res.applied, res.fixesApplied);
+  }
+  // The to-disk rider: the engine has already judged `res.bytes` (a strict
+  // failure threw above, autofix rewrote in memory), so stage them beside
+  // the destination and rename into place — same-directory rename keeps the
+  // move atomic on one filesystem, and `out` never holds unjudged bytes.
+  const tmp = join(
+    dirname(opts.out),
+    `.laterite-build-${process.pid}-${Date.now()}.tmp`,
+  );
+  try {
+    writeFileSync(tmp, res.bytes);
+    renameSync(tmp, opts.out);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // best-effort cleanup; the original error is the one to surface
+    }
+    throw err;
+  }
+  return new BuildSaved(opts.out, findings, res.applied, res.fixesApplied);
 }
 
 /** One cited divergence observation on a rule (`{id, note}`). */
@@ -1012,7 +1052,7 @@ export function fromExcel(
 export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
 export type { DuckdbStats, QueryOptions, Row } from "./duckdb";
-export { BuildResult, type BuildFinding } from "./build-result";
+export { BuildResult, BuildSaved, type BuildFinding } from "./build-result";
 export { FixResult, type AppliedFix } from "./fix-result";
 export {
   Ags4Error,

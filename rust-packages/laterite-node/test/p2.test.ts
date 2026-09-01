@@ -1,11 +1,15 @@
 // P2 — the high-level TS layer (Arrow-direct, no DuckDB): read → born-typed
 // arrow-js Table, validate → Report, buildAgs4 → BuildResult round-trip, and the
 // native-failure → mapped-exception protocol.
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type Table, tableFromArrays } from "apache-arrow";
 import { describe, expect, it } from "vitest";
 import {
   Ags4File,
   type BuildResult,
+  BuildSaved,
   FileNotFoundError,
   type GroupData,
   NotAgs4Error,
@@ -211,6 +215,52 @@ describe("buildAgs4 → data → AGS4", () => {
       "PROJ",
       "LOCA",
     ]);
+  });
+
+  it("out= writes the judged file and returns a BuildSaved with no bytes (#855)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "laterite-build-"));
+    try {
+      const proj = tableFromArrays({ PROJ_ID: ["P1"] });
+      const loca = tableFromArrays({ LOCA_ID: ["BH1"], LOCA_GL: ["1.0"] });
+      const groups = new Map<string, Table>([
+        ["PROJ", proj],
+        ["LOCA", loca],
+      ]);
+      const dest = join(dir, "built.ags");
+      const saved: BuildSaved = buildAgs4(groups, { out: dest });
+      expect(saved).toBeInstanceOf(BuildSaved);
+      expect(saved.path).toBe(dest);
+      expect("bytes" in saved).toBe(false);
+      // The file on disk is byte-identical to the bytes-carrying door's
+      // output for the same input — the rider changes where, never what.
+      const plain = buildAgs4(groups);
+      expect(readFileSync(dest).equals(plain.bytes)).toBe(true);
+      expect(saved.findings).toEqual(plain.findings);
+      expect(saved.fixesApplied).toBe(plain.fixesApplied);
+      // No staging debris beside the destination.
+      expect(readdirSync(dir)).toEqual(["built.ags"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("out= under strict leaves the destination untouched on refusal", () => {
+    const dir = mkdtempSync(join(tmpdir(), "laterite-build-"));
+    try {
+      // No PROJ/TRAN → error-severity findings → strict throws, and the
+      // destination path must never hold the unjudged bytes.
+      const loca = tableFromArrays({ LOCA_ID: ["BH1"] });
+      const dest = join(dir, "refused.ags");
+      expect(() =>
+        buildAgs4(new Map<string, Table>([["LOCA", loca]]), {
+          mode: "strict",
+          out: dest,
+        }),
+      ).toThrow(/strict/);
+      expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("BuildResult.applied is the safe-fix ledger (#294 F#7)", () => {

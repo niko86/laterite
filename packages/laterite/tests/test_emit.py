@@ -187,6 +187,47 @@ def test_emit_result_write(tmp_path):
     assert out.read_bytes().startswith(b'"GROUP","PROJ"')
 
 
+def test_build_out_writes_the_judged_file_and_returns_no_bytes(tmp_path):
+    # The to-disk rider (#855): out= lands the judged document at the path and
+    # hands back a BuildSaved — path + verdict, deliberately no bytes held.
+    loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
+    dest = tmp_path / "built.ags"
+    saved = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, out=dest)
+    assert isinstance(saved, laterite.BuildSaved)
+    assert saved.path == dest
+    assert not hasattr(saved, "bytes")
+    # The file on disk is byte-identical to what the bytes-carrying door
+    # returns for the same input — the rider changes where, never what.
+    plain = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
+    assert dest.read_bytes() == plain.bytes
+    assert saved.findings == plain.findings
+    assert saved.fixes_applied == plain.fixes_applied
+    # No staging debris left beside the destination.
+    assert [p.name for p in tmp_path.iterdir()] == ["built.ags"]
+
+
+def test_build_out_strict_failure_writes_nothing(tmp_path):
+    # Build-and-judge survives the trip to disk: a strict refusal raises with
+    # the destination untouched — never a file of unjudged bytes.
+    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
+    dest = tmp_path / "refused.ags"
+    with pytest.raises(RuntimeError, match="strict mode rejected"):
+        laterite.build_ags4({"LOCA": loca}, mode="strict", out=dest)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_build_out_replaces_an_existing_file_atomically(tmp_path):
+    # os.replace semantics: an existing destination is overwritten in one
+    # move, and the autofix rewrite happened before the path existed.
+    loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": ["12.3"]})  # string → padded
+    dest = tmp_path / "built.ags"
+    dest.write_bytes(b"stale previous content")
+    saved = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, out=dest)
+    text = dest.read_text()
+    assert '"12.30"' in text and "stale" not in text
+    assert saved.fixes_applied >= 1
+
+
 def test_accepts_ordered_pairs_too():
     # A list of (code, frame) pairs preserves order without a Mapping.
     res = laterite.build_ags4(
