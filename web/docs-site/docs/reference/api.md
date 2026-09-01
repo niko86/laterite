@@ -22,6 +22,8 @@ recipe set. Cross-references below are clickable.
 
 ::: laterite.BuildResult
 
+::: laterite.BuildSaved
+
 ::: laterite.fix
 
 ::: laterite.FixResult

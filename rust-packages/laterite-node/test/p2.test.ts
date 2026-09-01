@@ -1,7 +1,13 @@
 // P2 — the high-level TS layer (Arrow-direct, no DuckDB): read → born-typed
 // arrow-js Table, validate → Report, buildAgs4 → BuildResult round-trip, and the
 // native-failure → mapped-exception protocol.
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Table, tableFromArrays } from "apache-arrow";
@@ -239,6 +245,8 @@ describe("buildAgs4 → data → AGS4", () => {
       expect(saved.fixesApplied).toBe(plain.fixesApplied);
       // No staging debris beside the destination.
       expect(readdirSync(dir)).toEqual(["built.ags"]);
+      expect(String(saved)).toContain("BuildSaved");
+      expect(String(saved)).toContain(dest);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -258,6 +266,32 @@ describe("buildAgs4 → data → AGS4", () => {
         }),
       ).toThrow(/strict/);
       expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("out= failure cleans its staging file and surfaces the original error", () => {
+    const dir = mkdtempSync(join(tmpdir(), "laterite-build-"));
+    try {
+      const proj = tableFromArrays({ PROJ_ID: ["P1"] });
+      const loca = tableFromArrays({ LOCA_ID: ["BH1"], LOCA_GL: ["1.0"] });
+      const groups = new Map<string, Table>([
+        ["PROJ", proj],
+        ["LOCA", loca],
+      ]);
+      // A destination that IS an existing directory fails at the rename, after
+      // the staging write succeeded — the staging file must not survive it.
+      const sub = join(dir, "sub");
+      mkdirSync(sub);
+      expect(() => buildAgs4(groups, { out: sub })).toThrow();
+      expect(readdirSync(dir)).toEqual(["sub"]);
+      // A destination whose parent does not exist fails at the staging write
+      // itself; the best-effort unlink of a never-created staging file must
+      // not mask the original error.
+      expect(() =>
+        buildAgs4(groups, { out: join(dir, "missing", "built.ags") }),
+      ).toThrow(/ENOENT/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
