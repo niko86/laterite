@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Materialise the forge size ladder for the cross-surface perf matrix.
 
-The per-surface harnesses — `laterite-ags4-perf` (rust) today, the Node/wasm/
-CLI lanes to follow (#823-#825) — all read one ladder manifest
+The per-surface harnesses — `laterite-ags4-perf` (rust) and the Node lane
+(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823) today, the
+wasm/CLI lanes to follow (#824/#825) — all read one ladder manifest
 (`output/perf-ladder/manifest.json`) naming the rungs to measure. This script
 writes it. The rungs themselves are the python lane's fixtures: the same
 forge invocation, the same SHA pins, the same on-disk files
@@ -137,10 +138,14 @@ def main() -> int:
         f"ladder written: {len(manifest['rungs'])} rungs, "
         f"{total / 1e6:.0f} MB plain → {args.out.relative_to(REPO)}"
     )
-    print("next, the rust leg (from the repo root):")
+    print("next, the surface legs:")
     print(
         "  cargo run --release --manifest-path rust-packages/Cargo.toml "
-        "-p laterite-ags4-perf"
+        "-p laterite-ags4-perf                  # rust, from the repo root"
+    )
+    print(
+        "  npm run bench:matrix   # node, from rust-packages/laterite-node "
+        "(needs npm run build)"
     )
     print("then aggregate:  uv run python tools/perf-matrix.py")
     return 0

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Aggregate the per-surface perf-matrix results into one document.
 
-Each surface's harness — `laterite-ags4-perf` (rust) today, the Node/wasm/CLI
-lanes to follow (#823-#825) — writes the matrix's uniform per-surface schema
+Each surface's harness — `laterite-ags4-perf` (rust) and the Node lane
+(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823) today, the
+wasm/CLI lanes to follow (#824/#825) — writes the matrix's uniform per-surface schema
 (`{surface, results: [{op, rung, bytes, median_ms, throughput_mb_s, mem?}]}`)
 into `output/perf-results/`. This script is the dumb merger those files were
 shaped for: it folds them into one matrix document and prints the table. It

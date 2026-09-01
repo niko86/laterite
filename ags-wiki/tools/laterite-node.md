@@ -236,6 +236,15 @@ never runs `napi build`, so it needs them in the checkout (and the tarball's
 re-runs `napi build` then `git diff --exit-code` (they regenerate
 byte-identically), so a `#[napi]`-surface edit can't ship a stale loader/types.
 
+Two bench lanes, deliberately separate (neither is a CI gate):
+`bench/read.bench.ts` (`npm run bench`, vitest) is the **regression guard** —
+read only, one rung; `bench/perf-matrix.mjs` (`npm run bench:matrix`) is the
+[[perf-campaign]]'s **comparison lane** (#823) — validate/parse-to-typed/write
+over the forge ladder, wall time plus the fresh-child peak-RSS instrument,
+emitting the same uniform per-surface schema as [[laterite-ags4-perf]] for
+`tools/perf-matrix.py` to merge. Both need the built package; the matrix lane
+also needs the ladder manifest (`tools/perf-ladder.py`).
+
 ## Distribution (P4)
 
 Ships as **`laterite`** on npm (unscoped); the native binary ships as three

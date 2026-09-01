@@ -275,7 +275,7 @@ condition being met and a fresh measurement, never by someone re-filing it.
 |---|---|---|---|
 | positional row model (`Vec<Vec<String>>` + heading index) | ~25 ms, 13% of the typed read | breaks `r["LOCA_ID"]` at every call site — `lat read`, `laterite-ags4-excel`, node, `read_groups_raw` | a caller reads these rows in a hot loop, **or** `AgsGroup` is being reshaped anyway. Not on the 13% alone. |
 | `raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:35` `pub text: String`, allocated at `:721`) — queue #4, was issue #112 | ~9.9 ms = **6.9% of `parse_bytes`**, 1.9% of `check_file` — and that was the ceiling *for the raw-line push alone* | **invasive**: needs `ParsedFile<'a>` or whole-file-decode + span, changing the public `RawLine.text` type across `line_format`/`structure`/`fixes`/PyO3. Fails the 20% gate by ~3× | **COLLECTED 2026-08-31 as M4's rider (#838)**: the memory-axis re-pricing (rule 12) landed the span rewrite, and the time win came with it far past this row's ceiling — paired criterion `parse_bytes` −43…−47% (the per-cell `String`s were most of the parse *time* too, not just the hold). The decline was correct on the evidence it had; the "revisit when" condition fired exactly as written |
-| `EmitGroup` owns `Vec<Vec<String>>`, so `emit.rs:354` deep-clones an already-owned matrix to hand the writer a *view* — queue #9, was issue #113 | **measured 2026-08-03, paired**: `emit_ags4/report` 18.155 → 16.525 ms with the clone removed = **−1.63 ms, −9.0%** (autofix −8.8%, +synth −7.6%) | **invasive**, and more so than when first declined: `laterite-ags4-emit` now **publishes to crates.io** (0.9.0), so changing `EmitGroup.rows`'s type is a breaking change to a published API — an engine MINOR under the pre-1.0 convention. 9% against a 20% gate | the original condition was "node gets a bench harness **and** node's emit dominates there". Half of it is now met — `node/bench/read.bench.ts` + `npm run bench` exist — but it benches **read only**. At 9% on the Rust side a node emit bench would have to find something dramatically different to change the answer, so: only if a node emit bench is written for its own reasons and shows that |
+| `EmitGroup` owns `Vec<Vec<String>>`, so `emit.rs:354` deep-clones an already-owned matrix to hand the writer a *view* — queue #9, was issue #113 | **measured 2026-08-03, paired**: `emit_ags4/report` 18.155 → 16.525 ms with the clone removed = **−1.63 ms, −9.0%** (autofix −8.8%, +synth −7.6%) | **invasive**, and more so than when first declined: `laterite-ags4-emit` now **publishes to crates.io** (0.9.0), so changing `EmitGroup.rows`'s type is a breaking change to a published API — an engine MINOR under the pre-1.0 convention. 9% against a 20% gate | ~~the original condition was "node gets a bench harness **and** node's emit dominates there"~~ **CLOSED 2026-09-01 (#823), both halves resolved — and the candidate itself no longer exists.** The #790 arc's #792 made the write view borrow (`EmitGroup.rows: &[Vec<String>]`), deleting the deep-clone this row priced — the breaking change it weighed happened anyway, for the streaming rework's own reasons, inside the emit 0.12.0 cycle. And the node write bench now exists (`laterite-node/bench/perf-matrix.mjs`, the #823 lane): the node emit door measures at rust-parity throughput across the whole ladder, nothing dramatic. Nothing is left to revisit |
 | keychain S3 — memoise the parent `_id` across a group's rows — was issue #111 | ~5–15% of *id-minting*, which post-S1/S2 is no longer the dominant stage of the keyed read | end-to-end ceiling falls **below the tranche floor**. Contained, but there is nothing left to win here | id-minting becomes the dominant stage of the keyed read again |
 | keychain S4 — fuse UUID→string into the Arrow builder, skipping the per-row 36-char `String` (`keychain.rs:181`) — was issue #111 | **measured 2026-08-03**: with both `to_string()` calls removed outright, `group_row_ids/SAMP-10k` 1.327 → 1.045 ms = **−21.6% of that stage**. That is an over-stated bound (it drops the hyphen formatting too, which S4 keeps); scaled to the keyed read it lands in the estimated **4–8%** band | straddles the 5% candidate floor **from below** once the over-statement is discounted, and it touches the `_id`/`_parent_id` byte-identity contract guarded by the cross-surface golden. Delicate work for a sub-floor prize | the keyed path is being revisited for another reason and this can ride along under the existing golden-pin |
 | keychain S5 — emit `_id`/`_parent_id` as a 16-byte DuckDB `UUID` instead of 36-char Utf8 — was issue #111 | not a perf candidate at all | it is a **contract change**: the column *type* moves, touching the golden, `test_content_keys.py`, `p3-content-keys.test.ts`, `arrow_cols`, every surface reader and the extension's `read_ags`. It sat inside a perf issue where the stopping rule cannot judge it | a DuckDB-heavy consumer asks for it. Then it gets its own design page and a deliberate decision, not a slip-in — the contract it would change is described in [[laterite-ags4-reference]] |
@@ -309,7 +309,7 @@ as such, because they are counts, not timings.
 | ~~6~~ | ~~node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped~~ | surfaces (node) | per-row | **LANDED T6 — default `read + table(all)` 692 → 152 ms (−78%)**: the keychain is ~96% of the native build (isolated: keyed `tableIpc(all)` 509 ms vs keyless 18 ms), so `withKeys=false` skips it on the keys-less default; only the explicit keyed variant still pays it | contained | yes (`node/bench/read.bench.ts`) | `.sql()`/`.at()` after a prior plain `table()` pinned (`p3-content-keys.test.ts`) |
 | ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **LANDED (#99) — narrowed `AGS4_to_dataframe` 144.4 → 131.2 ms (−9.1%)**; the native `parse_compat_arrow` drops 121.7 → 111.0 ms when one group of 123 is asked for. `only_groups=None` builds every group exactly as before, and ~25 MB of peak RSS goes with the tables that are no longer materialised | contained (~20 lines: an `only_groups` parameter on the pyfunction, threaded from `AGS4_to_dataframe`) | yes (paired native + end-to-end) | `test_compat_only_groups.py` — the strict raises (dup GROUP / ragged / dup heading) still fire on groups the caller filtered out |
 | ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
-| ~~9~~ | ~~`EmitGroup` owns `Vec<Vec<String>>`, so a caller deep-clones an already-owned matrix~~ | emit + node | per-cell | **DECLINED 2026-08-03 — measured −1.63 ms, −9.0% of `emit_ags4/report`** against a 20% invasive gate. See *Priced, declined* above for the paired numbers and the revisit condition | **invasive** — changes a public field type on a crate that now publishes to crates.io | yes (`benches/emit.rs`; node has `bench/read.bench.ts` but benches read only) | — |
+| ~~9~~ | ~~`EmitGroup` owns `Vec<Vec<String>>`, so a caller deep-clones an already-owned matrix~~ | emit + node | per-cell | **DECLINED 2026-08-03 — measured −1.63 ms, −9.0% of `emit_ags4/report`** against a 20% invasive gate; **the candidate was then deleted by #792** (the write view borrows) — see *Priced, declined* above for the close (#823) | **invasive** — changes a public field type on a crate that now publishes to crates.io | yes (`benches/emit.rs`; node benches write too since #823's matrix lane) | — |
 | ~~10~~ | ~~the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed)~~ | parse leaf → all surfaces | per-cell alloc | **LANDED — mimalloc `#[global_allocator]` on all 3 native artifacts: wheel end-to-end read −22%, validate −14%; lat/node the same read win** for +163 KB (.so) / +116 KB (lat) | contained (dep + 3 lines/artifact; C `libmimalloc-sys` on the abi3 matrix, the accepted dep-shape cost) | yes (dhat + wheel e2e) | wheel 681 + node 289 green; Arrow release-callback handoff proven safe |
 | ~~11~~ | ~~the *keyed* keychain (`group_row_ids`) rebuilds a per-row all-columns `HashMap<String,String>` and re-hashes with a fresh `Sha256` per row — paid on every `.sql()`/`.at()`/`keys=True`/`to_duckdb` read (#6 skipped it on the keys-less default but left the keyed path untouched)~~ | reference leaf (keychain) → surfaces | per-row | **LANDED (Steps 1+2, #106/#108).** S1 `perf/keychain-positional-keys` — kill the per-row map, read KEY cells positionally: end-to-end node 25 MB **keyed** read **521 → 277 ms (−47%)**, keychain overhead ~386 → ~144 ms (−63%); isolated 1002 → 201 ns/row. S2 `perf/keychain-streaming-hash` — borrow + stream KEY cells into one reused `Sha256` (`finalize_reset`) behind a `ByteSink` trait: isolated `group_row_ids` **353 → 132 ns/row (2.68×)**. S2 end-to-end is flat — post-S1, id-minting sits one stage *behind* the Arrow key-column build + IPC, which now dominate the keyed read | contained (byte-identical; public signatures unchanged) | yes (`benches/keychain.rs` criterion + node `read.bench.ts`) | `content_id_pins_the_cross_surface_golden` + injectivity + node `p3-content-keys.test.ts` pin byte-identity |
 
@@ -791,7 +791,9 @@ cache `sql()`/`at()` need. Pinned by tests asserting `.sql()`/`.at()` resolve
 **Exit:** the tranche floor applies per surface, not to the group. #9 is
 deliberately **not** here: it is invasive and its stage is 22.4 ms, so it cannot
 clear the 20% gate. It reopens only if node gets a bench and node's emit turns
-out to dominate there.
+out to dominate there. (Resolved 2026-09-01: the node bench exists — the #823
+matrix lane — and #792 had already deleted the clone; the *Priced, declined*
+row carries the close.)
 
 ### Refuted — do not chase
 
@@ -885,6 +887,7 @@ time** (epic decision 8) and never pre-written.
 | M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; design page DONE: [[dec-parse-cell-representation]] (2026-08-31 — the shape, the scope, and the spike-gated mint conditions); **minted as #838** (2026-08-31, taking the queue slot #834 vacated) |
 | M5 | the shipped pyarrow-free pandas hop paid a whole-file polars intermediate | read_strings (the default `[compat]` install only) | was priced at **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children); **CLAIMED 2026-08-31 (#834) — and the price was misattributed**: removing the copy moved the shipped hop's read peak **−0.9% / −0.6%** at the 100/265 MB rungs (−1.9%/−4.2% at 25/5 MB; write ~0; A-legs bracket ±0.1%, the pyarrow control unmoved) and its read time −3–5%, while the premium itself — **~+2.4–2.6×-of-output at every rung** — survives the fix | the copy existed and is gone: the native table's own `__arrow_c_stream__` registers into DuckDB and the rename rides the SQL projection. But it was never sum-like at peak — each group's freed copy is reused by the next (the same heap-reuse behaviour #831's probe 2 measured), so the intermediate contributed ~one group's worth to peak, not the file's. The surviving premium is the **DuckDB bridge leg itself** (Arrow scan → engine vectors → NumPy `.df()`), sum-like on this instrument and **unattributed** — pricing it is a fresh diagnosis with its own code-reading, not a rider on this row | landed as an avoidance + simplification (#834; tests pin the no-intermediate path, hostile identifiers, the strict-zip raise and cross-hop frame equality). The owner's evidence trigger **FIRED**: post-fix the shipped hop still trails the pyarrow hop by **~+18–19% of the operation's peak** at the top rungs — recorded on #834 for the owner's dep-shape decision, nothing acted on |
 | M6 | the retained parse **structure** — per-row span-vec heap blocks plus source-byte fields the validator never reads | validate + read_typed (and every `ParsedFile` holder: every write door's input half, and M2's constructed verdict had it landed) | was priced by the #848 attribution as most of the retained hold beyond the buffer, sitting *at* rule 10's gate; the spike's A/B/A on the lane instrument measured the full flattening at **−6.9/−6.2% (25 MB) and −13.1/−10.7% (100 MB)** of the validate/read_typed peaks — **under the 20% floor on all four gate cells** (A-spread ≤ 0.035%; A-legs reproduce the committed cells within 0.25%), and the row stood declined on that verdict. **LANDED BY OWNER DECISION 2026-09-01 (#850)**: the measured ~10–13% plus the time rider — `parse_bytes` −9…−15%, `check_parsed` unchanged — was judged worth the remaining effort with the spike already built and contract-green. A dated waiver of the floor for this row, argued in absolute terms on #850; NOT a precedent that ~10% clears an invasive gate | the shape was built exactly as designed (per-group arena + slim 12-byte row index, `RawLine` 24 → 16 B, per-row/per-line offsets profile-gated — the inventory held: nothing outside the leaf's own tests reads them) and the structure is real — but the requested-bytes pricing OVERstated its RSS contribution, the inverse error to the undercount the design reasoned from: the span content itself (8 B/cell) survives in the arena by construction, and the old per-group rows-Vecs' doubling headroom was largely never-touched pages RSS never paid (requested 123.2 MB vs ~68 MB content at the 100 MB rung, #848's own table). What flattening removes — the row/line slimming plus allocator block overhead — is ~13% of the operation peak at 100 MB, ~7% at 25 MB where the import floor pads the denominator. dhat prices requests; RSS pays touched pages — in both directions | **landed** (owner decision, floor waived — the record and the waiver are both on #850): [[dec-parse-structure-layout]] back to `accepted` with the gate outcome noted; the one-arc migration is the #850 land PR, before/after refreshed in `tools/perf-results/python-lane.json` at the landed tree. M2's "re-price on the post-layout lane" precondition is live again — see its row |
+| M7 | the node write door stands the file up beside itself twice more than the engine needs: `buildAgs4` accumulates every group's IPC `Buffer` before the one native call (the `ipcGroups` slab in `rust-packages/laterite-node/ts/index.ts`), and the native side then decodes the whole vec into a second full typed materialisation before the streaming emit runs (`emit_ags4_from_ipc` → `group_from_ipc` in `rust-packages/laterite-node/src/lib.rs`, all groups up front) | write (node lane, #823) | door increment over the same lane's typed hold: **5.40×-of-output at 265 MB (10.25 − 4.85) and 5.06× at 100 MB, vs the rust door's 1.67×/1.62×** on the same run — the ~3.4–3.7× delta is ≈ **33–36% of the write stage's peak**, over the invasive gate *at ceiling* | mechanism as read, not yet priced: the post-M2 engine already streams per group, so a per-group handoff shape exists on the native side — but #848's co-peak lesson applies in full (shares are not contributions; the slabs may back each other up), so nothing here is a prize until variant children run alone *and* paired on the node lane | **unpriced** — a diagnosis round before any mint; reshapes the napi handoff, so invasive |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
@@ -1012,6 +1015,56 @@ lives on #848. What it settled:
   table — but they are the caller's allocations. They ship as a docs
   recipe on the write door's page, with this note as the ledger's record.
 
+### The node lane (#823, 2026-09-01)
+
+The first surface lane on the cross-surface matrix (epic decision 2: our own
+ladder, **no external baseline**).
+`rust-packages/laterite-node/bench/perf-matrix.mjs` (`npm run bench:matrix`)
+drives the npm package's **public API** — napi marshalling and arrow-js
+decode included, because that is what a Node caller pays — over the same
+pinned ladder, and writes the same schema-2 per-surface file as
+[[laterite-ags4-perf]] for `tools/perf-matrix.py` to merge. The rust column
+below is the same day's run of the rust bin at the same tree (post-M6/M2),
+so the pairs are attributable; both instruments are the lane's own (wall
+medians over 10 iters, fresh-child peak RSS).
+
+| op | 100 MB (node / rust) | 265 MB (node / rust) |
+|---|---|---|
+| validate | 134 / 131 MB/s · 4.60× / 3.99× | 141 / 132 MB/s · 4.07× / 3.68× |
+| parse-to-typed | 277 / 305 MB/s · 5.37× / 3.47× | 286 / 310 MB/s · 4.85× / 3.34× |
+| write | 107 / 97 MB/s · 10.43× / 5.09× | 106 / 99 MB/s · 10.25× / 5.01× |
+
+What the lane says:
+
+- **Time is at parity with the engine.** Validate and write sit inside the
+  drift band on both sides of rust (same engine underneath — a node "win"
+  here is run-to-run spread, not a finding); parse-to-typed pays ~8–10% for
+  the IPC hop + arrow-js decode. No time candidate clears any floor.
+- **Memory is where the boundary lives.** Validate's premium is ~the node
+  runtime floor (the 5 MB rung prices the floor: ~98 MB total vs rust's
+  ~29 MB — rank from the big rungs, as ever). The typed read holds
+  ~1.5×-of-input more than rust's — the floor plus the retained IPC bytes
+  (the napi boundary has no capsule analog; the `Buffer`s ARE the boundary).
+  The write door's increment over the same lane's typed hold is
+  **5.40×-of-output vs the rust door's 1.67×** — that delta is the **M7**
+  queue row, mechanism read in the code, unpriced. (The doors are not quite
+  twins — node's dictionary-fills UNIT/TYPE where the rust leg carries the
+  source's — but that difference is per-heading metadata, nowhere near
+  ×-of-file scale.)
+- **Every cell measured to the cap** — the 265 MB rung included, no refusals,
+  no deaths; the ladder's default stops there (rule 11), so the file carries
+  no 524 MB row at all rather than a silent gap.
+- **The swap watch fired once, honestly, at the wrong target.** The lane's
+  first full run refused all three 265 MB cells as `swapped` — and fresh
+  re-probes of the same children measured cleanly, within 0.1% of the later
+  committed cells. The pager's load was the *harness parent* (a V8 process
+  that has just run the timed loops keeps gigabytes resident; nulled refs
+  return no pages), so the harness now runs the whole memory pass FIRST,
+  while the parent holds nothing beyond the manifest. The rust bin can
+  interleave because its parent genuinely frees; a GC'd host cannot — the
+  wasm/CLI lanes (#824/#825) should inherit the mem-first ordering where
+  their parent is GC'd too.
+
 ## Decisions taken
 
 Recorded here so the next session does not re-open them. Each was a genuine fork
@@ -1121,7 +1174,12 @@ the numbers.
 Per-surface read harnesses mirror the Rust rungs on the same 25 MB fixture, each
 in its own lane (not part of the unit suite): `laterite-node/bench/read.bench.ts`
 (`npm run bench`) and `web/bench/wasm-read.bench.ts` (`npm run bench:wasm`, driving
-the built browser cdylib from its `.wasm` bytes). For attribution rather than
+the built browser cdylib from its `.wasm` bytes). Since #823 the node surface also
+carries the cross-surface **matrix lane**, `laterite-node/bench/perf-matrix.mjs`
+(`npm run bench:matrix`): the campaign's three ops over the whole forge ladder,
+time plus the fresh-child peak-RSS instrument, emitting the same uniform
+per-surface schema as `laterite-ags4-perf` for `tools/perf-matrix.py` to merge
+(the read bench stays the regression guard; the matrix lane is the comparison). For attribution rather than
 timing, `laterite-ags4-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
 `dhat` heap profile of the read stages — it says whether a stage is
 allocation-bound (fixable) or a compute/bandwidth wall; its write-side sibling is
