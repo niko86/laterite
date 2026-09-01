@@ -210,8 +210,8 @@ impl ParsedGroup {
         self.headings.iter().position(|h| h == name)
     }
 
-    /// The decoded buffer this group's [`DataRow::values`] spans index —
-    /// the slicing base for direct `row.values` reads.
+    /// The decoded buffer this group's arena spans index — the slicing base
+    /// for direct [`Self::row_spans`] reads.
     #[must_use]
     pub fn text(&self) -> &str {
         &self.buf
