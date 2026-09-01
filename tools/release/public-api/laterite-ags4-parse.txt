@@ -259,8 +259,10 @@ pub laterite_ags4_parse::ParsedGroup::units: alloc::vec::Vec<alloc::string::Stri
 impl laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::cell(&self, usize, usize) -> core::option::Option<&str>
 pub fn laterite_ags4_parse::ParsedGroup::col(&self, &str) -> core::option::Option<usize>
+pub fn laterite_ags4_parse::ParsedGroup::padded_row_strings(&self, &laterite_ags4_parse::DataRow, usize) -> alloc::vec::Vec<alloc::string::String>
 pub fn laterite_ags4_parse::ParsedGroup::shared_text(&self) -> &alloc::sync::Arc<alloc::string::String>
 pub fn laterite_ags4_parse::ParsedGroup::text(&self) -> &str
+pub fn laterite_ags4_parse::ParsedGroup::value_at(&self, &laterite_ags4_parse::DataRow, usize) -> core::option::Option<&str>
 impl core::clone::Clone for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> laterite_ags4_parse::ParsedGroup
 impl core::cmp::Eq for laterite_ags4_parse::ParsedGroup

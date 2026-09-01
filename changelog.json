@@ -29,6 +29,9 @@
    },
    {
     "text": "**The Python-lane benchmark measures memory, and writes** (#821). `tools/bench-vs-python-ags4.py` grows a peak-RSS harness — each (library, axis, rung) memory cell is a fresh subprocess running one end-to-end operation through that library's public API, the same instrument on both sides — and a fourth axis: **write** (baseline `dataframe_to_AGS4`; ours through both doors, compat's streaming `dataframe_to_AGS4` and native `build_ags4`). Every run writes a machine-readable results file (`tools/perf-results/python-lane.json`, schema declared in the tool) carrying times, peak-RSS cells, the ×-of-output headline factor, the import-floor baselines and any refusals — a rung a side cannot run without swapping is recorded as a refusal, never skipped. Memory columns stop at the 265 MB rung; the 524 MB rung stays time-only (epic #820, decision 7)."
+   },
+   {
+    "text": "**The parse leaf owns the span/buffer pairing** (#844). Two `ParsedGroup` accessors join `cell`: `value_at(&row, col)` — the row-relative read every rule module, diff, merge and the reference readers hand-rolled as `row.values.get(ci).map_or(\"\", |s| s.slice(g.text()))` — and `padded_row_strings(&row, n)`, the padded owned-string materialisation the four matrix-building emitters (laterite-py/node `emit`, xcheck's canonical pair) each re-implemented. ~40 call sites migrate; diff's `changed_cells` and merge's `cell` shed the bare buffer parameters the M4 span rewrite had threaded through them, so a span can no longer be read against the wrong buffer at those sites. No behaviour change."
    }
   ],
   "changed": [

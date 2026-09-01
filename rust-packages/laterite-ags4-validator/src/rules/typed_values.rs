@@ -116,7 +116,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
             }
 
             for (ri, row) in g.rows.iter().enumerate() {
-                let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) else {
+                let Some(v) = g.value_at(row, ci) else {
                     continue;
                 };
                 if v.is_empty() {
@@ -207,14 +207,14 @@ fn flag_duplicate_ids(
     use std::collections::HashMap;
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for row in &g.rows {
-        if let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) {
+        if let Some(v) = g.value_at(row, ci) {
             if !v.is_empty() {
                 *counts.entry(v).or_default() += 1;
             }
         }
     }
     for (ri, row) in g.rows.iter().enumerate() {
-        if let Some(v) = row.values.get(ci).map(|s| s.slice(g.text())) {
+        if let Some(v) = g.value_at(row, ci) {
             if !v.is_empty() && counts.get(v).copied().unwrap_or(0) > 1 {
                 add_at(
                     found,

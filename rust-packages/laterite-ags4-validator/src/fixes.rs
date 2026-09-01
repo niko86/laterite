@@ -312,7 +312,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     // finding fired). field_span gives the inner span — for
                     // an empty `""` field that's a zero-width point just
                     // inside the quotes, exactly where the value belongs.
-                    let cur = data.values.get(ci).map_or("", |s| s.slice(tran.text()));
+                    let cur = tran.value_at(data, ci).unwrap_or("");
                     if !cur.is_empty() {
                         return;
                     }
@@ -1548,11 +1548,11 @@ mod tests {
         let row = proj
             .rows
             .iter()
-            .find(|r| r.values.first().map(|s| s.slice(proj.text())) == Some("P1"))
+            .find(|r| proj.value_at(r, 0) == Some("P1"))
             .expect("the P1 DATA row");
         assert_eq!(
-            row.values[1].slice(proj.text()),
-            "say \"hi\" now",
+            proj.value_at(row, 1),
+            Some("say \"hi\" now"),
             "cell truncated / mis-escaped"
         );
     }

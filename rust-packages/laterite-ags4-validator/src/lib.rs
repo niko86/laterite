@@ -166,8 +166,7 @@ impl Default for CheckOptions {
 pub fn tran_ags_of(parsed: &parse::ParsedFile) -> Option<String> {
     let tran = parsed.groups.get("TRAN")?;
     let ci = tran.headings.iter().position(|h| h == "TRAN_AGS")?;
-    let v = tran.rows.first()?.values.get(ci)?;
-    let t = v.slice(tran.text()).trim();
+    let t = tran.value_at(tran.rows.first()?, ci)?.trim();
     (!t.is_empty()).then(|| t.to_string())
 }
 

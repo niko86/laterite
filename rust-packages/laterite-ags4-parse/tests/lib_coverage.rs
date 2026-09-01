@@ -157,3 +157,42 @@ fn escaped_cells_read_unescaped_through_the_fixup_region() {
         owned[1..].iter().map(String::as_str).collect::<Vec<_>>()
     );
 }
+
+/// LOCA with a ragged DATA row (one value short of the two headings) and a
+/// long DATA row (one value past them) — the shapes `value_at` /
+/// `padded_row_strings` exist to make safe (#844).
+const LOCA_RAGGED: &str = "\"GROUP\",\"LOCA\"\r\n\
+                           \"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+                           \"UNIT\",\"\",\"m\"\r\n\
+                           \"TYPE\",\"ID\",\"2DP\"\r\n\
+                           \"DATA\",\"BH01\"\r\n\
+                           \"DATA\",\"BH02\",\"1.00\",\"extra\"\r\n";
+
+#[test]
+fn value_at_reads_row_relative_against_the_owning_buffer() {
+    let pf = parse_str(LOCA_RAGGED).unwrap();
+    let g = &pf.groups["LOCA"];
+    let short = &g.rows[0];
+    let long = &g.rows[1];
+    assert_eq!(g.value_at(short, 0), Some("BH01"));
+    assert_eq!(g.value_at(short, 1), None, "past the ragged row's width");
+    assert_eq!(
+        g.value_at(long, 2),
+        Some("extra"),
+        "past the headings is fine"
+    );
+    // agrees with the (col, row) accessor where both apply
+    assert_eq!(g.value_at(short, 0), g.cell(0, 0));
+}
+
+#[test]
+fn padded_row_strings_pads_and_truncates_to_n() {
+    let pf = parse_str(LOCA_RAGGED).unwrap();
+    let g = &pf.groups["LOCA"];
+    // a short row's tail fills with ""
+    assert_eq!(g.padded_row_strings(&g.rows[0], 2), vec!["BH01", ""]);
+    // a long row truncates to n
+    assert_eq!(g.padded_row_strings(&g.rows[1], 2), vec!["BH02", "1.00"]);
+    // n = 0 materialises nothing
+    assert!(g.padded_row_strings(&g.rows[0], 0).is_empty());
+}
