@@ -2203,13 +2203,27 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     return items
 
 
+def _columns_of(frame: Any) -> Any:
+    """``frame.columns`` if it can actually be read, else ``None``. A plain
+    ``getattr`` default only swallows AttributeError, but ``.columns`` may be a
+    *property that raises* — pyo3-arrow's ``PyTable.columns`` imports its arro3
+    companion package and dies with ModuleNotFoundError in a venv without it,
+    even though the object's ``__arrow_c_stream__`` capsule (the only thing the
+    build consumes) is fine. Both probes below want "no columns", not a foreign
+    import error, for such inputs. (#852)"""
+    try:
+        return getattr(frame, "columns", None)
+    except Exception:
+        return None
+
+
 def _drop_synth_keys(frame: Any) -> Any:
     """Drop the synthetic ``_``-prefixed key columns (``_id`` / ``_parent_id``) a
     user frame may carry from ``read(keys=True)[code]`` — AGS4 emit is byte-faithful
     to the DATA and must never write a synthetic column out. AGS headings never
     start with ``_``, so this is safe; a frame with none is returned unchanged.
     Handles polars and pandas (the two frame types ``read`` ever hands back). (#303)"""
-    cols = getattr(frame, "columns", None)
+    cols = _columns_of(frame)
     if cols is None:
         return frame  # not a columnar frame (e.g. an Arrow capsule) — nothing to strip
     synth = [c for c in cols if isinstance(c, str) and c.startswith("_")]
@@ -2294,7 +2308,11 @@ def build_ags4(
             ``#[pyclass]`` group or a `laterite.dynamic` passthrough node with
             its children attached), a mapping of ``{code: frame}``, or a list of
             ``(code, frame)`` pairs. Each ``frame`` is a polars or pandas
-            ``DataFrame`` whose column names are the AGS headings.
+            ``DataFrame`` whose column names are the AGS headings — or any
+            object exposing an Arrow C-stream capsule (``__arrow_c_stream__``),
+            e.g. an Arrow table, which is handed to the emitter zero-copy. The
+            ``units=``/``types=`` heading check only vouches for frames whose
+            ``.columns`` it can read; capsule-only inputs skip it.
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
             Defaults to ``"4.1.1"`` when ``None``.
@@ -2403,7 +2421,7 @@ def build_ags4(
     _cols = {
         code: set(cols)
         for code, frame in items
-        if (cols := getattr(frame, "columns", None)) is not None
+        if (cols := _columns_of(frame)) is not None
     }
 
     def _check_meta(meta: Mapping[str, Mapping[str, str]] | None, name: str) -> None:
