@@ -120,11 +120,9 @@ fn byte_offsets_monotonic_and_in_bounds() {
     // retains them (dec-parse-structure-layout); `parse_bytes`' validating
     // profile drops them — asserted at the end.
     let bytes = lf();
-    let pf = laterite_ags4_parse::parse_bytes_opts(
-        &bytes,
-        laterite_ags4_parse::ParseOptions::lean(),
-    )
-    .unwrap();
+    let pf =
+        laterite_ags4_parse::parse_bytes_opts(&bytes, laterite_ags4_parse::ParseOptions::lean())
+            .unwrap();
     assert_eq!(pf.line_byte_offsets.len(), pf.raw_lines.len());
     let mut prev = 0u64;
     for (i, _rl) in pf.raw_lines.iter().enumerate() {

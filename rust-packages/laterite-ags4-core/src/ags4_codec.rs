@@ -260,8 +260,10 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         // The shared decoded buffer the row spans index — cloned out so the
         // descriptor fields can be moved while cells are still read through it.
         let buf = Arc::clone(pg.shared_text());
-        let headings: Vec<String> =
-            std::mem::take(&mut pg.headings).into_iter().map(trim_owned).collect();
+        let headings: Vec<String> = std::mem::take(&mut pg.headings)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         // Resolve BEFORE the UNIT/TYPE pad below, so those still align with the
         // heading count — `Recover` renames headings, it never adds or drops one.
         let headings = resolve_headings(&code, headings, read_opts.duplicate_headings)?;
@@ -269,13 +271,17 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         // present (the csv reader resized inside its UNIT/TYPE arm; a group with
         // no UNIT row kept an empty vec, never padded). `unit_line`/`type_line`
         // are `Some` iff the leaf saw that descriptor row.
-        let mut units: Vec<String> =
-            std::mem::take(&mut pg.units).into_iter().map(trim_owned).collect();
+        let mut units: Vec<String> = std::mem::take(&mut pg.units)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         if pg.unit_line.is_some() {
             units.resize(headings.len(), String::new());
         }
-        let mut types: Vec<String> =
-            std::mem::take(&mut pg.types).into_iter().map(trim_owned).collect();
+        let mut types: Vec<String> = std::mem::take(&mut pg.types)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         if pg.type_line.is_some() {
             types.resize(headings.len(), "X".to_string());
         }

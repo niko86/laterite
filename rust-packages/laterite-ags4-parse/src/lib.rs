@@ -263,7 +263,10 @@ impl std::fmt::Debug for ParsedGroup {
             .field("units", &self.units)
             .field("types", &self.types)
             .field("rows", &self.rows)
-            .field("spans", &format_args!("Vec<Span>({} cells)", self.spans.len()))
+            .field(
+                "spans",
+                &format_args!("Vec<Span>({} cells)", self.spans.len()),
+            )
             .field(
                 "row_byte_offsets",
                 &format_args!("Vec<u64>({} rows)", self.row_byte_offsets.len()),

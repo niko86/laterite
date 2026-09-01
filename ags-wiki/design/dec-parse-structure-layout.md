@@ -1,7 +1,7 @@
 ---
 type: decision
 title: "the parse leaf's retained structure flattens — a span arena + profile-gated source-byte fields (queue M6's shape)"
-status: rejected
+status: accepted
 tags: [design, decision]
 decided: 2026-09-01
 supersedes: []
@@ -12,19 +12,23 @@ sources: []
 
 # the parse leaf's retained structure flattens — a span arena + profile-gated source-byte fields
 
-> [!warning] **REJECTED 2026-09-01 — the spike gate this page mandated (its
-> own §Mint conditions) returned a decline.** The flattening was built
-> exactly as decided below on a throwaway branch and measured on the lane
+> [!note] **Gate outcome (2026-09-01): the spike MISSED this page's own
+> floor, and the owner landed the shape anyway at the measured prize.** The
+> flattening was built exactly as decided below and measured on the lane
 > instrument: **−6.9/−6.2% (25 MB) and −13.1/−10.7% (100 MB)** of the
-> validate/read_typed peaks, against rule 10's 20% floor on all four cells;
-> the criterion riders were clean (`parse_bytes` −9…−15%, `check_parsed`
-> unchanged) but cannot carry an invasive break on the time axis. The full
-> A/B/A record — protocol, bracket table, and the requested-vs-touched-pages
-> correction to this page's pricing — is on **#850**; the ledger's M6 row
-> ([[perf-campaign]]) carries the decline. Per §Consequences,
+> validate/read_typed peaks — under rule 10's 20% floor on all four cells
+> (the page briefly stood `rejected` on that verdict). The owner's decision,
+> recorded on #850: the measured ~10–13% plus the time rider
+> (`parse_bytes` −9…−15%, `check_parsed` unchanged) is worth the remaining
+> effort with the spike already built and contract-green — a dated waiver
+> of the floor for this row, **not** a precedent that ~10% clears an
+> invasive gate. The full A/B/A record — protocol, bracket table, and the
+> requested-vs-touched-pages correction to this page's pricing (the
+> requested-bytes instrument OVERcounted here, the inverse of the M4-era
+> undercount) — is on **#850**; the ledger's M6 row ([[perf-campaign]])
+> carries the landed numbers. With the layout landed,
 > [[dec-emit-streamed-verdict]]'s "re-price on the post-layout lane"
-> precondition is void; that row's next step is an owner decision. The page
-> body below is preserved as decided, for the record.
+> precondition is live again.
 
 The direct successor of [[dec-parse-cell-representation]]: M4 replaced the
 per-cell `String`s with spans over one retained decoded buffer, and this
