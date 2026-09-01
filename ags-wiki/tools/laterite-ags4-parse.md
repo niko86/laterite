@@ -52,7 +52,9 @@ allocator-heavy dependency belongs above it.
 The leaf carries them in a single pass, none back-derived from another:
 
 - each record's absolute **byte** offset in the original buffer (what the
-  `.ags.idx` certificate indexes — see `O-40`);
+  `.ags.idx` certificate indexes — see `O-40`). Group-level offsets
+  (`group_records`, `group_byte`, `total_bytes`) exist under every profile;
+  the per-row/per-line ones are profile-gated — see *Parse profiles*;
 - its 1-indexed **line** number (what findings and fixes join on);
 - since [[dec-parse-cell-representation]], every line and cell is also a
   `u32` `Span` into the **retained decoded buffer** (`ParsedFile::text`) — a
@@ -79,10 +81,18 @@ that line's body (fix-ups are *interleaved*, so consecutive line spans are not
 contiguous — slice per span, never across spans) — and shares it into each
 `ParsedGroup` by refcount, so a group
 handed out alone (the three long-lived FFI holders) still resolves its rows.
-`RawLine::text` and `DataRow::values` are `u32` spans into that buffer; every
-read comes back a plain `&str` (`ParsedGroup::cell` and its row-relative
-sibling `value_at`, `ParsedFile::line_text`); `padded_row_strings` is the
-one owning accessor, for the matrix-building emitters.
+`RawLine::text` is a `u32` span into that buffer. A DATA row's cells are
+spans in their group's **span arena** — one contiguous `Vec<Span>` per
+group, with `DataRow` reduced to a slim index into it (`{line, first, n}`,
+12 bytes) — so the per-row heap block the pre-M6 layout paid on every DATA
+row is gone ([[dec-parse-structure-layout]]; landed by owner decision on
+#850 at the measured prize, under the campaign's invasive floor). Every
+read still comes back a plain `&str` through the same seam
+(`ParsedGroup::cell`, its row-relative sibling `value_at`, `row_spans` for
+the raw slice, `ParsedFile::line_text`); `padded_row_strings` is the one
+owning accessor, for the matrix-building emitters. A `DataRow`'s arena
+indices are group-local: resolve a row only against the group that
+produced it.
 The buffer is an `Arc<String>` rather than the design page's literal
 `Arc<str>`: the `Arc<str>` materialisation *copies* the buffer, and the M4
 spike measured that whole-file transient sitting exactly at the operation
@@ -102,16 +112,30 @@ its own trims in `from_shared`; see [[laterite-ags4-core]].
 
 The old `retain_raw_lines` knob is **dead** — a raw line is a span over a
 buffer the parse keeps anyway, so the overlay collapsed into the base model
-([[dec-parse-cell-representation]]). What remains is decode policy plus the
-explicit opt-ins (`strict_structure`, `locate_only`). Every profile walks the
-file identically — same line spans, same decode, same UTF-8 handling, same
-AGS3 sniff:
+([[dec-parse-cell-representation]]). What remains is decode policy, the
+explicit opt-ins (`strict_structure`, `locate_only`), and — since
+[[dec-parse-structure-layout]] — **profile-dependent field presence**: the
+per-row/per-line SOURCE byte offsets (`ParsedGroup::row_byte_offsets`,
+`ParsedFile::line_byte_offsets`, read via `row_byte_offset(i)` /
+`line_byte_offset(i)`) exist only under a profile that sets
+`retain_source_offsets`. The rule engine reads none of them, so
+`validating()` drops them; the group-level coordinates (`group_byte`,
+`group_records`, `total_bytes`, `byte_offsets_source_true`) are NOT gated —
+every profile records them, which is why the cert index can mint from any
+parse. Every profile walks the file identically — same line spans, same
+decode, same UTF-8 handling, same AGS3 sniff:
 
 | profile | is | used by |
 |---|---|---|
-| `validating()` | lossy decode | the rule engine |
-| `lean()` | reject invalid bytes | the read codec (+ `strict_structure`) |
+| `validating()` | lossy decode; per-row/per-line source offsets dropped | the rule engine |
+| `lean()` | reject invalid bytes; source offsets retained | the read codec (+ `strict_structure`) |
 | `lean()` + `locate_only` | retains no text: GROUP records only | the certificate index |
+
+A consumer that needs per-row/per-line source-byte coordinates must parse
+under a profile that retains them — the leaf enumerates its consumers
+rather than abstracting for them ([[dec-parse-structure-layout]]'s
+decision; at land the per-row/per-line offsets had no readers outside the
+leaf's own tests).
 
 `locate_only` exists because the index reads `group_records`, `group_order` and
 `total_bytes` and nothing else, but used to pay for the whole row model and

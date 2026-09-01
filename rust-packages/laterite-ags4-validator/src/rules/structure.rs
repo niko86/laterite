@@ -228,7 +228,7 @@ fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut Findin
         );
     }
     for row in &g.rows {
-        if row.values.len() != want {
+        if row.n_values() != want {
             add(
                 found,
                 RULE_4,

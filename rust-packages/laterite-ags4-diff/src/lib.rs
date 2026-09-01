@@ -114,7 +114,7 @@ fn row_key(
             })
             .collect()
     } else {
-        row.values
+        g.row_spans(row)
             .iter()
             .map(|s| s.slice(g.text()).to_string())
             .collect()

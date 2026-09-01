@@ -52,7 +52,7 @@ fn oldmac_parses_into_the_same_rows_as_crlf() {
             g.rows
                 .iter()
                 .map(|r| {
-                    r.values
+                    g.row_spans(r)
                         .iter()
                         .map(|s| s.slice(g.text()).to_string())
                         .collect()

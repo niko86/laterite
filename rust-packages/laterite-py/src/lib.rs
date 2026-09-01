@@ -945,7 +945,7 @@ fn parse_primitives(
             ro.set_item("line", r.line)?;
             ro.set_item(
                 "values",
-                r.values
+                g.row_spans(r)
                     .iter()
                     .map(|s| s.slice(g.text()))
                     .collect::<Vec<_>>(),
@@ -1060,8 +1060,8 @@ fn parse_compat_arrow(
         let ragged: Vec<(u32, usize)> = g
             .rows
             .iter()
-            .filter(|r| r.values.len() != n_head)
-            .map(|r| (r.line, r.values.len()))
+            .filter(|r| r.n_values() != n_head)
+            .map(|r| (r.line, r.n_values()))
             .collect();
         gd.set_item("ragged", ragged)?;
 

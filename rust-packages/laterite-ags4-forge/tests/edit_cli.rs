@@ -180,7 +180,7 @@ heading = "LOCA_NATE"
     assert_eq!(g.headings, ["LOCA_ID", "LOCA_REM"]);
     assert_eq!(g.rows.len(), 2);
     assert!(
-        g.rows.iter().all(|r| r.values.len() == 2),
+        g.rows.iter().all(|r| r.n_values() == 2),
         "ragged: {:?}",
         g.rows
     );
@@ -480,7 +480,7 @@ type = "2DP"
     assert_eq!(g.cell(col, 1), Some(""));
     for (i, row) in g.rows.iter().enumerate() {
         assert_eq!(
-            row.values.len(),
+            row.n_values(),
             g.headings.len(),
             "row {} must not be ragged",
             i + 1
@@ -523,7 +523,7 @@ fn a_row_is_inserted_at_a_position_and_a_bad_position_is_refused() {
     assert_eq!(g.cell(col, 0), Some(""), "the new row takes position 1");
     assert_eq!(g.cell(col, 1), Some("BH1"));
     assert!(
-        g.rows.iter().all(|r| r.values.len() == g.headings.len()),
+        g.rows.iter().all(|r| r.n_values() == g.headings.len()),
         "no row may be ragged: {text}"
     );
 

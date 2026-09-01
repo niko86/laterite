@@ -25,14 +25,12 @@ fn lenient() -> MergeOpts {
 
 fn row_by_key<'a>(g: &'a ParsedGroup, key_h: &str, key_v: &str) -> Option<&'a DataRow> {
     let ci = g.headings.iter().position(|h| h == key_h)?;
-    g.rows
-        .iter()
-        .find(|r| r.values.get(ci).map(|s| s.slice(g.text())) == Some(key_v))
+    g.rows.iter().find(|r| g.value_at(r, ci) == Some(key_v))
 }
 
 fn cell(g: &ParsedGroup, r: &DataRow, h: &str) -> Option<String> {
     let ci = g.headings.iter().position(|x| x == h)?;
-    r.values.get(ci).map(|s| s.slice(g.text()).to_string())
+    g.value_at(r, ci).map(str::to_string)
 }
 
 fn type_of(g: &ParsedGroup, h: &str) -> Option<String> {

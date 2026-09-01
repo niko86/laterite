@@ -84,24 +84,39 @@ pub struct RawLine {
     /// Whether the line was CR+LF terminated (the `text` loses the CR, so
     /// the evidence is captured here — Rule 2a).
     pub had_crlf: bool,
-    /// Absolute byte offset of this line's start in the ORIGINAL bytes
-    /// (BOM included — byte 0 is genuinely byte 0).
-    pub byte_offset: u64,
+    // The per-line source byte offset moved to
+    // [`ParsedFile::line_byte_offsets`], profile-gated (dec-parse-structure-
+    // layout): the validator never read it, and 8 bytes per physical line was
+    // most of this struct's weight.
 }
 
-/// One DATA row.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One DATA row: the slim index into its group's span arena
+/// ([`ParsedGroup::row_spans`]). The cells themselves live contiguously in
+/// the arena — a per-row `Vec<Span>` heap block was the retained-structure
+/// cost queue M6 exists to remove (`dec-parse-structure-layout`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataRow {
     /// 1-indexed physical line (the validator's findings/fixes join key).
     pub line: u32,
-    /// Record start byte offset in source bytes (record-granular index).
-    pub byte_offset: u64,
-    /// Field values after the leading tag, unquoted + unescaped, positionally
-    /// aligned with [`ParsedGroup::headings`]. RAW (untrimmed). Spans into the
-    /// shared decoded buffer — a cell whose source carried `""` escapes was
-    /// unescaped ONCE at parse into the buffer's fix-up region, so every span
-    /// reads as a plain `&str` ([`ParsedGroup::cell`]).
-    pub values: Vec<Span>,
+    /// First cell's index in [`ParsedGroup`]'s span arena.
+    first: u32,
+    /// Cell count (fields after the leading tag).
+    n: u32,
+}
+
+impl DataRow {
+    /// Number of fields after the leading tag — what `values.len()` was.
+    #[must_use]
+    pub fn n_values(&self) -> usize {
+        self.n as usize
+    }
+
+    /// This row's index range in its group's span arena. Meaningful only
+    /// against the [`ParsedGroup`] that produced the row.
+    #[must_use]
+    pub fn span_range(&self) -> std::ops::Range<usize> {
+        self.first as usize..(self.first + self.n) as usize
+    }
 }
 
 /// One GROUP and its descriptor rows + data.
@@ -129,6 +144,15 @@ pub struct ParsedGroup {
     /// NOT padded.
     pub types: Vec<String>,
     pub rows: Vec<DataRow>,
+    /// The span arena: every DATA row's cells, contiguous, in row order.
+    /// Row `i` owns `spans[rows[i].span_range()]` — one allocation per group
+    /// instead of one per row (`dec-parse-structure-layout`).
+    spans: Vec<Span>,
+    /// Source byte offset of each DATA row's record start, parallel to
+    /// `rows` — PROFILE-GATED: filled only under
+    /// [`ParseOptions::retain_source_offsets`] (the lean/certify profiles),
+    /// empty under `validating()` (the rule engine never reads it).
+    pub row_byte_offsets: Vec<u64>,
 }
 
 impl ParsedGroup {
@@ -136,10 +160,22 @@ impl ParsedGroup {
     /// row. Borrowing accessor every typed-Arrow host feeds to
     /// `laterite_ags4_types::arrow_cols` — keeps typing out of the parse leaf.
     pub fn cell(&self, col: usize, row: usize) -> Option<&str> {
-        self.rows
-            .get(row)
-            .and_then(|r| r.values.get(col))
-            .map(|s| s.slice(&self.buf))
+        self.rows.get(row).and_then(|r| self.value_at(r, col))
+    }
+
+    /// The row's cell spans, resolved against this group's arena. Meaningful
+    /// only for a row this group produced — the arena indices are group-local.
+    #[must_use]
+    pub fn row_spans(&self, row: &DataRow) -> &[Span] {
+        &self.spans[row.span_range()]
+    }
+
+    /// Source byte offset of DATA row `i`'s record start, if this parse's
+    /// profile retained the per-row source-byte coordinate
+    /// ([`ParseOptions::retain_source_offsets`]).
+    #[must_use]
+    pub fn row_byte_offset(&self, i: usize) -> Option<u64> {
+        self.row_byte_offsets.get(i).copied()
     }
 
     /// Raw value of `row` at `col`, resolved against this group's shared
@@ -149,7 +185,12 @@ impl ParsedGroup {
     /// not an error, so the group the row came from does the read (#844).
     #[must_use]
     pub fn value_at(&self, row: &DataRow, col: usize) -> Option<&str> {
-        row.values.get(col).map(|s| s.slice(&self.buf))
+        if col >= row.n_values() {
+            return None;
+        }
+        self.spans
+            .get(row.first as usize + col)
+            .map(|s| s.slice(&self.buf))
     }
 
     /// `row`'s values materialised as owned strings, padded/truncated to
@@ -169,8 +210,8 @@ impl ParsedGroup {
         self.headings.iter().position(|h| h == name)
     }
 
-    /// The decoded buffer this group's [`DataRow::values`] spans index —
-    /// the slicing base for direct `row.values` reads.
+    /// The decoded buffer this group's arena spans index — the slicing base
+    /// for direct [`Self::row_spans`] reads.
     #[must_use]
     pub fn text(&self) -> &str {
         &self.buf
@@ -196,6 +237,8 @@ impl PartialEq for ParsedGroup {
             && self.units == other.units
             && self.types == other.types
             && self.rows == other.rows
+            && self.spans == other.spans
+            && self.row_byte_offsets == other.row_byte_offsets
     }
 }
 
@@ -220,6 +263,14 @@ impl std::fmt::Debug for ParsedGroup {
             .field("units", &self.units)
             .field("types", &self.types)
             .field("rows", &self.rows)
+            .field(
+                "spans",
+                &format_args!("Vec<Span>({} cells)", self.spans.len()),
+            )
+            .field(
+                "row_byte_offsets",
+                &format_args!("Vec<u64>({} rows)", self.row_byte_offsets.len()),
+            )
             .finish()
     }
 }
@@ -270,6 +321,11 @@ pub struct ParsedFile {
     pub group_records: Vec<GroupRecord>,
     /// Every line — empty only under [`ParseOptions::locate_only`].
     pub raw_lines: Vec<RawLine>,
+    /// Source byte offset of each physical line's start in the ORIGINAL
+    /// bytes (BOM included — byte 0 is genuinely byte 0), parallel to
+    /// `raw_lines`. PROFILE-GATED: filled only under
+    /// [`ParseOptions::retain_source_offsets`], empty under `validating()`.
+    pub line_byte_offsets: Vec<u64>,
     pub total_lines: u32,
     /// File began with a UTF-8 BOM (`EF BB BF`).
     pub has_bom: bool,
@@ -289,6 +345,14 @@ impl ParsedFile {
     pub fn line_text<'a>(&'a self, line: &RawLine) -> &'a str {
         line.text.slice(&self.text)
     }
+
+    /// Source byte offset of physical line `i` (0-based index into
+    /// `raw_lines`), if this parse's profile retained the per-line
+    /// source-byte coordinate ([`ParseOptions::retain_source_offsets`]).
+    #[must_use]
+    pub fn line_byte_offset(&self, i: usize) -> Option<u64> {
+        self.line_byte_offsets.get(i).copied()
+    }
 }
 
 impl std::fmt::Debug for ParsedFile {
@@ -303,6 +367,10 @@ impl std::fmt::Debug for ParsedFile {
             .field("group_order", &self.group_order)
             .field("group_records", &self.group_records)
             .field("raw_lines", &self.raw_lines)
+            .field(
+                "line_byte_offsets",
+                &format_args!("Vec<u64>({} lines)", self.line_byte_offsets.len()),
+            )
             .field("total_lines", &self.total_lines)
             .field("has_bom", &self.has_bom)
             .field("total_bytes", &self.total_bytes)
@@ -347,6 +415,17 @@ pub struct ParseOptions {
     /// then drops. `groups` comes back with empty headings/units/types/rows,
     /// so it is NOT a read profile; `index_ags4_bytes` is the only caller.
     pub locate_only: bool,
+    /// Retain the per-row/per-line SOURCE byte offsets
+    /// ([`ParsedGroup::row_byte_offsets`], [`ParsedFile::line_byte_offsets`]).
+    /// ON under `lean()` (the certify/read profiles keep the source-byte
+    /// coordinate system), OFF under `validating()` — the rule engine reads
+    /// none of them, and their per-row/per-line `u64`s were most of the
+    /// retained structure's weight beyond the arena
+    /// (`dec-parse-structure-layout`). The group-level coordinates
+    /// (`group_byte`, `group_records`, `total_bytes`,
+    /// `byte_offsets_source_true`) are NOT gated: every profile records
+    /// them, so the cert index works from any parse.
+    pub retain_source_offsets: bool,
 }
 
 impl ParseOptions {
@@ -362,14 +441,17 @@ impl ParseOptions {
             on_invalid_utf8: InvalidUtf8::Reject,
             strict_structure: false,
             locate_only: false,
+            retain_source_offsets: true,
         }
     }
     /// Validating: UTF-8, lossy-replace, lenient structure (the validator
-    /// twin — never crashes, reports problems as findings).
+    /// twin — never crashes, reports problems as findings). Drops the
+    /// per-row/per-line source byte offsets: no rule reads them.
     #[must_use]
     pub fn validating() -> Self {
         ParseOptions {
             on_invalid_utf8: InvalidUtf8::LossyReplace,
+            retain_source_offsets: false,
             ..ParseOptions::lean()
         }
     }
@@ -764,6 +846,10 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     let mut group_order: Vec<String> = Vec::new();
     let mut group_records: Vec<GroupRecord> = Vec::new();
     let mut raw_lines: Vec<RawLine> = Vec::new();
+    let mut line_byte_offsets: Vec<u64> = Vec::new();
+    // The locator profile retains no lines/rows, so there is nothing to
+    // hang an offset on — the group-level records carry its coordinates.
+    let retain_offsets = opts.retain_source_offsets && !opts.locate_only;
     let mut current: Option<String> = None;
     let mut looks_ags3 = false;
     let mut source_true = true;
@@ -879,6 +965,8 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                                 units: Vec::new(),
                                 types: Vec::new(),
                                 rows: Vec::new(),
+                                spans: Vec::new(),
+                                row_byte_offsets: Vec::new(),
                             }
                         });
                         // A duplicate GROUP still re-points "current" so its
@@ -935,8 +1023,14 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                             // locate_only is the only profile that skips the
                             // buffer, and it never reaches this arm.
                             let base = line_base.expect("DATA arm implies a retained line");
-                            let mut values: Vec<Span> =
-                                Vec::with_capacity(fspans.len().saturating_sub(1));
+                            // Cells append to the group's arena, not a per-row
+                            // Vec: one heap block per GROUP, not per row
+                            // (dec-parse-structure-layout). The arena index is
+                            // u32 like the span space it points into; a file
+                            // dense enough to overflow it refuses like the
+                            // buffer would.
+                            let first =
+                                u32::try_from(g.spans.len()).map_err(|_| ParseError::TooLarge)?;
                             for f in fspans.iter().skip(1) {
                                 if f.has_escape {
                                     // Unescaped ONCE, here, into the buffer's
@@ -944,17 +1038,24 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                                     // cell is a plain `&str` slice.
                                     let fixed = unescape_doubled(&text[f.start..f.end]);
                                     let start = append_text(&mut buf, &fixed)? as usize;
-                                    values.push(span_at(start, start + fixed.len()));
+                                    g.spans.push(span_at(start, start + fixed.len()));
                                 } else {
                                     let base = base as usize;
-                                    values.push(span_at(base + f.start, base + f.end));
+                                    g.spans.push(span_at(base + f.start, base + f.end));
                                 }
                             }
+                            // Fits u32: bounded by the arena growth just
+                            // guarded above.
+                            #[allow(clippy::cast_possible_truncation)]
+                            let n = (g.spans.len() - first as usize) as u32;
                             g.rows.push(DataRow {
                                 line: number,
-                                byte_offset,
-                                values,
+                                first,
+                                n,
                             });
+                            if retain_offsets {
+                                g.row_byte_offsets.push(byte_offset);
+                            }
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("DATA row before any GROUP".into()));
                         }
@@ -973,8 +1074,10 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                 number,
                 text: span_at(base as usize, base as usize + text.len()),
                 had_crlf,
-                byte_offset,
             });
+            if retain_offsets {
+                line_byte_offsets.push(byte_offset);
+            }
         }
     }
 
@@ -1001,6 +1104,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         group_order,
         group_records,
         raw_lines,
+        line_byte_offsets,
         total_lines,
         has_bom,
         total_bytes,

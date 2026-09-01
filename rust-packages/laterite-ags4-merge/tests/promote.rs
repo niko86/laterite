@@ -98,8 +98,8 @@ fn loca_gl(r: &MergeResult) -> (String, Vec<(String, String)>) {
         .iter()
         .map(|r| {
             (
-                r.values[id].slice(g.text()).to_string(),
-                r.values[gl].slice(g.text()).to_string(),
+                g.value_at(r, id).unwrap().to_string(),
+                g.value_at(r, gl).unwrap().to_string(),
             )
         })
         .collect();

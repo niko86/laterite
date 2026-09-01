@@ -504,7 +504,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 continue; // not a DATA row (UNIT/TYPE/GROUP arity) → skip
             };
             let want = group.headings.len();
-            let have = row.values.len();
+            let have = row.n_values();
             if have >= want {
                 continue; // exact, or too many — padding doesn't apply
             }
@@ -590,13 +590,13 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             else {
                 continue; // HEADING/UNIT/TYPE/GROUP row, or a row outside any group
             };
-            if row.values.len() > group.headings.len() {
+            if row.n_values() > group.headings.len() {
                 continue; // overflow — the one genuinely ambiguous case
             }
             if !row_is_clean(raw) {
                 continue; // the tokenizer dropped content — re-quoting bakes the loss in
             }
-            if raw.ends_with(',') && row.values.len() < group.headings.len() {
+            if raw.ends_with(',') && row.n_values() < group.headings.len() {
                 // Rule 4's pad edit for this same line assumes the trailing
                 // comma survives; our whole-line replacement consumes it, so
                 // the two edits would corrupt when composed. Rare enough to
@@ -1662,7 +1662,7 @@ mod tests {
         // The padded row now re-parses to exactly the 2 heading columns.
         let reparsed = parse_str(&out).expect("padded output parses");
         let row = &reparsed.groups["LOCA"].rows[0];
-        assert_eq!(row.values.len(), 2, "padded row should have 2 values");
+        assert_eq!(row.n_values(), 2, "padded row should have 2 values");
     }
 
     #[test]

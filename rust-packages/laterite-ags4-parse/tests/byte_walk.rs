@@ -116,23 +116,41 @@ fn walk_emits_true_group_offsets() {
 
 #[test]
 fn byte_offsets_monotonic_and_in_bounds() {
-    let pf = parse_bytes(&lf(), encoding_rs::UTF_8).unwrap();
+    // Per-line source offsets are profile-gated now: the lean profile
+    // retains them (dec-parse-structure-layout); `parse_bytes`' validating
+    // profile drops them — asserted at the end.
+    let bytes = lf();
+    let pf =
+        laterite_ags4_parse::parse_bytes_opts(&bytes, laterite_ags4_parse::ParseOptions::lean())
+            .unwrap();
+    assert_eq!(pf.line_byte_offsets.len(), pf.raw_lines.len());
     let mut prev = 0u64;
-    for rl in &pf.raw_lines {
-        assert!(rl.byte_offset >= prev, "raw-line offsets must be monotonic");
-        assert!(rl.byte_offset < pf.total_bytes);
-        prev = rl.byte_offset;
+    for (i, _rl) in pf.raw_lines.iter().enumerate() {
+        let off = pf.line_byte_offset(i).expect("lean retains offsets");
+        assert!(off >= prev, "raw-line offsets must be monotonic");
+        assert!(off < pf.total_bytes);
+        prev = off;
     }
     // Three-coordinate consistency: each line's offset = sum of prior line
     // byte lengths (content + its terminator).
-    let bytes = lf();
     let mut expect = 0u64;
-    for rl in &pf.raw_lines {
-        assert_eq!(rl.byte_offset, expect, "line {} offset", rl.number);
+    for (i, rl) in pf.raw_lines.iter().enumerate() {
+        assert_eq!(
+            pf.line_byte_offset(i),
+            Some(expect),
+            "line {} offset",
+            rl.number
+        );
         let term = if rl.had_crlf { 2 } else { 1 };
         expect += rl.text.len() as u64 + term;
     }
     assert_eq!(expect, bytes.len() as u64, "lines tile the whole buffer");
+
+    // The validating profile drops the per-line/per-row source offsets —
+    // no rule reads them, so retaining them was pure weight.
+    let pf = parse_bytes(&bytes, encoding_rs::UTF_8).unwrap();
+    assert!(pf.line_byte_offsets.is_empty());
+    assert!(pf.groups.values().all(|g| g.row_byte_offsets.is_empty()));
 }
 
 #[test]

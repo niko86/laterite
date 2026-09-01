@@ -254,13 +254,16 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         if groups.contains_key(&code) {
             continue; // first-seen wins on the trimmed code (csv-reader parity)
         }
-        let Some(pg) = pgroups.remove(raw_code) else {
+        let Some(mut pg) = pgroups.remove(raw_code) else {
             continue; // group_order and groups are built together; defensive.
         };
         // The shared decoded buffer the row spans index — cloned out so the
-        // rows can be moved while cells are still read through it.
+        // descriptor fields can be moved while cells are still read through it.
         let buf = Arc::clone(pg.shared_text());
-        let headings: Vec<String> = pg.headings.into_iter().map(trim_owned).collect();
+        let headings: Vec<String> = std::mem::take(&mut pg.headings)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         // Resolve BEFORE the UNIT/TYPE pad below, so those still align with the
         // heading count — `Recover` renames headings, it never adds or drops one.
         let headings = resolve_headings(&code, headings, read_opts.duplicate_headings)?;
@@ -268,11 +271,17 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         // present (the csv reader resized inside its UNIT/TYPE arm; a group with
         // no UNIT row kept an empty vec, never padded). `unit_line`/`type_line`
         // are `Some` iff the leaf saw that descriptor row.
-        let mut units: Vec<String> = pg.units.into_iter().map(trim_owned).collect();
+        let mut units: Vec<String> = std::mem::take(&mut pg.units)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         if pg.unit_line.is_some() {
             units.resize(headings.len(), String::new());
         }
-        let mut types: Vec<String> = pg.types.into_iter().map(trim_owned).collect();
+        let mut types: Vec<String> = std::mem::take(&mut pg.types)
+            .into_iter()
+            .map(trim_owned)
+            .collect();
         if pg.type_line.is_some() {
             types.resize(headings.len(), "X".to_string());
         }
@@ -282,11 +291,13 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         let keys: Vec<Arc<str>> = headings.iter().map(|h| Arc::from(h.as_str())).collect();
         let rows: Vec<HashMap<Arc<str>, String>> = pg
             .rows
-            .into_iter()
+            .iter()
             .map(|r| {
-                let (line, found) = (r.line, r.values.len());
+                let (line, found) = (r.line, r.n_values());
                 let mut row = HashMap::with_capacity(keys.len());
-                let mut values = r.values.into_iter();
+                // Cell spans come from the group's arena; `Copy`, so nothing
+                // is moved — the owned Strings are built from the buffer.
+                let mut values = pg.row_spans(r).iter();
                 for key in &keys {
                     // A short/ragged row yields "" for the missing tail, as
                     // before — the positional contract is unchanged.

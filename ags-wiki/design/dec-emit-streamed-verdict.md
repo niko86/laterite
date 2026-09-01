@@ -12,13 +12,12 @@ sources: []
 
 # build-and-judge without the double parse hold — the streamed join + the writer-built verdict
 
-> [!note] **The precondition below is void as written (2026-09-01):**
-> [[dec-parse-structure-layout]]'s spike gate returned a **decline** (#850),
-> so there is no post-layout lane to re-price on. This page's shape was
-> settled and its own #848 spike numbers were measured on the *standing*
-> layout, where the pair cleared at ceiling — whether to re-price and mint
-> on that layout is an owner decision, recorded as open on the M2 row of
-> [[perf-campaign]]. Nothing else on this page changes.
+> [!note] **Precondition status (2026-09-01):** [[dec-parse-structure-layout]]'s
+> spike missed its own floor, and the owner then landed the layout anyway at
+> the measured prize (#850 — a dated waiver of the floor for that row). So
+> the post-layout lane this page's re-price waits on **exists once M6's land
+> PR merges**; the M2 ticket is still minted only after that re-price runs,
+> exactly as written below.
 
 The write-side successor of [[dec-emit-cell-representation]], and
 **conditional on [[dec-parse-structure-layout]]'s spike gate**: this page
