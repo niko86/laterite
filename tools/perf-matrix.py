@@ -2,9 +2,9 @@
 """Aggregate the per-surface perf-matrix results into one document.
 
 Each surface's harness — `laterite-ags4-perf` (rust), the Node lane
-(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823) and the wasm
-lane (`web/bench/perf-matrix.mjs`, #824) today, the CLI lane to follow
-(#825) — writes the matrix's uniform per-surface schema
+(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823), the wasm lane
+(`web/bench/perf-matrix.mjs`, #824) and the CLI lane (`tools/perf-cli.py`,
+#825) — writes the matrix's uniform per-surface schema
 (`{surface, results: [{op, rung, bytes, median_ms, throughput_mb_s, mem?}]}`)
 into `output/perf-results/`. This script is the dumb merger those files were
 shaped for: it folds them into one matrix document and prints the table. It
