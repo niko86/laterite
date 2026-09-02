@@ -612,6 +612,42 @@ _Notes:_
 - _node_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records — there is no Node sibling for it to be a view over.
 - _browser_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it.
 
+### read-output-arrow — A group's born-typed raw Arrow output from the read handle.
+
+*Offered anywhere — in: handle · out: bytes, table*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle · out: table, which python and node both do. A minimum to clear, not a gate*
+
+**Input**
+
+| surface (spelling) | handle |
+|---|---|
+| python (free) | ✓ |
+| node (free) | ✓ |
+| rust (absent) |   |
+| duckdb (n/a) |   |
+| cli (absent) |   |
+| browser (free) | ✓ |
+
+**Output**
+
+| surface (spelling) | bytes | table |
+|---|---|---|
+| python (free) |   | ✓ |
+| node (free) |   | ✓ |
+| rust (absent) |   |   |
+| duckdb (n/a) |   |   |
+| cli (absent) |   |   |
+| browser (free) | ✓ |   |
+
+_Notes:_
+- _python_: The capsule-bearing pyo3-arrow table, born-typed from the file's TYPE row, zero-copy over the Arrow PyCapsule interface — the exact shape build_ags4 consumes, so the read half of the zero-copy round trip #852 opened the write half of (#860). keys= is the same tri-state as .table()'s; no frame is materialised and the SQL engine is never touched.
+- _node_: Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). Whether a closer analog is owed is #871, not a gap row here.
+- _rust_: Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.
+- _duckdb_: **by-design.** read_ags already returns a typed RELATION — the engine's own Arrow-speaking object, recorded under read; a separate raw-table door would duplicate it.
+- _cli_: **by-design.** The CLI hands back files and text, not in-process objects; lat read --csv/--json is its data-out door.
+- _browser_: Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). Whether a closer analog is owed anywhere is #871.
+
 ## Legend
 
 Grid: ✓ present · — absent · ≈ divergent (present but shape differs from siblings). Findings: 🔴 P1 · 🟠 P2 · 🟡 P3 · ⚪ by-design. Generated from [[crate-map|the crate map]]'s surfaces via `repo:tools/gen_modality.py`; the SSOT is `repo:modality.json`. Two standing gates: `repo:packages/laterite/tests/test_modality_parity.py` holds the SSOT against the live surfaces, and `gen_modality.py --check` holds this page against the SSOT.
