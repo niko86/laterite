@@ -122,10 +122,10 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 REPO = Path(__file__).resolve().parent.parent
-# Both rebindable via --fixtures-dir / --manifest (#878): a runner lane pins
-# against the current-forge corpus (`tools/perf-probe-fixtures.json`) because
-# the README corpus is unmintable off the ledger machine (#873), and the two
-# corpora must never share a cache path — same rung names, different bytes.
+# Both rebindable via --fixtures-dir / --manifest (#878). Since the corpus-v2
+# re-pin (#873) this manifest IS the current-forge corpus — any machine can
+# mint it — so there is one manifest for every lane; the flags remain for
+# runners that want their own cache directory.
 OUT_DIR = REPO / "output" / "readme-bench"
 MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
 FORGE = (
@@ -221,6 +221,20 @@ def fixture(size: str) -> Path:
             ],
             check=True,
             stdout=subprocess.DEVNULL,
+        )
+    # A file present on disk is not evidence it is the rung: a killed mint
+    # leaves a truncated-but-parseable file that a later --update-manifest
+    # run would bless as the pin (the 524MB rung's own history, #873). The
+    # band is generous — calibration lands within a few percent of target —
+    # so only a wrong file trips it.
+    target = float(size.removesuffix("MB")) * 1e6
+    got = path.stat().st_size
+    if not 0.9 * target <= got <= 1.1 * target:
+        die(
+            f"{path.name} is {got:,} bytes but the {size} rung targets "
+            f"~{int(target):,} — a stale or truncated fixture (a killed "
+            f"generation leaves one behind). Delete it (and its .zst twin) "
+            f"and re-run to re-mint."
         )
     return path
 
@@ -942,18 +956,18 @@ def main() -> int:
         "--manifest",
         type=Path,
         default=MANIFEST,
-        help="fixture pin manifest (default: %(default)s). A fresh runner "
-        "cannot mint the README corpus (#873), so the cross-OS lane (#878) "
-        "passes tools/perf-probe-fixtures.json — the current-forge pins whose "
-        "per-OS drift checks double as the cross-OS byte-identity proof",
+        help="fixture pin manifest (default: %(default)s). Since corpus-v2 "
+        "(#873) the default manifest is mintable on any machine, so every "
+        "lane pins against it; the per-OS drift checks double as the "
+        "cross-OS byte-identity proof (#878)",
     )
     ap.add_argument(
         "--fixtures-dir",
         type=Path,
         default=OUT_DIR,
-        help="fixture cache directory (default: %(default)s). Pass a fresh "
-        "directory alongside --manifest: the two corpora share rung names "
-        "and must never share a cache path",
+        help="fixture cache directory (default: %(default)s). A lane that "
+        "pins a different --manifest must pass a fresh directory with it: "
+        "cached rungs are trusted by name against the active manifest",
     )
     ap.add_argument("--worker", help=argparse.SUPPRESS)
     args = ap.parse_args()

@@ -33,8 +33,8 @@ describe("wasm perf-matrix harness seams", () => {
   it("mem cap admits the 265MB rung and refuses 524MB", () => {
     // The pinned rung sizes (tools/readme-bench-fixtures.json): epic #820
     // decision 7, in agreement with the rust/node/python harnesses.
-    expect(memRungAllowed(275_510_179)).toBe(true);
-    expect(memRungAllowed(549_703_139)).toBe(false);
+    expect(memRungAllowed(276_462_834)).toBe(true);
+    expect(memRungAllowed(551_560_078)).toBe(false);
   });
 
   it("mem cells carry the instrument label and never the peak-RSS key", () => {
