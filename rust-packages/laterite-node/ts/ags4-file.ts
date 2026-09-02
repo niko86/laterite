@@ -218,6 +218,24 @@ export class Ags4File {
     return opts?.keys ? this.#rawTable(code) : this.#keylessTable(code);
   }
 
+  /** SPIKE (#871): one group's born-typed Arrow **IPC stream, un-decoded** —
+   * the exact bytes {@link table} hands to `tableFromIPC`. For a caller whose
+   * destination speaks Arrow itself (duckdb, a worker `postMessage`, a socket),
+   * decoding to an arrow-js `Table` here only to re-serialise is pure waste;
+   * this door skips the materialisation entirely. Same `keys` switch and same
+   * absent-group throw as `table()`. NOT cached — the caller owns the buffer,
+   * and a repeat call rebuilds it native-side. */
+  arrowIpc(code: string, opts?: { keys?: boolean }): Buffer {
+    const ipc = this.#reading.tableIpc(
+      code,
+      this.#contentHash,
+      opts?.keys === true,
+    );
+    if (ipc === null)
+      throw new Error(`group ${JSON.stringify(code)} not in file`);
+    return ipc;
+  }
+
   // --- emit / save ---------------------------------------------------------
 
   /** Spec-correct AGS4 as text — byte-faithful to the source DATA values
