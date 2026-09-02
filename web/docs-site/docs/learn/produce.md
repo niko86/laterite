@@ -89,6 +89,40 @@ path never holds unjudged output, and a `mode="strict"` refusal raises with
 nothing written. Node mirrors it as `buildAgs4(groups, { out })`; the browser
 build has no filesystem, so there is nothing to mirror there.
 
+## Three write doors, one honest difference
+
+Three ways out of laterite produce an AGS4 file, and what separates them is
+what each one *claims* about its output:
+
+- **`compat`'s writer** is the faithful blind write: your string frames go to
+  disk exactly as you hold them, matching python-ags4's behaviour byte for
+  byte. It claims nothing: fidelity to your data *is* the contract.
+- **`build_ags4`** is build-and-judge: canonical formatting, dictionary
+  fills, and then the full rule engine over the result. The verdict (the
+  `findings` on the object you get back) is the premium you are paying for,
+  and it is most of what the call spends its time on.
+- **`build_ags4_unchecked`** is the same build with the verdict declined:
+
+```python
+raw = laterite.build_ags4_unchecked({"PROJ": proj, "LOCA": loca})   # bytes
+laterite.build_ags4_unchecked({"PROJ": proj, "LOCA": loca}, out="delivery.ags")
+```
+
+The bytes are **identical to `build_ags4(mode="report")`'s**: same fills,
+same canonical cells, same order, with a test pinning the identity. But
+nothing has checked them against any AGS4 rule, and nothing will. There is
+no `mode=` (there is no verdict for a mode to act on), no
+`synthesise_metadata=`/`tran=` (synthesis fills gaps only a report would
+surface), and the return is plain `bytes` rather than a `BuildResult`,
+because an empty findings list would read as "judged clean" when nothing
+judged anything. With `out=` it stages and renames exactly as above, minus
+the verdict gate in front of the write.
+
+Reach for it when the verdict is genuinely spent elsewhere: a pipeline's
+inner loop whose final output gets validated once, a file bound for an
+external checker. You are choosing to ship unchecked bytes; that is the whole
+feature, and the choice is yours to make.
+
 ## Keeping the build's memory peak down
 
 `build_ags4` judges its own writing as it streams, so the door's side of the

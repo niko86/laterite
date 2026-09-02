@@ -28,7 +28,7 @@ use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_types::{Cell, ags4_str, dt_to_unit_precision};
-use laterite_ags4_validator::Dictionary;
+use laterite_ags4_validator::{DictVersion, Dictionary};
 
 use crate::emit::{EmitStream, OwnedGroup, resolved_meta_parts};
 use crate::{EmitError, EmitOpts, EmitResult};
@@ -202,6 +202,28 @@ pub fn emit_ags4_from_arrow(
         stream.push(owned_group_from_arrow(g, &dict))?;
     }
     stream.finish()
+}
+
+/// [`emit_ags4_from_arrow`] with NO validity verdict — the Arrow half of the
+/// unchecked pair beside [`crate::emit_ags4_unchecked`] (#858).
+///
+/// The caller is choosing to ship unchecked bytes: nothing here confirms the
+/// output satisfies any AGS4 rule, and nothing downstream will. Everything
+/// up to the verdict is the judged door's — the same streaming conversion,
+/// the same #695 DT-precision rendering (it lives in the door, not the
+/// judge), the same fills and section order; a test pins the bytes equal to
+/// the judged `Report` build's.
+pub fn emit_ags4_from_arrow_unchecked(
+    groups: Vec<ArrowGroup>,
+    edition: DictVersion,
+) -> Result<Vec<u8>, EmitError> {
+    let opts = crate::emit::unchecked_opts(edition);
+    let dict = Dictionary::bundled(edition);
+    let mut stream = EmitStream::new(&opts, &dict);
+    for g in groups {
+        stream.push(owned_group_from_arrow(g, &dict))?;
+    }
+    stream.finish_unchecked()
 }
 
 /// One [`ArrowGroup`] → the formatted [`OwnedGroup`] — the Arrow door's half
@@ -649,6 +671,66 @@ mod tests {
             String::from_utf8_lossy(&via_arrow.bytes),
             "the doors drifted — they may only differ before the OwnedGroup join"
         );
+    }
+
+    /// #858: the Arrow door's unchecked variant returns exactly the judged
+    /// `Report` build's bytes — including the #695 DT-precision rendering,
+    /// which lives in the door conversion, upstream of the judge. The judged
+    /// build must OBJECT to the fixture (a data-only TRAN, no PROJ or
+    /// catalogs), or the identity proves nothing.
+    #[test]
+    fn unchecked_arrow_bytes_equal_the_judged_report_bytes() {
+        let mk = || {
+            let schema = Schema::new(vec![Field::new(
+                "TRAN_DATE",
+                arrow::datatypes::DataType::Timestamp(
+                    arrow::datatypes::TimeUnit::Millisecond,
+                    None,
+                ),
+                true,
+            )]);
+            let batch = RecordBatch::try_new(
+                Arc::new(schema.clone()),
+                vec![Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])) as ArrayRef],
+            )
+            .expect("batch");
+            vec![arrow_group("TRAN", schema, vec![batch])]
+        };
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            edition: DictVersion::V4_2,
+            ..EmitOpts::default()
+        };
+
+        let judged = emit_ags4_from_arrow(mk(), &opts).expect("judged door emits");
+        assert!(
+            judged.findings.values().flatten().count() > 0,
+            "the fixture must draw findings, or the identity proves nothing"
+        );
+        let bytes =
+            emit_ags4_from_arrow_unchecked(mk(), DictVersion::V4_2).expect("unchecked door emits");
+        assert_eq!(
+            bytes, judged.bytes,
+            "unchecked bytes must be the judged Report bytes, DT rendering included"
+        );
+    }
+
+    /// #858: the Arrow door's zero-group refusal matches its judged twin,
+    /// worded identically — same guarantee `emit.rs` pins for the cell-rows
+    /// pair; both finishers share `assemble`, where the refusal lives.
+    #[test]
+    fn unchecked_arrow_zero_group_build_fails_like_the_judged_door() {
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let Err(judged) = emit_ags4_from_arrow(vec![], &opts) else {
+            panic!("a zero-group judged build must refuse");
+        };
+        let Err(unchecked) = emit_ags4_from_arrow_unchecked(vec![], opts.edition) else {
+            panic!("a zero-group unchecked build must refuse");
+        };
+        assert_eq!(unchecked.to_string(), judged.to_string());
     }
 
     /// The one INTENDED divergence, pinned so the join test above can never be

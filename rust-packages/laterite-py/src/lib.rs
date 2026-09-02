@@ -1695,6 +1695,10 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        emit_typed::emit_ags4_from_arrow_unchecked,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat_to_path, m)?)?;
     m.add_class::<PySidecar>()?;
