@@ -1251,6 +1251,66 @@ What the lane says:
 - **Every cell measured to the cap** — twelve cells, both instruments, no
   refusals, no deaths, `skipped` empty.
 
+### The close-out (#826, 2026-09-02)
+
+The two publication questions the epic deferred on day one, decided with the
+campaign's accumulated evidence, and the done-rule pass over every
+(operation × axis) row. The epic (#820) closes behind this section.
+
+**1. The ratio gate — DECLINED, reasons on record.** A CI gate on the
+measured ours-vs-baseline ratio does not survive its own instrument test,
+on either axis:
+
+- **Time**: a ratio gate re-measures per run, and every runner available is
+  the wrong instrument — the self-hosted pool is shared hardware (the
+  campaign's own runner-choice note in `perf-probe.yml` records that peak
+  memory, *unlike timing*, is robust to contention; the p3 flake history is
+  the same fact observed the hard way), and even the dedicated ledger
+  machine drifts run-to-run on criterion (the stopping-rule section records
+  a concrete instance on a 25 MB fixture). A band wide enough not to flake would
+  hold nothing the claims gate does not already hold: `check_speed_claims.py`
+  enforces the invariant that actually protects readers — prose never
+  misdescribes the committed tables, and the tables move only by a
+  deliberate re-run of the instrument that prints them.
+- **Memory**: robust to contention in principle, but blocked twice today.
+  The fixture corpus is unmintable in a fresh environment (#873 — a
+  measuring gate dies in the probe's own drift guard before measuring
+  anything), and a CI-Linux measurement is a **different claim family**
+  from the darwin ledger (rule 8): it cannot "hold" this page's numbers,
+  only found its own family with its own baseline history.
+- **Revisit condition**: corpus v2 lands (#873) *and* a quiet dedicated
+  runner exists. Then the candidate is a **memory**-ratio gate as its own
+  Linux claim family seeded from a fresh baseline pair — not a time gate.
+
+**2. README memory columns — PROMOTED, unflattering cells included.** The
+settled darwin-lane peak-RSS numbers move into both READMEs on the same
+three axes as the time tables, printed by the instrument
+(`bench-vs-python-ags4.py`'s README-format memory tables), pasted verbatim,
+and banded by the claims gate (the `peak RSS` header marker separates the
+memory tables from the time tables sharing the API names; `~N× less memory
+than python-ags4` is the claim vocabulary it holds). The decision's honest
+half: validate and read→typed hold materially less than python-ags4 at
+every memory rung, while **read→strings holds more at every rung** — printed
+as ratios below 1, deliberately (the mechanism is M5's bridge premium, still
+unattributed; #834 carries the owner's pending dep-shape decision, and the
+shipped pyarrow-free hop holds more than the accelerator hop the lane
+measured). The write doors stay ledger-only: the README time tables never
+carried write, and the promotion keeps that scope. The 524 MB rung stays
+time-only everywhere (decision 7).
+
+**3. The done-rule pass (rule 12), per (operation × axis).**
+
+| op | time | memory (darwin lane) | verdict |
+|---|---|---|---|
+| validate | ratio ≪ 1 at every rung | ratio ≤ 1 at every rung | **closed** — floors cleared on both axes; no open queue row targets it |
+| read → typed | ratio ≪ 1 | ratio ≤ 1 at every rung | **closed** — same grounds |
+| read → strings (compat) | ratio ≪ 1 | above 1 at every memory rung | **closed by diminishing-returns verdict**: the residual is the frames themselves (which are the product) plus the M5 bridge premium (unattributed — pricing it is a fresh diagnosis with its own code-reading, not a rider on this campaign); M1's release landed where it can be seen (#833 — the cross-OS family's cells) and cannot move the darwin cell (the instrument, not the fix). Nothing left in this campaign's queue clears its floors on this axis |
+| write | ratio ≪ 1 (both doors) | compat door above 1; native door above 1 at the top rungs | **closed by diminishing-returns verdict**: M2 landed over the invasive floor at both gate rungs and spent most of its measured ceiling on the real verdict (its queue row carries the cells); the compat door inherits M1 (falls where the release is visible); what remains on the native door is co-peak shoulders (#848's lesson — shares are not contributions), and the next lever is a diagnosis round of M7/M8's class, minted by a future campaign |
+
+The memory queue survives the campaign: M7 and M8 stay **recorded,
+unpriced** — the next campaign's starting rank, not this one's unfinished
+business.
+
 ## Decisions taken
 
 Recorded here so the next session does not re-open them. Each was a genuine fork

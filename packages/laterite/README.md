@@ -96,42 +96,79 @@ on top:
 
 Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
 groups**, realistic type mix, zero findings. macOS arm64, hot files, mean of 5
-warm runs, `python-ags4` 1.2.0 vs `laterite` 0.8.0. Both agree on the findings.
+warm runs, `python-ags4` 1.2.0 vs `laterite` 0.12.0. Both agree on the findings.
 
 **Validation**
 
 | File | `python-ags4 check_file` | `laterite.validate` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB · 459 BH | 1.5 s | 50 ms | **30.0×** |
-| 24.9 MB · 2,219 BH | 3.7 s | 266 ms | **13.9×** |
-| 102.7 MB · 8,872 BH | 12.3 s | 1.1 s | **11.7×** |
-| 275.5 MB · 22,813 BH | 34.1 s | 2.6 s | **13.0×** |
-| 549.7 MB · 45,107 BH | 70.0 s | 5.4 s | **12.9×** |
+| 4.9 MB | 1.5 s | 40 ms | **37.5×** |
+| 24.9 MB | 3.7 s | 188 ms | **19.6×** |
+| 102.7 MB | 12.1 s | 765 ms | **15.8×** |
+| 275.5 MB | 31.3 s | 1.9 s | **16.1×** |
+| 549.7 MB | 65.1 s | 4.0 s | **16.2×** |
 
 **Read → typed** — the honest comparison for real work. python-ags4 needs
 `AGS4_to_dataframe` + `convert_to_numeric` on every group to get numbers, and
 still leaves dates as text; `laterite.read` is born-typed, dates included.
 
-| File | `python-ags4` + `convert_to_numeric` | `laterite.read` | speedup |
+| File | `python-ags4 + convert_to_numeric` | `laterite.read` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB | 187 ms | 26 ms | **7.2×** |
-| 24.9 MB | 811 ms | 136 ms | **6.0×** |
-| 102.7 MB | 3.4 s | 541 ms | **6.3×** |
-| 275.5 MB | 8.9 s | 1.4 s | **6.4×** |
-| 549.7 MB | 17.5 s | 2.9 s | **6.0×** |
+| 4.9 MB | 182 ms | 15 ms | **12.1×** |
+| 24.9 MB | 768 ms | 75 ms | **10.2×** |
+| 102.7 MB | 3.1 s | 296 ms | **10.6×** |
+| 275.5 MB | 8.4 s | 777 ms | **10.8×** |
+| 549.7 MB | 17.6 s | 1.6 s | **10.9×** |
 
 **Read → strings** — like for like, both returning pandas frames of text.
 
 | File | `python-ags4 AGS4_to_dataframe` | `laterite.compat` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB | 144 ms | 49 ms | **2.9×** |
-| 24.9 MB | 718 ms | 206 ms | **3.5×** |
-| 102.7 MB | 2.8 s | 870 ms | **3.2×** |
-| 275.5 MB | 7.3 s | 2.2 s | **3.3×** |
-| 549.7 MB | 15.2 s | 4.6 s | **3.3×** |
+| 4.9 MB | 139 ms | 37 ms | **3.7×** |
+| 24.9 MB | 669 ms | 144 ms | **4.6×** |
+| 102.7 MB | 2.7 s | 583 ms | **4.6×** |
+| 275.5 MB | 7.1 s | 1.5 s | **4.8×** |
+| 549.7 MB | 14.4 s | 3.0 s | **4.9×** |
 
-The ratio holds as files grow — the gap is a constant factor, not a head start
-that erodes. Reproduce any of this with
+**Validation — peak RSS**
+
+| File | `python-ags4 check_file` peak RSS | `laterite.validate` peak RSS | ratio |
+|---:|---:|---:|:---:|
+| 4.9 MB | 170 MB | 94 MB | **1.81×** |
+| 24.9 MB | 342 MB | 175 MB | **1.96×** |
+| 102.7 MB | 1013 MB | 469 MB | **2.16×** |
+| 275.5 MB | 2659 MB | 1118 MB | **2.38×** |
+
+**Read → typed — peak RSS**
+
+| File | `python-ags4` + `convert_to_numeric` peak RSS | `laterite.read` peak RSS | ratio |
+|---:|---:|---:|:---:|
+| 4.9 MB | 155 MB | 94 MB | **1.64×** |
+| 24.9 MB | 314 MB | 182 MB | **1.73×** |
+| 102.7 MB | 935 MB | 503 MB | **1.86×** |
+| 275.5 MB | 2445 MB | 1262 MB | **1.94×** |
+
+**Read → strings — peak RSS**
+
+| File | `python-ags4 AGS4_to_dataframe` peak RSS | `laterite.compat` peak RSS | ratio |
+|---:|---:|---:|:---:|
+| 4.9 MB | 149 MB | 197 MB | **0.76×** |
+| 24.9 MB | 313 MB | 387 MB | **0.81×** |
+| 102.7 MB | 915 MB | 1094 MB | **0.84×** |
+| 275.5 MB | 2203 MB | 2541 MB | **0.87×** |
+
+Peak RSS of one fresh process per cell; the ratio is python-ags4's
+peak over laterite's, so above 1 laterite holds less. The largest
+rung is time-only (epic #820 decision 7). Read → strings measured
+on the pyarrow accelerator hop.
+
+The compat door holds *more* than python-ags4 — those ratios sit below 1 on
+purpose: the frames it returns are the product, and the remaining gap is the
+dataframe-bridge premium the perf ledger's M5 row records. `laterite.validate`
+and `laterite.read` are the recommended paths, on memory as on time.
+
+The time ratio holds as files grow — the gap is a constant factor, not a head
+start that erodes. Reproduce any of this with
 `uv run python tools/bench-vs-python-ags4.py` in the repo: it generates the
 rungs, verifies each against a pinned SHA-256 so a change to the generator can't
 move the numbers unnoticed, and prints these exact tables.

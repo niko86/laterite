@@ -164,13 +164,29 @@ groups**, realistic type mix, zero findings. macOS arm64, hot files, mean of 5
 warm runs, against `python-ags4` 1.2.0. Each cell is laterite's time and its
 speedup.
 
-| File (123 groups) | `validate` | read → typed | read → strings (`compat`) |
+| File (123 groups) | `laterite.validate` | `laterite.read` (typed) | `laterite.compat` (strings) |
 |---:|---:|---:|---:|
-| 4.9 MB · 459 BH | 50 ms · **30.0×** | 26 ms · **7.2×** | 49 ms · **2.9×** |
-| 24.9 MB · 2,219 BH | 266 ms · **13.9×** | 136 ms · **6.0×** | 206 ms · **3.5×** |
-| 102.7 MB · 8,872 BH | 1.1 s · **11.7×** | 541 ms · **6.3×** | 870 ms · **3.2×** |
-| 275.5 MB · 22,813 BH | 2.6 s · **13.0×** | 1.4 s · **6.4×** | 2.2 s · **3.3×** |
-| 549.7 MB · 45,107 BH | 5.4 s · **12.9×** | 2.9 s · **6.0×** | 4.6 s · **3.3×** |
+| 4.9 MB | 40 ms · **37.5×** | 15 ms · **12.1×** | 37 ms · **3.7×** |
+| 24.9 MB | 188 ms · **19.6×** | 75 ms · **10.2×** | 144 ms · **4.6×** |
+| 102.7 MB | 765 ms · **15.8×** | 296 ms · **10.6×** | 583 ms · **4.6×** |
+| 275.5 MB | 1.9 s · **16.1×** | 777 ms · **10.8×** | 1.5 s · **4.8×** |
+| 549.7 MB | 4.0 s · **16.2×** | 1.6 s · **10.9×** | 3.0 s · **4.9×** |
+
+Peak memory (same run, one fresh process per cell; each cell is laterite's
+peak RSS and python-ags4's peak over it, so above 1 laterite holds less —
+the largest rung is time-only):
+
+| File | `laterite.validate` | `laterite.read` (typed) | `laterite.compat` (strings) |
+|---:|---:|---:|---:|
+| 4.9 MB | 94 MB · **1.81×** | 94 MB · **1.64×** | 197 MB · **0.76×** |
+| 24.9 MB | 175 MB · **1.96×** | 182 MB · **1.73×** | 387 MB · **0.81×** |
+| 102.7 MB | 469 MB · **2.16×** | 503 MB · **1.86×** | 1094 MB · **0.84×** |
+| 275.5 MB | 1118 MB · **2.38×** | 1262 MB · **1.94×** | 2541 MB · **0.87×** |
+
+The compat door's memory ratios sit below 1 on purpose — it holds more than
+python-ags4, and saying so is the point of publishing the column. The
+recommended `laterite.validate` and `laterite.read` paths hold materially
+less, on memory as on time.
 
 Reproduce with `uv run python tools/bench-vs-python-ags4.py`. It generates the
 rungs, verifies each against a pinned SHA-256 so a change to the generator can't

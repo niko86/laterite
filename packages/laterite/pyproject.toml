@@ -71,7 +71,7 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 # compat (the python-ags4 drop-in, pandas by default) is pyarrow-FREE: its
 # AGS4_to_dataframe reads a Rust-built all-Utf8 Arrow table (no per-cell boxing)
 # and hands pandas an object-dtype frame via DuckDB's NumPy `.df()` — already
-# ~3x faster than python-ags4. Adding pyarrow (`[compat,pyarrow]` or `[all]`)
+# ~4x faster than python-ags4. Adding pyarrow (`[compat,pyarrow]` or `[all]`)
 # swaps that hop for pyarrow's `to_pandas` (a touch faster) and unlocks pandas'
 # Arrow-backed `str` dtype (`string_dtype="string"`, the pandas-3 baseline), so
 # pyarrow is an opt-in accelerator, never required for the drop-in.

@@ -16,7 +16,7 @@ pip install laterite[compat,pyarrow]  # + pyarrow accelerator (faster pandas hop
 pip install laterite[pyarrow]         # the Arrow backend (adds pyarrow)
 ```
 
-`[compat]` alone is already **~3× faster than python-ags4** (object-dtype pandas
+`[compat]` alone is already **~4× faster than python-ags4** (object-dtype pandas
 via DuckDB). pyarrow is an optional accelerator. See
 [Dependency shape](../concepts/dependency-shape.md).
 
