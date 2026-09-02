@@ -102,11 +102,11 @@ warm runs, `python-ags4` 1.2.0 vs `laterite` 0.12.0. Both agree on the findings.
 
 | File | `python-ags4 check_file` | `laterite.validate` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB | 1.5 s | 40 ms | **37.5×** |
-| 24.9 MB | 3.7 s | 188 ms | **19.6×** |
-| 102.7 MB | 12.1 s | 765 ms | **15.8×** |
-| 275.5 MB | 31.3 s | 1.9 s | **16.1×** |
-| 549.7 MB | 65.1 s | 4.0 s | **16.2×** |
+| 4.9 MB | 1.5 s | 41 ms | **36.8×** |
+| 25.0 MB | 3.7 s | 188 ms | **19.5×** |
+| 103.0 MB | 12.2 s | 781 ms | **15.7×** |
+| 276.5 MB | 31.4 s | 2.0 s | **15.9×** |
+| 551.6 MB | 67.1 s | 4.1 s | **16.4×** |
 
 **Read → typed** — the honest comparison for real work. python-ags4 needs
 `AGS4_to_dataframe` + `convert_to_numeric` on every group to get numbers, and
@@ -114,48 +114,48 @@ still leaves dates as text; `laterite.read` is born-typed, dates included.
 
 | File | `python-ags4 + convert_to_numeric` | `laterite.read` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB | 182 ms | 15 ms | **12.1×** |
-| 24.9 MB | 768 ms | 75 ms | **10.2×** |
-| 102.7 MB | 3.1 s | 296 ms | **10.6×** |
-| 275.5 MB | 8.4 s | 777 ms | **10.8×** |
-| 549.7 MB | 17.6 s | 1.6 s | **10.9×** |
+| 4.9 MB | 188 ms | 15 ms | **12.3×** |
+| 25.0 MB | 785 ms | 74 ms | **10.6×** |
+| 103.0 MB | 3.2 s | 300 ms | **10.7×** |
+| 276.5 MB | 8.7 s | 780 ms | **11.2×** |
+| 551.6 MB | 18.3 s | 1.6 s | **11.1×** |
 
 **Read → strings** — like for like, both returning pandas frames of text.
 
 | File | `python-ags4 AGS4_to_dataframe` | `laterite.compat` | speedup |
 |---:|---:|---:|:---:|
-| 4.9 MB | 139 ms | 37 ms | **3.7×** |
-| 24.9 MB | 669 ms | 144 ms | **4.6×** |
-| 102.7 MB | 2.7 s | 583 ms | **4.6×** |
-| 275.5 MB | 7.1 s | 1.5 s | **4.8×** |
-| 549.7 MB | 14.4 s | 3.0 s | **4.9×** |
+| 4.9 MB | 141 ms | 38 ms | **3.7×** |
+| 25.0 MB | 672 ms | 148 ms | **4.6×** |
+| 103.0 MB | 2.7 s | 589 ms | **4.6×** |
+| 276.5 MB | 7.2 s | 1.5 s | **4.9×** |
+| 551.6 MB | 15.3 s | 3.0 s | **5.1×** |
 
 **Validation — peak RSS**
 
 | File | `python-ags4 check_file` peak RSS | `laterite.validate` peak RSS | ratio |
 |---:|---:|---:|:---:|
-| 4.9 MB | 170 MB | 94 MB | **1.81×** |
-| 24.9 MB | 342 MB | 175 MB | **1.96×** |
-| 102.7 MB | 1013 MB | 469 MB | **2.16×** |
-| 275.5 MB | 2659 MB | 1118 MB | **2.38×** |
+| 4.9 MB | 171 MB | 95 MB | **1.80×** |
+| 25.0 MB | 343 MB | 175 MB | **1.96×** |
+| 103.0 MB | 1019 MB | 470 MB | **2.17×** |
+| 276.5 MB | 2664 MB | 1121 MB | **2.38×** |
 
 **Read → typed — peak RSS**
 
 | File | `python-ags4` + `convert_to_numeric` peak RSS | `laterite.read` peak RSS | ratio |
 |---:|---:|---:|:---:|
-| 4.9 MB | 155 MB | 94 MB | **1.64×** |
-| 24.9 MB | 314 MB | 182 MB | **1.73×** |
-| 102.7 MB | 935 MB | 503 MB | **1.86×** |
-| 275.5 MB | 2445 MB | 1262 MB | **1.94×** |
+| 4.9 MB | 156 MB | 95 MB | **1.64×** |
+| 25.0 MB | 315 MB | 182 MB | **1.73×** |
+| 103.0 MB | 938 MB | 505 MB | **1.86×** |
+| 276.5 MB | 2446 MB | 1266 MB | **1.93×** |
 
 **Read → strings — peak RSS**
 
 | File | `python-ags4 AGS4_to_dataframe` peak RSS | `laterite.compat` peak RSS | ratio |
 |---:|---:|---:|:---:|
-| 4.9 MB | 149 MB | 197 MB | **0.76×** |
-| 24.9 MB | 313 MB | 387 MB | **0.81×** |
-| 102.7 MB | 915 MB | 1094 MB | **0.84×** |
-| 275.5 MB | 2203 MB | 2541 MB | **0.87×** |
+| 4.9 MB | 149 MB | 198 MB | **0.75×** |
+| 25.0 MB | 314 MB | 388 MB | **0.81×** |
+| 103.0 MB | 918 MB | 1098 MB | **0.84×** |
+| 276.5 MB | 2205 MB | 2556 MB | **0.86×** |
 
 Peak RSS of one fresh process per cell; the ratio is python-ags4's
 peak over laterite's, so above 1 laterite holds less. The largest

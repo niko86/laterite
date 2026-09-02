@@ -10,11 +10,11 @@
 # rule 8): never a shared table with the darwin lane, the M1 probe, or each
 # other.
 #
-# Corpus: the README corpus is unmintable off the ledger machine (#873), so
-# this lane pins against tools/perf-probe-fixtures.json — the current-forge
-# corpus — via the bench's --manifest/--fixtures-dir flags. The per-OS drift
-# checks double as the cross-OS byte-identity proof, exactly as they do for
-# the M1 probe.
+# Corpus: since the corpus-v2 re-pin (#873) there is ONE manifest —
+# tools/readme-bench-fixtures.json, mintable by the current forge on any
+# machine — so this lane pins against it like every other lane, keeping its
+# own cache directory via --fixtures-dir. The per-OS drift checks double as
+# the cross-OS byte-identity proof, exactly as they do for the M1 probe.
 #
 # Timing caveat, recorded here because it cannot be recorded loudly enough:
 # the Linux pool is shared hardware and windows-2022 is a hosted VM — peak
@@ -96,7 +96,7 @@ jobs:
           uv pip install --python "$GITHUB_WORKSPACE/.lane/bin/python" "$GITHUB_WORKSPACE"/dist/laterite-*.whl "pandas<3" "python-ags4==1.2.0"
 
       - name: Run the lane
-        run: '"$GITHUB_WORKSPACE/.lane/bin/python" tools/bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/perf-probe-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/linux.json'
+        run: '"$GITHUB_WORKSPACE/.lane/bin/python" tools/bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/readme-bench-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/linux.json'
 
       # if: always() — a failed lane's partial JSON is the diagnosis (the
       # first M1 probe dispatch uploaded nothing and left only a log line).
@@ -162,7 +162,7 @@ jobs:
       - name: Run the lane
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          .lane\Scripts\python.exe tools\bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/perf-probe-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/windows.json
+          .lane\Scripts\python.exe tools\bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/readme-bench-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/windows.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()

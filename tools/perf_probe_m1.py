@@ -64,16 +64,15 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 REPO = Path(__file__).resolve().parents[1]
-# The probe carries its OWN corpus pin, not the README bench's. Its results
-# are a separate claim family (campaign rule 8), so all it needs is byte
-# identity ACROSS the two probe OSes — and the README manifest predates
-# emit-output-changing work (Rule 5 re-quoting and after), so a fresh forge
-# can no longer reproduce those bytes anywhere (#873). Own manifest, own
-# cache directory: the README bench's cached rungs are a different corpus
-# under the same rung names, and sharing a path would flag one corpus as
-# drift against the other's pin.
-OUT_DIR = REPO / "output" / "perf-probe-fixtures"
-MANIFEST = REPO / "tools" / "perf-probe-fixtures.json"
+# The probe's results stay their own claim family (campaign rule 8) — never
+# a shared table with the README ladder — but since the corpus-v2 re-pin
+# (#873) the corpus itself is one and the same: the README manifest is
+# mintable by the current forge on any machine, so the probe pins against it
+# and shares its fixture cache. (Pre-v2 the probe carried its own manifest
+# because the README pins predated emit-output-changing work and could not
+# be reproduced anywhere.)
+OUT_DIR = REPO / "output" / "readme-bench"
+MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
 FORGE = (
     REPO
     / "rust-packages"
