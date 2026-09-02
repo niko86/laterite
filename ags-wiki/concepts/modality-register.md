@@ -678,11 +678,11 @@ _Notes:_
 
 _Notes:_
 - _python_: The capsule-bearing pyo3-arrow table, born-typed from the file's TYPE row, zero-copy over the Arrow PyCapsule interface — the exact shape build_ags4 consumes, so the read half of the zero-copy round trip #852 opened the write half of (#860). keys= is the same tri-state as .table()'s; no frame is materialised and the SQL engine is never touched.
-- _node_: Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). Whether a closer analog is owed is #871, not a gap row here.
+- _node_: Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). **Settled by #871 (2026-09-02): by-design — each boundary's Arrow shape is its own answer, and node's is the decoded arrow-js Table.** A public un-decoded-IPC door (`arrowIpc`) was spiked and REJECTED: arrow-js decode/re-encode are zero-copy and cost loose milliseconds per whole-file sweep, while the door would hand out raw MUTABLE Buffers beside a zero-copy decoder (aliasing and postMessage-detach hazards against every decoded view), be uncached by contract (silent keychain rebuilds on repeat keyed calls — caching instead would alias mutable memory across callers, worse), and make the IPC framing itself public contract. The spike — accessor, time bench, peak-RSS/retention probe — is preserved on `prototype/node-arrow-ipc`; the measured cells are on #871.
 - _rust_: Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.
 - _duckdb_: **by-design.** read_ags already returns a typed RELATION — the engine's own Arrow-speaking object, recorded under read; a separate raw-table door would duplicate it.
 - _cli_: **by-design.** The CLI hands back files and text, not in-process objects; lat read --csv/--json is its data-out door.
-- _browser_: Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). Whether a closer analog is owed anywhere is #871.
+- _browser_: Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). **Settled by #871 (2026-09-02): by-design** — each boundary's Arrow shape is its own answer: Python the capsule, node the decoded arrow-js Table, the browser these IPC bytes. No surface owes another surface's shape; the node cell's note records the spiked-and-rejected pass-through.
 
 ## Legend
 
