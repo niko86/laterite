@@ -186,6 +186,17 @@ def peak_bytes() -> tuple[int, str]:
         counters = PROCESS_MEMORY_COUNTERS()
         counters.cb = ctypes.sizeof(counters)
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        # Without declared signatures ctypes marshals through c_int, which
+        # truncates the 64-bit pseudo-handle GetCurrentProcess returns —
+        # every call then fails ERROR_INVALID_HANDLE (run 33585274632, all
+        # four Windows measurement cells).
+        kernel32.GetCurrentProcess.restype = wt.HANDLE
+        kernel32.K32GetProcessMemoryInfo.argtypes = [
+            wt.HANDLE,
+            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+            wt.DWORD,
+        ]
+        kernel32.K32GetProcessMemoryInfo.restype = wt.BOOL
         ok = kernel32.K32GetProcessMemoryInfo(
             kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
         )
@@ -368,6 +379,13 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(doc, indent=1) + "\n")
     print(f"\nresults written: {args.out}")
+    # The probe exists to produce verdicts. A run where every cell was
+    # refused wrote a diagnosable artifact but measured nothing — a green
+    # job over it would read as "Windows measured" when Windows did not
+    # (run 33585274632's windows leg concluded success on four refusals).
+    if not verdicts:
+        print("error: no verdicts — every measurement cell was refused", flush=True)
+        return 1
     return 0
 
 

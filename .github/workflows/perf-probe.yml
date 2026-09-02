@@ -93,7 +93,10 @@ jobs:
       - name: Run the probe
         run: '"$GITHUB_WORKSPACE/.probe/bin/python" tools/perf_probe_m1.py --rungs "${{ inputs.rungs }}" --out output/perf-probe/linux.json'
 
+      # if: always() — a failed probe's partial JSON is the diagnosis; the
+      # first drift-guard failure uploaded nothing and left only a log line.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
           name: perf-probe-linux
           path: output/perf-probe/
@@ -156,6 +159,7 @@ jobs:
           .probe\Scripts\python.exe tools\perf_probe_m1.py --rungs "${{ inputs.rungs }}" --out output/perf-probe/windows.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
           name: perf-probe-windows
           path: output/perf-probe/
