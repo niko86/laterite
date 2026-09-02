@@ -233,15 +233,15 @@ fn aligned_cells<'a>(tag: &'a str, cells: &[&'a str], n: usize, fill: &'a str) -
 /// writer's contract is faithful-or-fail, and a caller that wants the value
 /// cleaned fixes it first (fold CR/LF → space) so the mutation is explicit.
 fn write_row<W: Write>(out: &mut W, cells: &[&str]) -> Result<(), EmitError> {
-    // Scan the whole row up front so a rejected row leaves NO partial bytes
-    // (row-atomic): the writer streams cell-by-cell, so checking mid-loop
-    // would already have flushed the earlier cells of the same row.
-    if let Some(field) = cells.iter().position(|c| c.contains(['\r', '\n'])) {
-        return Err(EmitError::EmbeddedNewline {
-            tag: cells.first().copied().unwrap_or("").to_string(),
-            field,
-        });
-    }
+    row_atomic_guard(cells)?;
+    // The cell loop below is the one shape this function shares with
+    // `write_row_recorded`, and the split is the DESIGN, not an oversight
+    // (#857 asked): the recorded twin observes `out.len()` around every
+    // cell write, which only a concrete byte buffer can yield — a shared
+    // loop over `W: Write` would either lose that observation or force a
+    // per-cell callback on this, the allocation-free hot path. The guard
+    // above and the quoting authority are the shared parts, and both ARE
+    // shared; the differential test pins the two loops' bytes identical.
     for (i, c) in cells.iter().enumerate() {
         if i > 0 {
             out.write_all(b",").map_err(|e| io_err(&e))?;
@@ -253,6 +253,20 @@ fn write_row<W: Write>(out: &mut W, cells: &[&str]) -> Result<(), EmitError> {
         laterite_ags4_types::write_quoted_field(out, c).map_err(|e| io_err(&e))?;
     }
     out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
+    Ok(())
+}
+
+/// The row-atomic Rule-6 refusal both row writers share: scan the whole row
+/// BEFORE any byte lands, so a rejected row leaves no partial output — the
+/// writers stream cell-by-cell, and checking mid-loop would already have
+/// flushed the earlier cells of the same row (#423).
+fn row_atomic_guard(cells: &[&str]) -> Result<(), EmitError> {
+    if let Some(field) = cells.iter().position(|c| c.contains(['\r', '\n'])) {
+        return Err(EmitError::EmbeddedNewline {
+            tag: cells.first().copied().unwrap_or("").to_string(),
+            field,
+        });
+    }
     Ok(())
 }
 
@@ -273,13 +287,13 @@ fn write_row_recorded(
     cells: &[&str],
     recs: &mut Vec<RecordedCell>,
 ) -> Result<std::ops::Range<usize>, EmitError> {
-    // Row-atomic, as in write_row: scan before any byte lands.
-    if let Some(field) = cells.iter().position(|c| c.contains(['\r', '\n'])) {
-        return Err(EmitError::EmbeddedNewline {
-            tag: cells.first().copied().unwrap_or("").to_string(),
-            field,
-        });
-    }
+    row_atomic_guard(cells)?;
+    // The cell loop deliberately mirrors `write_row`'s rather than sharing
+    // it (#857): this side's whole job is reading `out.len()` back around
+    // each cell write — an observation a `W: Write` sink cannot yield — so
+    // the loops share their guard and their quoting authority, and split
+    // exactly where the observation happens. The differential test holds
+    // their bytes identical.
     recs.clear();
     let start = out.len();
     for (i, c) in cells.iter().enumerate() {
