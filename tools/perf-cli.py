@@ -28,8 +28,9 @@ timed loops. Each row carries a `door` string naming the invocation.
              block. Two skews, named: process spawn + report rendering ride
              inside the time, and the CLI's surface default keeps the
              warnings tier ON where the rust bin's `CheckOptions::default()`
-             has it off (the tier T5 priced at ~2% at scale — the wasm
-             lane's skew, same direction).
+             has it off (the tier the campaign's T5 tranche priced — the
+             wasm lane's skew, same direction; the price lives on the
+             ledger, not here).
   read       `lat read <rung> <G> --csv --out … --quiet` — the read door as
              exposed: tolerant-parse the whole file, render ONE group as
              CSV, write it atomically. `<G>` is the rung's bulk group,
@@ -81,6 +82,7 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -235,25 +237,40 @@ def build_output(
 # --- the doors --------------------------------------------------------------
 
 
-def doors(
-    lat: Path, rung_path: Path, group: str, scratch: Path
-) -> list[dict[str, Any]]:
-    """The three invocations, built once per rung so the timed loop and the
+@dataclass
+class Door:
+    """One invocation shape, built once per rung so the timed loop and the
     memory child run the same argv by construction. `out` is the path whose
     size is the op's `out_bytes` (the write door only — the read door's CSV
-    is one group's slice, not the operation's product)."""
+    is one group's slice, not the operation's product); `label` is the
+    path-free description the artifact's `door` field carries."""
+
+    op: str
+    argv: list[str]
+    out: Path | None
+    label: str
+
+
+class DoorFailed(Exception):
+    """A door failed during the timed pass. Raised, not died on: one bad
+    (op, rung) must land in the artifact's `skipped` list, never destroy
+    the measurements already taken — the wasm lane's lesson (#824)."""
+
+
+def doors(lat: Path, rung_path: Path, group: str, scratch: Path) -> list[Door]:
+    """The three doors for one rung."""
     read_out = scratch / "read.csv"
     merge_out = scratch / "merged.ags"
     return [
-        {
-            "op": "validate",
-            "argv": [str(lat), "validate", str(rung_path), "--quiet"],
-            "out": None,
-            "door": "lat validate <rung> --quiet",
-        },
-        {
-            "op": "read",
-            "argv": [
+        Door(
+            op="validate",
+            argv=[str(lat), "validate", str(rung_path), "--quiet"],
+            out=None,
+            label="lat validate <rung> --quiet",
+        ),
+        Door(
+            op="read",
+            argv=[
                 str(lat),
                 "read",
                 str(rung_path),
@@ -263,12 +280,12 @@ def doors(
                 str(read_out),
                 "--quiet",
             ],
-            "out": None,
-            "door": f"lat read <rung> {group} --csv --out <scratch> --quiet",
-        },
-        {
-            "op": "merge",
-            "argv": [
+            out=None,
+            label=f"lat read <rung> {group} --csv --out <scratch> --quiet",
+        ),
+        Door(
+            op="merge",
+            argv=[
                 str(lat),
                 "merge",
                 str(rung_path),
@@ -277,19 +294,19 @@ def doors(
                 str(merge_out),
                 "--quiet",
             ],
-            "out": merge_out,
-            "door": "lat merge <rung> <rung> --out <scratch> --quiet",
-        },
+            out=merge_out,
+            label="lat merge <rung> <rung> --out <scratch> --quiet",
+        ),
     ]
 
 
-def run_child(door: dict[str, Any], stderr_path: Path) -> tuple[int, int]:
+def run_child(door: Door, stderr_path: Path) -> tuple[int, int]:
     """One fresh `lat` child, reaped with `os.wait4` so the peak RSS is THIS
     child's own — `RUSAGE_CHILDREN` high-waters over every reaped child, so
     a small child after a big one would inherit the big one's number.
     Returns (returncode, peak_rss_bytes)."""
     with stderr_path.open("wb") as errf:
-        proc = subprocess.Popen(door["argv"], stdout=subprocess.DEVNULL, stderr=errf)
+        proc = subprocess.Popen(door.argv, stdout=subprocess.DEVNULL, stderr=errf)
         _, status, ru = os.wait4(proc.pid, 0)
         # Tell Popen the child is reaped; a second waitpid would raise.
         proc.returncode = os.waitstatus_to_exitcode(status)
@@ -297,7 +314,7 @@ def run_child(door: dict[str, Any], stderr_path: Path) -> tuple[int, int]:
     return proc.returncode, bench.maxrss_to_bytes(ru.ru_maxrss, sysname)
 
 
-def measure_mem(door: dict[str, Any], input_bytes: int) -> dict[str, Any]:
+def measure_mem(door: Door, input_bytes: int) -> dict[str, Any]:
     """One (op, rung) memory cell: a fresh child, swap watched across the
     run. Every veto is a recorded refusal, never a silent skip — the shared
     semantics, through the shared code."""
@@ -312,9 +329,11 @@ def measure_mem(door: dict[str, Any], input_bytes: int) -> dict[str, Any]:
     try:
         returncode, peak = run_child(door, stderr_path)
     except OSError as e:
-        return bench.refusal_cell("failed", f"spawn: {e}")
+        # Covers the spawn and the wait4 reap alike — either way there is no
+        # child number to report, only the OS's reason.
+        return bench.refusal_cell("failed", f"spawn/reap: {e}")
     swap_after = bench.swap_used_bytes()
-    if not acceptable_exit(door["op"], returncode):
+    if not acceptable_exit(door.op, returncode):
         stderr_text = stderr_path.read_text(errors="replace")
         return bench.refusal_cell("failed", failure_detail(returncode, stderr_text))
     if (
@@ -325,36 +344,47 @@ def measure_mem(door: dict[str, Any], input_bytes: int) -> dict[str, Any]:
         grew = (swap_after - swap_before) / 1e6
         return bench.refusal_cell("swapped", f"swap grew {grew:.1f} MB during the run")
     out_bytes = None
-    if door["out"] is not None and door["out"].exists():
-        out_bytes = door["out"].stat().st_size
+    if door.out is not None and door.out.exists():
+        out_bytes = door.out.stat().st_size
     cell = bench.mem_cell(peak, denominator(out_bytes, input_bytes))
     if out_bytes is not None:
         cell["out_bytes"] = out_bytes
     return cell
 
 
-def timed_ms(door: dict[str, Any], iters: int) -> float:
+def timed_ms(door: Door, iters: int) -> float:
     """Warm up one untimed run, then the median wall time over `iters` fresh
     children — spawn included, because a CLI caller pays it. Output sinks to
-    /dev/null (the cheapest honest stand-in for a terminal)."""
+    /dev/null (the cheapest honest stand-in for a terminal). A door that
+    stops completing raises `DoorFailed` — the caller records the skip and
+    the artifact still gets written."""
     samples = []
     for i in range(iters + 1):
         t = time.perf_counter()
         proc = subprocess.run(
-            door["argv"],
+            door.argv,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         )
         elapsed = (time.perf_counter() - t) * 1000.0
-        if not acceptable_exit(door["op"], proc.returncode):
-            die(
-                f"{door['door']} exited {proc.returncode} during the timed "
-                "pass — the artifact would be measuring a failure"
+        if not acceptable_exit(door.op, proc.returncode):
+            raise DoorFailed(
+                f"{door.label} exited {proc.returncode} during the timed pass"
             )
         if i > 0:
             samples.append(elapsed)
     return median(samples)
+
+
+@dataclass
+class Rung:
+    """One on-disk ladder rung, plus the read door's chosen bulk group."""
+
+    label: str
+    path: Path
+    bytes: int
+    group: str = ""
 
 
 def main() -> int:
@@ -394,33 +424,31 @@ def main() -> int:
             f"read ladder manifest {args.manifest}: {e} — run `uv run python tools/perf-ladder.py` first"
         )
 
-    rungs = []
+    rungs: list[Rung] = []
     skipped: list[dict[str, str]] = []
-    for rung in manifest["rungs"]:
-        path = Path(rung["path"])
+    for entry in manifest["rungs"]:
+        path = Path(entry["path"])
         if not path.exists():
             print(
-                f"perf-cli.py: rung {rung['label']} missing ({path}) — "
+                f"perf-cli.py: rung {entry['label']} missing ({path}) — "
                 "skipping (re-run `uv run python tools/perf-ladder.py`)",
                 file=sys.stderr,
             )
             skipped.append(
-                {"rung": rung["label"], "reason": f"missing on disk: {path}"}
+                {"rung": entry["label"], "reason": f"missing on disk: {path}"}
             )
             continue
-        rungs.append(
-            {"label": rung["label"], "path": path, "bytes": path.stat().st_size}
-        )
+        rungs.append(Rung(entry["label"], path, path.stat().st_size))
 
     SCRATCH.mkdir(parents=True, exist_ok=True)
 
     # The read door's group, per rung — chosen from the data, outside any
     # timed or measured window, and recorded in the door string.
     for rung in rungs:
-        code, nrows = bulk_group(rung["path"])
-        rung["group"] = code
+        code, nrows = bulk_group(rung.path)
+        rung.group = code
         print(
-            f"perf-cli.py: {rung['label']} read door dumps {code} ({nrows} DATA rows)",
+            f"perf-cli.py: {rung.label} read door dumps {code} ({nrows} DATA rows)",
             file=sys.stderr,
         )
 
@@ -429,26 +457,32 @@ def main() -> int:
     mem_cells: dict[str, dict[str, Any]] = {}
     if not args.skip_mem:
         for rung in rungs:
-            print(f"perf-cli.py: {rung['label']} memory children", file=sys.stderr)
-            cells = {}
-            for door in doors(lat, rung["path"], rung["group"], SCRATCH):
-                cells[door["op"]] = measure_mem(door, rung["bytes"])
-            mem_cells[rung["label"]] = cells
+            print(f"perf-cli.py: {rung.label} memory children", file=sys.stderr)
+            cells: dict[str, Any] = {}
+            for door in doors(lat, rung.path, rung.group, SCRATCH):
+                cells[door.op] = measure_mem(door, rung.bytes)
+            mem_cells[rung.label] = cells
 
     results = []
     for rung in rungs:
         print(
-            f"perf-cli.py: {rung['label']} ({rung['bytes']} bytes) × {args.iters} iters",
+            f"perf-cli.py: {rung.label} ({rung.bytes} bytes) × {args.iters} iters",
             file=sys.stderr,
         )
-        for door in doors(lat, rung["path"], rung["group"], SCRATCH):
-            ms = timed_ms(door, args.iters)
-            row = measurement(
-                door["op"], rung["label"], rung["bytes"], ms, door["door"]
-            )
-            cells = mem_cells.get(rung["label"])
-            if cells:
-                row["mem"] = cells[door["op"]]
+        for door in doors(lat, rung.path, rung.group, SCRATCH):
+            # A door failing mid-ladder is recorded, and every measurement
+            # already taken still reaches the artifact (the wasm lesson —
+            # one bad cell must not lose the run).
+            try:
+                ms = timed_ms(door, args.iters)
+            except DoorFailed as e:
+                print(f"perf-cli.py: {rung.label} {e} — skipping", file=sys.stderr)
+                skipped.append({"rung": rung.label, "reason": f"{door.op}: {e}"})
+                continue
+            row = measurement(door.op, rung.label, rung.bytes, ms, door.label)
+            cells_for_rung = mem_cells.get(rung.label)
+            if cells_for_rung:
+                row["mem"] = cells_for_rung[door.op]
             results.append(row)
 
     output = build_output(

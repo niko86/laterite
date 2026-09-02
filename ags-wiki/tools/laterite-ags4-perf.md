@@ -115,8 +115,8 @@ names (`read`, `merge`) and a per-row `door` string instead of borrowing
 
 The lanes' shared measurement contract — the rung cap, the refusal
 vocabulary, the swap watch, the statistics — is held by **each copy's own
-unit tests**, the accepted mechanism per #865's decision (owner,
-2026-09-02): the rust bin, the node and wasm lanes each pin their copy, and
+unit tests**, the accepted mechanism per the decision recorded on #865
+(owner, 2026-09-02): the rust bin, the node and wasm lanes each pin their copy, and
 the CLI lane needs no copy at all — it imports the python harness's
 machinery outright, which is also what finally put tests on the python
 copy.

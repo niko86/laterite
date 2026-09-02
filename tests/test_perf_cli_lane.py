@@ -29,6 +29,13 @@ from pathlib import Path
 
 import pytest
 
+# The suite split is file-granular (the conftest collection hook ignores
+# whole modules): one test here spawns a child interpreter to prove the
+# timed pass raises rather than dies, and `sys.executable` puts the whole
+# file behind the built python job. The seam tests ride with it — the
+# contract they pin can only drift when code changes, which runs that job.
+pytestmark = pytest.mark.needs_env
+
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -173,6 +180,24 @@ def test_failure_detail_names_the_signal_and_the_stderr_tail() -> None:
     detail = cli.failure_detail(1, "a\nb\nc\nd\ne")
     assert detail == "c | d | e"
     assert cli.failure_detail(3, "") == "exit 3"
+
+
+def test_a_failing_timed_door_raises_rather_than_dying() -> None:
+    # The wasm lane's lesson (#824), inherited rather than re-learned: one
+    # bad (op, rung) in the timed pass must become a recorded skip while the
+    # artifact still gets written — so `timed_ms` raises `DoorFailed` for
+    # the caller to record, never a process-killing SystemExit that would
+    # lose every measurement already taken. (The child is a bare
+    # interpreter exiting 1, not project code — but it is why this file
+    # carries `needs_env`.)
+    door = cli.Door(
+        op="read",
+        argv=[sys.executable, "-c", "import sys; sys.exit(1)"],
+        out=None,
+        label="failing door",
+    )
+    with pytest.raises(cli.DoorFailed, match="exited 1"):
+        cli.timed_ms(door, 1)
 
 
 def test_acceptable_exit_codes_per_door() -> None:
