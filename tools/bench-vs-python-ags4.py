@@ -353,6 +353,142 @@ def refusal_cell(reason: str, detail: str) -> dict[str, Any]:
     return {"refusal": reason, "detail": detail}
 
 
+# --- README table rendering (pure, pinned by tests/test_bench_python_lane.py)
+#
+# The READMEs may hold only what this instrument prints (the house rule against
+# measured values in prose: the tables stay legal because this tool regenerates
+# them and `tools/check_speed_claims.py` reads them). So every README-format
+# table — the wheel's per-axis tables, the root's condensed pair, and the
+# memory tables the #826 close-out promoted — is rendered here, by the run
+# that measured it, and pasted verbatim.
+
+# (title, axis key in mem_cells, ours-door key, left header, right header)
+MEM_README_PLAN: list[tuple[str, str, str, str, str]] = [
+    (
+        "Validation — peak RSS",
+        "validate",
+        NATIVE_DOOR,
+        "`python-ags4 check_file`",
+        "`laterite.validate`",
+    ),
+    (
+        "Read → typed — peak RSS",
+        "read_typed",
+        NATIVE_DOOR,
+        "`python-ags4` + `convert_to_numeric`",
+        "`laterite.read`",
+    ),
+    (
+        "Read → strings — peak RSS",
+        "read_strings",
+        COMPAT_DOOR,
+        "`python-ags4 AGS4_to_dataframe`",
+        "`laterite.compat`",
+    ),
+]
+
+
+def mem_ratio(pa_cell: dict[str, Any], ours_cell: dict[str, Any]) -> float | None:
+    """python-ags4's peak over ours — above 1 means laterite holds less.
+    None when either side is a recorded refusal (a vetoed rung renders as no
+    row, never as a number)."""
+    if "refusal" in pa_cell or "refusal" in ours_cell:
+        return None
+    return pa_cell["peak_rss_bytes"] / ours_cell["peak_rss_bytes"]
+
+
+def memory_readme_tables(
+    mem_cells: dict[str, dict[str, dict[str, Any]]],
+    labels: dict[str, str],
+    compat_hop: str,
+) -> list[str]:
+    """The wheel README's per-axis peak-RSS tables. The bolded ratio is the
+    value `check_speed_claims.py` bands, and 'peak RSS' in the header row is
+    how it tells a memory table from the time table sharing the API name."""
+    lines: list[str] = []
+    for title, axis, ours_door, left, right in MEM_README_PLAN:
+        rows: list[str] = []
+        for size, cell in mem_cells.get(axis, {}).items():
+            ratio = mem_ratio(cell[UPSTREAM_DOOR], cell[ours_door])
+            if ratio is None:
+                continue
+            pa, ours = cell[UPSTREAM_DOOR], cell[ours_door]
+            rows.append(
+                f"| {labels.get(size, size)} "
+                f"| {fmt_mb(pa['peak_rss_bytes'])} "
+                f"| {fmt_mb(ours['peak_rss_bytes'])} "
+                f"| **{ratio:.2f}×** |"
+            )
+        if not rows:
+            continue
+        lines += [f"\n**{title}**\n"]
+        lines += [f"| File | {left} peak RSS | {right} peak RSS | ratio |"]
+        lines += ["|---:|---:|---:|:---:|"]
+        lines += rows
+    if lines:
+        lines += [
+            "",
+            "Peak RSS of one fresh process per cell; the ratio is python-ags4's",
+            "peak over laterite's, so above 1 laterite holds less. The largest",
+            "rung is time-only (epic #820 decision 7). Read → strings measured",
+            f"on the {compat_hop} hop.",
+        ]
+    return lines
+
+
+def condensed_time_table(rows: dict[str, list]) -> list[str]:
+    """The root README's one-table summary, from the same run as the wheel's
+    per-axis tables so the two can never quote different measurements."""
+    lines = [
+        "| File (123 groups) | `laterite.validate` | `laterite.read` (typed) "
+        "| `laterite.compat` (strings) |",
+        "|---:|---:|---:|---:|",
+    ]
+    for (label, v_up, v_ours), (_, t_up, t_ours), (_, s_up, s_ours) in zip(
+        rows["validate"], rows["read_typed"], rows["read_strings"], strict=True
+    ):
+        lines.append(
+            f"| {label} "
+            f"| {fmt(v_ours)} · **{v_up / v_ours:.1f}×** "
+            f"| {fmt(t_ours)} · **{t_up / t_ours:.1f}×** "
+            f"| {fmt(s_ours)} · **{s_up / s_ours:.1f}×** |"
+        )
+    return lines
+
+
+def condensed_memory_table(
+    mem_cells: dict[str, dict[str, dict[str, Any]]], labels: dict[str, str]
+) -> list[str]:
+    """The root README's memory summary — same axes, cells `ours · ratio`,
+    rendered only for rungs where every door measured (a refusal anywhere
+    drops the rung rather than printing a partial row)."""
+    plan = [(axis, door) for _, axis, door, _, _ in MEM_README_PLAN]
+    sizes = [
+        size
+        for size in mem_cells.get("validate", {})
+        if all(
+            mem_ratio(mem_cells[axis][size][UPSTREAM_DOOR], mem_cells[axis][size][door])
+            is not None
+            for axis, door in plan
+        )
+    ]
+    if not sizes:
+        return []
+    lines = [
+        "| File | `laterite.validate` | `laterite.read` (typed) "
+        "| `laterite.compat` (strings) |",
+        "|---:|---:|---:|---:|",
+    ]
+    for size in sizes:
+        cells = []
+        for axis, door in plan:
+            ours = mem_cells[axis][size][door]
+            ratio = mem_ratio(mem_cells[axis][size][UPSTREAM_DOOR], ours)
+            cells.append(f"{fmt_mb(ours['peak_rss_bytes'])} · **{ratio:.2f}×**")
+        lines.append(f"| {labels.get(size, size)} | " + " | ".join(cells) + " |")
+    return lines
+
+
 def parse_swap_used(text: str) -> int:
     """The `used = 512.50M` field of Darwin's `vm.swapusage` sysctl, in bytes."""
     m = re.search(r"used\s*=\s*([0-9.]+)([KMG])", text)
@@ -996,6 +1132,34 @@ def main() -> int:
                 f"| {label} | {fmt(a)} | {fmt(b)} | **{a / b:.1f}×** "
                 f"| {fmt(c)} | **{a / c:.1f}×** |"
             )
+
+    if mem_cells:
+        from laterite import _frames
+
+        compat_hop = (
+            "pyarrow accelerator"
+            if _frames._pyarrow_available()
+            else "shipped pyarrow-free DuckDB"
+        )
+        print("\n" + "=" * 62)
+        print("README-format memory tables — the #826 promotion paste source")
+        print("=" * 62)
+        for line in memory_readme_tables(mem_cells, labels, compat_hop):
+            print(line)
+
+    if time_sizes:
+        print("\n" + "=" * 62)
+        print("root-README condensed tables — paste into its Performance section")
+        print("=" * 62)
+        print()
+        for line in condensed_time_table(rows):
+            print(line)
+        if mem_cells:
+            mem_lines = condensed_memory_table(mem_cells, labels)
+            if mem_lines:
+                print("\nPeak memory (same run, one fresh process per cell):\n")
+                for line in mem_lines:
+                    print(line)
 
     flush()
     print(f"\nresults written: {args.out}")

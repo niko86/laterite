@@ -87,7 +87,17 @@ AXES = {
 CLAIM_RE = re.compile(
     r"~?\s*(\d+(?:\.\d+)?)\s*[×x]\s*\*{0,2}\s*faster\s+than\s+python-ags4"
 )
+# The #826 promotion's memory twin: "~2× less (peak) memory than python-ags4".
+# Banded against the peak-RSS tables the same way time claims are banded
+# against the time tables.
+CLAIM_MEM_RE = re.compile(
+    r"~?\s*(\d+(?:\.\d+)?)\s*[×x]\s*\*{0,2}\s*less\s+(?:peak\s+)?memory\s+"
+    r"than\s+python-ags4"
+)
 RUNG_RE = re.compile(r"\*\*(\d+(?:\.\d+)?)×\*\*")
+# What tells a memory table's header row from the time table sharing the same
+# API name — `bench-vs-python-ags4.py` prints it into every memory header.
+MEM_MARKER = "peak RSS"
 # How far from the claim an axis marker may sit. The claims in the tree today
 # carry theirs within a sentence or two; a wider window starts finding the
 # wrong axis in a neighbouring paragraph.
@@ -98,11 +108,14 @@ def _fail(msg: str) -> None:
     print(f"[speed-claims] FAIL: {msg}", file=sys.stderr)
 
 
-def read_bands(text: str) -> dict[str, tuple[float, float]]:
+def read_bands(text: str, memory: bool = False) -> dict[str, tuple[float, float]]:
     """Each table's measured band, keyed by axis.
 
     A markdown table is found by its HEADER row naming the API, then its rungs
-    are the bolded multiples in the rows below it until the table ends.
+    are the bolded multiples in the rows below it until the table ends. The
+    time and memory tables name the same APIs, so the MEM_MARKER in the header
+    is what separates them — `memory=True` reads the peak-RSS tables, the
+    default reads the time tables and skips the memory ones.
     """
     lines = text.splitlines()
     bands: dict[str, tuple[float, float]] = {}
@@ -110,6 +123,8 @@ def read_bands(text: str) -> dict[str, tuple[float, float]]:
         rungs: list[float] = []
         for i, line in enumerate(lines):
             if not (line.startswith("|") and header_token in line):
+                continue
+            if (MEM_MARKER in line) != memory:
                 continue
             for row in lines[i + 1 :]:
                 if not row.startswith("|"):
@@ -137,7 +152,9 @@ def main() -> int:
     if not TABLES.is_file():
         _fail(f"no benchmark tables at {TABLES.relative_to(ROOT)}")
         return 1
-    bands = read_bands(TABLES.read_text(encoding="utf-8"))
+    tables_text = TABLES.read_text(encoding="utf-8")
+    bands = read_bands(tables_text)
+    mem_bands = read_bands(tables_text, memory=True)
     missing = set(AXES) - set(bands)
     if missing:
         _fail(
@@ -147,9 +164,13 @@ def main() -> int:
             f"tools/bench-vs-python-ags4.py and update the axis headers here."
         )
         return 1
+    # The memory tables (the #826 promotion) are checked the same way, but
+    # their absence only fails once a prose claim needs them — the memory
+    # claim vocabulary may legitimately go unused.
 
     ok = True
     checked = 0
+    mem_checked = 0
     for path in SCANNED:
         if not path.is_file():
             continue
@@ -159,32 +180,50 @@ def main() -> int:
         # `cookbook/compat.md` splits one of these claims across a line break
         # mid-phrase. A per-line scan silently skipped it — a gate that misses
         # the claim it exists to check passes for the worst possible reason.
-        for m in CLAIM_RE.finditer(text):
-            i = text.count("\n", 0, m.start())
-            checked += 1
-            where = f"{path.relative_to(ROOT)}:{i + 1}"
-            claimed = float(m.group(1))
-            axis = axis_for(lines, i)
-            if axis is None:
-                _fail(
-                    f"{where} claims {m.group(0).strip()} without naming which "
-                    f"benchmark it summarises. Name the axis near the claim "
-                    f"(compat / laterite.validate / laterite.read) so it can be "
-                    f"checked — the three tables measure different things."
-                )
-                ok = False
-                continue
-            lo, hi = bands[axis]
-            if not lo <= claimed <= hi:
-                side = "above" if claimed > hi else "below"
-                _fail(
-                    f"{where} claims {claimed:g}× on the {axis} axis, {side} the "
-                    f"{lo:g}–{hi:g}× the table in "
-                    f"{TABLES.relative_to(ROOT)} measures. Quote a multiple "
-                    f"inside the band, or re-run tools/bench-vs-python-ags4.py "
-                    f"if the table is the stale one."
-                )
-                ok = False
+        for kind, regex, kind_bands in (
+            ("speed", CLAIM_RE, bands),
+            ("memory", CLAIM_MEM_RE, mem_bands),
+        ):
+            for m in regex.finditer(text):
+                i = text.count("\n", 0, m.start())
+                if kind == "memory":
+                    mem_checked += 1
+                else:
+                    checked += 1
+                where = f"{path.relative_to(ROOT)}:{i + 1}"
+                claimed = float(m.group(1))
+                axis = axis_for(lines, i)
+                if axis is None:
+                    _fail(
+                        f"{where} claims {m.group(0).strip()} without naming "
+                        f"which benchmark it summarises. Name the axis near the "
+                        f"claim (compat / laterite.validate / laterite.read) so "
+                        f"it can be checked — the tables measure different "
+                        f"things."
+                    )
+                    ok = False
+                    continue
+                if axis not in kind_bands:
+                    _fail(
+                        f"{where} makes a {kind} claim on the {axis} axis but "
+                        f"{TABLES.relative_to(ROOT)} has no {kind} table for it "
+                        f"— re-run tools/bench-vs-python-ags4.py and paste the "
+                        f"table the claim summarises."
+                    )
+                    ok = False
+                    continue
+                lo, hi = kind_bands[axis]
+                if not lo <= claimed <= hi:
+                    side = "above" if claimed > hi else "below"
+                    _fail(
+                        f"{where} claims {claimed:g}× ({kind}) on the {axis} "
+                        f"axis, {side} the {lo:g}–{hi:g}× the table in "
+                        f"{TABLES.relative_to(ROOT)} measures. Quote a multiple "
+                        f"inside the band, or re-run "
+                        f"tools/bench-vs-python-ags4.py if the table is the "
+                        f"stale one."
+                    )
+                    ok = False
 
     if not checked:
         _fail(
@@ -197,8 +236,11 @@ def main() -> int:
 
     if ok:
         print(
-            f"[speed-claims] OK: {checked} claim(s) across "
-            f"{len(bands)} benchmark axes, each inside its table's band."
+            f"[speed-claims] OK: {checked} speed claim(s) across "
+            f"{len(bands)} benchmark axes, each inside its table's band; "
+            f"{mem_checked} memory claim(s) against {len(mem_bands)} peak-RSS "
+            f"table(s). Zero memory claims is fine — zero SCANNED claims "
+            f"overall is not, and fails above."
         )
     return 0 if ok else 1
 
