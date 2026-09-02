@@ -45,15 +45,16 @@ export {
   ags4BytesToXlsx,
   xlsxBytesToAgs4,
 } from "#native";
+// Only the names `ts/` consumers actually import: `FixReport`,
+// `MergeOutput`/`EmitResult` used to be re-exported here too and nothing ever
+// imported them (knip, #866) — the napi-generated `index.d.ts` remains the
+// declaration surface for the native shapes themselves.
 export type {
   GroupMeta,
   Finding,
   ValidationReport,
   AppliedFix,
-  FixReport,
   GroupIpc,
-  MergeOutput as NativeMergeOutput,
-  EmitResult as NativeEmitResult,
   PackStats,
   UnpackStats,
   ExcelStats,
