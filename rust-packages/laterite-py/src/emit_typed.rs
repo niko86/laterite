@@ -20,6 +20,7 @@ use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_emit::{
     ArrowGroup, DictVersion, EmitMode, EmitOpts, emit_ags4_from_arrow as engine_emit_from_arrow,
+    emit_ags4_from_arrow_unchecked as engine_emit_from_arrow_unchecked,
 };
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -137,6 +138,42 @@ pub fn emit_ags4_from_arrow(
     let bytes = PyBytes::new(py, &res.bytes).unbind();
     let applied = crate::fixes_to_pylist(py, &res.applied)?;
     Ok((bytes, findings_json, applied, res.fixes_applied))
+}
+
+/// The unchecked door (#858): [`emit_ags4_from_arrow`]'s marshalling handed
+/// to the engine's judge-free entry — bytes out, nothing validated, pinned
+/// byte-identical to the `report` build. No mode / synthesis / TRAN
+/// parameters on purpose: there is no verdict for a mode to act on, and
+/// synthesis + TRAN stamping are conveniences whose gaps only a judge would
+/// have reported.
+#[pyfunction]
+#[pyo3(signature = (tables, edition=None, units=None, types=None))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+pub fn emit_ags4_from_arrow_unchecked(
+    py: Python<'_>,
+    tables: Vec<(String, PyTable)>,
+    edition: Option<String>,
+    units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+) -> PyResult<Py<PyBytes>> {
+    let edition = parse_edition(edition.as_deref())?;
+    let mut groups: Vec<ArrowGroup> = Vec::with_capacity(tables.len());
+    for (code, table) in tables {
+        let (batches, schema) = table.into_inner();
+        let u = units.as_ref().and_then(|m| m.get(&code)).cloned();
+        let t = types.as_ref().and_then(|m| m.get(&code)).cloned();
+        groups.push(ArrowGroup {
+            code,
+            schema,
+            batches,
+            units: u,
+            types: t,
+        });
+    }
+    let bytes = engine_emit_from_arrow_unchecked(groups, edition)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    Ok(PyBytes::new(py, &bytes).unbind())
 }
 
 /// Reproduce python-ags4's `"" if v is None else str(v)` for `compat`'s

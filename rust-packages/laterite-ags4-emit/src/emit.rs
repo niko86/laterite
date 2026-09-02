@@ -512,6 +512,56 @@ impl<'a> EmitStream<'a> {
         let (parsed, emitted_len) = self.assemble()?;
         judge(parsed, emitted_len, opts)
     }
+
+    /// Assemble and STOP — the unchecked doors' finisher (#858). The rule
+    /// engine never runs; the bytes are byte-identical to `finish` under
+    /// `Report` (a test per door pins it), because the two share `assemble`
+    /// and diverge only here.
+    pub(crate) fn finish_unchecked(self) -> Result<Vec<u8>, EmitError> {
+        let (parsed, emitted_len) = self.assemble()?;
+        Ok(reclaim_bytes(parsed, emitted_len))
+    }
+}
+
+/// The one `EmitOpts` shape the unchecked doors are allowed to feed the
+/// stream (#858): no mode dispatch ever happens (`finish_unchecked` has no
+/// judge to hand it to), no TRAN stamping and no catalog synthesis — both
+/// are judge-era conveniences whose absence Report would have REPORTED, and
+/// unchecked has nothing to report with. Report-shaped so the synth
+/// accumulator never arms and the assembly is the judged Report door's,
+/// bit for bit.
+pub(crate) fn unchecked_opts(edition: DictVersion) -> EmitOpts {
+    EmitOpts {
+        mode: EmitMode::Report,
+        edition,
+        tran: None,
+        synthesise_metadata: false,
+    }
+}
+
+/// Build AGS4 bytes from typed/string group data with NO validity verdict —
+/// [`emit_ags4_owned`]'s assembly under `Report`, minus the judge (#858).
+///
+/// The caller is choosing to ship unchecked bytes: nothing here confirms the
+/// output satisfies any AGS4 rule, and nothing downstream will. The verdict
+/// is most of what [`emit_ags4`] spends its time on (the decomposition is on
+/// #858), so this exists for the caller who validates elsewhere or not at
+/// all — a pipeline's inner loop, a file bound for an external checker. Same
+/// hybrid UNIT/TYPE fills, same cell formatting, same section order: a test
+/// pins the bytes equal to the judged `Report` build's.
+pub fn emit_ags4_unchecked(
+    groups: Vec<GroupInput>,
+    edition: DictVersion,
+) -> Result<Vec<u8>, EmitError> {
+    let opts = unchecked_opts(edition);
+    let dict = Dictionary::bundled(edition);
+    let mut stream = EmitStream::new(&opts, &dict);
+    for g in groups {
+        // Consuming, like `emit_ags4_owned`: unchecked exists for the
+        // caller counting costs, so it takes the door with the lower peak.
+        stream.push(owned_group_consuming(g, &dict))?;
+    }
+    stream.finish_unchecked()
 }
 
 /// Step 4, over the CONSTRUCTED verdict: run the rule engine, apply the
@@ -1304,6 +1354,80 @@ mod tests {
             "Report should not pad, got:\n{text}"
         );
         assert_eq!(r.fixes_applied, 0);
+    }
+
+    /// #858: the unchecked door's whole contract is BYTE IDENTITY with the
+    /// judged `Report` door — same fills, same formatting, same section
+    /// order; the only thing removed is the verdict. Held on a clean build
+    /// AND a dirty one (no PROJ, a ragged row, a non-canonical string under
+    /// a 2DP fill): the dirty case is where a judge influencing the bytes
+    /// would show, and asserting Report actually OBJECTED to it keeps the
+    /// identity falsifiable.
+    #[test]
+    fn unchecked_bytes_equal_the_judged_report_bytes() {
+        let clean = || {
+            vec![
+                proj(),
+                GroupInput {
+                    code: "LOCA".into(),
+                    headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+                    units: None,
+                    types: None,
+                    rows: vec![vec![c("BH01"), c(12.3)], vec![c("BH02"), Cell::Null]],
+                },
+            ]
+        };
+        let dirty = || {
+            vec![GroupInput {
+                code: "LOCA".into(),
+                headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+                units: None,
+                types: None,
+                rows: vec![vec![c("BH01"), c("12.3")], vec![c("BH02")]],
+            }]
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+
+        let judged = emit_ags4(&clean(), &opts).unwrap();
+        assert_eq!(
+            emit_ags4_unchecked(clean(), opts.edition).unwrap(),
+            judged.bytes,
+            "clean build: unchecked bytes must be the judged Report bytes"
+        );
+
+        let judged = emit_ags4(&dirty(), &opts).unwrap();
+        assert!(
+            judged.findings.values().flatten().count() > 0,
+            "the dirty fixture must draw findings, or the identity proves nothing"
+        );
+        assert_eq!(
+            emit_ags4_unchecked(dirty(), opts.edition).unwrap(),
+            judged.bytes,
+            "dirty build: the judge must not have been shaping the bytes"
+        );
+    }
+
+    /// #858: a zero-group build refuses through the unchecked door exactly
+    /// as through the judged one, worded identically — the refusal lives in
+    /// `assemble`, upstream of the judge, and must not drift between doors.
+    #[test]
+    fn unchecked_zero_group_build_fails_like_the_judged_door() {
+        let Err(judged) = emit_ags4(
+            &[],
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..EmitOpts::default()
+            },
+        ) else {
+            panic!("a zero-group judged build must refuse");
+        };
+        let Err(unchecked) = emit_ags4_unchecked(vec![], DictVersion::V4_1_1) else {
+            panic!("a zero-group unchecked build must refuse");
+        };
+        assert_eq!(unchecked.to_string(), judged.to_string());
     }
 
     #[test]

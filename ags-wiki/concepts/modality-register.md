@@ -26,7 +26,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 ## Findings backlog (find-only — fixes are follow-ups)
 
 - **🔴 P1** (0): —
-- **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
+- **🟠 P2** (6): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); build-unchecked/node (out.bytes); build-unchecked/browser (out.bytes); emit/browser (out.bytes)
 - **🟡 P3** (5): read/rust (in.file-like); validate/rust (in.file-like); transport-pack/browser (in.bytes); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (17): intentional absences, rationale in each cell below.
 
@@ -184,6 +184,42 @@ _Notes:_
 - _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 - _cli_: **by-design.** "Construct from caller-supplied data" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
+
+### build-unchecked — Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).
+
+*Offered anywhere — in: handle, value · out: bytes, file*
+
+**Input**
+
+| surface (spelling) | handle | value |
+|---|---|---|
+| python (free) | ✓ | ✓ |
+| node (absent) | — | — |
+| browser (absent) |   | — |
+| rust (absent) |   |   |
+| duckdb (n/a) |   |   |
+| cli (absent) |   |   |
+
+**Output**
+
+| surface (spelling) | file | bytes |
+|---|---|---|
+| python (free) | ✓ | ✓ |
+| node (absent) | — | — |
+| browser (absent) |   | — |
+| rust (absent) |   |   |
+| duckdb (n/a) |   |   |
+| cli (absent) |   |   |
+
+_Findings:_
+- 🟠 P2 · **node** out.bytes `build-unchecked-follow-up` — Decided on #858 (all three data surfaces get the door; Python shipped first) and recorded as #881: buildAgs4Unchecked, the same suffix everywhere, Buffer out + the out= staged-write rider, byte-identity test against the report build. The engine entry (laterite-ags4-emit::emit_ags4_from_arrow_unchecked) already exists — this is binding work only.
+- 🟠 P2 · **browser** out.bytes `build-unchecked-follow-up` — Decided on #858 and recorded as #881: a flat build_ags4_unchecked export, bytes out — bytes being the universal output form is what lets the unchecked door exist in a browser at all (no filesystem, so no file rider). Binding work only; the shared engine entry exists.
+
+_Notes:_
+- _python_: Byte-identical to build_ags4(mode="report") — pinned by test — with the verdict skipped; the docstring is the consent form ("you are choosing to ship unchecked bytes"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as "judged clean". The file form is build's staged write minus the verdict gate in front of it.
+- _rust_: Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now.
+- _duckdb_: **by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes.
+- _cli_: **by-design.** Same as build: "construct from caller-supplied data" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files.
 
 ### diff — Compare two AGS4 revisions.
 

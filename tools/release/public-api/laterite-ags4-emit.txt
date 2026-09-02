@@ -173,6 +173,8 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::TranStampError
 pub fn laterite_ags4_emit::canonical_matrix_blocks(&laterite_ags4_parse::ParsedFile) -> alloc::vec::Vec<(alloc::string::String, alloc::vec::Vec<alloc::vec::Vec<alloc::string::String>>)>
 pub fn laterite_ags4_emit::emit_ags4(&[laterite_ags4_emit::GroupInput], &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::emit_ags4_from_arrow(alloc::vec::Vec<laterite_ags4_emit::ArrowGroup>, &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
+pub fn laterite_ags4_emit::emit_ags4_from_arrow_unchecked(alloc::vec::Vec<laterite_ags4_emit::ArrowGroup>, laterite_ags4_reference::dict::dict_data::DictVersion) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::emit_ags4_owned(alloc::vec::Vec<laterite_ags4_emit::GroupInput>, &laterite_ags4_emit::EmitOpts) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
+pub fn laterite_ags4_emit::emit_ags4_unchecked(alloc::vec::Vec<laterite_ags4_emit::GroupInput>, laterite_ags4_reference::dict::dict_data::DictVersion) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::write_ags4<W: core::io::write::Write>(&mut W, &[laterite_ags4_emit::EmitGroup<'_>]) -> core::result::Result<(), laterite_ags4_emit::EmitError>
 pub fn laterite_ags4_emit::write_ags4_matrix<W: core::io::write::Write>(&mut W, &[(alloc::string::String, alloc::vec::Vec<alloc::vec::Vec<alloc::string::String>>)], bool) -> core::result::Result<(), laterite_ags4_emit::EmitError>

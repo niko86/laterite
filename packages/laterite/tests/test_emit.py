@@ -532,3 +532,78 @@ def test_read_build_round_trip_of_a_date_only_dt_needs_no_fix(tmp_path):
         assert not [f for f in out.findings if f["rule"] == "AGS Format Rule 8"], mode
         assert out.fixes_applied == 0, f"{mode}: nothing should need fixing"
         assert _data_rows(out.text, "LOCA")[0][1] == "2021-08-09"
+
+
+# --- build_ags4_unchecked (#858): the no-verdict door -----------------------
+
+
+def test_unchecked_bytes_equal_the_judged_report_bytes():
+    # The whole contract: same fills, same formatting, same order as
+    # build_ags4(mode="report") — the only thing removed is the verdict.
+    # Held on a clean build AND a dirty one; asserting report actually
+    # OBJECTED to the dirty one keeps the identity falsifiable.
+    clean = {
+        "PROJ": _proj(),
+        "LOCA": pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]}),
+    }
+    judged = laterite.build_ags4(clean, mode="report")
+    assert laterite.build_ags4_unchecked(clean) == judged.bytes
+
+    # No PROJ, a non-canonical string under the 2DP dict fill.
+    dirty = {"LOCA": pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": ["12.3"]})}
+    judged = laterite.build_ags4(dirty, mode="report")
+    assert judged.findings, "the dirty fixture must draw findings"
+    assert laterite.build_ags4_unchecked(dirty) == judged.bytes
+
+
+def test_unchecked_returns_plain_bytes_not_a_build_result():
+    # Deliberately NOT a BuildResult: an empty `findings` would read as
+    # "judged clean", and nothing here judged anything. The absent field IS
+    # the statement.
+    raw = laterite.build_ags4_unchecked({"PROJ": _proj()})
+    assert type(raw) is bytes
+
+
+def test_unchecked_accepts_edition_units_and_types():
+    # The data-shaping knobs survive; only the judge-coupled ones
+    # (mode / synthesise_metadata / tran) are gone.
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": [1.0], "LOCA_XTRA": ["9"]})
+    raw = laterite.build_ags4_unchecked(
+        {"PROJ": _proj(), "LOCA": loca},
+        dict_version="4.2",
+        units={"LOCA": {"LOCA_XTRA": "kPa"}},
+        types={"LOCA": {"LOCA_XTRA": "3DP"}},
+    )
+    rows = _group_rows(raw.decode("utf-8"), "LOCA")
+    assert rows["types"] == ["ID", "2DP", "3DP"]
+    assert rows["units"] == ["", "m", "kPa"]
+    with pytest.raises(TypeError):
+        laterite.build_ags4_unchecked({"PROJ": _proj()}, mode="report")
+    with pytest.raises(ValueError, match=r"^build_ags4_unchecked "):
+        laterite.build_ags4_unchecked({"PROJ": _proj()}, units={"NOPE": {"X": "m"}})
+
+
+def test_unchecked_out_stages_the_write(tmp_path):
+    # Same staged write as build_ags4(out=) — a temp file beside the
+    # destination, os.replace'd into place — WITHOUT the verdict gate:
+    # unvalidated bytes landing on disk is the feature being asked for.
+    frames = {"PROJ": _proj()}
+    dest = tmp_path / "delivery.ags"
+    ret = laterite.build_ags4_unchecked(frames, out=dest)
+    assert ret == dest
+    assert dest.read_bytes() == laterite.build_ags4_unchecked(frames)
+    leftovers = [p for p in tmp_path.iterdir() if p != dest]
+    assert not leftovers, f"staging must clean up: {leftovers}"
+
+
+def test_unchecked_out_writes_even_a_dirty_file(tmp_path):
+    # THE difference from build_ags4(out=): nothing judges, so a file
+    # build_ags4(mode="strict") refuses still lands — the caller chose
+    # unchecked, and the docstring is the consent form.
+    dirty = {"LOCA": pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": ["12.3"]})}
+    dest = tmp_path / "dirty.ags"
+    with pytest.raises(RuntimeError):
+        laterite.build_ags4(dirty, mode="strict", out=dest)
+    assert not dest.exists(), "the judged door must not have written"
+    laterite.build_ags4_unchecked(dirty, out=dest)
+    assert dest.exists(), "the unchecked door writes what the caller chose"

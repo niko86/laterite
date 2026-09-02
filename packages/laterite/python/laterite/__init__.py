@@ -77,6 +77,7 @@ __all__ = [
     "WorldCheckRequiresSourceError",
     "XnMode",
     "build_ags4",
+    "build_ags4_unchecked",
     "dict_for",
     "diff",
     "engine_fingerprint",
@@ -2292,7 +2293,10 @@ def build_ags4(
 
     Where [`read`][laterite.read] loads an *existing* file, ``build_ags4`` *constructs* a new
     one (and autofixes + validates it); persist the result with
-    [`BuildResult.save`][laterite.BuildResult.save].
+    [`BuildResult.save`][laterite.BuildResult.save]. The verdict is the point
+    of this door; if you have weighed its cost and declined it,
+    [`build_ags4_unchecked`][laterite.build_ags4_unchecked] is the same
+    construction with no judgement at all.
 
     ``groups`` arrives in one of two shapes — the same two laterite-node's
     ``buildAgs4`` accepts:
@@ -2426,6 +2430,47 @@ def build_ags4(
         dict_version = "4.1.1"
     import json
 
+    # `_bridge` (the DuckDB fallback connection, usually None) must outlive
+    # the native call — its registered relations stream lazily.
+    tables, _bridge = _frames_to_tables(groups, units, types, caller="build_ags4")
+    data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
+        tables,
+        dict_version,
+        mode,
+        {k: dict(v) for k, v in units.items()} if units else None,
+        {k: dict(v) for k, v in types.items()} if types else None,
+        synthesise_metadata,
+        tran.issue if tran else None,
+        tran.date if tran else None,
+        tran.producer if tran else None,
+        tran.recipient if tran else None,
+        tran.status if tran else None,
+        tran.description if tran else None,
+        tran.remarks if tran else None,
+    )
+    by_rule: dict[str, list[dict]] = json.loads(findings_json)
+    findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
+    if out is None:
+        return BuildResult(data, findings, list(applied))
+    # The to-disk rider (dec-emit-streamed-verdict): the engine has already
+    # judged `data` (a strict failure raised above, autofix rewrote in
+    # memory), so the destination path never holds unjudged bytes.
+    return BuildSaved(_staged_write(data, out), findings, list(applied))
+
+
+def _frames_to_tables(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    units: Mapping[str, Mapping[str, str]] | None,
+    types: Mapping[str, Mapping[str, str]] | None,
+    *,
+    caller: str,
+) -> tuple[list[tuple[str, Any]], Any]:
+    """The build doors' shared marshalling (#858): a typed graph, mapping or
+    ``(code, frame)`` list → ordered Arrow-capsule tables, with the
+    ``units=``/``types=`` typo check spoken in the caller's name. Returns
+    ``(tables, bridge)`` — ``bridge`` is the DuckDB fallback connection
+    (usually ``None``) and must outlive the native call consuming the
+    tables, because its registered relations stream lazily."""
     if _typed_group_code(groups) is not None:
         items = _typed_graph_to_items(groups)
     elif isinstance(groups, Mapping):
@@ -2448,13 +2493,13 @@ def build_ags4(
             return
         for code, hmap in meta.items():
             if code not in _codes:
-                raise ValueError(f"build_ags4 {name}=: unknown group {code!r}")
+                raise ValueError(f"{caller} {name}=: unknown group {code!r}")
             known = _cols.get(code)
             if known is not None:
                 for heading in hmap:
                     if heading not in known:
                         raise ValueError(
-                            f"build_ags4 {name}=: group {code!r} has no heading {heading!r}"
+                            f"{caller} {name}=: group {code!r} has no heading {heading!r}"
                         )
 
     _check_meta(units, "units")
@@ -2467,7 +2512,7 @@ def build_ags4(
     # branch never burdens a base polars user. (#111 base-surface audit: the old
     # code registered EVERY frame into DuckDB, whose polars ingest goes via
     # polars `.to_arrow()` → pyarrow, leaking [compat] into a base call.)
-    tables = []
+    tables: list[tuple[str, Any]] = []
     con = None
     for i, (code, frame) in enumerate(items):
         frame = _drop_synth_keys(frame)  # never emit a read(keys=True) _id/_parent_id
@@ -2503,30 +2548,15 @@ def build_ags4(
         name = f"_emit_{i}"  # pragma: no cover
         con.register(name, frame)  # pragma: no cover
         tables.append((code, con.sql(f'SELECT * FROM "{name}"')))  # pragma: no cover
-    data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
-        tables,
-        dict_version,
-        mode,
-        {k: dict(v) for k, v in units.items()} if units else None,
-        {k: dict(v) for k, v in types.items()} if types else None,
-        synthesise_metadata,
-        tran.issue if tran else None,
-        tran.date if tran else None,
-        tran.producer if tran else None,
-        tran.recipient if tran else None,
-        tran.status if tran else None,
-        tran.description if tran else None,
-        tran.remarks if tran else None,
-    )
-    by_rule: dict[str, list[dict]] = json.loads(findings_json)
-    findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
-    if out is None:
-        return BuildResult(data, findings, list(applied))
-    # The to-disk rider (dec-emit-streamed-verdict): the engine has already
-    # judged `data` (a strict failure raised above, autofix rewrote in
-    # memory), so stage it beside the destination and move it into place —
-    # same-directory os.replace keeps the move atomic on one filesystem, and
-    # the destination path never holds unjudged bytes.
+    return tables, con
+
+
+def _staged_write(data: bytes, out: str | os.PathLike[str]) -> Path:
+    """Write ``data`` to ``out`` via a temp file in the destination's own
+    directory + ``os.replace`` — atomic on one filesystem, so ``out`` never
+    holds a partial write. Shared by the two build doors' ``out=`` riders;
+    what each door lets REACH this write is the doors' difference, not the
+    write's."""
     import contextlib
     import tempfile
 
@@ -2543,7 +2573,84 @@ def build_ags4(
         with contextlib.suppress(OSError):
             tmp.unlink()
         raise
-    return BuildSaved(out_path, findings, list(applied))
+    return out_path
+
+
+@overload
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: None = None,
+) -> bytes: ...
+@overload
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: str | os.PathLike[str],
+) -> Path: ...
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: str | os.PathLike[str] | None = None,
+) -> bytes | Path:
+    """[`build_ags4`][laterite.build_ags4] without the verdict — you are choosing to ship
+    unchecked bytes.
+
+    Builds exactly what ``build_ags4(mode="report")`` builds — the same
+    dictionary UNIT/TYPE fills, the same canonical cell formatting, the same
+    section order, byte for byte (a test pins the identity) — and skips the
+    validation that follows. **Nothing here confirms the output satisfies any
+    AGS4 rule, and nothing downstream will**: no findings, no fixes, no
+    strict gate. The rule engine is most of what ``build_ags4`` spends its
+    time on (the decomposition is recorded on issue #858), so this door
+    exists for the caller who validates elsewhere or has decided not to — a
+    pipeline's inner loop whose output the pipeline's end validates once, a
+    file bound for an external checker.
+
+    The judge-coupled knobs are gone, not defaulted: no ``mode=`` (there is
+    no verdict for a mode to act on), no ``synthesise_metadata=`` / ``tran=``
+    (synthesis fills gaps a report would have told you about; with no report,
+    a silently minted catalog is a statement nobody checked). ``groups``,
+    ``dict_version``, ``units=`` and ``types=`` behave exactly as on
+    ``build_ags4`` — they shape the data, not the verdict.
+
+    Returns the AGS4 ``bytes``. With ``out=`` given, writes them to that path
+    instead — the same staged temp-file + ``os.replace`` as
+    ``build_ags4(out=)``, minus the verdict gate in front of it — and returns
+    the ``Path`` written. Deliberately **not** a
+    [`BuildResult`][laterite.BuildResult]: its empty ``findings`` would read
+    as "judged clean", and nothing here judged anything.
+
+    If you want the fastest *checked* build, ``build_ags4(mode="report")`` is
+    the same construction with the verdict attached; ``compat``'s writer is
+    the byte-faithful door for data you hold as strings. This one is for when
+    you have weighed the verdict's cost and declined it.
+    """
+    # `_bridge` (the DuckDB fallback connection, usually None) must outlive
+    # the native call — its registered relations stream lazily.
+    tables, _bridge = _frames_to_tables(
+        groups, units, types, caller="build_ags4_unchecked"
+    )
+    # `dict_version=None` passes straight through: the binding's own fallback
+    # (generated from the dictionary) is the single source of the default.
+    data = _native.emit_ags4_from_arrow_unchecked(
+        tables,
+        dict_version,
+        {k: dict(v) for k, v in units.items()} if units else None,
+        {k: dict(v) for k, v in types.items()} if types else None,
+    )
+    if out is None:
+        return data
+    return _staged_write(data, out)
 
 
 class FixResult:

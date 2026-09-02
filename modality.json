@@ -852,6 +852,110 @@
       ]
     },
     {
+      "capability": "build-unchecked",
+      "summary": "Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4_unchecked",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "bytes",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "bytes": "present",
+            "file": "present"
+          },
+          "gaps": [],
+          "note": "Byte-identical to build_ags4(mode=\"report\") — pinned by test — with the verdict skipped; the docstring is the consent form (\"you are choosing to ship unchecked bytes\"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as \"judged clean\". The file form is build's staged write minus the verdict gate in front of it."
+        },
+        {
+          "surface": "node",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {
+            "handle": "absent",
+            "value": "absent"
+          },
+          "output": {
+            "bytes": "absent",
+            "file": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "bytes",
+              "verdict": "gap",
+              "reason": "Decided on #858 (all three data surfaces get the door; Python shipped first) and recorded as #881: buildAgs4Unchecked, the same suffix everywhere, Buffer out + the out= staged-write rider, byte-identity test against the report build. The engine entry (laterite-ags4-emit::emit_ags4_from_arrow_unchecked) already exists — this is binding work only.",
+              "priority": "P2",
+              "related": "build-unchecked-follow-up"
+            }
+          ]
+        },
+        {
+          "surface": "browser",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {
+            "value": "absent"
+          },
+          "output": {
+            "bytes": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "bytes",
+              "verdict": "gap",
+              "reason": "Decided on #858 and recorded as #881: a flat build_ags4_unchecked export, bytes out — bytes being the universal output form is what lets the unchecked door exist in a browser at all (no filesystem, so no file rider). Binding work only; the shared engine entry exists.",
+              "priority": "P2",
+              "related": "build-unchecked-follow-up"
+            }
+          ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now."
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Same as build: \"construct from caller-supplied data\" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files."
+        }
+      ]
+    },
+    {
       "capability": "diff",
       "summary": "Compare two AGS4 revisions.",
       "cells": [
