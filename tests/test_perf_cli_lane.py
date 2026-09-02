@@ -105,8 +105,8 @@ def test_shared_mem_contract_is_the_python_lanes() -> None:
     # shapes share no keys — all read THROUGH this lane's import, so these
     # are also the python copy's first tests.
     assert cli.bench.MEM_CAP_BYTES == 300_000_000
-    assert cli.bench.mem_rung_allowed(275_510_179)
-    assert not cli.bench.mem_rung_allowed(549_703_139)
+    assert cli.bench.mem_rung_allowed(276_462_834)
+    assert not cli.bench.mem_rung_allowed(551_560_078)
     assert cli.bench.SWAP_REFUSAL_BYTES == 64 * 1024 * 1024
 
     measured = cli.bench.mem_cell(1_500_000, 1_000_000)

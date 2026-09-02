@@ -1273,15 +1273,17 @@ on either axis:
   enforces the invariant that actually protects readers — prose never
   misdescribes the committed tables, and the tables move only by a
   deliberate re-run of the instrument that prints them.
-- **Memory**: robust to contention in principle, but blocked twice today.
-  The fixture corpus is unmintable in a fresh environment (#873 — a
-  measuring gate dies in the probe's own drift guard before measuring
-  anything), and a CI-Linux measurement is a **different claim family**
-  from the darwin ledger (rule 8): it cannot "hold" this page's numbers,
-  only found its own family with its own baseline history.
-- **Revisit condition**: corpus v2 lands (#873) *and* a quiet dedicated
-  runner exists. Then the candidate is a **memory**-ratio gate as its own
-  Linux claim family seeded from a fresh baseline pair — not a time gate.
+- **Memory**: robust to contention in principle, but blocked twice at the
+  time of the close-out. The fixture corpus was then unmintable in a fresh
+  environment (#873 — a measuring gate would die in the probe's own drift
+  guard before measuring anything; the corpus-v2 re-pin below has since
+  removed this half), and a CI-Linux measurement is a **different claim
+  family** from the darwin ledger (rule 8): it cannot "hold" this page's
+  numbers, only found its own family with its own baseline history.
+- **Revisit condition**: ~~corpus v2 lands (#873)~~ (landed — see the
+  corpus-v2 re-pin section) *and* a quiet dedicated runner exists. Then
+  the candidate is a **memory**-ratio gate as its own Linux claim family
+  seeded from a fresh baseline pair — not a time gate.
 
 **2. README memory columns — PROMOTED, unflattering cells included.** The
 settled darwin-lane peak-RSS numbers move into both READMEs on the same
@@ -1311,6 +1313,38 @@ time-only everywhere (decision 7).
 The memory queue survives the campaign: M7 and M8 stay **recorded,
 unpriced** — the next campaign's starting rank, not this one's unfinished
 business.
+
+### The corpus-v2 re-pin (#873, 2026-09-02)
+
+The corpus the campaign measured on ("v1") predated emit-output-changing
+work, so the current forge could no longer reproduce its bytes on any
+machine — the manifest pinned files only the ledger machine's cache still
+held. #873 re-minted every rung with the current forge (same seed, same
+`wide` scaffold) through the bench's own `--update-manifest` path and
+re-measured the whole ladder on the result ("v2").
+
+What this moves, and what it does not:
+
+- **A corpus is a claim-family boundary (rule 8).** Every number in this
+  page's ledger history was measured on v1 bytes and stays labelled
+  history; a v2 cell is never compared against a v1 cell. The README
+  tables were re-measured wholesale on v2, never patched.
+- **One manifest.** v2 is mintable anywhere, which dissolves the reason
+  the cross-OS probe/lane carried a separate manifest
+  (`perf-probe-fixtures.json`, deleted): every lane now pins against
+  `tools/readme-bench-fixtures.json`, each keeping its own cache
+  directory. The per-OS drift checks double as the cross-OS byte-identity
+  proof, as before.
+- **v1 is archived, not lost**: on the ledger machine
+  (`~/laterite-corpus-v1/`) and as the `bench-corpus-v1` release asset on
+  the dev satellite, manifest copy included, so any v1-era ledger row can
+  still be re-run against the bytes it described.
+- **A file on disk is not a fixture.** The re-pin itself demonstrated the
+  trap: a killed mint leaves a truncated, syntactically clean file that
+  `--update-manifest` would bless as the pin. The bench's `fixture()` now
+  refuses a file whose size is not plausibly its rung before any pin or
+  measurement (the check in `tools/bench-vs-python-ags4.py` is the
+  authority on the band).
 
 ## Decisions taken
 

@@ -114,13 +114,13 @@ Node 24, macOS arm64, hot files, mean of 5 warm runs. Fixtures are synthetic,
 spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123 groups**,
 realistic type mix, zero findings.
 
-|    File (123 groups) |            `read` |        `validate` | `read` + all typed tables |
-| -------------------: | ----------------: | ----------------: | ------------------------: |
-|      4.9 MB · 459 BH |  24 ms · 203 MB/s |   53 ms · 92 MB/s |          32 ms · 153 MB/s |
-|   24.9 MB · 2,219 BH | 121 ms · 205 MB/s | 229 ms · 109 MB/s |         135 ms · 184 MB/s |
-|  102.7 MB · 8,872 BH | 451 ms · 227 MB/s | 921 ms · 111 MB/s |         619 ms · 166 MB/s |
-| 275.5 MB · 22,813 BH |  1.2 s · 238 MB/s |  2.4 s · 117 MB/s |          1.8 s · 151 MB/s |
-| 549.7 MB · 45,107 BH |  2.7 s · 206 MB/s |  5.0 s · 111 MB/s |          3.9 s · 141 MB/s |
+| File (123 groups) |            `read` |        `validate` | `read` + typed tables |
+| ----------------: | ----------------: | ----------------: | --------------------: |
+|            4.9 MB |  16 ms · 310 MB/s |  40 ms · 122 MB/s |      22 ms · 225 MB/s |
+|           25.0 MB |  75 ms · 335 MB/s | 186 ms · 134 MB/s |      97 ms · 258 MB/s |
+|          103.0 MB | 301 ms · 343 MB/s | 769 ms · 134 MB/s |     392 ms · 262 MB/s |
+|          276.5 MB | 787 ms · 351 MB/s |  2.0 s · 140 MB/s |      1.1 s · 242 MB/s |
+|          551.6 MB |  1.7 s · 327 MB/s |  4.1 s · 134 MB/s |      2.4 s · 228 MB/s |
 
 `read` parses and holds the file; the third column adds materialising **every**
 group to an apache-arrow Table, which is what a consumer actually pays. Throughput

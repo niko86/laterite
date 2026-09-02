@@ -610,8 +610,8 @@ mod tests {
         // The pinned rung sizes (tools/readme-bench-fixtures.json): the cap
         // must admit the 265MB rung and refuse 524MB — epic #820 decision 7,
         // in agreement with the python lane's harness.
-        assert!(mem_rung_allowed(275_510_179));
-        assert!(!mem_rung_allowed(549_703_139));
+        assert!(mem_rung_allowed(276_462_834));
+        assert!(!mem_rung_allowed(551_560_078));
     }
 
     #[test]
