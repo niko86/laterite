@@ -64,7 +64,7 @@ mimalloc = { version = "0.1", features = ["v2"] }
 # has zero code-consumer breakage (every call site uses the re-exported
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /
 # check_file / findings).
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.1" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.14.0" }
 # `--diff` (#204): parse both files via the shared parse leaf + the
 # KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
 laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
