@@ -947,6 +947,17 @@ def main() -> int:
     if args.worker:
         return worker_main(args.worker)
 
+    if sys.platform == "win32":
+        # The tables carry '→' and '×', which a cp1252 console cannot encode
+        # — and dying while PRINTING already-measured results is the worst
+        # possible exit (run 33612539765 measured everything, then crashed
+        # on this glyph). Reconfigure the streams rather than strip the
+        # glyphs: the printed tables are the README paste source and must be
+        # byte-identical across platforms.
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
     # Rebind the module's fixture config before anything touches a rung —
     # fixture(), check_manifest() and the mem harness all read these.
     OUT_DIR = args.fixtures_dir
