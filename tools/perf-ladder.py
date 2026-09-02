@@ -2,9 +2,9 @@
 """Materialise the forge size ladder for the cross-surface perf matrix.
 
 The per-surface harnesses — `laterite-ags4-perf` (rust), the Node lane
-(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823) and the wasm
-lane (`web/bench/perf-matrix.mjs`, #824) today, the CLI lane to follow
-(#825) — all read one ladder manifest
+(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823), the wasm lane
+(`web/bench/perf-matrix.mjs`, #824) and the CLI lane (`tools/perf-cli.py`,
+#825) — all read one ladder manifest
 (`output/perf-ladder/manifest.json`) naming the rungs to measure. This script
 writes it. The rungs themselves are the python lane's fixtures: the same
 forge invocation, the same SHA pins, the same on-disk files
@@ -149,6 +149,10 @@ def main() -> int:
         "(needs npm run build)"
     )
     print("  npm run bench:matrix   # wasm, from web (needs npm run build:wasm-full)")
+    print(
+        "  uv run python tools/perf-cli.py   # cli (needs the release lat; "
+        "never resolves from PATH)"
+    )
     print("then aggregate:  uv run python tools/perf-matrix.py")
     return 0
 
