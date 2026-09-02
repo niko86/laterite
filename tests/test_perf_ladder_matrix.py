@@ -135,6 +135,28 @@ def test_refusal_cells_survive_and_render_as_refusals() -> None:
     assert matrix.fmt_mem(None) == "—"
 
 
+def test_wasm_linear_memory_cells_are_a_labelled_distinct_claim() -> None:
+    # The #824 two-claims rule: the wasm lane's linear-memory high-water is a
+    # different claim from the other surfaces' fresh-child peak RSS. The
+    # merger carries the cell through untouched and the renderer names the
+    # instrument on every measured row, so the two claims can never read as
+    # one cross-surface memory column.
+    wasm_cell = {
+        "instrument": "wasm-linear-memory",
+        "peak_linear_memory_bytes": 3_000_000,
+        "x_output": 0.6,
+    }
+    doc = matrix.merge({"wasm.json": surface_doc("wasm", mem=wasm_cell)})
+    mem = doc["cells"]["validate"]["5MB"]["wasm"]["mem"]
+    rendered = matrix.fmt_mem(mem)
+    assert "wasm linear memory" in rendered and "0.6×" in rendered
+    assert "RSS" not in rendered
+    # The RSS render names its claim too, so neither is an unlabelled default.
+    assert "peak RSS" in matrix.fmt_mem({"peak_rss_bytes": 7_500_000, "x_output": 1.5})
+    # A cell shaped like neither claim renders loudly, not as a KeyError.
+    assert "unrecognised" in matrix.fmt_mem({"x_output": 1.0})
+
+
 def test_render_table_covers_every_surface_and_op() -> None:
     doc = matrix.merge(
         {
