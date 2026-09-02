@@ -1104,39 +1104,10 @@ impl Reading {
     /// every field quoted, blank line between groups) — byte-faithful to
     /// the source DATA values it re-emits.
     fn emit(&self) -> String {
-        let blocks: Vec<(String, Vec<Vec<String>>)> = self
-            .parsed
-            .group_order
-            .iter()
-            .filter_map(|code| {
-                let g = self.parsed.groups.get(code)?;
-                let n = g.headings.len();
-                // tag + each of the n columns, padded/truncated like the old
-                // Python `_matrix` (a ragged DATA row fills its tail with "").
-                let pad = |tag: &str, src: &[String]| {
-                    let mut row = Vec::with_capacity(n + 1);
-                    row.push(tag.to_string());
-                    for i in 0..n {
-                        row.push(src.get(i).cloned().unwrap_or_default());
-                    }
-                    row
-                };
-                let mut matrix: Vec<Vec<String>> = Vec::with_capacity(3 + g.rows.len());
-                let mut heading = Vec::with_capacity(n + 1);
-                heading.push("HEADING".to_string());
-                heading.extend(g.headings.iter().cloned());
-                matrix.push(heading);
-                matrix.push(pad("UNIT", &g.units));
-                matrix.push(pad("TYPE", &g.types));
-                for r in &g.rows {
-                    let mut data = Vec::with_capacity(n + 1);
-                    data.push("DATA".to_string());
-                    data.extend(g.padded_row_strings(r, n));
-                    matrix.push(data);
-                }
-                Some((code.clone(), matrix))
-            })
-            .collect();
+        // The block build is the shared constructor beside the writer — one
+        // copy for this surface and the xcheck reference leg, so the two
+        // cannot drift apart (#847 retired the byte-identical pair).
+        let blocks = laterite_ags4_emit::canonical_matrix_blocks(&self.parsed);
         // The ONE guarded verbatim writer (was this crate's private `emit::emit`, now
         // gone). `trailing_blank_line = false` — the canonical shape every other surface
         // emits, so `.text` no longer carries the trailing blank line that made the Python

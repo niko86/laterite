@@ -21,6 +21,7 @@
 
 use std::io::Write;
 
+use laterite_ags4_parse::ParsedFile;
 use laterite_ags4_parse::builder::{ParsedFileBuilder, RecordedCell, RowTag};
 
 use crate::error::EmitError;
@@ -103,6 +104,50 @@ pub fn write_ags4_matrix<W: Write>(
         stream.group(code, matrix)?;
     }
     stream.finish().map(drop)
+}
+
+/// The canonical `(code, matrix)` blocks of a retained parse — the input
+/// shape [`write_ags4_matrix`] serialises for the structured re-emit behind
+/// `Ags4File.text` (laterite-py's `Reading::emit`) and the xcheck reference
+/// leg (`emit_cases reemit_canonical`). ONE constructor because those two
+/// sites carried byte-identical copies that could only drift apart (#847,
+/// finishing what #844's shared DATA half started): the HEADING row leads
+/// with its literal tag, UNIT/TYPE are tag-prefixed and padded/truncated to
+/// the heading count (a ragged descriptor's tail fills with `""` —
+/// python-ags4's `_matrix` shape, and the reason a descriptor LONGER than
+/// the headings loses its overhang), and DATA rows pad through the parse
+/// leaf's `padded_row_strings`.
+pub fn canonical_matrix_blocks(parsed: &ParsedFile) -> Vec<(String, Vec<Vec<String>>)> {
+    parsed
+        .group_order
+        .iter()
+        .filter_map(|code| {
+            let g = parsed.groups.get(code)?;
+            let n = g.headings.len();
+            let pad = |tag: &str, src: &[String]| {
+                let mut row = Vec::with_capacity(n + 1);
+                row.push(tag.to_string());
+                for i in 0..n {
+                    row.push(src.get(i).cloned().unwrap_or_default());
+                }
+                row
+            };
+            let mut matrix: Vec<Vec<String>> = Vec::with_capacity(3 + g.rows.len());
+            let mut heading = Vec::with_capacity(n + 1);
+            heading.push("HEADING".to_string());
+            heading.extend(g.headings.iter().cloned());
+            matrix.push(heading);
+            matrix.push(pad("UNIT", &g.units));
+            matrix.push(pad("TYPE", &g.types));
+            for r in &g.rows {
+                let mut data = Vec::with_capacity(n + 1);
+                data.push("DATA".to_string());
+                data.extend(g.padded_row_strings(r, n));
+                matrix.push(data);
+            }
+            Some((code.clone(), matrix))
+        })
+        .collect()
 }
 
 /// [`write_ags4_matrix`], one group at a time — the streaming door (#805).
@@ -648,5 +693,28 @@ mod tests {
         assert_eq!(pg.cell(1, 0), Some("say \"hi\""), "unescaped via fix-up");
         assert_eq!(pg.rows[1].n_values(), 1, "ragged row keeps its arity");
         assert_eq!(pg.cell(1, 1), None);
+    }
+
+    #[test]
+    fn canonical_blocks_pad_descriptors_and_data_to_heading_arity() {
+        // The #847 constructor's whole contract: tags in column 0, and every
+        // row squared to the heading count — a short UNIT tail fills with "",
+        // a TYPE longer than the headings loses its overhang (the `_matrix`
+        // shape both former copies implemented), and a ragged DATA row pads
+        // through the parse leaf's shared helper.
+        let text = "\"GROUP\",\"PROJ\"\r\n\
+                    \"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                    \"UNIT\",\"u1\"\r\n\
+                    \"TYPE\",\"ID\",\"X\",\"2DP\"\r\n\
+                    \"DATA\",\"P1\"\r\n";
+        let parsed = laterite_ags4_parse::parse_str(text).expect("fixture parses");
+        let blocks = canonical_matrix_blocks(&parsed);
+        assert_eq!(blocks.len(), 1);
+        let (code, matrix) = &blocks[0];
+        assert_eq!(code, "PROJ");
+        assert_eq!(matrix[0], ["HEADING", "PROJ_ID", "PROJ_NAME"]);
+        assert_eq!(matrix[1], ["UNIT", "u1", ""], "short UNIT tail fills");
+        assert_eq!(matrix[2], ["TYPE", "ID", "X"], "long TYPE overhang drops");
+        assert_eq!(matrix[3], ["DATA", "P1", ""], "ragged DATA row pads");
     }
 }

@@ -45,38 +45,15 @@ fn reemit_canonical(input_path: &PathBuf) -> Observation {
         Ok(p) => p,
         Err(e) => return Observation::Err(format!("{e:?}")),
     };
-    // Build the (code, matrix) blocks exactly as `Reading::emit` does: the tag
-    // plus each of the group's n columns, a ragged row's tail padded with "".
-    let blocks: Vec<(String, Vec<Vec<String>>)> = parsed
-        .group_order
-        .iter()
-        .filter_map(|code| {
-            let g = parsed.groups.get(code)?;
-            let n = g.headings.len();
-            let pad = |tag: &str, src: &[String]| {
-                let mut row = Vec::with_capacity(n + 1);
-                row.push(tag.to_string());
-                for i in 0..n {
-                    row.push(src.get(i).cloned().unwrap_or_default());
-                }
-                row
-            };
-            let mut matrix: Vec<Vec<String>> = Vec::with_capacity(3 + g.rows.len());
-            let mut heading = Vec::with_capacity(n + 1);
-            heading.push("HEADING".to_string());
-            heading.extend(g.headings.iter().cloned());
-            matrix.push(heading);
-            matrix.push(pad("UNIT", &g.units));
-            matrix.push(pad("TYPE", &g.types));
-            for r in &g.rows {
-                let mut data = Vec::with_capacity(n + 1);
-                data.push("DATA".to_string());
-                data.extend(g.padded_row_strings(r, n));
-                matrix.push(data);
-            }
-            Some((code.clone(), matrix))
-        })
-        .collect();
+    // The blocks come from the SAME constructor `Reading::emit` calls
+    // (`canonical_matrix_blocks`, beside the shared writer). That is a
+    // decision, not an accident (#847): this used to be a deliberate
+    // byte-identical copy so the reference stayed independently built, but
+    // #844 already moved the DATA half onto a shared helper, spending that
+    // argument — what this leg still checks independently is the SURFACE
+    // path itself (the binding round trip, and that each surface actually
+    // takes the canonical shape and writer flag), not the block arithmetic.
+    let blocks = laterite_ags4_emit::canonical_matrix_blocks(&parsed);
 
     let mut out = Vec::new();
     match laterite_ags4_emit::write_ags4_matrix(&mut out, &blocks, false) {

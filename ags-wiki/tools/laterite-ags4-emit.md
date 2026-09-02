@@ -44,7 +44,11 @@ Two layers, both public:
   AGS4 file order, every cell double-quote-wrapped with embedded `"` doubled
   (Rule 5), CRLF line ends (Rule 2a), a blank line between sections. UNIT and
   TYPE rows are padded to the heading count so the column count is stable, TYPE
-  defaulting to `X`.
+  defaulting to `X`. Beside them, `canonical_matrix_blocks(&ParsedFile)` builds
+  the `(code, matrix)` block list the matrix writer serialises for the
+  structured re-emit — one constructor shared by `laterite-py`'s
+  `Reading::emit` and the xcheck reference leg, which carried byte-identical
+  copies until #847.
 - **`emit_ags4`** (`repo:rust-packages/laterite-ags4-emit/src/emit.rs`) — the
   host-agnostic orchestrator every surface actually calls: resolve UNIT/TYPE per
   heading (**hybrid** — the caller's explicit value wins, else the per-edition
