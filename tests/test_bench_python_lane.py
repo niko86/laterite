@@ -258,3 +258,17 @@ def test_condensed_memory_table_drops_partial_rungs() -> None:
     text = "\n".join(lines)
     assert "100 MB · **2.00×**" in text and "125 MB · **0.80×**" in text
     assert "549.7 MB" not in text
+
+
+# --- the per-platform peak instrument (#878) --------------------------------
+
+
+def test_peak_rss_self_bytes_is_positive_bytes() -> None:
+    # POSIX here; the Windows branch (PeakWorkingSetSize via ctypes, declared
+    # signatures) is exercised by the perf-lane workflow's windows leg, where
+    # an instrument fault fails every cell loudly rather than silently.
+    peak = bench.peak_rss_self_bytes()
+    assert isinstance(peak, int)
+    # A live interpreter holds at least a few MB; a KiB-vs-bytes unit slip
+    # (the maxrss_to_bytes split) would land three orders below this.
+    assert peak > 10_000_000
