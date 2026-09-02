@@ -224,6 +224,60 @@ extern "C" {
     pub type BuildOptionsJs;
 }
 
+/// Options for the unchecked door (#881): `dictVersion` ONLY. The judge-coupled
+/// knobs are not merely omitted from the TS type — `decode_opts` enumerates
+/// `KEYS`, so a caller passing `mode`/`synthesiseMetadata`/`tran` here is
+/// refused at runtime rather than silently ignored: there is no verdict for a
+/// mode to act on, and synthesis fills gaps only a report would surface.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct UncheckedBuildOptions {
+    dict_version: Option<String>,
+}
+
+impl WasmOptions for UncheckedBuildOptions {
+    const KEYS: &'static [&'static str] = &["dictVersion"];
+    const WHAT: &'static str = "unchecked build options";
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_UNCHECKED_BUILD_OPTIONS: &'static str = r#"
+/** Options for `build_ags4_unchecked` — `dictVersion` only. The judged door's
+ *  `mode` / `synthesiseMetadata` / `tran` are gone, not defaulted: there is no
+ *  verdict for a mode to act on, and synthesis fills gaps only a report would
+ *  surface. Passing them is refused at runtime, never silently ignored. */
+export interface UncheckedBuildOptions {
+  /** The edition to write against. `"auto"` (or omitted) uses the standard. */
+  dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "UncheckedBuildOptions")]
+    pub type UncheckedBuildOptionsJs;
+}
+
+/// The JSON door's decode, shared by the judged and unchecked cores (#881):
+/// one mapping from the browser's `{code, headings, units?, types?, rows}`
+/// array to the engine's `GroupInput`s, so the doors cannot drift at the
+/// input.
+fn groups_from_json(groups_json: &str) -> Result<Vec<laterite_ags4_emit::GroupInput>, String> {
+    let parsed: Vec<GroupInputJson> =
+        serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
+    Ok(parsed
+        .into_iter()
+        .map(|g| laterite_ags4_emit::GroupInput {
+            code: g.code,
+            headings: g.headings,
+            units: g.units,
+            types: g.types,
+            rows: g.rows,
+        })
+        .collect())
+}
+
 /// Core of [`build_ags4`], host-testable (no `JsValue`): parse the JSON, run
 /// the shared `laterite-ags4-emit` orchestrator, flatten the findings.
 fn build_ags4_from_json(
@@ -233,19 +287,27 @@ fn build_ags4_from_json(
     synthesise_metadata: bool,
     tran: Option<laterite_ags4_emit::TranStamp>,
 ) -> Result<BuildAgs4Report, String> {
-    let parsed: Vec<GroupInputJson> =
-        serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
-    let groups: Vec<laterite_ags4_emit::GroupInput> = parsed
-        .into_iter()
-        .map(|g| laterite_ags4_emit::GroupInput {
-            code: g.code,
-            headings: g.headings,
-            units: g.units,
-            types: g.types,
-            rows: g.rows,
-        })
-        .collect();
-    emit_report(groups, edition, mode, synthesise_metadata, tran)
+    emit_report(
+        groups_from_json(groups_json)?,
+        edition,
+        mode,
+        synthesise_metadata,
+        tran,
+    )
+}
+
+/// The host-testable core of [`build_ags4_unchecked`] (#881): the same JSON
+/// decode and the same edition resolution as the judged door, handed to the
+/// engine's judge-free entry. Bytes out, nothing validated — pinned
+/// byte-identical to the judged `report` build by test, exactly the #858
+/// contract Python ships.
+pub(crate) fn build_ags4_unchecked_core(
+    groups_json: &str,
+    edition: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    let groups = groups_from_json(groups_json)?;
+    laterite_ags4_emit::emit_ags4_unchecked(groups, emit_edition(edition)?)
+        .map_err(|e| e.to_string())
 }
 
 /// Run the shared orchestrator over already-built `GroupInput`s and shape the
@@ -478,6 +540,30 @@ pub fn build_ags4(
     to_js(&report)
 }
 
+/// [`build_ags4`] with NO validity verdict — the browser's half of the #858
+/// unchecked pair (#881), taking the same `groups_json` and returning raw
+/// bytes.
+///
+/// The caller is choosing to ship unchecked bytes: nothing here confirms the
+/// output satisfies any AGS4 rule, and nothing downstream will. The bytes are
+/// **identical to the judged `"report"` build's** (same dictionary fills, same
+/// canonical formatting, same order — pinned by test); what is removed is the
+/// rule engine, which is most of what the judged call spends its time on (the
+/// decomposition is on #858). No `mode` / `synthesiseMetadata` / `tran`:
+/// passing them is refused, never silently ignored. Returns a `Uint8Array`
+/// (UTF-8, CRLF) — bytes being the universal output form is what lets this
+/// door exist in a browser at all.
+#[wasm_bindgen]
+pub fn build_ags4_unchecked(
+    groups_json: &str,
+    opts: Option<UncheckedBuildOptionsJs>,
+) -> Result<Vec<u8>, JsError> {
+    console_error_panic_hook::set_once();
+    let o: UncheckedBuildOptions =
+        decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    build_ags4_unchecked_core(groups_json, o.dict_version.as_deref()).map_err(|e| JsError::new(&e))
+}
+
 /// Build valid AGS4 from **columnar Arrow IPC** input — the same as
 /// [`build_ags4`] but for large, already-columnar browser data (e.g. a
 /// duckdb-wasm query result) without a per-cell JSON round-trip.
@@ -641,6 +727,58 @@ mod tests {
         let r = build_ags4_from_json(json, None, Some("autofix"), false, None).unwrap();
         assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
         assert!(r.text.contains("\"12.30\""), "{}", r.text);
+    }
+
+    /// #881: the browser's unchecked door returns exactly the judged `report`
+    /// build's bytes — the same #858 contract Python pins. Held on a clean
+    /// build AND a dirty one (a data-only build with a non-canonical string,
+    /// reporting its missing catalogs): the dirty case is where a judge
+    /// shaping the bytes would show, and asserting it demonstrably draws
+    /// findings keeps the identity falsifiable.
+    #[test]
+    fn unchecked_bytes_equal_the_judged_report_bytes() {
+        let clean = r#"[
+          {"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","Demo"]]},
+          {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01",12.3]]}
+        ]"#;
+        let judged =
+            build_ags4_from_json(clean, Some("4.1.1"), Some("report"), false, None).unwrap();
+        assert_eq!(
+            build_ags4_unchecked_core(clean, Some("4.1.1")).unwrap(),
+            judged.text.as_bytes(),
+            "clean build: unchecked bytes must be the judged report text"
+        );
+
+        let dirty = r#"[
+          {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
+          {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
+        ]"#;
+        let judged =
+            build_ags4_from_json(dirty, Some("4.1.1"), Some("report"), false, None).unwrap();
+        assert!(
+            !judged.findings.is_empty(),
+            "the dirty fixture must draw findings, or the identity proves nothing"
+        );
+        let bytes = build_ags4_unchecked_core(dirty, Some("4.1.1")).unwrap();
+        assert_eq!(
+            bytes,
+            judged.text.as_bytes(),
+            "dirty build: the judge must not have been shaping the bytes"
+        );
+    }
+
+    /// #881: a zero-group build refuses identically through both doors — the
+    /// refusal lives in the shared assembly, upstream of the judge, and must
+    /// not drift between them on this surface either.
+    #[test]
+    fn unchecked_zero_group_refusal_matches_the_judged_door() {
+        let Err(judged) = build_ags4_from_json("[]", None, Some("report"), false, None) else {
+            panic!("a zero-group judged build must refuse");
+        };
+        let Err(unchecked) = build_ags4_unchecked_core("[]", None) else {
+            panic!("a zero-group unchecked build must refuse");
+        };
+        assert_eq!(unchecked, judged);
     }
 
     #[test]

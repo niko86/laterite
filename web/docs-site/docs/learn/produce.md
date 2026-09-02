@@ -123,6 +123,12 @@ inner loop whose final output gets validated once, a file bound for an
 external checker. You are choosing to ship unchecked bytes; that is the whole
 feature, and the choice is yours to make.
 
+The door exists on all three data surfaces under one name: Python's
+`build_ags4_unchecked` above, Node's `buildAgs4Unchecked` (a `Buffer` back, or
+the path with `out`), and the browser wasm build's `build_ags4_unchecked`
+(a `Uint8Array`; no filesystem, so no `out` rider). Each surface pins the
+same byte-identity contract against its own judged `report` build.
+
 ## Keeping the build's memory peak down
 
 `build_ags4` judges its own writing as it streams, so the door's side of the

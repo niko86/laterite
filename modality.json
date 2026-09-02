@@ -884,47 +884,53 @@
         },
         {
           "surface": "node",
-          "spelling": "absent",
-          "verbs": [],
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "buildAgs4Unchecked",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "bytes",
+                "file"
+              ]
+            }
+          ],
           "input": {
-            "handle": "absent",
-            "value": "absent"
+            "handle": "present",
+            "value": "present"
           },
           "output": {
-            "bytes": "absent",
-            "file": "absent"
+            "bytes": "present",
+            "file": "present"
           },
-          "gaps": [
-            {
-              "direction": "out",
-              "form": "bytes",
-              "verdict": "gap",
-              "reason": "Decided on #858 (all three data surfaces get the door; Python shipped first) and recorded as #881: buildAgs4Unchecked, the same suffix everywhere, Buffer out + the out= staged-write rider, byte-identity test against the report build. The engine entry (laterite-ags4-emit::emit_ags4_from_arrow_unchecked) already exists — this is binding work only.",
-              "priority": "P2",
-              "related": "build-unchecked-follow-up"
-            }
-          ]
+          "gaps": [],
+          "note": "Landed via #881, one release behind Python's door. Byte-identical to buildAgs4({ mode: \"report\" }) — pinned by test — returning a plain Buffer (deliberately not a BuildResult), or the path with out= via the same staged rename minus the verdict gate. The judge-coupled knobs are refused at runtime by name, never silently ignored — absence from the TS type alone would let a JS caller's mode: \"strict\" be dropped on the floor."
         },
         {
           "surface": "browser",
-          "spelling": "absent",
-          "verbs": [],
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4_unchecked",
+              "in_forms": [
+                "text"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
           "input": {
-            "value": "absent"
+            "text": "present"
           },
           "output": {
-            "bytes": "absent"
+            "bytes": "present"
           },
-          "gaps": [
-            {
-              "direction": "out",
-              "form": "bytes",
-              "verdict": "gap",
-              "reason": "Decided on #858 and recorded as #881: a flat build_ags4_unchecked export, bytes out — bytes being the universal output form is what lets the unchecked door exist in a browser at all (no filesystem, so no file rider). Binding work only; the shared engine entry exists.",
-              "priority": "P2",
-              "related": "build-unchecked-follow-up"
-            }
-          ]
+          "gaps": [],
+          "note": "Landed via #881. Takes the judged door's own groups_json (the build capability's recorded JSON-text outlier rides along unchanged — reconciling it is that cell's gap, not this one's) and returns a Uint8Array, byte-identical to the judged report build's text. dictVersion is the only option; the decode_opts KEYS guard refuses mode/synthesiseMetadata/tran by name. No filesystem, so no file rider — bytes being the universal output form is what lets this door exist in a browser at all."
         },
         {
           "surface": "rust",

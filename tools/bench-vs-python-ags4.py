@@ -163,6 +163,10 @@ SWAP_REFUSAL_BYTES = 64 * 1024 * 1024
 UPSTREAM_DOOR = "python_ags4"
 NATIVE_DOOR = "laterite"
 COMPAT_DOOR = "laterite_compat"
+# The write axis's fourth door (#881): build_ags4_unchecked — the judged
+# build's assembly with the verdict declined. python-ags4's write checks
+# nothing either, so this is the closest like-for-like write cell.
+UNCHECKED_DOOR = "laterite_unchecked"
 
 
 def die(msg: str) -> None:
@@ -721,6 +725,15 @@ def _op_write_native(path: str, out: str | None) -> None:
     laterite.build_ags4(frames).save(out)
 
 
+def _op_write_native_unchecked(path: str, out: str | None) -> None:
+    import laterite
+
+    assert out is not None  # the write plan always supplies a destination
+    handle = laterite.read(path)
+    frames = {code: handle[code] for code in handle.groups}
+    laterite.build_ags4_unchecked(frames, out=out)
+
+
 WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
     "baseline_upstream": _op_baseline_upstream,
     "baseline_native": _op_baseline_native,
@@ -733,6 +746,7 @@ WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
     "write_upstream": _op_write_upstream,
     "write_compat": _op_write_compat,
     "write_native": _op_write_native,
+    "write_native_unchecked": _op_write_native_unchecked,
 }
 
 
@@ -1071,6 +1085,14 @@ def main() -> int:
             lambda: laterite.build_ags4(frames).save(str(write_out)), args.runs
         )
 
+    def timed_write_unchecked(target: str) -> float:
+        handle = laterite.read(target)
+        frames = {code: handle[code] for code in handle.groups}
+        return best_of(
+            lambda: laterite.build_ags4_unchecked(frames, out=str(write_out)),
+            args.runs,
+        )
+
     def record_time(axis: str, size: str, door: str, seconds: float) -> None:
         time_cells[axis].setdefault(size, {})[door] = {
             "seconds": round(seconds, 4),
@@ -1167,20 +1189,23 @@ def main() -> int:
         gc.collect()
         w_native = timed_write_native(p)
         gc.collect()
+        w_unchecked = timed_write_unchecked(p)
+        gc.collect()
         write_out.unlink(missing_ok=True)
         for door, seconds in (
             (UPSTREAM_DOOR, w_up),
             (COMPAT_DOOR, w_compat),
             (NATIVE_DOOR, w_native),
+            (UNCHECKED_DOOR, w_unchecked),
         ):
             record_time("write", size, door, seconds)
-        rows["write"].append((label, w_up, w_compat, w_native))
+        rows["write"].append((label, w_up, w_compat, w_native, w_unchecked))
         flush()
         print(
             f"  [{label}] done — validate {fmt(cells[0][2])}/{fmt(cells[1][2])}, "
             f"read {fmt(cells[2][2])}/{fmt(cells[3][2])}, "
             f"typed {fmt(cells[4][2])}/{fmt(cells[5][2])}, "
-            f"write {fmt(w_up)}/{fmt(w_compat)}/{fmt(w_native)} "
+            f"write {fmt(w_up)}/{fmt(w_compat)}/{fmt(w_native)}/{fmt(w_unchecked)} "
             f"(upstream/ours) — checkpointed",
             flush=True,
         )
@@ -1215,6 +1240,7 @@ def main() -> int:
                 (UPSTREAM_DOOR, "write_upstream", True),
                 (COMPAT_DOOR, "write_compat", True),
                 (NATIVE_DOOR, "write_native", True),
+                (UNCHECKED_DOOR, "write_native_unchecked", True),
             ],
         ),
     ]
@@ -1315,13 +1341,14 @@ def main() -> int:
         print("\n**Write**\n")
         print(
             "| File | `python-ags4 dataframe_to_AGS4` | `compat` | speedup "
-            "| `build_ags4` | speedup |"
+            "| `build_ags4` | speedup | `build_ags4_unchecked` | speedup |"
         )
-        print("|---:|---:|---:|:---:|---:|:---:|")
-        for label, a, b, c in rows["write"]:
+        print("|---:|---:|---:|:---:|---:|:---:|---:|:---:|")
+        for label, a, b, c, d in rows["write"]:
             print(
                 f"| {label} | {fmt(a)} | {fmt(b)} | **{a / b:.1f}×** "
-                f"| {fmt(c)} | **{a / c:.1f}×** |"
+                f"| {fmt(c)} | **{a / c:.1f}×** "
+                f"| {fmt(d)} | **{a / d:.1f}×** |"
             )
 
     if mem_cells:
