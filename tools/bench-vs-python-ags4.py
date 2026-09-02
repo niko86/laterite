@@ -539,6 +539,10 @@ def mem_total_bytes() -> int | None:
             ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, check=False
         )
         return int(out.stdout.strip()) if out.returncode == 0 else None
+    # Windows has no os.sysconf — absent context, not a crash (#878; the
+    # first windows lane leg died right here building its results block).
+    if not hasattr(os, "sysconf"):
+        return None
     try:
         return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     except (ValueError, OSError):
@@ -732,15 +736,55 @@ WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
 }
 
 
+def parse_vm_hwm_bytes(status_text: str) -> int | None:
+    """`VmHWM:  123456 kB` from a /proc/<pid>/status dump, in bytes."""
+    m = re.search(r"^VmHWM:\s*(\d+)\s*kB", status_text, re.MULTILINE)
+    return int(m.group(1)) * 1024 if m else None
+
+
+def reset_peak_accounting() -> bool:
+    """Linux only: reset this process's VmHWM high-water (`echo 5 >
+    /proc/self/clear_refs`), so the peak read at exit is the peak of THIS
+    process's own work.
+
+    Why it exists (#878, lane run 33610286305): Linux `ru_maxrss` is
+    inherited across fork() and never resets on exec, so a child spawned by
+    a fat parent — this tool, right after timing the biggest rung
+    in-process — starts with the parent's high-water already stamped, and
+    every memory cell reads the parent's RSS as one constant. darwin's
+    spawn semantics reset accounting (the committed lane never saw this)
+    and the M1 probe's parent is thin (nor did it); the Linux lane's parent
+    is exactly the fat case. VmHWM is the resettable twin of ru_maxrss.
+    Returns False where the mechanism doesn't exist (not Linux, or /proc
+    withheld) — the reader below falls back to ru_maxrss there."""
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        Path("/proc/self/clear_refs").write_text("5")
+    except OSError:
+        return False
+    return True
+
+
 def peak_rss_self_bytes() -> int:
     """This process's peak RSS in bytes — the one instrument, per platform.
 
-    POSIX reads `ru_maxrss` (bytes on darwin, KiB on Linux — `maxrss_to_bytes`
-    owns that split). Windows has no `resource` module; the equivalent
-    high-water is `PeakWorkingSetSize` via ctypes, with declared signatures —
-    without them ctypes marshals the 64-bit pseudo-handle through `c_int` and
-    every call fails ERROR_INVALID_HANDLE (perf_probe_m1.py learned this on
-    run 33585274632; this is the same instrument, kept in step)."""
+    Linux prefers `VmHWM` (the resettable twin of `ru_maxrss` — see
+    `reset_peak_accounting` for why resettable matters) with `ru_maxrss` as
+    the fallback; darwin reads `ru_maxrss` (bytes there, KiB on Linux —
+    `maxrss_to_bytes` owns that split). Windows has no `resource` module;
+    the equivalent high-water is `PeakWorkingSetSize` via ctypes, with
+    declared signatures — without them ctypes marshals the 64-bit
+    pseudo-handle through `c_int` and every call fails ERROR_INVALID_HANDLE
+    (perf_probe_m1.py learned this on run 33585274632; this is the same
+    instrument, kept in step)."""
+    if sys.platform.startswith("linux"):
+        try:
+            hwm = parse_vm_hwm_bytes(Path("/proc/self/status").read_text())
+        except OSError:
+            hwm = None
+        if hwm is not None:
+            return hwm
     if sys.platform == "win32":
         import ctypes
         import ctypes.wintypes as wt
@@ -783,6 +827,10 @@ def peak_rss_self_bytes() -> int:
 
 def worker_main(spec_json: str) -> int:
     spec = json.loads(spec_json)
+    # Before the op, so the peak read at exit belongs to this child's own
+    # work, not to the accounting the fork stamped on it (see
+    # reset_peak_accounting — this line is the #878 fix).
+    reset_peak_accounting()
     WORKER_OPS[spec["op"]](spec.get("path", ""), spec.get("out"))
     out = spec.get("out")
     result = {
@@ -898,6 +946,17 @@ def main() -> int:
 
     if args.worker:
         return worker_main(args.worker)
+
+    if sys.platform == "win32":
+        # The tables carry '→' and '×', which a cp1252 console cannot encode
+        # — and dying while PRINTING already-measured results is the worst
+        # possible exit (run 33612539765 measured everything, then crashed
+        # on this glyph). Reconfigure the streams rather than strip the
+        # glyphs: the printed tables are the README paste source and must be
+        # byte-identical across platforms.
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
 
     # Rebind the module's fixture config before anything touches a rung —
     # fixture(), check_manifest() and the mem harness all read these.
@@ -1190,6 +1249,40 @@ def main() -> int:
                         f"  [{labels[size]}] {axis:12s} {door:16s} {shown}", flush=True
                     )
             flush()
+
+        # A broken peak instrument does not scatter, it repeats: when fork
+        # accounting (or an emulated kernel) hands every child the same
+        # inherited high-water, every cell reads one constant and the
+        # numbers LOOK precise (#878 — lane run 33610286305 published
+        # fifteen byte-identical cells before this guard existed). The
+        # checkpointed results file keeps the raw cells for diagnosis; the
+        # run itself must not conclude success over them.
+        measured = {
+            cell["peak_rss_bytes"]
+            for by_size in mem_cells.values()
+            for by_door in by_size.values()
+            for cell in by_door.values()
+            if "peak_rss_bytes" in cell
+        }
+        if (
+            len(measured) == 1
+            and sum(
+                1
+                for by_size in mem_cells.values()
+                for by_door in by_size.values()
+                for cell in by_door.values()
+                if "peak_rss_bytes" in cell
+            )
+            >= 4
+        ):
+            die(
+                "every memory cell measured the same peak "
+                f"({next(iter(measured))} bytes) — that is an instrument "
+                "reading one inherited constant, not a set of measurements. "
+                "Per-process peak accounting is not working in this "
+                "environment; the checkpointed results file carries the raw "
+                "cells for diagnosis."
+            )
 
     # --- output -------------------------------------------------------------
 
