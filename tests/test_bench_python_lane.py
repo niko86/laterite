@@ -272,3 +272,20 @@ def test_peak_rss_self_bytes_is_positive_bytes() -> None:
     # A live interpreter holds at least a few MB; a KiB-vs-bytes unit slip
     # (the maxrss_to_bytes split) would land three orders below this.
     assert peak > 10_000_000
+
+
+def test_parse_vm_hwm_bytes() -> None:
+    status = "Name:\tpython3\nVmPeak:\t  999 kB\nVmHWM:\t  123456 kB\nVmRSS:\t 5 kB\n"
+    assert bench.parse_vm_hwm_bytes(status) == 123456 * 1024
+    assert bench.parse_vm_hwm_bytes("Name:\tpython3\n") is None
+    # VmPeak (virtual) must never be mistaken for the RSS high-water.
+    assert bench.parse_vm_hwm_bytes("VmPeak:\t 42 kB\n") is None
+
+
+def test_reset_peak_accounting_is_linux_only() -> None:
+    # On darwin this is a recorded no-op (False), never an error; on Linux
+    # (CI) it must succeed — /proc/self/clear_refs is writable by self.
+    import sys
+
+    got = bench.reset_peak_accounting()
+    assert got is sys.platform.startswith("linux")
