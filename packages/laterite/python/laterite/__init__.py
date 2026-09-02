@@ -726,6 +726,25 @@ class Ags4File:
         handle's ``keys=`` default governs whether ``_id``/``_parent_id`` show."""
         return self.table(code)
 
+    def arrow(self, code: str, *, keys: bool | None = None) -> Any:
+        """One group's born-typed **raw Arrow table** — capsule-bearing
+        (``__arrow_c_stream__``), zero-copy, engine-free, exactly the shape
+        ``build_ags4`` consumes — so a read → write round trip over the
+        handle's own tables pays no frame materialisation (#860; the write
+        half landed with #852). Typing comes from the file's TYPE row, like
+        every other accessor; unlike ``.table()`` nothing is materialised to
+        polars/pandas and the SQL engine is never touched. ``keys=`` is the
+        same tri-state as ``.table()``'s: the handle default, overridable per
+        call — with keys the table carries the synthetic ``_id``/``_parent_id``
+        columns, without them the keying work is skipped entirely. Hand the
+        result to anything speaking the Arrow PyCapsule interface (DuckDB,
+        polars, pyarrow, ``build_ags4``)."""
+        want = self._keys if keys is None else keys
+        table = self._p["_handle"].table_for(code, self._content_hash, want)
+        if table is None:
+            raise KeyError(f"group {code!r} not in file")
+        return table
+
     @property
     def connection(self) -> duckdb.DuckDBPyConnection:
         """The raw ``duckdb`` connection — every engine feature (parquet export,

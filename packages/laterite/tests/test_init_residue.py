@@ -131,9 +131,11 @@ def test_build_from_frame_with_raising_columns_property() -> None:
 
 
 def test_build_from_raw_pyo3_arrow_table() -> None:
-    # The #852 repro: the handle's own pyo3-arrow table, passed straight back in.
+    # The #852 repro, now through the PUBLIC seam (#860): the handle's own
+    # raw Arrow table, passed straight back in — the private two-hop reach
+    # this test used to carry existed only because no public door did.
     handle = L.read(str(_CLEAN))
-    table = handle._p["_handle"].table_for("PROJ", False, False)
+    table = handle.arrow("PROJ")
     br = L.build_ags4({"PROJ": table}, synthesise_metadata=True)
     assert (
         br.bytes

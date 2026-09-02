@@ -2587,6 +2587,108 @@
           "note": "**by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it."
         }
       ]
+    },
+    {
+      "capability": "read-output-arrow",
+      "summary": "A group's born-typed raw Arrow output from the read handle.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "Ags4File.arrow",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": [],
+          "note": "The capsule-bearing pyo3-arrow table, born-typed from the file's TYPE row, zero-copy over the Arrow PyCapsule interface — the exact shape build_ags4 consumes, so the read half of the zero-copy round trip #852 opened the write half of (#860). keys= is the same tri-state as .table()'s; no frame is materialised and the SQL engine is never touched."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "Ags4File.table",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": [],
+          "note": "Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). Whether a closer analog is owed is #871, not a gap row here."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.",
+          "facade_verdict": "planned"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** read_ags already returns a typed RELATION — the engine's own Arrow-speaking object, recorded under read; a separate raw-table door would duplicate it."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** The CLI hands back files and text, not in-process objects; lat read --csv/--json is its data-out door."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "arrow_ipc",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). Whether a closer analog is owed anywhere is #871."
+        }
+      ]
     }
   ]
 }
