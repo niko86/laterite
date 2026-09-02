@@ -27,6 +27,7 @@ export {
   renderReadCsv,
   renderReadJson,
   emitAgs4FromIpc,
+  emitAgs4FromIpcUnchecked,
   Reading,
   Sidecar,
   canonicalType,

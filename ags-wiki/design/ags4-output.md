@@ -209,8 +209,19 @@ a separate, loudly-named door, never a mode:
   defaulted**; returns plain `bytes` (deliberately not a `BuildResult`:
   empty findings would read as "judged clean"), or with `out=` the same
   staged atomic write minus the verdict gate. The docstring is the consent
-  form. Node/wasm halves are #881; the register rows sit absent-with-reason
-  until they land.
+  form.
+- **Node + wasm** (#881, landed one release behind Python): node's
+  `buildAgs4Unchecked` (`repo:rust-packages/laterite-node/ts/index.ts`)
+  returns a `Buffer` or the `out` path via the shared staged rename, with
+  the judge-coupled knobs refused at runtime **by name** — absence from the
+  TS type alone would let a JS caller's `mode: "strict"` be silently
+  dropped; wasm's flat `build_ags4_unchecked`
+  (`repo:rust-packages/laterite-ags4-wasm/src/build.rs`) takes the judged
+  door's own `groups_json` and returns a `Uint8Array`, its `decode_opts`
+  KEYS guard doing the same refusal. Both surfaces pin the byte-identity
+  contract against their own judged `report` builds, and each shares its
+  marshalling with its judged door (node's `marshalGroups`, wasm's
+  `groups_from_json`) so the doors cannot drift at the input.
 - **Why it exists**: the write-verdict decomposition (the per-module cost
   table is on #858) showed the relational rules dominating the verdict,
   irreducibly data-dependent, killing the "scoped verdict" alternative — the

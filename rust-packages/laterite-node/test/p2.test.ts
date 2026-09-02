@@ -21,6 +21,7 @@ import {
   NotAgs4Error,
   type Report,
   buildAgs4,
+  buildAgs4Unchecked,
   read,
   validate,
 } from "../ts/index";
@@ -362,5 +363,79 @@ describe("buildAgs4 → data → AGS4", () => {
     expect(() =>
       buildAgs4(groups, { types: { LOCA: { NOSUCH: "3DP" } } }),
     ).toThrow(/no heading/);
+  });
+});
+
+describe("buildAgs4Unchecked → the no-verdict door (#881)", () => {
+  const clean = (): Array<[string, GroupData]> => [
+    ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
+    ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
+  ];
+  // No PROJ, a non-canonical string under the 2DP dict fill — report objects.
+  const dirty = (): Array<[string, GroupData]> => [
+    ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: "12.3" }]],
+  ];
+
+  it("returns exactly the judged report build's bytes, clean and dirty", () => {
+    const judged = buildAgs4(clean(), { mode: "report" });
+    expect(buildAgs4Unchecked(clean()).equals(judged.bytes)).toBe(true);
+
+    const judgedDirty = buildAgs4(dirty(), { mode: "report" });
+    expect(judgedDirty.findings.length).toBeGreaterThan(0); // falsifiability
+    expect(buildAgs4Unchecked(dirty()).equals(judgedDirty.bytes)).toBe(true);
+  });
+
+  it("returns a plain Buffer, deliberately not a BuildResult", () => {
+    const raw = buildAgs4Unchecked(clean());
+    expect(Buffer.isBuffer(raw)).toBe(true);
+    expect("findings" in raw).toBe(false);
+  });
+
+  it("keeps the data-shaping knobs and refuses the judge-coupled ones", () => {
+    const groups: Array<[string, GroupData]> = [
+      ["PROJ", [{ PROJ_ID: "P1" }]],
+      ["LOCA", [{ LOCA_ID: "BH1", LOCA_GL: 1.0, LOCA_XTRA: "9" }]],
+    ];
+    const raw = buildAgs4Unchecked(groups, {
+      dictVersion: "4.2",
+      units: { LOCA: { LOCA_XTRA: "kPa" } },
+      types: { LOCA: { LOCA_XTRA: "3DP" } },
+    });
+    const loca = raw.toString("utf-8").split('"GROUP","LOCA"')[1] ?? "";
+    expect(loca).toContain('"UNIT","","m","kPa"');
+    expect(loca).toContain('"TYPE","ID","2DP","3DP"');
+    expect(() =>
+      buildAgs4Unchecked(groups, { units: { NOPE: { X: "m" } } }),
+    ).toThrow(/buildAgs4Unchecked.*unknown group/);
+    // Gone, not defaulted — a JS caller passing a judged-door knob is refused,
+    // never silently ignored.
+    expect(() =>
+      buildAgs4Unchecked(groups, {
+        mode: "report",
+      } as unknown as Parameters<typeof buildAgs4Unchecked>[1]),
+    ).toThrow(/mode/);
+  });
+
+  it("out= stages the write and returns the path — with no verdict gate", () => {
+    const dir = mkdtempSync(join(tmpdir(), "laterite-unchecked-"));
+    try {
+      const dest = join(dir, "delivery.ags");
+      const ret = buildAgs4Unchecked(clean(), { out: dest });
+      expect(ret).toBe(dest);
+      expect(readFileSync(dest).equals(buildAgs4Unchecked(clean()))).toBe(true);
+      expect(readdirSync(dir)).toEqual(["delivery.ags"]); // no staging debris
+
+      // THE difference from buildAgs4({ out }): nothing judges, so a file the
+      // strict door refuses still lands — the caller chose unchecked.
+      const refused = join(dir, "dirty.ags");
+      expect(() =>
+        buildAgs4(dirty(), { mode: "strict", out: refused }),
+      ).toThrow();
+      expect(readdirSync(dir)).toEqual(["delivery.ags"]);
+      buildAgs4Unchecked(dirty(), { out: refused });
+      expect(readdirSync(dir).sort()).toEqual(["delivery.ags", "dirty.ags"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

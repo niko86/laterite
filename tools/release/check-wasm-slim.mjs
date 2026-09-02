@@ -32,6 +32,7 @@ import { checkWasmArtifact, pkgDirArg } from "./wasm-artifact-gate.mjs";
 const EXPECTED_FUNCTIONS = [
   "apply_fixes",
   "build_ags4",
+  "build_ags4_unchecked",
   "compute_fixes",
   "dictionary",
   "engine_fingerprint",

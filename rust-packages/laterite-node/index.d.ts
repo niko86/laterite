@@ -189,6 +189,15 @@ export declare function editions(): Array<string>
 export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tran?: TranInput | undefined | null): EmitResult
 
 /**
+ * The unchecked door (#881): [`emit_ags4_from_ipc`]'s marshalling handed to
+ * the engine's judge-free entry — bytes out, nothing validated, pinned
+ * byte-identical to the `report` build (the #858 contract). No mode /
+ * synthesis / TRAN parameters on purpose: there is no verdict for a mode to
+ * act on, and synthesis fills gaps only a report would surface.
+ */
+export declare function emitAgs4FromIpcUnchecked(groups: Array<GroupIpc>, edition?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null): Buffer
+
+/**
  * The emit result. `bytes` is the AGS4 document; `findingsJson` is the
  * validator's `{rule:[…]}` map on the output; `applied` is the safe-fix ledger
  * `AutoFix` made (same shape as `fix()`'s `FixReport.applied`); `fixesApplied`

@@ -24,6 +24,7 @@ import {
   ags4BytesToXlsx,
   ags4ToExcel,
   emitAgs4FromIpc,
+  emitAgs4FromIpcUnchecked,
   excelToAgs4,
   fixFile,
   listRules as nativeListRules,
@@ -387,27 +388,78 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
 
 /** Validate a `{code: {heading: value}}` UNIT/TYPE override map (#294 F#9)
  * against the groups actually being built — an unknown group code or a heading
- * not in that group is a caller typo we surface, not a silent no-op. */
+ * not in that group is a caller typo we surface, not a silent no-op. The typo
+ * is reported in the caller's name (`buildAgs4` / `buildAgs4Unchecked`). */
 function checkMeta(
   meta: Record<string, Record<string, string>> | undefined,
   name: string,
   columns: Map<string, Set<string>>,
+  caller: string,
 ): void {
   if (meta === undefined) return;
   for (const [code, hmap] of Object.entries(meta)) {
     const known = columns.get(code);
     if (known === undefined) {
       throw new Ags4Error(
-        `buildAgs4 ${name}: unknown group ${JSON.stringify(code)}`,
+        `${caller} ${name}: unknown group ${JSON.stringify(code)}`,
       );
     }
     for (const heading of Object.keys(hmap)) {
       if (!known.has(heading)) {
         throw new Ags4Error(
-          `buildAgs4 ${name}: group ${JSON.stringify(code)} has no heading ${JSON.stringify(heading)}`,
+          `${caller} ${name}: group ${JSON.stringify(code)} has no heading ${JSON.stringify(heading)}`,
         );
       }
     }
+  }
+}
+
+/** The build doors' shared marshalling (#881): a typed-graph root, Map or
+ * `[code, data]` array → per-group Arrow IPC buffers plus the column sets the
+ * `units=`/`types=` typo check reads. One walk for both doors, so they cannot
+ * drift at the input — the same anti-drift split laterite-py's
+ * `_frames_to_tables` makes. */
+function marshalGroups(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+): { ipcGroups: GroupIpc[]; columns: Map<string, Set<string>> } {
+  const items: Array<[string, GroupData]> =
+    groups instanceof AgsGroup
+      ? walkTree(groups)
+      : groups instanceof Map
+        ? [...groups]
+        : groups;
+  const ipcGroups: GroupIpc[] = [];
+  const columns = new Map<string, Set<string>>();
+  for (const [code, data] of items) {
+    // Never emit a read(...).table(code, { keys: true }) _id/_parent_id.
+    const table = stripSynthKeys(
+      Array.isArray(data) ? rowsToTable(data) : data,
+    );
+    columns.set(code, new Set(table.schema.fields.map((f) => f.name)));
+    ipcGroups.push({ code, ipc: Buffer.from(tableToIPC(table, "stream")) });
+  }
+  return { ipcGroups, columns };
+}
+
+/** Write `bytes` to `out` via a temp file in the destination's own directory +
+ * `renameSync` — atomic on one filesystem, so `out` never holds a partial
+ * write. Shared by the two build doors' `out` riders; what each door lets
+ * REACH this write is the doors' difference, not the write's. */
+function stagedWrite(bytes: Buffer, out: string): void {
+  const tmp = join(
+    dirname(out),
+    `.laterite-build-${process.pid}-${Date.now()}.tmp`,
+  );
+  try {
+    writeFileSync(tmp, bytes);
+    renameSync(tmp, out);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // best-effort cleanup; the original error is the one to surface
+    }
+    throw err;
   }
 }
 
@@ -453,26 +505,11 @@ export function buildAgs4(
   groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
   opts: EmitOptions = {},
 ): BuildResult | BuildSaved {
-  const items: Array<[string, GroupData]> =
-    groups instanceof AgsGroup
-      ? walkTree(groups)
-      : groups instanceof Map
-        ? [...groups]
-        : groups;
-  const ipcGroups: GroupIpc[] = [];
-  const columns = new Map<string, Set<string>>();
-  for (const [code, data] of items) {
-    // Never emit a read(...).table(code, { keys: true }) _id/_parent_id.
-    const table = stripSynthKeys(
-      Array.isArray(data) ? rowsToTable(data) : data,
-    );
-    columns.set(code, new Set(table.schema.fields.map((f) => f.name)));
-    ipcGroups.push({ code, ipc: Buffer.from(tableToIPC(table, "stream")) });
-  }
+  const { ipcGroups, columns } = marshalGroups(groups);
   // Per-heading UNIT/TYPE overrides (#294 F#9): an unknown group code or a
   // heading not in that group is a typo to surface, not a silent no-op.
-  checkMeta(opts.units, "units", columns);
-  checkMeta(opts.types, "types", columns);
+  checkMeta(opts.units, "units", columns, "buildAgs4");
+  checkMeta(opts.types, "types", columns, "buildAgs4");
   const res = emitAgs4FromIpc(
     ipcGroups,
     opts.dictVersion,
@@ -493,25 +530,91 @@ export function buildAgs4(
     return new BuildResult(res.bytes, findings, res.applied, res.fixesApplied);
   }
   // The to-disk rider: the engine has already judged `res.bytes` (a strict
-  // failure threw above, autofix rewrote in memory), so stage them beside
-  // the destination and rename into place — same-directory rename keeps the
-  // move atomic on one filesystem, and `out` never holds unjudged bytes.
-  const tmp = join(
-    dirname(opts.out),
-    `.laterite-build-${process.pid}-${Date.now()}.tmp`,
-  );
-  try {
-    writeFileSync(tmp, res.bytes);
-    renameSync(tmp, opts.out);
-  } catch (err) {
-    try {
-      unlinkSync(tmp);
-    } catch {
-      // best-effort cleanup; the original error is the one to surface
-    }
-    throw err;
-  }
+  // failure threw above, autofix rewrote in memory), so the destination
+  // path never holds unjudged bytes.
+  stagedWrite(res.bytes, opts.out);
   return new BuildSaved(opts.out, findings, res.applied, res.fixesApplied);
+}
+
+/** Options for {@link buildAgs4Unchecked} — the data-shaping knobs only.
+ * `mode` / `synthesiseMetadata` / `tran` are gone, not defaulted: there is no
+ * verdict for a mode to act on, and synthesis fills gaps only a report would
+ * surface. Passing one is refused at runtime, never silently ignored. */
+export interface UncheckedEmitOptions {
+  /** `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"` (default `"4.1.1"`). */
+  dictVersion?: string;
+  /** Per-heading UNIT overrides — as {@link EmitOptions.units}. */
+  units?: Record<string, Record<string, string>>;
+  /** Per-heading AGS data-TYPE overrides — as {@link EmitOptions.types}. */
+  types?: Record<string, Record<string, string>>;
+  /** Destination path — the same staged temp + rename as `buildAgs4({ out })`,
+   *  minus the verdict gate in front of it. Returns the path written. */
+  out?: string;
+}
+
+/** The judged door's knobs, refused here by name — absence from the TS type
+ * alone would let a JS caller's `mode: "strict"` be silently ignored, which is
+ * worse than either honouring or refusing it. */
+const JUDGE_COUPLED_KEYS = ["mode", "synthesiseMetadata", "tran"] as const;
+
+/**
+ * {@link buildAgs4} without the verdict — you are choosing to ship unchecked
+ * bytes (#858/#881).
+ *
+ * Builds exactly what `buildAgs4(groups, { mode: "report" })` builds — the
+ * same dictionary UNIT/TYPE fills, the same canonical cell formatting, the
+ * same section order, byte for byte (a test pins the identity) — and skips
+ * the validation that follows. **Nothing here confirms the output satisfies
+ * any AGS4 rule, and nothing downstream will**: no findings, no fixes, no
+ * strict gate. The rule engine is most of what the judged call spends its
+ * time on (the decomposition is recorded on #858), so this door exists for
+ * the caller who validates elsewhere or has decided not to.
+ *
+ * Returns the AGS4 bytes as a plain `Buffer` — deliberately **not** a
+ * {@link BuildResult}, whose empty `findings` would read as "judged clean"
+ * when nothing judged anything. With `out` given, writes them there via the
+ * same staged atomic rename as `buildAgs4({ out })` (minus the verdict gate)
+ * and returns the path written.
+ *
+ * @param groups The data to emit — the same shapes {@link buildAgs4} takes.
+ * @param opts `dictVersion` / `units` / `types` / `out` only; see
+ *   {@link UncheckedEmitOptions}.
+ * @returns The AGS4 `Buffer`, or with `out` the destination path.
+ * @throws {Ags4Error} On a judged-door knob, an unknown `units`/`types`
+ *   group or heading, or a typed-graph node that is not a registered group.
+ */
+export function buildAgs4Unchecked(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+  opts: UncheckedEmitOptions & { out: string },
+): string;
+export function buildAgs4Unchecked(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+  opts?: UncheckedEmitOptions & { out?: undefined },
+): Buffer;
+export function buildAgs4Unchecked(
+  groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
+  opts: UncheckedEmitOptions = {},
+): Buffer | string {
+  for (const key of JUDGE_COUPLED_KEYS) {
+    if (key in opts) {
+      throw new Ags4Error(
+        `buildAgs4Unchecked: ${JSON.stringify(key)} is not an option here — ` +
+          "there is no verdict for it to act on; use buildAgs4 for a judged build",
+      );
+    }
+  }
+  const { ipcGroups, columns } = marshalGroups(groups);
+  checkMeta(opts.units, "units", columns, "buildAgs4Unchecked");
+  checkMeta(opts.types, "types", columns, "buildAgs4Unchecked");
+  const bytes = emitAgs4FromIpcUnchecked(
+    ipcGroups,
+    opts.dictVersion,
+    opts.units,
+    opts.types,
+  );
+  if (opts.out === undefined) return bytes;
+  stagedWrite(bytes, opts.out);
+  return opts.out;
 }
 
 /** One cited divergence observation on a rule (`{id, note}`). */

@@ -229,6 +229,7 @@ mod tests {
     fn option_keys_match_the_structs() {
         assert_keys_match::<ValidateOptions>();
         assert_keys_match::<BuildOptions>();
+        assert_keys_match::<crate::build::UncheckedBuildOptions>();
         #[cfg(feature = "certify")]
         assert_keys_match::<CertifyOptions>();
         #[cfg(feature = "merge")]

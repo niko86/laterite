@@ -26,7 +26,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 ## Findings backlog (find-only — fixes are follow-ups)
 
 - **🔴 P1** (0): —
-- **🟠 P2** (6): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); build-unchecked/node (out.bytes); build-unchecked/browser (out.bytes); emit/browser (out.bytes)
+- **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
 - **🟡 P3** (5): read/rust (in.file-like); validate/rust (in.file-like); transport-pack/browser (in.bytes); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (17): intentional absences, rationale in each cell below.
 
@@ -187,36 +187,36 @@ _Notes:_
 
 ### build-unchecked — Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).
 
-*Offered anywhere — in: handle, value · out: bytes, file*
+*Offered anywhere — in: handle, text, value · out: bytes, file*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle, value · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
-| surface (spelling) | handle | value |
-|---|---|---|
-| python (free) | ✓ | ✓ |
-| node (absent) | — | — |
-| browser (absent) |   | — |
-| rust (absent) |   |   |
-| duckdb (n/a) |   |   |
-| cli (absent) |   |   |
+| surface (spelling) | text | handle | value |
+|---|---|---|---|
+| python (free) |   | ✓ | ✓ |
+| node (free) |   | ✓ | ✓ |
+| browser (free) | ✓ |   |   |
+| rust (absent) |   |   |   |
+| duckdb (n/a) |   |   |   |
+| cli (absent) |   |   |   |
 
 **Output**
 
 | surface (spelling) | file | bytes |
 |---|---|---|
 | python (free) | ✓ | ✓ |
-| node (absent) | — | — |
-| browser (absent) |   | — |
+| node (free) | ✓ | ✓ |
+| browser (free) |   | ✓ |
 | rust (absent) |   |   |
 | duckdb (n/a) |   |   |
 | cli (absent) |   |   |
 
-_Findings:_
-- 🟠 P2 · **node** out.bytes `build-unchecked-follow-up` — Decided on #858 (all three data surfaces get the door; Python shipped first) and recorded as #881: buildAgs4Unchecked, the same suffix everywhere, Buffer out + the out= staged-write rider, byte-identity test against the report build. The engine entry (laterite-ags4-emit::emit_ags4_from_arrow_unchecked) already exists — this is binding work only.
-- 🟠 P2 · **browser** out.bytes `build-unchecked-follow-up` — Decided on #858 and recorded as #881: a flat build_ags4_unchecked export, bytes out — bytes being the universal output form is what lets the unchecked door exist in a browser at all (no filesystem, so no file rider). Binding work only; the shared engine entry exists.
-
 _Notes:_
 - _python_: Byte-identical to build_ags4(mode="report") — pinned by test — with the verdict skipped; the docstring is the consent form ("you are choosing to ship unchecked bytes"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as "judged clean". The file form is build's staged write minus the verdict gate in front of it.
+- _node_: Landed via #881, one release behind Python's door. Byte-identical to buildAgs4({ mode: "report" }) — pinned by test — returning a plain Buffer (deliberately not a BuildResult), or the path with out= via the same staged rename minus the verdict gate. The judge-coupled knobs are refused at runtime by name, never silently ignored — absence from the TS type alone would let a JS caller's mode: "strict" be dropped on the floor.
+- _browser_: Landed via #881. Takes the judged door's own groups_json (the build capability's recorded JSON-text outlier rides along unchanged — reconciling it is that cell's gap, not this one's) and returns a Uint8Array, byte-identical to the judged report build's text. dictVersion is the only option; the decode_opts KEYS guard refuses mode/synthesiseMetadata/tran by name. No filesystem, so no file rider — bytes being the universal output form is what lets this door exist in a browser at all.
 - _rust_: Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now.
 - _duckdb_: **by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes.
 - _cli_: **by-design.** Same as build: "construct from caller-supplied data" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files.
