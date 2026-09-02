@@ -461,15 +461,11 @@ impl<'a> EmitStream<'a> {
         }
     }
 
-    /// Write one formatted group's section and record its verdict structure.
-    /// Consumes the group ON PURPOSE (the streamed join's whole point): its
-    /// cells free when this returns, not at finish — by-reference would let a
-    /// caller keep the formatted slab alive across the stream.
-    #[allow(clippy::needless_pass_by_value)]
-    pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
-        if let Some(acc) = &mut self.synth {
-            acc.fold(&og);
-        }
+    /// One group's section through the recording writer: the borrow view is
+    /// built HERE and only here — `push` and `assemble`'s synthesised loop
+    /// carried this block verbatim twice, which is exactly the shape that
+    /// drifts one field at a time (#857).
+    fn write_group(&mut self, og: &OwnedGroup) -> Result<(), EmitError> {
         let view = EmitGroup {
             code: &og.code,
             headings: og.headings.iter().map(String::as_str).collect(),
@@ -482,21 +478,25 @@ impl<'a> EmitStream<'a> {
         Ok(())
     }
 
+    /// Write one formatted group's section and record its verdict structure.
+    /// Consumes the group ON PURPOSE (the streamed join's whole point): its
+    /// cells free when this returns, not at finish — by-reference would let a
+    /// caller keep the formatted slab alive across the stream.
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
+        if let Some(acc) = &mut self.synth {
+            acc.fold(&og);
+        }
+        self.write_group(&og)
+    }
+
     /// Write the synthesised groups (last, preserving the batch pipeline's
     /// byte order) and assemble the writer-built verdict: the emitted bytes
     /// adopted as the verdict's buffer, no `parse_bytes` run.
     pub(crate) fn assemble(mut self) -> Result<(ParsedFile, usize), EmitError> {
         if let Some(acc) = self.synth.take() {
             for og in acc.synthesised(self.dict, self.opts.tran.as_ref()) {
-                let view = EmitGroup {
-                    code: &og.code,
-                    headings: og.headings.iter().map(String::as_str).collect(),
-                    units: og.units.iter().map(String::as_str).collect(),
-                    types: og.types.iter().map(String::as_str).collect(),
-                    rows: &og.rows,
-                };
-                write_section_recorded(&mut self.builder, &view, !self.wrote_any)?;
-                self.wrote_any = true;
+                self.write_group(&og)?;
             }
         }
         // A zero-group build fails exactly as the parse-back used to:
