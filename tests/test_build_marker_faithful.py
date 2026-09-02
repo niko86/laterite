@@ -36,8 +36,10 @@ degrades to skips in the fast job and runs for real in the slow one.
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
 import sys
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -164,6 +166,26 @@ def test_unmarked_tests_stay_buildless(path: Path) -> None:
     )
 
 
+@cache
+def _root_conftest():
+    """Import THIS suite's conftest.py by path, never by the bare name.
+
+    `from conftest import …` resolves to whichever conftest.py claimed that
+    name in `sys.modules` first — and with both suites in one serial session,
+    root-suite-first, the wheel suite's conftest owns it by the time this
+    test runs (#828). Loading by file path is order-proof; the module is
+    deliberately NOT registered in `sys.modules`, so the bare name stays
+    whatever pytest made it.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "_marker_gate_root_conftest", TESTS / "conftest.py"
+    )
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 @pytest.mark.parametrize("path", ROOT_TESTS, ids=lambda p: p.name)
 def test_the_ignore_hook_reads_the_same_marker(path: Path) -> None:
     """The marker and the hook that acts on it must see the same set.
@@ -174,7 +196,7 @@ def test_the_ignore_hook_reads_the_same_marker(path: Path) -> None:
     `pytestmark = [pytest.mark.needs_env, pytest.mark.slow]` list, say, that one
     of them handles and the other does not.
     """
-    from conftest import _declares_marker
+    _declares_marker = _root_conftest()._declares_marker
 
     assert _declares_marker(path) == _is_marked(path), (
         f"{path.name}: the collection-time hook and the marker text disagree. "
