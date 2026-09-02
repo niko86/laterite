@@ -10,7 +10,7 @@ a `read()` returns. This is the full surface; for the guided tour, see the
 | ----------- | --------------------------------------------------------- | --------------- |
 | `read`      | `read(source?, opts?)`                                    | `Ags4File`      |
 | `validate`  | `validate(source?, opts?)`                                | `Report`        |
-| `buildAgs4` | `buildAgs4(groups, opts?)`                                | `Ags4File`      |
+| `buildAgs4` | `buildAgs4(groups, opts?)`                                | `BuildResult` (or `BuildSaved` with `out`) |
 | `buildAgs4Unchecked` | `buildAgs4Unchecked(groups, opts?)`              | `Buffer` (or the `out` path) |
 | `fix`       | `fix(source?, opts?)`                                     | `FixResult`     |
 | `diff`      | `diff(a, b, opts?)`                                       | `RevisionDelta` |
@@ -37,7 +37,7 @@ choosing to ship unchecked bytes: see the
 
 ## `Ags4File`
 
-Returned by `read()` and `buildAgs4()`. The read handle is **fluent**: the
+Returned by `read()`. The read handle is **fluent**: the
 chained verbs return something you keep working on.
 
 ### Inspect
