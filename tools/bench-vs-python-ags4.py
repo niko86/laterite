@@ -1112,8 +1112,13 @@ def main() -> int:
         print("README-format tables — paste into the Performance section")
         print("=" * 62)
         table("Validation", "python-ags4 check_file", "laterite.validate", "validate")
+        # `laterite.compat`, not `compat`: the claims gate keys the axis off
+        # this header token, and the README paste must carry it verbatim.
         table(
-            "Read, strings", "python-ags4 AGS4_to_dataframe", "compat", "read_strings"
+            "Read, strings",
+            "python-ags4 AGS4_to_dataframe",
+            "laterite.compat",
+            "read_strings",
         )
         table(
             "Read, typed",
