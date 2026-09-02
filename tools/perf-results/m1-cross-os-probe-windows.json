@@ -1,0 +1,61 @@
+{
+ "schema": "laterite-m1-cross-os-probe/1",
+ "claim_family": "third family (#833): per-mode fresh-child peak memory on this OS; never shares a table with the darwin lane or dhat numbers",
+ "generated": "2026-09-02T03:21:50+00:00",
+ "commit": "b0d3e76ea7abd8c8fbbb07559eb57912cdf687e5",
+ "platform": "Windows-2022Server-10.0.20348-SP0",
+ "arch": "AMD64",
+ "go_floor": 0.05,
+ "rungs": {
+  "25MB": {
+   "file_bytes": 25009164,
+   "cells": {
+    "held": {
+     "peak_bytes": 407699456,
+     "instrument": "PeakWorkingSetSize",
+     "hop": "duckdb",
+     "groups": 123,
+     "purge_via": null
+    },
+    "released": {
+     "peak_bytes": 323670016,
+     "instrument": "PeakWorkingSetSize",
+     "hop": "duckdb",
+     "groups": 123,
+     "purge_via": null
+    },
+    "purge": {
+     "refusal": "purge-unavailable",
+     "detail": "no hook on this ref and mi_collect not exported"
+    }
+   }
+  },
+  "265MB": {
+   "file_bytes": 276462834,
+   "cells": {
+    "held": {
+     "peak_bytes": 3122270208,
+     "instrument": "PeakWorkingSetSize",
+     "hop": "duckdb",
+     "groups": 123,
+     "purge_via": null
+    },
+    "released": {
+     "peak_bytes": 2215960576,
+     "instrument": "PeakWorkingSetSize",
+     "hop": "duckdb",
+     "groups": 123,
+     "purge_via": null
+    },
+    "purge": {
+     "refusal": "purge-unavailable",
+     "detail": "no hook on this ref and mi_collect not exported"
+    }
+   }
+  }
+ },
+ "verdicts": [
+  "25MB/released: +20.6% (GO)",
+  "265MB/released: +29.0% (GO)"
+ ]
+}

@@ -398,9 +398,16 @@ def AGS4_to_dataframe(
     # Resolve the per-backend hop once (pyarrow presence, one shared DuckDB
     # connection for the pyarrow-free pandas fallback) — not per group.
     mat = compat_materializer(be, sd)
-    tables: dict[str, Any] = {
-        code: mat(groups[code]["table"], headings[code]) for code in keys
-    }
+    # M1 (#833): pop each group's Arrow table as its frame materialises, so
+    # its buffers are releasable the moment the backend copy exists instead
+    # of the whole file's tables staying live until return. Invisible to peak
+    # RSS on darwin (#831 — madvise'd returns never leave residency there);
+    # the cross-OS probe (`tools/perf_probe_m1.py`, committed results in
+    # `tools/perf-results/m1-cross-os-probe-*.json`) is the instrument that
+    # cleared it on Linux and Windows.
+    tables: dict[str, Any] = {}
+    for code in keys:
+        tables[code] = mat(groups[code].pop("table"), headings[code])
     return tables, headings
 
 

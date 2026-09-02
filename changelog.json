@@ -74,6 +74,9 @@
    },
    {
     "text": "**`EmitError::Reparse`'s message says what the variant actually covers.** Since the streamed verdict landed (#855), two of the variant's four raise sites never re-parse anything — the writer-built verdict is assembled over the emitted bytes, and skipping the re-parse is the point — yet the rendered message still said \"re-parse for validation failed\". It now reads \"building the output's verdict failed\", which is true at every site (assembly, the rules run over the constructed verdict, and `AutoFix`'s rare actual-fixes branch, the one place a genuine re-parse remains). The variant NAME keeps its misnomer for now: renaming it is a breaking change on a crate level with the registry, so it waits for emit's next breaking window; the doc comment records that intent (#857)."
+   },
+   {
+    "text": "**Compat's read releases each group's Arrow table as its frame materialises (M1).** `AGS4_to_dataframe` used to keep every group's native Arrow table live until return; it now pops each one as the backend frame is built, so the table's buffers are releasable the moment the copy exists. Outputs are unchanged — this is purely when memory becomes reclaimable. Landed on the #833 cross-OS probe's verdict: the darwin ledger machine cannot see the release in peak RSS (#831 — madvise'd returns never leave residency there), but on the OSes most users actually run the same read's peak fell well past the campaign's floor on both probe rungs — Linux −17.9/−27.9% and Windows −20.6/−29.0% at 25/265 MB — measured as a separately-labelled claim family (`tools/perf_probe_m1.py`, committed results in `tools/perf-results/m1-cross-os-probe-*.json`) that never shares a table with the darwin lane numbers (#833)."
    }
   ],
   "deprecated": [],
