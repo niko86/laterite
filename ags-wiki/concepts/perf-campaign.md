@@ -4,7 +4,7 @@ title: "perf campaign: the strategy, the stopping rule and the ledger"
 status: drafted
 tags: [concept, performance, process, register]
 volatile: [timings, status]
-volatile_asof: 2026-08-31
+volatile_asof: 2026-09-02
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
@@ -102,6 +102,29 @@ attribution is a guess with a number attached** — this ledger marks them as su
     terms, against what the operation actually holds — closes it. The
     baseline says nothing about what the engine *could* hold; the
     attribution instruments do.
+13. **The wasm lane's memory instrument is linear-memory high-water — its
+    own labelled claim, never a peak-RSS column** (decided inside #824, as
+    the ticket required). Process peak RSS does not transfer to a browser
+    context, so the wasm lane reports `WebAssembly.Memory.buffer.byteLength`
+    after one end-to-end operation in a **fresh instantiation** — wasm32
+    linear memory only ever grows, so the size at exit *is* the peak, and
+    the number is deterministic (byte-identical run to run, verified) and
+    engine-independent: the growth a browser's wasm heap would show, not
+    the harness's V8. The rejected candidate — the JS heap's own
+    measurement APIs — is engine-dependent, GC-timing non-deterministic,
+    and in the harness's node host does not even count wasm linear memory
+    (an external `ArrayBuffer`), so the "broader" instrument would measure
+    *less* of the engine, less reproducibly. The claim's scope is the
+    **engine's hold only**: JS-side allocations (the input bytes, the
+    returned IPC/text) are out of claim and belong to the host app. Like
+    RSS vs dhat (rule 8), the claims never share a table or a column —
+    results files label every wasm cell by instrument
+    (`wasm-linear-memory`, key `peak_linear_memory_bytes`), and the matrix
+    renderer names the instrument on every rendered row. One consequence,
+    recorded so nobody "fixes" it: this instrument needs no swap watch —
+    host paging cannot move a linear-memory byte count — so the wasm lane's
+    refusal vocabulary is `beyond-mem-cap`/`failed` only, while the rung
+    cap itself stays (it is ladder policy, rule 11, not a swap guard).
 
 ## Order of attack
 
@@ -833,7 +856,11 @@ row carries the close.)
 
 Opened 2026-08-31 by #821 — the first cross-library memory measurement this
 repo has made (the earlier showcase table was laterite-only). Everything in
-this section is the **peak-RSS instrument** (rule of engagement 8); absolute
+this section is the **peak-RSS instrument** (rule of engagement 8) — except
+where a subsection names another claim family itself: the attribution and
+diagnosis subsections below are the dhat/diagnosis instruments (rule 8's
+other half), and the wasm lane's subsection is rule 13's linear-memory
+instrument, each labelled at its own tables; absolute
 MB and the per-rung series live in `tools/perf-results/python-lane.json`, and
 the tables quote the **×-of-output headline** (rule 9) at the **265 MB rung**
 — the top memory rung (rule 11), where the interpreters' import floors have
@@ -1063,7 +1090,86 @@ What the lane says:
   while the parent holds nothing beyond the manifest. The rust bin can
   interleave because its parent genuinely frees; a GC'd host cannot — the
   wasm/CLI lanes (#824/#825) should inherit the mem-first ordering where
-  their parent is GC'd too.
+  their parent is GC'd too. (The wasm lane did — the next section; the CLI
+  lane is the half still open.)
+
+### The wasm lane (#824, 2026-09-02)
+
+The second surface lane on the matrix (epic decision 2: our own ladder, **no
+external baseline**). `web/bench/perf-matrix.mjs` (`npm run bench:matrix`
+from `web/`) drives the browser cdylib's **public API** — the `wasm-full`
+build the app loads, instantiated from its `.wasm` bytes, the JS→wasm input
+copy inside the measured path because a browser pays it — over the same
+pinned ladder, writing the same schema-2 per-surface file for
+`tools/perf-matrix.py` to merge (`wasm-read.bench.ts` stays the regression
+guard; this is the comparison lane). It inherits the node lane's mem-first
+ordering, and its memory column is **rule 13's instrument** — linear-memory
+high-water in a fresh instantiation, verified byte-identical run to run —
+which is why the memory table below carries no rust column: the claims
+differ, so they do not share one.
+
+**Time** (wall medians over 10 iters; the rust column is the same session's
+run of the rust bin at the same tree, so the pairs are attributable — with
+two named skews. Each lane measures its surface's *default* call shape, and
+the wasm `validate` default has the warnings tier on where the rust bin's
+`CheckOptions::default()` has it off, a tier T5 priced at ~2% at scale. And
+the timed pass drives **one shared instance across the ladder** — the same
+one-process shape the rust/node lanes' timed loops run in, kept for
+comparability — but wasm linear memory never shrinks, so earlier rungs'
+allocator state carries forward in a way the sibling heaps' can partially
+give back; the memory table is immune, every cell a fresh child, and a rung
+that outgrows the shared instance is a recorded skip in the artifact, never
+a lost run):
+
+| op | 100 MB (wasm / rust) | 265 MB (wasm / rust) |
+|---|---|---|
+| validate | 112 / 129 MB/s | 117 / 132 MB/s |
+| parse-to-typed | 296 / 303 MB/s | 302 / 311 MB/s |
+| write | 72 / 96 MB/s | 75 / 98 MB/s |
+
+**Memory** — the lane's own labelled claim (linear-memory high-water,
+×-of-output; engine-side only, JS holds out of claim):
+
+| op | 5 MB | 25 MB | 100 MB | 265 MB |
+|---|---|---|---|---|
+| validate | 4.97× | 4.41× | 4.26× | 4.62× |
+| parse-to-typed | 4.36× | 3.98× | 3.85× | 4.22× |
+| write | 7.99× | 4.98× | 5.16× | 6.17× |
+
+What the lane says:
+
+- **parse-to-typed runs at native parity across the whole ladder** (within
+  ~2–3% at the top rungs) — the boundary copy in and the per-group Arrow
+  IPC back are absorbed at scale, the July 25 MB finding now held on every
+  rung. No candidate.
+- **validate trails rust by ~11–13%** at the big rungs — but the pair is
+  the one skewed cell (the warnings-tier default above, plus
+  bytes-in-memory vs the rust bin's path door), so the residual is smaller
+  than it reads and **unattributed**. Nothing here clears a floor until a
+  diagnosis round says where it lives.
+- **write is the lane's one visible time gap: ~25% behind rust** at every
+  rung. Plausible mechanisms are all boundary- or allocator-shaped (the
+  whole input's IPC crossing at the call, the document string crossing
+  back, dlmalloc where the native artifacts run mimalloc — the wasm
+  allocator probe kept dlmalloc for the *read* path), but none has been
+  read against this measurement — **unattributed, recorded, no queue row
+  minted** (the #848 rule: variant children before any mint).
+- **Every cell measured to the cap** — twelve cells, no refusals, no
+  deaths; the top cell (265 MB write) tops out well inside wasm32's 4 GB
+  address ceiling, so the ladder fits the surface.
+- **The write door's increment over the same lane's typed hold** (same
+  instrument, so the subtraction is legitimate) is **~1.3×-of-output at
+  100 MB and ~1.9× at 265 MB** — the same ballpark as the rust door's
+  peak-RSS increment and nothing like the node door's M7 stack, which is
+  consistent with the doors' shapes (the wasm door takes per-group IPC
+  directly; node's slabs the whole file's IPC and re-decodes) but is a
+  cross-instrument reading and stays an observation, not an attribution.
+- **x-of-output rises from the 100 MB rung to the 265 MB rung on every op**
+  (e.g. validate 4.26× → 4.62×) where the rust lane's RSS falls. A fresh
+  instance underlies every cell, so this is real per-op growth behaviour
+  on this instrument — linear memory never shrinks, and dlmalloc's growth
+  requests scale with the workload — recorded as the instrument's own
+  signature, unattributed.
 
 ## Decisions taken
 
@@ -1179,7 +1285,11 @@ carries the cross-surface **matrix lane**, `laterite-node/bench/perf-matrix.mjs`
 (`npm run bench:matrix`): the campaign's three ops over the whole forge ladder,
 time plus the fresh-child peak-RSS instrument, emitting the same uniform
 per-surface schema as `laterite-ags4-perf` for `tools/perf-matrix.py` to merge
-(the read bench stays the regression guard; the matrix lane is the comparison). For attribution rather than
+(the read bench stays the regression guard; the matrix lane is the comparison).
+The wasm surface's matrix lane is `web/bench/perf-matrix.mjs` (#824, `npm run
+bench:matrix` from `web/`, needing the built `wasm-full` artifact): the same
+three ops through the browser cdylib's public API, time plus the lane's own
+linear-memory instrument (rule 13). For attribution rather than
 timing, `laterite-ags4-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
 `dhat` heap profile of the read stages — it says whether a stage is
 allocation-bound (fixable) or a compute/bandwidth wall; its write-side sibling is
