@@ -122,9 +122,19 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 REPO = Path(__file__).resolve().parent.parent
+# Both rebindable via --fixtures-dir / --manifest (#878): a runner lane pins
+# against the current-forge corpus (`tools/perf-probe-fixtures.json`) because
+# the README corpus is unmintable off the ledger machine (#873), and the two
+# corpora must never share a cache path — same rung names, different bytes.
 OUT_DIR = REPO / "output" / "readme-bench"
 MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
-FORGE = REPO / "rust-packages" / "target" / "release" / "laterite-ags4-forge"
+FORGE = (
+    REPO
+    / "rust-packages"
+    / "target"
+    / "release"
+    / ("laterite-ags4-forge.exe" if sys.platform == "win32" else "laterite-ags4-forge")
+)
 
 # The README's rungs. Seed 0 and the `wide` scaffold everywhere — the point is a
 # FIXED file, not a varied one.
@@ -563,15 +573,19 @@ def build_results(
             "arch": platform.machine(),
             "cpu_count": os.cpu_count(),
             "mem_total_bytes": mem_total_bytes(),
-            "load_avg_start": list(os.getloadavg()),
+            # No load average on Windows — absent, not zero (#878).
+            "load_avg_start": (
+                list(os.getloadavg()) if hasattr(os, "getloadavg") else None
+            ),
         },
         "versions": versions,
         "protocol": {
             "time": "mean of N warm in-process runs, first run discarded",
             "memory": (
-                "peak RSS (ru_maxrss) of a fresh subprocess running one "
-                "end-to-end operation through the library's public API — the "
-                "same instrument both sides; dhat/tracemalloc numbers are a "
+                "peak RSS of a fresh subprocess running one end-to-end "
+                "operation through the library's public API — ru_maxrss on "
+                "POSIX, PeakWorkingSetSize on Windows, the same instrument "
+                "both sides of every cell; dhat/tracemalloc numbers are a "
                 "different claim and never share a table with these"
             ),
             "refusals": (
@@ -718,16 +732,62 @@ WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
 }
 
 
-def worker_main(spec_json: str) -> int:
+def peak_rss_self_bytes() -> int:
+    """This process's peak RSS in bytes — the one instrument, per platform.
+
+    POSIX reads `ru_maxrss` (bytes on darwin, KiB on Linux — `maxrss_to_bytes`
+    owns that split). Windows has no `resource` module; the equivalent
+    high-water is `PeakWorkingSetSize` via ctypes, with declared signatures —
+    without them ctypes marshals the 64-bit pseudo-handle through `c_int` and
+    every call fails ERROR_INVALID_HANDLE (perf_probe_m1.py learned this on
+    run 33585274632; this is the same instrument, kept in step)."""
+    if sys.platform == "win32":
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wt.DWORD),
+                ("PageFaultCount", wt.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(counters)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wt.HANDLE
+        kernel32.K32GetProcessMemoryInfo.argtypes = [
+            wt.HANDLE,
+            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+            wt.DWORD,
+        ]
+        kernel32.K32GetProcessMemoryInfo.restype = wt.BOOL
+        ok = kernel32.K32GetProcessMemoryInfo(
+            kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+        if not ok:
+            raise OSError(ctypes.get_last_error(), "K32GetProcessMemoryInfo failed")
+        return int(counters.PeakWorkingSetSize)
     import resource
 
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return maxrss_to_bytes(raw, sys.platform)
+
+
+def worker_main(spec_json: str) -> int:
     spec = json.loads(spec_json)
     WORKER_OPS[spec["op"]](spec.get("path", ""), spec.get("out"))
-    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     out = spec.get("out")
     result = {
         "ok": True,
-        "maxrss_bytes": maxrss_to_bytes(raw, sys.platform),
+        "maxrss_bytes": peak_rss_self_bytes(),
         "out_bytes": Path(out).stat().st_size if out and Path(out).exists() else None,
     }
     Path(spec["result_path"]).write_text(json.dumps(result))
@@ -777,6 +837,10 @@ def measure_mem(op: str, path: Path | None, out: Path | None) -> dict[str, Any]:
 
 
 def main() -> int:
+    # Rebound from --fixtures-dir / --manifest below; declared up top because
+    # the argparse defaults read the same names.
+    global OUT_DIR, MANIFEST
+
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--rungs",
@@ -812,11 +876,33 @@ def main() -> int:
         default=DEFAULT_OUT,
         help="results file to write (default: %(default)s)",
     )
+    ap.add_argument(
+        "--manifest",
+        type=Path,
+        default=MANIFEST,
+        help="fixture pin manifest (default: %(default)s). A fresh runner "
+        "cannot mint the README corpus (#873), so the cross-OS lane (#878) "
+        "passes tools/perf-probe-fixtures.json — the current-forge pins whose "
+        "per-OS drift checks double as the cross-OS byte-identity proof",
+    )
+    ap.add_argument(
+        "--fixtures-dir",
+        type=Path,
+        default=OUT_DIR,
+        help="fixture cache directory (default: %(default)s). Pass a fresh "
+        "directory alongside --manifest: the two corpora share rung names "
+        "and must never share a cache path",
+    )
     ap.add_argument("--worker", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     if args.worker:
         return worker_main(args.worker)
+
+    # Rebind the module's fixture config before anything touches a rung —
+    # fixture(), check_manifest() and the mem harness all read these.
+    OUT_DIR = args.fixtures_dir
+    MANIFEST = args.manifest
 
     try:
         from python_ags4 import AGS4 as UPSTREAM
@@ -874,6 +960,13 @@ def main() -> int:
         f"default [compat] install is pyarrow-free (DuckDB hop) — see the "
         f"memory queue's M5 row (#834)"
     ]
+    if swap_used_bytes() is None:
+        # A watch that silently is not watching is a blind spot with a green
+        # tick on it — say so in the record (Windows has no swap instrument).
+        run_notes.append(
+            "no swap instrument on this platform: memory cells carry no "
+            "swapped-refusal protection this run"
+        )
     # Report both versions: a speedup is meaningless without knowing what it
     # was measured against, and neither package exposes __version__ reliably.
     print(
