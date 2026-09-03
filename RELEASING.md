@@ -79,9 +79,9 @@ the publish dispatched automatically, any stale queued run cancelled first.
 The dispatched run executes unattended: since 2026-09-03 the `crates`
 environment carries no required reviewer, so the human gate on a publish is
 the PR merge that put the stamp on `main`, not a second click on the run.
-Owed *bumps* are answer-only until the repo variable `ENGINE_CUT_MODE` is set
-to `pr`, at which point the nightly also opens one cut PR for the whole owed
-set (a human still reviews and merges it — that merge is the release act).
+Owed *bumps*: the nightly opens one cut PR for the whole owed set
+(`ENGINE_CUT_MODE=pr` since 2026-09-03; a human still reviews and merges it —
+that merge is the release act, and the only human step left in an engine cut).
 
 ### Cutting a product release
 
@@ -271,9 +271,9 @@ the crates to bump alongside — the #809 class, which no build or test can see
 because in-tree the laterite deps are path deps and always unify. The
 **nightly cut** derives the owed set every night, tracks it on the
 `Engine release work owed` issue, dispatches the publish for anything stamped
-but absent from the registry, and — once `ENGINE_CUT_MODE=pr` — opens the cut
-PR itself. Forgetting a bump is therefore recoverable by morning; the by-hand
-flow is for not wanting to wait.
+but absent from the registry, and opens the cut PR itself
+(`ENGINE_CUT_MODE=pr` since 2026-09-03). Forgetting a bump is therefore
+recoverable by morning; the by-hand flow is for not wanting to wait.
 
 The resulting Actions run executes **unattended** — unlike `pypi` and `npm`,
 the `crates` environment has carried no required reviewer since 2026-09-03

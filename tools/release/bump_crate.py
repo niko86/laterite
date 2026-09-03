@@ -139,8 +139,25 @@ def bump(crate: str, part_or_version: str) -> None:
         check=True,
     )
     print("bump_crate: verifying version faithfulness…")
+    # Project-free on purpose: the nightly's engine-cut job (PR mode) runs this
+    # on a checkout with no synced venv — `--no-sync` there makes an EMPTY env,
+    # and the root addopts need pytest-benchmark. The test itself is stdlib +
+    # pyyaml, so `--with` supplies everything and `-o addopts=` sheds the rest.
     subprocess.run(
-        ["uv", "run", "--no-sync", "pytest", "tests/test_version_faithful.py", "-q"],
+        [
+            "uv",
+            "run",
+            "--no-project",
+            "--with",
+            "pytest",
+            "--with",
+            "pyyaml",
+            "pytest",
+            "-o",
+            "addopts=",
+            "tests/test_version_faithful.py",
+            "-q",
+        ],
         cwd=ROOT,
         check=True,
     )
