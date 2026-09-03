@@ -44,13 +44,24 @@ impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::ExcessFields
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::ExcessFields
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::ExcessFields
 pub struct laterite_ags4_core::ags4_codec::AgsGroup
-pub laterite_ags4_core::ags4_codec::AgsGroup::code: alloc::string::String
-pub laterite_ags4_core::ags4_codec::AgsGroup::headings: alloc::vec::Vec<alloc::string::String>
-pub laterite_ags4_core::ags4_codec::AgsGroup::rows: alloc::vec::Vec<std::collections::hash::map::HashMap<alloc::sync::Arc<str>, alloc::string::String>>
-pub laterite_ags4_core::ags4_codec::AgsGroup::types: alloc::vec::Vec<alloc::string::String>
-pub laterite_ags4_core::ags4_codec::AgsGroup::units: alloc::vec::Vec<alloc::string::String>
+impl laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::cell(&self, usize, usize) -> core::option::Option<&str>
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::cell_named(&self, usize, &str) -> core::option::Option<&str>
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::code(&self) -> &str
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::col(&self, &str) -> core::option::Option<usize>
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::from_owned_rows(alloc::string::String, alloc::vec::Vec<alloc::string::String>, alloc::vec::Vec<alloc::string::String>, alloc::vec::Vec<alloc::string::String>, alloc::vec::Vec<alloc::vec::Vec<alloc::string::String>>) -> laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::headings(&self) -> &[alloc::string::String]
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::n_rows(&self) -> usize
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::padded_row(&self, usize) -> alloc::vec::Vec<alloc::string::String>
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::push_row(&mut self, alloc::vec::Vec<alloc::string::String>)
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::row_cells(&self, usize) -> impl core::iter::traits::iterator::Iterator<Item = &str> + '_
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::set_cell(&mut self, usize, usize, alloc::string::String) -> bool
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::types(&self) -> &[alloc::string::String]
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::units(&self) -> &[alloc::string::String]
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::AgsGroup
 pub fn laterite_ags4_core::ags4_codec::AgsGroup::clone(&self) -> laterite_ags4_core::ags4_codec::AgsGroup
+impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::AgsGroup
 pub fn laterite_ags4_core::ags4_codec::AgsGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_core::ags4_codec::AgsGroup
@@ -61,10 +72,13 @@ impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::AgsGroup
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::AgsGroup
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::AgsGroup
 pub struct laterite_ags4_core::ags4_codec::ParsedAgs4
-pub laterite_ags4_core::ags4_codec::ParsedAgs4::groups: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_core::ags4_codec::AgsGroup>
-pub laterite_ags4_core::ags4_codec::ParsedAgs4::order: alloc::vec::Vec<alloc::string::String>
 impl laterite_ags4_core::ags4_codec::ParsedAgs4
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::from_groups(alloc::vec::Vec<laterite_ags4_core::ags4_codec::AgsGroup>) -> laterite_ags4_core::ags4_codec::ParsedAgs4
 pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::get(&self, &str) -> core::option::Option<&laterite_ags4_core::ags4_codec::AgsGroup>
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::get_mut(&mut self, &str) -> core::option::Option<&mut laterite_ags4_core::ags4_codec::AgsGroup>
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::order(&self) -> &[alloc::string::String]
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::retain_only(&mut self, &[alloc::string::String])
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::take_group(&mut self, &str) -> core::option::Option<laterite_ags4_core::ags4_codec::AgsGroup>
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ParsedAgs4
 pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::clone(&self) -> laterite_ags4_core::ags4_codec::ParsedAgs4
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ParsedAgs4

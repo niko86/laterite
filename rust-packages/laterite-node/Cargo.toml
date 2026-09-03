@@ -78,7 +78,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 # light dep now — sha2 + uuid + the dictionary. `default-features = false` drops
 # core's `transport` feature (we bind the leaf directly below), so core pulls
 # neither age nor zstd for us.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.2", default-features = false }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.14.0", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
 laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.14.0" }

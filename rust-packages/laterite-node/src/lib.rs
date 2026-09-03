@@ -962,27 +962,20 @@ pub fn read_groups_raw(
     )
     .map_err(|e| Error::from_reason(e.to_string()))?;
     let mut groups = Map::new();
-    for code in &parsed.order {
+    for code in parsed.order() {
         if let Some(g) = parsed.get(code) {
-            let rows: Vec<Value> = g
-                .rows
-                .iter()
-                .map(|row| {
-                    Value::Array(
-                        g.headings
-                            .iter()
-                            .map(|h| Value::from(row.get(h.as_str()).cloned().unwrap_or_default()))
-                            .collect(),
-                    )
-                })
+            // Positional projection straight off the span-backed accessors
+            // (#900) — one row's worth of owned cells at a time.
+            let rows: Vec<Value> = (0..g.n_rows())
+                .map(|i| Value::Array(g.row_cells(i).map(Value::from).collect()))
                 .collect();
             let mut gd = Map::new();
-            gd.insert("headings".to_string(), Value::from(g.headings.clone()));
+            gd.insert("headings".to_string(), Value::from(g.headings().to_vec()));
             gd.insert("rows".to_string(), Value::Array(rows));
             groups.insert(code.clone(), Value::Object(gd));
         }
     }
-    let out = serde_json::json!({ "order": parsed.order, "groups": Value::Object(groups) });
+    let out = serde_json::json!({ "order": parsed.order(), "groups": Value::Object(groups) });
     serde_json::to_string(&out).map_err(|e| Error::from_reason(e.to_string()))
 }
 

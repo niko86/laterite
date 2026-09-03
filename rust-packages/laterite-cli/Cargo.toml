@@ -76,7 +76,7 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.13.0" }
 # clean check (`Sidecar::assemble`). `default-features = false` drops core's
 # `transport` feature, so the CLI does NOT pull age/zstd — only the index +
 # registry it needs.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.2", default-features = false }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.14.0", default-features = false }
 # The trust model: `check` (validate, with or without a certificate) and `mint`. The
 # binary no longer owns a `try_certified_skip` of its own — that conjunction was one of
 # five across the surfaces, and no two agreed.

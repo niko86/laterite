@@ -17,7 +17,7 @@ const AGS4: &str = concat!(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parsed = read_ags4_bytes_with(AGS4.as_bytes(), ReadOptions::default())?;
-    println!("{} group(s)", parsed.groups.len());
+    println!("{} group(s)", parsed.order().len());
     Ok(())
 }
 ```

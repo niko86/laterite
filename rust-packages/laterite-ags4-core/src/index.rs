@@ -1020,7 +1020,7 @@ mod tests {
             assert_eq!(s.headings, g.headings, "{code} headings");
             assert_eq!(s.units, g.units, "{code} units");
             assert_eq!(s.types, g.types, "{code} types");
-            assert_eq!(s.rows, g.rows, "{code} rows");
+            assert_eq!(&s, g, "{code} rows");
         }
     }
 
@@ -1085,8 +1085,8 @@ mod tests {
         // Each span, sliced and re-parsed, yields the row that section declared.
         let first = parse_group_slice(bytes, loca[0], "LOCA").unwrap();
         let second = parse_group_slice(bytes, loca[1], "LOCA").unwrap();
-        assert_eq!(first.rows[0]["LOCA_ID"], "BH01");
-        assert_eq!(second.rows[0]["LOCA_ID"], "BH02");
+        assert_eq!(first.cell_named(0, "LOCA_ID"), Some("BH01"));
+        assert_eq!(second.cell_named(0, "LOCA_ID"), Some("BH02"));
     }
 
     /// `range()` REFUSES an ambiguous code rather than handing back the first span.
@@ -1114,7 +1114,9 @@ mod tests {
     fn the_whole_file_parse_sees_both_sections_rows() {
         let whole = read_ags4_bytes(REDECLARED.as_bytes()).unwrap();
         let loca = whole.get("LOCA").unwrap();
-        let ids: Vec<&str> = loca.rows.iter().map(|r| r["LOCA_ID"].as_str()).collect();
+        let ids: Vec<&str> = (0..loca.n_rows())
+            .map(|i| loca.cell_named(i, "LOCA_ID").unwrap())
+            .collect();
         assert_eq!(ids, vec!["BH01", "BH02"]);
     }
 
@@ -1145,7 +1147,7 @@ mod tests {
         let bytes = f.as_bytes();
         let idx = index_ags4_bytes(bytes).unwrap();
         let proj = parse_group_slice(bytes, idx.range("PROJ").unwrap(), "PROJ").unwrap();
-        assert_eq!(proj.rows[0]["PROJ_NAME"], r#"Acme, Inc. "HQ""#);
+        assert_eq!(proj.cell_named(0, "PROJ_NAME"), Some(r#"Acme, Inc. "HQ""#));
     }
 
     #[test]
@@ -1166,7 +1168,7 @@ mod tests {
         let bytes = f.as_bytes();
         let idx = index_ags4_bytes(bytes).unwrap();
         let proj = parse_group_slice(bytes, idx.range("PROJ").unwrap(), "PROJ").unwrap();
-        assert!(proj.rows.is_empty());
+        assert_eq!(proj.n_rows(), 0);
     }
 
     /// The sliced read is a shortcut to the same answer, never a different one —
@@ -1201,7 +1203,7 @@ mod tests {
             ..ReadOptions::default()
         };
         let loca = parse_group_slice_with(bytes, range, "LOCA", opts).expect("truncates");
-        assert_eq!(loca.rows[0]["LOCA_LOCX"], "Acme");
+        assert_eq!(loca.cell_named(0, "LOCA_LOCX"), Some("Acme"));
     }
 
     /// Deterministic stand-in for a property test: many synthetic files varying
@@ -1253,7 +1255,7 @@ mod tests {
             let g = whole.get(code).unwrap();
             let s = parse_group_slice(bytes, idx.range(code).unwrap(), code).unwrap();
             assert_eq!(s.headings, g.headings, "{code} headings");
-            assert_eq!(s.rows, g.rows, "{code} rows");
+            assert_eq!(&s, g, "{code} rows");
         }
     }
 

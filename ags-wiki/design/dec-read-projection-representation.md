@@ -12,6 +12,15 @@ sources: []
 
 # the codec's read projection goes span-backed — `AgsGroup.rows` dies as a field, accessors + copy-on-write replace it
 
+> [!note] **Gate outcome (2026-09-03, #900): PASSED — landed as designed.**
+> The land A/B/A (main-built release `lat` as A-legs vs the branch build)
+> measured **−64.8/−63.3%** of the read door's peak at the 100/265 MB gate
+> rungs (11.29× → 3.97× and 10.90× → 4.00×-of-input; A-legs spread 0.0%,
+> output sha-identical on every leg and across all three `lat` programs) —
+> over rule 10's 20% invasive floor three times, matching the #893 price.
+> The claim and the refreshed lane cells live on [[perf-campaign]]'s M8
+> row; the record is on #900.
+
 > [!note] **Grilled with the owner and accepted 2026-09-03**, two rounds,
 > every recommendation ratified; the outcomes are folded into Decision and
 > Consequences below rather than kept as a separate record. The four that

@@ -28,8 +28,8 @@ pub fn file_dict_of(parsed: &ParsedAgs4) -> FileDict {
     let Some(d) = parsed.get("DICT") else {
         return FileDict::default();
     };
-    FileDict::from_rows(d.rows.iter().map(|row| {
-        let get = |n: &str| row.get(n).map_or("", String::as_str);
+    FileDict::from_rows((0..d.n_rows()).map(|i| {
+        let get = |n: &str| d.cell_named(i, n).unwrap_or("");
         DictRow {
             dict_type: get("DICT_TYPE"),
             group: get("DICT_GRP"),

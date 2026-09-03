@@ -1614,19 +1614,17 @@ fn read_groups_raw(
         laterite_ags4_core::ags4_codec::read_ags4_with(std::path::Path::new(&path), read_opts)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     let d = PyDict::new(py);
-    d.set_item("order", PyList::new(py, &parsed.order)?)?;
+    d.set_item("order", PyList::new(py, parsed.order())?)?;
     let groups = PyDict::new(py);
-    for code in &parsed.order {
+    for code in parsed.order() {
         if let Some(g) = parsed.get(code) {
             let gd = PyDict::new(py);
-            gd.set_item("headings", PyList::new(py, &g.headings)?)?;
+            gd.set_item("headings", PyList::new(py, g.headings())?)?;
             let rows = PyList::empty(py);
-            for row in &g.rows {
-                let cells: Vec<&str> = g
-                    .headings
-                    .iter()
-                    .map(|h| row.get(h.as_str()).map_or("", String::as_str))
-                    .collect();
+            // Positional projection straight off the span-backed accessors
+            // (#900) — one row's worth of borrowed cells at a time.
+            for i in 0..g.n_rows() {
+                let cells: Vec<&str> = g.row_cells(i).collect();
                 rows.append(PyList::new(py, &cells)?)?;
             }
             gd.set_item("rows", rows)?;
