@@ -27,7 +27,7 @@ fn row_cells_is_send_and_sync() {
     let g = AgsGroup::from_owned_rows(
         "PROJ".into(),
         vec!["PROJ_ID".into()],
-        vec!["".into()],
+        vec![String::new()],
         vec!["ID".into()],
         vec![vec!["P1".into()]],
     );
