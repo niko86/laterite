@@ -1281,9 +1281,20 @@ on either axis:
   family** from the darwin ledger (rule 8): it cannot "hold" this page's
   numbers, only found its own family with its own baseline history.
 - **Revisit condition**: ~~corpus v2 lands (#873)~~ (landed — see the
-  corpus-v2 re-pin section) *and* a quiet dedicated runner exists. Then
-  the candidate is a **memory**-ratio gate as its own Linux claim family
-  seeded from a fresh baseline pair — not a time gate.
+  corpus-v2 re-pin section) *and* ~~a quiet dedicated runner exists~~
+  (**amended 2026-09-03 — an owner call**: the runner half is struck on this
+  page's own evidence — peak memory, unlike timing, is robust to contention
+  (the runner-choice note in `perf-probe.yml`; the M1 cross-OS probe's
+  accepted claims ran on the shared pool) — and replaced by what the memory
+  bullet's reasoning actually requires: the same hardware class run to run,
+  a baseline pair seeded fresh before any candidate lands, and a dirty-run
+  refusal guard — load and swap recorded, the verdict withheld under
+  pressure — so contention degrades to a recorded skip, never a flake).
+  **The condition is met**; campaign 2 mints the gate as instrumentation
+  (epic #892, ticket #894). Then the candidate is a **memory**-ratio gate
+  as its own Linux claim family seeded from a fresh baseline pair — not a
+  time gate, which stays dead on the evidence above regardless of
+  infrastructure.
 
 **2. README memory columns — PROMOTED, unflattering cells included.** The
 settled darwin-lane peak-RSS numbers move into both READMEs on the same
