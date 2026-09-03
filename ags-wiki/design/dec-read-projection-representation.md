@@ -1,9 +1,9 @@
 ---
 type: decision
 title: "the codec's read projection goes span-backed — AgsGroup.rows dies as a field, accessors + copy-on-write replace it (queue M8's shape)"
-status: proposed
+status: accepted
 tags: [design, decision]
-decided: ""
+decided: 2026-09-03
 supersedes: []
 from_gap: []
 related: [perf-campaign, dec-parse-structure-layout, dec-parse-cell-representation, laterite-ags4-core, laterite-crate, crate-map]
@@ -11,6 +11,16 @@ sources: []
 ---
 
 # the codec's read projection goes span-backed — `AgsGroup.rows` dies as a field, accessors + copy-on-write replace it
+
+> [!note] **Grilled with the owner and accepted 2026-09-03**, two rounds,
+> every recommendation ratified; the outcomes are folded into Decision and
+> Consequences below rather than kept as a separate record. The four that
+> sharpened the draft: accessors are **borrowing-first**; there is **one**
+> owned shape and any first mutation materialises the whole group; the
+> `ExcessFields::Truncate` flag's simplification is recorded; and the
+> construction surface goes **fully private** (option b of that fork) —
+> the family has changed shape three times (M4, M6, this), so the
+> constructor tax is paid once here.
 
 The successor to [[dec-parse-cell-representation]] (M4) and
 [[dec-parse-structure-layout]] (M6) one layer up: those two slimmed what a
@@ -90,27 +100,53 @@ risk is the **contract migration**, not the prize.
 trimmed `code`, policy-resolved `headings`, padded `units`/`types` — and
 its **rows become span-backed**: the group holds the parse leaf's
 per-group arena (the M6 layout: span arena + slim row index) plus the
-shared decoded buffer by refcount, and serves cells through accessors —
-row count, positional cell (trimmed on access, `""`-padded past the
-row's tail, the `from_shared` contract verbatim), a positional
-padded-row iterator, and by-name access that resolves the heading to a
-column index once per group. The public `rows` **field** dies; no
+shared decoded buffer by refcount, and serves cells through
+**borrowing-first accessors** (grill Q1): row count, positional
+`cell(row, col) -> Option<&str>` (trimmed on access, the `from_shared`
+contract verbatim), a padded borrowing row iterator (`""` past the row's
+tail, heading-count wide, allocating nothing), and `col(heading)` name
+resolution once per group — at most one owned convenience method beside
+them, because an owned-`String` row API would quietly rebuild per row the
+slab this decision deletes. The public `rows` **field** dies; no
 whole-file owned materialisation exists on any read path.
+
+**Construction goes fully private** (grill Q4, option b). Struct-literal
+construction of `AgsGroup` **and** `ParsedAgs4` dies with the field: all
+fields go private, replaced by constructors and accessors (`order()`,
+`get()`, the group accessors above). This family has changed shape three
+times — M4, M6, now this — and each time the open fields were the
+migration's cost; the constructor tax is paid once, here, inside the
+same breaking change, so the next layout move is not another semver
+event. The facade's sliced path and every hand-built test group move to
+the constructors in the arc.
 
 **Eager policy, lazy strings.** `read_ags4*` still resolves
 `DuplicateHeadings` and still refuses `ExcessFields` at read time — the
 arity walk runs over the spans during conversion, allocating nothing.
 What was the conversion's `String`-per-cell build becomes the accessors'
 trim-on-read against the retained buffer (the #893 `slab` child proved
-the projection byte-identical).
+the projection byte-identical). One semantics **simplification, recorded
+here** (grill Q3): `ExcessFields::Truncate` stops being an edit and
+becomes a property of the projection — every accessor projects through
+the heading count anyway, so the two policies read identically and the
+flag's only remaining meaning is whether the eager walk raises. That is
+the flag's meaning kept (opt into salvage vs refuse), and #776's point —
+dropped tails must not round-trip silently — is untouched: the walk
+still refuses by default.
 
 **Mutation and construction (the two non-readers).** A group mutates by
-**copy-on-write**: the facade's first `set_cell`/`push_row` on a group
-materialises that one group into an owned positional representation and
-the group serves reads from the overlay thereafter — one group's worth,
-only on the paths that asked. Excel's `from_excel` (and any other
-builder) constructs that same owned representation directly; the
-map-shaped builder dies with the field.
+**copy-on-write**: the **first mutation of any kind** — `set_cell` or
+`push_row` alike (grill Q2) — materialises that one group into **the one
+owned shape**: positional `Vec<Vec<String>>`, padded to the heading
+count, built through the group's constructor. Reads serve from the
+overlay thereafter — one group's worth, only on the paths that asked;
+there is no spans-plus-appended-tail hybrid. Excel's `from_excel` (and
+any other builder) constructs that same owned shape through the same
+constructor; the map-shaped builder dies with the field. With the fields
+private, **mutation enters core's accessor surface** (set-cell /
+push-row / remove-group methods on the codec types) and the facade
+delegates to it — the facade's published API is unchanged, its reach
+into fields is what moves.
 
 **Migration.** One arc through core's `ags4_codec` with every consumer
 moved onto the accessors in the same stack — the three `lat` doors, both
@@ -162,14 +198,22 @@ already answered (#893), so the gate is on the land:
 
 ## Consequences
 
-- `AgsGroup.rows` (the field) and the map-of-owned-strings shape leave
-  core's public API — a breaking change on `laterite-ags4-core`, priced
-  by the semver gate; the facade's published API is explicitly held
+- `AgsGroup.rows`, the map-of-owned-strings shape, and the whole open
+  construction surface (every pub field on `AgsGroup`/`ParsedAgs4`)
+  leave core's public API — one breaking change on `laterite-ags4-core`,
+  priced by the semver gate, deliberately sized to make the *next*
+  layout change free; the facade's published API is explicitly held
   stable across the arc.
 - The read codec commits to the parse leaf's buffer lifetime: a held
   `ParsedAgs4` keeps the decoded buffer alive (it already effectively
-  did — the strings were copies of it; now the copies are gone). The
-  sliced single-group path keeps its bounded hold.
+  did — the strings were copies of it; now the copies are gone). One
+  case genuinely regresses (grill round 1, accepted): extracting a
+  single small group from a huge file and **holding it** now retains the
+  whole file's decoded buffer where it used to hold only that group's
+  strings — the same trade the parse leaf made at M4 for its long-lived
+  group holders, one layer up. A caller with that shape belongs on the
+  sliced `.ags.idx` path, whose per-group hold stays bounded; the codec
+  page names it as the escape hatch.
 - Rules out: a dual eager/lazy read API, a per-row map anywhere on a
   read path, and any surface-private projection of the shared door.
 - The arc updates [[laterite-ags4-core]]'s codec section and the ledger's
