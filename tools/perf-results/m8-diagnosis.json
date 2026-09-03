@@ -1,0 +1,286 @@
+{
+  "schema": "m8-diagnosis/1",
+  "issue": 893,
+  "generated": "2026-09-03T18:59:53+00:00",
+  "git_sha": "7a9e2e0f88b2e226e8e742374c84895bbe11bc20",
+  "lat_bin": "/Users/niko86/sources/python/laterite/rust-packages/target/release/lat",
+  "instrument": "fresh-child peak RSS (ru_maxrss via os.wait4) \u2014 diagnosis family",
+  "denominator": "x-of-input (the CLI lane's read-row denominator)",
+  "group": "GEOL",
+  "reps": 3,
+  "loadavg_start": [
+    1.1376953125,
+    1.22265625,
+    1.15673828125
+  ],
+  "passes": [
+    {
+      "leg": "A1",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 67256320,
+          "x_output": 13.76,
+          "peaks_bytes": [
+            67174400,
+            67256320,
+            67305472
+          ],
+          "wall_ms_median": 29.7,
+          "out_sha256": "ef0db1b82e104593e49380674a9956600d093388e2d34699f832613633c8fadb"
+        },
+        "25MB": {
+          "peak_rss_bytes": 292143104,
+          "x_output": 11.68,
+          "peaks_bytes": [
+            292143104,
+            292143104,
+            292143104
+          ],
+          "wall_ms_median": 130.5,
+          "out_sha256": "c6eb66171d335962a00342f663b6d9e6646ae1617c5cfda89dbd0914a9a61320"
+        },
+        "100MB": {
+          "peak_rss_bytes": 1163149312,
+          "x_output": 11.29,
+          "peaks_bytes": [
+            1163149312,
+            1163149312,
+            1163149312
+          ],
+          "wall_ms_median": 514.2,
+          "out_sha256": "1205a95d6ce37b92217560b1f59b6fac56703d1cca9aec21d236778e5173f4ed"
+        },
+        "265MB": {
+          "peak_rss_bytes": 3013672960,
+          "x_output": 10.9,
+          "peaks_bytes": [
+            3013672960,
+            3013672960,
+            3013689344
+          ],
+          "wall_ms_median": 1336.4,
+          "out_sha256": "c6d5d66162b71ef2a726a0e646e05b11b22feeb84ba56e97fa335013ac220a68"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "slab",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 28049408,
+          "x_output": 5.74,
+          "peaks_bytes": [
+            28033024,
+            28049408,
+            28049408
+          ],
+          "wall_ms_median": 19.4,
+          "out_sha256": "ef0db1b82e104593e49380674a9956600d093388e2d34699f832613633c8fadb"
+        },
+        "25MB": {
+          "peak_rss_bytes": 109789184,
+          "x_output": 4.39,
+          "peaks_bytes": [
+            109789184,
+            109789184,
+            109789184
+          ],
+          "wall_ms_median": 81.7,
+          "out_sha256": "c6eb66171d335962a00342f663b6d9e6646ae1617c5cfda89dbd0914a9a61320"
+        },
+        "100MB": {
+          "peak_rss_bytes": 408764416,
+          "x_output": 3.97,
+          "peaks_bytes": [
+            408764416,
+            408764416,
+            408764416
+          ],
+          "wall_ms_median": 321.1,
+          "out_sha256": "1205a95d6ce37b92217560b1f59b6fac56703d1cca9aec21d236778e5173f4ed"
+        },
+        "265MB": {
+          "peak_rss_bytes": 1105674240,
+          "x_output": 4.0,
+          "peaks_bytes": [
+            1105674240,
+            1105674240,
+            1105674240
+          ],
+          "wall_ms_median": 831.9,
+          "out_sha256": "c6d5d66162b71ef2a726a0e646e05b11b22feeb84ba56e97fa335013ac220a68"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "proj",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 67010560,
+          "x_output": 13.71,
+          "peaks_bytes": [
+            66912256,
+            67010560,
+            67092480
+          ],
+          "wall_ms_median": 31.9,
+          "out_sha256": "ef0db1b82e104593e49380674a9956600d093388e2d34699f832613633c8fadb"
+        },
+        "25MB": {
+          "peak_rss_bytes": 291864576,
+          "x_output": 11.67,
+          "peaks_bytes": [
+            291864576,
+            291864576,
+            291864576
+          ],
+          "wall_ms_median": 144.0,
+          "out_sha256": "c6eb66171d335962a00342f663b6d9e6646ae1617c5cfda89dbd0914a9a61320"
+        },
+        "100MB": {
+          "peak_rss_bytes": 1158889472,
+          "x_output": 11.25,
+          "peaks_bytes": [
+            1158578176,
+            1158889472,
+            1158889472
+          ],
+          "wall_ms_median": 563.0,
+          "out_sha256": "1205a95d6ce37b92217560b1f59b6fac56703d1cca9aec21d236778e5173f4ed"
+        },
+        "265MB": {
+          "peak_rss_bytes": 3012640768,
+          "x_output": 10.9,
+          "peaks_bytes": [
+            3012624384,
+            3012640768,
+            3012722688
+          ],
+          "wall_ms_median": 1443.1,
+          "out_sha256": "c6d5d66162b71ef2a726a0e646e05b11b22feeb84ba56e97fa335013ac220a68"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "both",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 27836416,
+          "x_output": 5.7,
+          "peaks_bytes": [
+            27836416,
+            27836416,
+            27852800
+          ],
+          "wall_ms_median": 19.2,
+          "out_sha256": "ef0db1b82e104593e49380674a9956600d093388e2d34699f832613633c8fadb"
+        },
+        "25MB": {
+          "peak_rss_bytes": 108691456,
+          "x_output": 4.35,
+          "peaks_bytes": [
+            108691456,
+            108691456,
+            108691456
+          ],
+          "wall_ms_median": 81.6,
+          "out_sha256": "c6eb66171d335962a00342f663b6d9e6646ae1617c5cfda89dbd0914a9a61320"
+        },
+        "100MB": {
+          "peak_rss_bytes": 407339008,
+          "x_output": 3.95,
+          "peaks_bytes": [
+            407339008,
+            407339008,
+            407339008
+          ],
+          "wall_ms_median": 317.4,
+          "out_sha256": "1205a95d6ce37b92217560b1f59b6fac56703d1cca9aec21d236778e5173f4ed"
+        },
+        "265MB": {
+          "peak_rss_bytes": 1097138176,
+          "x_output": 3.97,
+          "peaks_bytes": [
+            1097121792,
+            1097138176,
+            1097138176
+          ],
+          "wall_ms_median": 824.9,
+          "out_sha256": "c6d5d66162b71ef2a726a0e646e05b11b22feeb84ba56e97fa335013ac220a68"
+        }
+      }
+    },
+    {
+      "leg": "A2",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 67305472,
+          "x_output": 13.77,
+          "peaks_bytes": [
+            67174400,
+            67305472,
+            67305472
+          ],
+          "wall_ms_median": 30.2,
+          "out_sha256": "ef0db1b82e104593e49380674a9956600d093388e2d34699f832613633c8fadb"
+        },
+        "25MB": {
+          "peak_rss_bytes": 292143104,
+          "x_output": 11.68,
+          "peaks_bytes": [
+            292143104,
+            292143104,
+            292257792
+          ],
+          "wall_ms_median": 133.0,
+          "out_sha256": "c6eb66171d335962a00342f663b6d9e6646ae1617c5cfda89dbd0914a9a61320"
+        },
+        "100MB": {
+          "peak_rss_bytes": 1163132928,
+          "x_output": 11.29,
+          "peaks_bytes": [
+            1162756096,
+            1163132928,
+            1163149312
+          ],
+          "wall_ms_median": 518.8,
+          "out_sha256": "1205a95d6ce37b92217560b1f59b6fac56703d1cca9aec21d236778e5173f4ed"
+        },
+        "265MB": {
+          "peak_rss_bytes": 3013672960,
+          "x_output": 10.9,
+          "peaks_bytes": [
+            3013672960,
+            3013672960,
+            3013689344
+          ],
+          "wall_ms_median": 1333.7,
+          "out_sha256": "c6d5d66162b71ef2a726a0e646e05b11b22feeb84ba56e97fa335013ac220a68"
+        }
+      }
+    }
+  ],
+  "output_byte_identity": {
+    "B-slab/5MB": true,
+    "B-slab/25MB": true,
+    "B-slab/100MB": true,
+    "B-slab/265MB": true,
+    "B-proj/5MB": true,
+    "B-proj/25MB": true,
+    "B-proj/100MB": true,
+    "B-proj/265MB": true,
+    "B-both/5MB": true,
+    "B-both/25MB": true,
+    "B-both/100MB": true,
+    "B-both/265MB": true,
+    "A2-base/5MB": true,
+    "A2-base/25MB": true,
+    "A2-base/100MB": true,
+    "A2-base/265MB": true
+  }
+}

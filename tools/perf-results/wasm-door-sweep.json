@@ -1,0 +1,200 @@
+{
+  "schema": "wasm-door-sweep/1",
+  "issue": 893,
+  "generated": "2026-09-03T19:02:39.898Z",
+  "git_sha": "7a9e2e0f88b2e226e8e742374c84895bbe11bc20",
+  "instrument": "wasm-linear-memory (rule 13): fresh instantiation, buffer.byteLength at exit",
+  "denominator": "x-of-output",
+  "reps": 2,
+  "loadavg_start": [
+    1.34423828125,
+    1.287109375,
+    1.18798828125
+  ],
+  "passes": [
+    {
+      "leg": "A1",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 39059456,
+          "x_output": 7.99,
+          "deterministic": true,
+          "highs_bytes": [
+            39059456,
+            39059456
+          ],
+          "door_ms_median": 129.2,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 132972544,
+          "x_output": 5.32,
+          "deterministic": true,
+          "highs_bytes": [
+            132972544,
+            132972544
+          ],
+          "door_ms_median": 508.3,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 498991104,
+          "x_output": 4.84,
+          "deterministic": true,
+          "highs_bytes": [
+            498991104,
+            498991104
+          ],
+          "door_ms_median": 1940.5,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 1701838848,
+          "x_output": 6.16,
+          "deterministic": true,
+          "highs_bytes": [
+            1701838848,
+            1701838848
+          ],
+          "door_ms_median": 5060.2,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "jit",
+      "cells": {
+        "5MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 39059456,
+          "x_output": 7.99,
+          "deterministic": true,
+          "highs_bytes": [
+            39059456,
+            39059456
+          ],
+          "door_ms_median": 121.2,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 124387328,
+          "x_output": 4.97,
+          "deterministic": true,
+          "highs_bytes": [
+            124387328,
+            124387328
+          ],
+          "door_ms_median": 496,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 395968512,
+          "x_output": 3.84,
+          "deterministic": true,
+          "highs_bytes": [
+            395968512,
+            395968512
+          ],
+          "door_ms_median": 1941.9,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 1701838848,
+          "x_output": 6.16,
+          "deterministic": true,
+          "highs_bytes": [
+            1701838848,
+            1701838848
+          ],
+          "door_ms_median": 5219.6,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "A2",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 39059456,
+          "x_output": 7.99,
+          "deterministic": true,
+          "highs_bytes": [
+            39059456,
+            39059456
+          ],
+          "door_ms_median": 127.3,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 132972544,
+          "x_output": 5.32,
+          "deterministic": true,
+          "highs_bytes": [
+            132972544,
+            132972544
+          ],
+          "door_ms_median": 510.9,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 498991104,
+          "x_output": 4.84,
+          "deterministic": true,
+          "highs_bytes": [
+            498991104,
+            498991104
+          ],
+          "door_ms_median": 1963.5,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "instrument": "wasm-linear-memory",
+          "peak_linear_memory_bytes": 1701838848,
+          "x_output": 6.16,
+          "deterministic": true,
+          "highs_bytes": [
+            1701838848,
+            1701838848
+          ],
+          "door_ms_median": 5074,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    }
+  ],
+  "output_byte_identity": {
+    "B-jit/5MB": true,
+    "B-jit/25MB": true,
+    "B-jit/100MB": true,
+    "B-jit/265MB": true,
+    "A2-base/5MB": true,
+    "A2-base/25MB": true,
+    "A2-base/100MB": true,
+    "A2-base/265MB": true
+  }
+}
