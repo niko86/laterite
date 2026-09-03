@@ -255,10 +255,11 @@ jobs:
   #     reviewer; the PR merge is the human gate), cancelling any run still
   #     queued first as a defensive bound;
   #   * in PR mode (`vars.ENGINE_CUT_MODE == 'pr'`) applies the owed bumps and
-  #     opens/updates ONE cut PR on a fixed branch. Until that variable is set
-  #     the cut is answer-only, per the rollout row on
-  #     ags-wiki/design/dec-engine-publish-automation.md — it must be seen to
-  #     agree with a human across real cuts before it acts.
+  #     opens/updates ONE cut PR on a fixed branch. PROMOTED 2026-09-03: the
+  #     rollout row's condition — seen to agree with a human across real cuts —
+  #     was met by the #849 round, where the two human-run cuts (#886, #888)
+  #     matched the derivation exactly. The PR still lands only through the
+  #     owner's merge; that merge is the human gate.
   #
   # `needs: [coverage]` is the design's "no clean build, no cut": coverage
   # compiles the whole workspace, so a night the tree does not build skips the

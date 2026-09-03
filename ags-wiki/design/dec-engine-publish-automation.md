@@ -231,13 +231,29 @@ equivalent per-stamp PR review.
     to one night. ~~The `crates` environment approval is unchanged.~~
     **Overtaken 2026-09-03** — the approval retired (section above); the
     cancel loop stays as defence against a run ever stuck `waiting` again.
-- **Rollout state: answer-only, as the design row requires.** The PR-opening
-  path is built and armed behind the repo variable `ENGINE_CUT_MODE=pr`;
-  promotion is that one variable, plus `ENGINE_CUT_TOKEN` (a fine-grained PAT,
-  contents + pull-requests write) — with the default `github.token` a
-  bot-created PR triggers **no** workflows, its required checks never report,
-  and it cannot merge. That answers the spike's "can a bot PR satisfy every
-  required check" unverified item: not with the default token, by design.
+- **Rollout state: ~~answer-only, as the design row requires~~ PROMOTED to PR
+  mode, 2026-09-03.** The design row's condition — the cut must be seen to
+  agree with a human across real cuts before it acts — was met by the #849
+  round: the two cuts a human ran by hand (#886: emit + validator; #888: the
+  merge + trust floor cascade) matched the nightly's derivation command for
+  command. `ENGINE_CUT_MODE=pr` is set, with `ENGINE_CUT_TOKEN` (a
+  fine-grained PAT, contents + pull-requests write) — with the default
+  `github.token` a bot-created PR triggers **no** workflows, its required
+  checks never report, and it cannot merge. That answers the spike's "can a
+  bot PR satisfy every required check" unverified item: not with the default
+  token, by design. Two operational notes from the promotion:
+  - The PAT's **expiry is the mode's maintenance point**: an expired token
+    fails the cut-PR step loudly in the nightly rather than falling back, so
+    the failure is heard (`notify` needs the job), but the fix is a human
+    re-minting the token.
+  - `repo:tools/release/bump_crate.py`'s faithfulness check runs
+    **project-free** (`--no-project --with pytest --with pyyaml`, addopts
+    shed): the engine-cut job deliberately never syncs the dev environment —
+    a sync would build the PyO3 wheel — and the first promoted run would have
+    found `--no-sync` pointing at an environment that does not exist there.
+  The nightly cut PR lands only through the owner's merge; with the `crates`
+  approval retired (above), that merge is the one human act in an engine
+  release.
 - **Pre-upload build verification is wired** (`check_package_contents.py
   --verify-buildable` in publish-crates.yml, before the first upload): a
   wave-3 compile failure no longer strands waves 1–2 on the append-only
