@@ -12,6 +12,14 @@ name: publish-crates
 # The token `crates-io-auth-action` mints is short-lived and its own post-step
 # revokes it when the job ends.
 #
+# NO REQUIRED REVIEWER since 2026-09-03: the `crates` environment carries the
+# branch policy and the OIDC binding, but a dispatched run executes without a
+# human click. Every stamp reaches main through an owner-merged PR, so the
+# merge is the human gate; the approval was a second look by the same person,
+# and its pending window published main as of APPROVAL time — the staleness
+# that minted #887 and the 2026-09-02 cascade round. Recorded on
+# ags-wiki/design/dec-engine-publish-automation.md.
+#
 # Its own file rather than a job in release.yml, deliberately: the engine moves
 # on its own clock. release.yml is driven by the three tag trains (`v*`,
 # `node-v*`, `wasm-v*`) and the engine has no tag — RELEASING.md cuts it from
