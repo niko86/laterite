@@ -14,8 +14,11 @@
 # check is the wheel; the instrument stays the family's own. Both SHAs are
 # recorded in the artifact.
 #
-#   gh workflow run perf-ratio.yml --ref main -f mode=seed  -f ref=<pre-campaign sha>
+#   gh workflow run perf-ratio.yml --ref main -f mode=seed  -f ref=<FULL 40-char pre-campaign sha>
 #   gh workflow run perf-ratio.yml --ref main -f mode=check -f ref=main
+#
+# (`ref` takes a branch or a FULL SHA — actions/checkout treats a short SHA
+# as a branch pattern and fails the fetch; the first seed dispatch did.)
 #
 # Runner: the Linux pool — peak memory, unlike timing, is robust to shared
 # hardware (perf-probe.yml's runner-choice note), and the guard degrades a
@@ -85,8 +88,16 @@ jobs:
       - name: uv sync (build backend into the venv)
         run: uv sync
 
+      # `uv run` resolves the project (and so the venv) from the cwd — inside
+      # `.measured` that venv was never synced, so `--no-sync maturin` has
+      # nothing to spawn (the first seed dispatch failed exactly there). The
+      # measured tree gets its own sync; the instrument tree's sync above
+      # stays what the gate script runs under.
       - name: Build the measured wheel
-        run: (cd .measured/packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
+        run: |
+          set -euxo pipefail
+          (cd .measured && uv sync)
+          (cd .measured/packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
 
       - name: Build forge (fixture generator, from the instrument tree)
         run: (cd rust-packages && cargo build --release -p laterite-ags4-forge)
