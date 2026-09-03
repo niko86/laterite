@@ -700,6 +700,7 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
+module.exports.EmitSessionSpike = nativeBinding.EmitSessionSpike
 module.exports.Reading = nativeBinding.Reading
 module.exports.Sidecar = nativeBinding.Sidecar
 module.exports.ags4BytesToXlsx = nativeBinding.ags4BytesToXlsx

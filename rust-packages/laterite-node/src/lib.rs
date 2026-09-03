@@ -1456,12 +1456,29 @@ pub fn emit_ags4_from_ipc(
             .unwrap_or(DictVersion::V4_1_1),
         synthesise_metadata: synthesise_metadata.unwrap_or(false),
     };
-    // The streaming Arrow door (#790): each cell formats straight off its
-    // array — no row-major input copy, and this surface stops holding every
-    // group borrowed across the write + validating re-parse as a bonus.
-    let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
-    let res = laterite_ags4_emit::emit_ags4_from_arrow(inputs, &opts)
-        .map_err(|e| Error::from_reason(e.to_string()))?;
+    // --- SPIKE #893 M7 (throwaway): `jit` decodes each group's IPC only as
+    // the streamed emit consumes it, so no whole-file decoded materialisation
+    // ever accumulates — the JS-side IPC slab stays (the napi call pins it).
+    let res = if spike_m7("jit") {
+        let mut session = laterite_ags4_emit::ArrowEmitSession::new(opts);
+        for g in &groups {
+            let u = units.as_ref().and_then(|m| m.get(&g.code)).cloned();
+            let t = types.as_ref().and_then(|m| m.get(&g.code)).cloned();
+            session
+                .push(group_from_ipc(g.code.clone(), &g.ipc, u, t)?)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        session
+            .finish()
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    } else {
+        // The streaming Arrow door (#790): each cell formats straight off its
+        // array — no row-major input copy, and this surface stops holding every
+        // group borrowed across the write + validating re-parse as a bonus.
+        let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
+        laterite_ags4_emit::emit_ags4_from_arrow(inputs, &opts)
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    };
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     // Bounded the same way as `fixes_applied` in `fix_ags4` above.
     #[allow(clippy::cast_possible_truncation)]
@@ -1472,6 +1489,95 @@ pub fn emit_ags4_from_ipc(
         applied: to_applied_fixes(&res.applied),
         fixes_applied,
     })
+}
+
+/// #893 M7 SPIKE toggle (throwaway branch; never lands). `jit` makes the
+/// one-call door decode per group as the emit consumes it; the `handoff` /
+/// `stream` children go through [`EmitSessionSpike`] instead (the probe
+/// harness drives them directly). Read per call — crude on purpose.
+fn spike_m7(flag: &str) -> bool {
+    std::env::var("LATERITE_M7_SPIKE").is_ok_and(|v| v == flag)
+}
+
+/// The bench write door's exact defaults, shared by the spike children so
+/// every variant judges with the same engine work.
+fn spike_opts() -> laterite_ags4_emit::EmitOpts {
+    laterite_ags4_emit::EmitOpts {
+        tran: None,
+        mode: laterite_ags4_emit::EmitMode::AutoFix,
+        edition: DictVersion::V4_1_1,
+        synthesise_metadata: false,
+    }
+}
+
+/// #893 M7 SPIKE (throwaway): the per-group handoff children. The probe
+/// calls `addGroup(code, ipc)` once per group — so no JS-side `ipcGroups`
+/// slab ever accumulates — then `finish()`.
+///
+/// * `eager` — each `addGroup` decodes immediately; the decoded
+///   `Vec<ArrowGroup>` still accumulates natively (the accumulate-hold
+///   removed ALONE).
+/// * `stream` — each `addGroup` decodes and writes through the emit
+///   stream at once; nothing whole-file accumulates on either side of the
+///   boundary (both holds removed — the pair).
+///
+/// Defaults pinned to the bench door's: AutoFix, 4.1.1, no synthesis, no
+/// TRAN, no unit/type overrides.
+#[napi]
+pub struct EmitSessionSpike {
+    eager: Vec<laterite_ags4_emit::ArrowGroup>,
+    stream: Option<laterite_ags4_emit::ArrowEmitSession>,
+}
+
+#[napi]
+impl EmitSessionSpike {
+    #[napi(constructor)]
+    pub fn new(mode: String) -> Result<Self> {
+        match mode.as_str() {
+            "eager" => Ok(EmitSessionSpike {
+                eager: Vec::new(),
+                stream: None,
+            }),
+            "stream" => Ok(EmitSessionSpike {
+                eager: Vec::new(),
+                stream: Some(laterite_ags4_emit::ArrowEmitSession::new(spike_opts())),
+            }),
+            o => Err(Error::from_reason(format!(
+                "unknown spike session mode {o:?}; expected eager|stream"
+            ))),
+        }
+    }
+
+    #[napi]
+    pub fn add_group(&mut self, code: String, ipc: Buffer) -> Result<()> {
+        let g = group_from_ipc(code, &ipc, None, None)?;
+        match &mut self.stream {
+            Some(s) => s.push(g).map_err(|e| Error::from_reason(e.to_string())),
+            None => {
+                self.eager.push(g);
+                Ok(())
+            }
+        }
+    }
+
+    #[napi]
+    pub fn finish(&mut self) -> Result<EmitResult> {
+        let opts = spike_opts();
+        let res = match self.stream.take() {
+            Some(s) => s.finish(),
+            None => laterite_ags4_emit::emit_ags4_from_arrow(std::mem::take(&mut self.eager), &opts),
+        }
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
+        #[allow(clippy::cast_possible_truncation)]
+        let fixes_applied = res.fixes_applied as u32;
+        Ok(EmitResult {
+            bytes: res.bytes.into(),
+            findings_json,
+            applied: to_applied_fixes(&res.applied),
+            fixes_applied,
+        })
+    }
 }
 
 /// The unchecked door (#881): [`emit_ags4_from_ipc`]'s marshalling handed to

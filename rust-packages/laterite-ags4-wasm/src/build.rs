@@ -610,6 +610,45 @@ pub fn build_ags4_ipc(
     to_js(&report)
 }
 
+/// #893 SPIKE (throwaway branch; never lands): [`build_ags4_ipc`] with the
+/// decode-then-materialise slab removed — each group's IPC copies in and
+/// decodes only as the streamed emit consumes it, so no whole-file
+/// `Vec<ArrowGroup>` ever accumulates in linear memory. The JS-side items
+/// array is out of rule 13's claim either way. Byte-identity with the
+/// shipped door is the probe's equivalence check.
+#[cfg(feature = "arrow")]
+#[wasm_bindgen]
+pub fn build_ags4_ipc_spike_jit(
+    groups: JsValue,
+    opts: Option<BuildOptionsJs>,
+) -> Result<BuildReportJs, JsError> {
+    use wasm_bindgen::JsCast;
+    console_error_panic_hook::set_once();
+    let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let (edition, mode, synth, tran) = build_parts(o).map_err(|e| JsError::new(&e))?;
+    let eopts = emit_opts(edition.as_deref(), mode.as_deref(), synth, tran)
+        .map_err(|e| JsError::new(&e))?;
+    let mut session = laterite_ags4_emit::ArrowEmitSession::new(eopts);
+    let arr = js_sys::Array::from(&groups);
+    for item in arr.iter() {
+        let code = js_sys::Reflect::get(&item, &JsValue::from_str("code"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("each group needs a string `code`"))?;
+        let ipc_val = js_sys::Reflect::get(&item, &JsValue::from_str("ipc"))
+            .map_err(|_| JsError::new("each group needs an `ipc` Uint8Array"))?;
+        let ipc = ipc_val
+            .dyn_into::<js_sys::Uint8Array>()
+            .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
+            .to_vec();
+        session
+            .push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?)
+            .map_err(|e| JsError::new(&e.to_string()))?;
+    }
+    let res = session.finish().map_err(|e| JsError::new(&e.to_string()))?;
+    to_js(&shape_report(&res))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
