@@ -101,12 +101,16 @@ struct GroupParse {
 /// registry) have no spec keys, so they're omitted here and left un-key-checked.
 fn file_declared_groups(pa: &laterite_ags4_core::ags4_codec::ParsedAgs4) -> BTreeSet<String> {
     pa.get("DICT")
-        .map(|d| {
-            (0..d.n_rows())
-                .filter_map(|i| d.cell_named(i, "DICT_GRP"))
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-                .collect()
+        .and_then(|d| {
+            // Name→column once per group, positional per row (#900's pattern).
+            let grp = d.col("DICT_GRP")?;
+            Some(
+                (0..d.n_rows())
+                    .filter_map(|i| d.cell(i, grp))
+                    .map(|v| v.trim().to_string())
+                    .filter(|v| !v.is_empty())
+                    .collect(),
+            )
         })
         .unwrap_or_default()
 }
@@ -116,13 +120,13 @@ fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
     let file_declared = file_declared_groups(&pa);
     let mut groups: BTreeMap<String, Vec<(String, Option<String>)>> = BTreeMap::new();
     let mut non_registry = Vec::new();
-    for code in pa.order().to_vec() {
-        let g = pa.get(&code).unwrap(); // order holds trimmed codes; groups are keyed by them
-        if reg.get(&code).is_none() {
-            non_registry.push((code.clone(), file_declared.contains(&code)));
+    for code in pa.order() {
+        let g = pa.get(code).unwrap(); // order holds trimmed codes; groups are keyed by them
+        if reg.get(code).is_none() {
+            non_registry.push((code.clone(), file_declared.contains(code)));
             continue;
         }
-        let mut ids = group_row_ids(reg, &code, g.headings(), g.n_rows(), |col, row| {
+        let mut ids = group_row_ids(reg, code, g.headings(), g.n_rows(), |col, row| {
             // Span-backed accessors (#900): a short/ragged row projects "" for
             // its missing tail (same as duckdb's padded short rows).
             g.cell(row, col)

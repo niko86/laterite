@@ -37,8 +37,9 @@ use crate::error::CliError;
 /// Since #900 the rows are **span-backed**: the group holds the parse leaf's
 /// arena (spans over the shared decoded buffer, the M6 layout) and serves
 /// cells through the accessors below, trimmed on read — the whole-file
-/// `String`-per-cell materialisation the old `rows` field forced was
-/// −62…−65% of the read door's peak (the #893 diagnosis;
+/// `String`-per-cell materialisation the old `rows` field forced was most
+/// of the read door's peak (priced by the #893 diagnosis; the campaign
+/// ledger's M8 row carries the numbers, and
 /// `ags-wiki/design/dec-read-projection-representation.md` is the shape's
 /// record). Construction is private on purpose: this family has changed
 /// layout three times (M4, M6, #900), and the constructor tax is paid once
@@ -185,11 +186,7 @@ impl AgsGroup {
         if row >= self.n_rows() || col >= self.headings.len() {
             return false;
         }
-        self.materialise();
-        let GroupRepr::Owned(rows) = &mut self.repr else {
-            unreachable!("materialise() always leaves the owned shape");
-        };
-        rows[row][col] = value;
+        self.owned_rows_mut()[row][col] = value;
         true
     }
 
@@ -197,12 +194,18 @@ impl AgsGroup {
     /// Materialises like [`Self::set_cell`] — there is no spans-plus-tail
     /// hybrid, by decision.
     pub fn push_row(&mut self, mut cells: Vec<String>) {
+        cells.resize(self.headings.len(), String::new());
+        self.owned_rows_mut().push(cells);
+    }
+
+    /// The one mutation seam: materialise (idempotent) and hand back the
+    /// owned rows.
+    fn owned_rows_mut(&mut self) -> &mut Vec<Vec<String>> {
         self.materialise();
         let GroupRepr::Owned(rows) = &mut self.repr else {
             unreachable!("materialise() always leaves the owned shape");
         };
-        cells.resize(self.headings.len(), String::new());
-        rows.push(cells);
+        rows
     }
 
     /// Spans → the one owned shape, applying the read trim exactly as the

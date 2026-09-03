@@ -81,7 +81,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.14.0", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.14.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
 # Transport (pack/unpack/lock/unlock) — zstd + age passphrase, the shared

@@ -151,7 +151,14 @@ count, built through the group's constructor. Reads serve from the
 overlay thereafter — one group's worth, only on the paths that asked;
 there is no spans-plus-appended-tail hybrid. Excel's `from_excel` (and
 any other builder) constructs that same owned shape through the same
-constructor; the map-shaped builder dies with the field. With the fields
+constructor; the map-shaped builder dies with the field. *(As landed
+(#902), `from_excel` departs from this sentence's mechanism while keeping
+its substance: it builds the positional rows and hands them straight to
+the emitter without constructing an `AgsGroup` at all — going through the
+constructor would have added a copy at the emit boundary, since the owned
+rows sit behind the private representation and an out-of-crate consumer
+can only borrow cells back out. The map-shaped builder is still dead and
+the one owned shape is still the only shape built.)* With the fields
 private, **mutation enters core's accessor surface** (set-cell /
 push-row / remove-group methods on the codec types) and the facade
 delegates to it — the facade's published API is unchanged, its reach
