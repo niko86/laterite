@@ -17,7 +17,7 @@ The modes map one-to-one onto the job's steps:
   registry never gave.
 * `--bumps`   — `<crate> <part>` rows for the PR mode's bump loop.
 * `--publish-owed` — the crates whose stamp should be on the registry and is
-  not; any output means "cancel the pending approval and dispatch a fresh one".
+  not; any output means "cancel any stale queued run and dispatch a fresh one".
 * `--render`  — the human report + the cut view, for the step summary.
 """
 

@@ -226,7 +226,8 @@ def _release_line(token: str) -> str:
         )
     if act.startswith("publish-"):
         return (
-            f"`{crate}` — **publish {act[8:]}**: approve the pending publish-crates run"
+            f"`{crate}` — **publish {act[8:]}**: tonight's dispatched "
+            "publish-crates run ships it unattended"
         )
     if act == "human":
         return f"`{crate}` — **needs a human**; the run's step summary says why"
