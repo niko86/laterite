@@ -67,9 +67,12 @@ rather than guessing.
 surface reports back.
 
 The read direction consumes `AgsGroup` from [[laterite-ags4-core]]'s
-`read_ags4_bytes`, so it inherits that projection's string/trim semantics — see
-[[core-perf-baseline]] for why those rows are keyed by shared `Arc<str>` heading
-names rather than per-row `String` clones.
+`read_ags4_bytes`, so it inherits that projection's string/trim semantics.
+Since #900 the group lends cells through borrowing accessors over the parse
+spans ([[dec-read-projection-representation]]) — the sheet walk iterates
+`row_cells` rather than a keyed rows map — and the write direction builds its
+own positional rows straight into the emitter instead of constructing an
+`AgsGroup` (construction is private there now).
 
 ## Status: flagged for rewrite
 

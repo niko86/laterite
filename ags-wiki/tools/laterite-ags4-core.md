@@ -47,6 +47,28 @@ double-quoted CSV reader), `ags4_writer` (spec-correct AGS4 emitter),
 (zstd + age envelope for `pack`/`unpack`/`lock`/`unlock`), and `error`
 (the shared `CliError`).
 
+## The read projection (since #900)
+
+`ags4_codec`'s `AgsGroup` no longer owns a `String` per cell: the group keeps
+the parse leaf's span arena (the M6 layout,
+[[dec-parse-structure-layout]]) and **lends** cells through borrowing
+accessors — `cell` / `cell_named` / `row_cells` / `padded_row`, trimmed on
+read — with exactly one owned shape (`Vec<Vec<String>>`) behind whole-group
+copy-on-write: the first `set_cell` / `push_row` materialises that group,
+and nothing else does. Construction is fully private (`from_owned_rows`,
+`ParsedAgs4::from_groups` are the doors), so the next layout change is not
+another break. The shape's record — including the eager `ExcessFields`
+refusal moving to read time and the no-hybrid mutation decision — is
+[[dec-read-projection-representation]]; the price that bought it is the
+campaign ledger's M8 row ([[perf-campaign]]).
+
+One consequence to know when holding groups long-term: a borrowed cell ties
+the group to the file's decoded buffer. A consumer that wants one group
+without the whole file's buffer held should take the **sliced `.ags.idx`
+path** (`repo:rust-packages/laterite-ags4-core/src/index.rs` — the cert's
+byte-offset index reads one group's bytes alone), which parses just that
+slice and holds just that slice's buffer.
+
 ## Inputs / outputs
 
 In: AGS4 byte streams, `.xlsx` workbooks, and pure-string heading values.

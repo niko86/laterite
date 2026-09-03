@@ -24,10 +24,8 @@
 //!
 //! Stage 2b of the python-ags4 parity arc.
 
-use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::Arc;
 
 use calamine::{Data, Reader, open_workbook_auto_from_rs};
 use rust_xlsxwriter::Workbook;
@@ -98,7 +96,7 @@ pub fn ags4_bytes_to_xlsx_with(
     read_opts: ReadOptions,
 ) -> Result<(Vec<u8>, ExcelStats), CliError> {
     let parsed = read_ags4_bytes_with(input, read_opts)?;
-    let order: Vec<String> = ordered_keys.unwrap_or_else(|| parsed.order.clone());
+    let order: Vec<String> = ordered_keys.unwrap_or_else(|| parsed.order().to_vec());
 
     if order.is_empty() {
         return Err(CliError::Schema(
@@ -112,7 +110,7 @@ pub fn ags4_bytes_to_xlsx_with(
     let mut warnings: Vec<String> = Vec::new();
 
     for code in &order {
-        let Some(group) = parsed.groups.get(code) else {
+        let Some(group) = parsed.get(code) else {
             warnings.push(format!("skip {code}: not in parsed AGS4 input"));
             continue;
         };
@@ -128,16 +126,16 @@ pub fn ags4_bytes_to_xlsx_with(
         sheet
             .write_string(0, 0, "HEADING")
             .map_err(|e| CliError::Schema(format!("write HEADING: {e}")))?;
-        for (i, heading) in group.headings.iter().enumerate() {
+        for (i, heading) in group.headings().iter().enumerate() {
             sheet
                 .write_string(0, excel_col(i + 1)?, heading)
                 .map_err(|e| CliError::Schema(format!("write heading: {e}")))?;
         }
 
         // UNIT, TYPE, then each DATA row.
-        write_group_row(sheet, 1, "UNIT", &group.units, group.headings.len())?;
-        write_group_row(sheet, 2, "TYPE", &group.types, group.headings.len())?;
-        for (ri, row) in group.rows.iter().enumerate() {
+        write_group_row(sheet, 1, "UNIT", group.units(), group.headings().len())?;
+        write_group_row(sheet, 2, "TYPE", group.types(), group.headings().len())?;
+        for ri in 0..group.n_rows() {
             // Row index, not column: bounded by rows actually held in memory
             // (Excel's own cap is ~1M, u32::MAX is billions — unreachable
             // without exhausting RAM first), so no fallible conversion here.
@@ -146,8 +144,7 @@ pub fn ags4_bytes_to_xlsx_with(
             sheet
                 .write_string(r, 0, "DATA")
                 .map_err(|e| CliError::Schema(format!("write DATA tag: {e}")))?;
-            for (ci, heading) in group.headings.iter().enumerate() {
-                let value = row.get(heading.as_str()).map_or("", String::as_str);
+            for (ci, value) in group.row_cells(ri).enumerate() {
                 if !value.is_empty() {
                     sheet
                         .write_string(r, excel_col(ci + 1)?, value)
@@ -165,7 +162,7 @@ pub fn ags4_bytes_to_xlsx_with(
         sheet
             .set_column_width(0, column_width("HEADING", group))
             .map_err(|e| CliError::Schema(format!("col width: {e}")))?;
-        for (i, heading) in group.headings.iter().enumerate() {
+        for (i, heading) in group.headings().iter().enumerate() {
             sheet
                 .set_column_width(excel_col(i + 1)?, column_width(heading, group))
                 .map_err(|e| CliError::Schema(format!("col width: {e}")))?;
@@ -209,6 +206,17 @@ fn write_group_row(
     Ok(())
 }
 
+/// One worksheet's harvested group, positional throughout — the local shape
+/// `from_excel` feeds the writer (it stopped constructing codec groups when
+/// #900 made those span-backed; the writer only ever wanted positions).
+struct SheetGroup {
+    code: String,
+    headings: Vec<String>,
+    units: Vec<String>,
+    types: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
 /// `usize` column index → the `u16` `rust_xlsxwriter` wants. A group with more
 /// than `u16::MAX` headings can't happen from a normal dictionary group (58 max
 /// — laterite-dev#475's `ags_dictionary.json`), but an oversized or malformed HEADING row
@@ -231,18 +239,18 @@ fn excel_col(index: usize) -> Result<u16, CliError> {
 fn column_width(heading: &str, group: &AgsGroup) -> f64 {
     let mut max_len = heading.len();
     // Compare against UNIT/TYPE entries at the same column index.
-    if let Some(idx) = group.headings.iter().position(|h| h == heading) {
-        if let Some(u) = group.units.get(idx) {
+    if let Some(idx) = group.col(heading) {
+        if let Some(u) = group.units().get(idx) {
             max_len = max_len.max(u.len());
         }
-        if let Some(t) = group.types.get(idx) {
+        if let Some(t) = group.types().get(idx) {
             max_len = max_len.max(t.len());
         }
-    }
-    // Then every DATA row.
-    for row in &group.rows {
-        if let Some(v) = row.get(heading) {
-            max_len = max_len.max(v.len());
+        // Then every DATA row.
+        for ri in 0..group.n_rows() {
+            if let Some(v) = group.cell(ri, idx) {
+                max_len = max_len.max(v.len());
+            }
         }
     }
     let width = max_len + 1;
@@ -290,7 +298,7 @@ pub fn xlsx_bytes_to_ags4(
         .map_err(|e| CliError::Schema(format!("open xlsx: {e}")))?;
 
     let sheet_names: Vec<String> = workbook.sheet_names().clone();
-    let mut emit_groups: Vec<AgsGroup> = Vec::new();
+    let mut emit_groups: Vec<SheetGroup> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     let mut rows_written = 0usize;
 
@@ -347,10 +355,10 @@ pub fn xlsx_bytes_to_ags4(
 
         let mut units: Vec<String> = vec![String::new(); headings.len()];
         let mut types: Vec<String> = vec![String::new(); headings.len()];
-        // Heading names shared across rows by refcount, matching `AgsGroup`'s
-        // shape — the same names were previously cloned into every row's map.
-        let keys: Vec<Arc<str>> = headings.iter().map(|h| Arc::from(h.as_str())).collect();
-        let mut data_rows: Vec<HashMap<Arc<str>, String>> = Vec::new();
+        // Positional rows, aligned with `headings` by the `keep_cols`
+        // projection — the writer wants positional cells, so the by-name map
+        // this used to build was a detour (#900 retired it with the codec's).
+        let mut data_rows: Vec<Vec<String>> = Vec::new();
 
         for row in rows_iter {
             let tag = cell_str(row.get(hcol).unwrap_or(&Data::Empty));
@@ -364,13 +372,7 @@ pub fn xlsx_bytes_to_ags4(
                 "UNIT" => units = payload(),
                 "TYPE" => types = payload(),
                 "DATA" => {
-                    let values = payload();
-                    let row_map: HashMap<Arc<str>, String> = keys
-                        .iter()
-                        .zip(values)
-                        .map(|(k, v)| (Arc::clone(k), v))
-                        .collect();
-                    data_rows.push(row_map);
+                    data_rows.push(payload());
                     rows_written += 1;
                 }
                 "" => {} // empty separator rows in the sheet
@@ -386,7 +388,7 @@ pub fn xlsx_bytes_to_ags4(
             apply_type_formatting(&headings, &types, &mut data_rows);
         }
 
-        emit_groups.push(AgsGroup {
+        emit_groups.push(SheetGroup {
             code: sheet_name.clone(),
             headings,
             units,
@@ -401,32 +403,16 @@ pub fn xlsx_bytes_to_ags4(
         ));
     }
 
-    // Convert AgsGroup → EmitGroup and call write_ags4. The rows are built
-    // here (each sheet row is a map, the writer wants positional cells), so
-    // they need an owned home first — `EmitGroup` borrows everything.
-    let emit_rows: Vec<Vec<Vec<String>>> = emit_groups
-        .iter()
-        .map(|g| {
-            g.rows
-                .iter()
-                .map(|row| {
-                    g.headings
-                        .iter()
-                        .map(|h| row.get(h.as_str()).cloned().unwrap_or_default())
-                        .collect()
-                })
-                .collect()
-        })
-        .collect();
+    // The sheets' rows are positional already, so `EmitGroup` borrows them
+    // directly — no per-group copy.
     let emit_views: Vec<EmitGroup<'_>> = emit_groups
         .iter()
-        .zip(&emit_rows)
-        .map(|(g, rows)| EmitGroup {
+        .map(|g| EmitGroup {
             code: &g.code,
             headings: g.headings.iter().map(String::as_str).collect(),
             units: g.units.iter().map(String::as_str).collect(),
             types: g.types.iter().map(String::as_str).collect(),
-            rows,
+            rows: &g.rows,
         })
         .collect();
 
@@ -473,12 +459,8 @@ fn emit_err(e: EmitError) -> CliError {
 /// Non-numeric specs pass through untouched. Cells that can't be
 /// parsed as floats (e.g. blank strings, sentinels like `?`) also
 /// pass through — matches python-ags4's silent `ValueError` fallback.
-fn apply_type_formatting(
-    headings: &[String],
-    types: &[String],
-    rows: &mut [HashMap<Arc<str>, String>],
-) {
-    for (i, heading) in headings.iter().enumerate() {
+fn apply_type_formatting(headings: &[String], types: &[String], rows: &mut [Vec<String>]) {
+    for i in 0..headings.len() {
         let Some(type_spec) = types.get(i) else {
             continue;
         };
@@ -490,9 +472,7 @@ fn apply_type_formatting(
             continue;
         };
         for row in rows.iter_mut() {
-            // Rewrite in place: re-inserting would re-hash the entry and mint a
-            // fresh key, discarding the shared heading Arc for no reason.
-            if let Some(value) = row.get_mut(heading.as_str()) {
+            if let Some(value) = row.get_mut(i) {
                 if value.is_empty() {
                     continue;
                 }
@@ -771,22 +751,15 @@ mod tests {
         let headings = vec!["TEST_VAL".to_string(), "TEST_TXT".to_string()];
         let types = vec!["3DP".to_string(), "X".to_string()];
         let mut rows = vec![
-            HashMap::from([
-                (Arc::from("TEST_VAL"), "5.1".to_string()),
-                (Arc::from("TEST_TXT"), "keep".to_string()),
-            ]),
-            HashMap::from([
-                (Arc::from("TEST_VAL"), String::new()), // empty -> skipped
-            ]),
-            HashMap::from([
-                (Arc::from("TEST_VAL"), "notnum".to_string()), // unparseable -> untouched
-            ]),
+            vec!["5.1".to_string(), "keep".to_string()],
+            vec![String::new()],        // empty -> skipped
+            vec!["notnum".to_string()], // unparseable -> untouched
         ];
         apply_type_formatting(&headings, &types, &mut rows);
-        assert_eq!(rows[0]["TEST_VAL"], "5.100"); // padded to 3DP
-        assert_eq!(rows[0]["TEST_TXT"], "keep"); // non-numeric type untouched
-        assert_eq!(rows[1]["TEST_VAL"], ""); // empty stays empty
-        assert_eq!(rows[2]["TEST_VAL"], "notnum"); // parse failure -> verbatim
+        assert_eq!(rows[0][0], "5.100"); // padded to 3DP
+        assert_eq!(rows[0][1], "keep"); // non-numeric type untouched
+        assert_eq!(rows[1][0], ""); // empty stays empty
+        assert_eq!(rows[2][0], "notnum"); // parse failure -> verbatim
     }
 
     #[test]
@@ -794,13 +767,10 @@ mod tests {
         let headings = vec!["TEST_A".to_string(), "TEST_B".to_string()];
         // TEST_A has a blank type; TEST_B has no type entry at all.
         let types = vec![String::new()];
-        let mut rows = vec![HashMap::from([
-            (Arc::from("TEST_A"), "1.5".to_string()),
-            (Arc::from("TEST_B"), "2.5".to_string()),
-        ])];
+        let mut rows = vec![vec!["1.5".to_string(), "2.5".to_string()]];
         apply_type_formatting(&headings, &types, &mut rows);
-        assert_eq!(rows[0]["TEST_A"], "1.5"); // blank spec -> untouched
-        assert_eq!(rows[0]["TEST_B"], "2.5"); // missing spec -> untouched
+        assert_eq!(rows[0][0], "1.5"); // blank spec -> untouched
+        assert_eq!(rows[0][1], "2.5"); // missing spec -> untouched
     }
 
     // --- round trip: AGS4 -> XLSX -> AGS4 --------------------------
@@ -847,20 +817,21 @@ mod tests {
         let (xlsx, _) = ags4_bytes_to_xlsx(src.as_bytes(), None).unwrap();
         let (ags4, _) = xlsx_bytes_to_ags4(&xlsx, true).unwrap();
         let back = read_ags4_bytes(&ags4).unwrap();
-        let loca = &back.groups["LOCA"];
+        let loca = back.get("LOCA").unwrap();
 
         assert_eq!(
-            loca.units,
-            vec![String::new(), "m".to_string()],
+            loca.units(),
+            [String::new(), "m".to_string()],
             "the UNIT row must survive the trip through the sheet"
         );
         assert_eq!(
-            loca.types,
-            vec!["ID".to_string(), "2DP".to_string()],
+            loca.types(),
+            ["ID".to_string(), "2DP".to_string()],
             "the TYPE row must survive — it is what drives re-formatting"
         );
         assert_eq!(
-            loca.rows[0]["LOCA_NATE"], "523145.10",
+            loca.cell_named(0, "LOCA_NATE").unwrap(),
+            "523145.10",
             "2DP re-formatting only happens if the TYPE row came back"
         );
     }
@@ -874,20 +845,13 @@ mod tests {
     #[allow(clippy::float_cmp)]
     fn column_width_matches_the_python_ags4_formula() {
         let mk = |headings: Vec<&str>, units: Vec<&str>, types: Vec<&str>, values: Vec<&str>| {
-            let keys: Vec<std::sync::Arc<str>> =
-                headings.iter().map(|h| std::sync::Arc::from(*h)).collect();
-            let row: HashMap<std::sync::Arc<str>, String> = keys
-                .iter()
-                .zip(values.iter())
-                .map(|(k, v)| (std::sync::Arc::clone(k), (*v).to_string()))
-                .collect();
-            AgsGroup {
-                code: "LOCA".into(),
-                headings: headings.iter().map(|s| (*s).to_string()).collect(),
-                units: units.iter().map(|s| (*s).to_string()).collect(),
-                types: types.iter().map(|s| (*s).to_string()).collect(),
-                rows: vec![row],
-            }
+            AgsGroup::from_owned_rows(
+                "LOCA".into(),
+                headings.iter().map(|s| (*s).to_string()).collect(),
+                units.iter().map(|s| (*s).to_string()).collect(),
+                types.iter().map(|s| (*s).to_string()).collect(),
+                vec![values.iter().map(|v| (*v).to_string()).collect()],
+            )
         };
 
         // Short content clamps UP to the 13 floor.
@@ -917,22 +881,13 @@ mod tests {
         // the index match inverts, LOCA_ID's width is computed from column 1 and
         // LOCA_NATE's from column 0 — so LOCA_NATE would inherit the long unit.
         let long_unit = "u".repeat(40);
-        let keys: Vec<std::sync::Arc<str>> = ["LOCA_NATE", "LOCA_ID"]
-            .iter()
-            .map(|h| std::sync::Arc::from(*h))
-            .collect();
-        let row: HashMap<std::sync::Arc<str>, String> = keys
-            .iter()
-            .zip(["1.0", "BH01"].iter())
-            .map(|(k, v)| (std::sync::Arc::clone(k), (*v).to_string()))
-            .collect();
-        let g = AgsGroup {
-            code: "LOCA".into(),
-            headings: vec!["LOCA_NATE".into(), "LOCA_ID".into()],
-            units: vec![long_unit, String::new()],
-            types: vec!["2DP".into(), "ID".into()],
-            rows: vec![row],
-        };
+        let g = AgsGroup::from_owned_rows(
+            "LOCA".into(),
+            vec!["LOCA_NATE".into(), "LOCA_ID".into()],
+            vec![long_unit, String::new()],
+            vec!["2DP".into(), "ID".into()],
+            vec![vec!["1.0".to_string(), "BH01".to_string()]],
+        );
 
         assert_eq!(
             column_width("LOCA_NATE", &g),
@@ -997,7 +952,10 @@ mod tests {
         );
         assert_eq!(stats.rows_written, 1, "only the DATA row counts");
         let back = read_ags4_bytes(&ags4).unwrap();
-        assert_eq!(back.groups["LOCA"].rows[0]["LOCA_ID"], "BH01");
+        assert_eq!(
+            back.get("LOCA").unwrap().cell_named(0, "LOCA_ID"),
+            Some("BH01")
+        );
     }
 
     /// The `i < 0` boundary in `format_sf`. At `i == 0` the two arms are NOT
@@ -1041,12 +999,12 @@ mod tests {
 
         // The re-emitted AGS4 carries both groups and the data values.
         let reparsed = read_ags4(&ags_out).unwrap();
-        assert!(reparsed.groups.contains_key("PROJ"));
-        let loca = &reparsed.groups["LOCA"];
-        assert_eq!(loca.rows.len(), 2);
-        assert_eq!(loca.rows[0]["LOCA_ID"], "BH01");
+        assert!(reparsed.get("PROJ").is_some());
+        let loca = reparsed.get("LOCA").unwrap();
+        assert_eq!(loca.n_rows(), 2);
+        assert_eq!(loca.cell_named(0, "LOCA_ID"), Some("BH01"));
         // 2DP numeric formatting preserved through the round trip.
-        assert_eq!(loca.rows[0]["LOCA_NATE"], "523145.10");
+        assert_eq!(loca.cell_named(0, "LOCA_NATE"), Some("523145.10"));
     }
 
     #[test]
@@ -1064,12 +1022,12 @@ mod tests {
         assert_eq!(r.rows_written, 3);
 
         let reparsed = read_ags4_bytes(&ags4).unwrap();
-        assert!(reparsed.groups.contains_key("PROJ"));
-        let loca = &reparsed.groups["LOCA"];
-        assert_eq!(loca.rows.len(), 2);
-        assert_eq!(loca.rows[0]["LOCA_ID"], "BH01");
+        assert!(reparsed.get("PROJ").is_some());
+        let loca = reparsed.get("LOCA").unwrap();
+        assert_eq!(loca.n_rows(), 2);
+        assert_eq!(loca.cell_named(0, "LOCA_ID"), Some("BH01"));
         // 2DP numeric formatting survives the FS-free round trip too.
-        assert_eq!(loca.rows[0]["LOCA_NATE"], "523145.10");
+        assert_eq!(loca.cell_named(0, "LOCA_NATE"), Some("523145.10"));
     }
 
     #[test]
@@ -1125,9 +1083,9 @@ mod tests {
         assert!(stats.warnings.iter().any(|w| w.contains("NOTE")));
 
         let parsed = read_ags4(&ags_out).unwrap();
-        let g = &parsed.groups["TEST"];
-        assert_eq!(g.headings, vec!["TEST_ID".to_string()]);
-        assert_eq!(g.rows[0]["TEST_ID"], "A1");
+        let g = parsed.get("TEST").unwrap();
+        assert_eq!(g.headings(), ["TEST_ID".to_string()]);
+        assert_eq!(g.cell_named(0, "TEST_ID"), Some("A1"));
     }
 
     #[test]

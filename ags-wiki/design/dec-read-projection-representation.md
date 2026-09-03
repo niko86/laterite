@@ -12,6 +12,15 @@ sources: []
 
 # the codec's read projection goes span-backed — `AgsGroup.rows` dies as a field, accessors + copy-on-write replace it
 
+> [!note] **Gate outcome (2026-09-03, #900): PASSED — landed as designed.**
+> The land A/B/A (main-built release `lat` as A-legs vs the branch build)
+> measured **−64.8/−63.3%** of the read door's peak at the 100/265 MB gate
+> rungs (11.29× → 3.97× and 10.90× → 4.00×-of-input; A-legs spread 0.0%,
+> output sha-identical on every leg and across all three `lat` programs) —
+> over rule 10's 20% invasive floor three times, matching the #893 price.
+> The claim and the refreshed lane cells live on [[perf-campaign]]'s M8
+> row; the record is on #900.
+
 > [!note] **Grilled with the owner and accepted 2026-09-03**, two rounds,
 > every recommendation ratified; the outcomes are folded into Decision and
 > Consequences below rather than kept as a separate record. The four that
@@ -142,7 +151,14 @@ count, built through the group's constructor. Reads serve from the
 overlay thereafter — one group's worth, only on the paths that asked;
 there is no spans-plus-appended-tail hybrid. Excel's `from_excel` (and
 any other builder) constructs that same owned shape through the same
-constructor; the map-shaped builder dies with the field. With the fields
+constructor; the map-shaped builder dies with the field. *(As landed
+(#902), `from_excel` departs from this sentence's mechanism while keeping
+its substance: it builds the positional rows and hands them straight to
+the emitter without constructing an `AgsGroup` at all — going through the
+constructor would have added a copy at the emit boundary, since the owned
+rows sit behind the private representation and an out-of-crate consumer
+can only borrow cells back out. The map-shaped builder is still dead and
+the one owned shape is still the only shape built.)* With the fields
 private, **mutation enters core's accessor surface** (set-cell /
 push-row / remove-group methods on the codec types) and the facade
 delegates to it — the facade's published API is unchanged, its reach

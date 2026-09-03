@@ -27,44 +27,289 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
-use laterite_ags4_parse::{ParseError, ParseOptions, ParsedFile, parse_bytes_opts};
+use laterite_ags4_parse::{ParseError, ParseOptions, ParsedFile, ParsedGroup, parse_bytes_opts};
 
 use crate::error::CliError;
 
 /// One AGS4 group section after parsing.
-#[derive(Debug, Clone)]
+///
+/// Since #900 the rows are **span-backed**: the group holds the parse leaf's
+/// arena (spans over the shared decoded buffer, the M6 layout) and serves
+/// cells through the accessors below, trimmed on read — the whole-file
+/// `String`-per-cell materialisation the old `rows` field forced was most
+/// of the read door's peak (priced by the #893 diagnosis; the campaign
+/// ledger's M8 row carries the numbers, and
+/// `ags-wiki/design/dec-read-projection-representation.md` is the shape's
+/// record). Construction is private on purpose: this family has changed
+/// layout three times (M4, M6, #900), and the constructor tax is paid once
+/// so the next change is not another break.
+#[derive(Clone)]
 pub struct AgsGroup {
-    pub code: String,
-    /// Heading names in declaration order (e.g. `["LOCA_ID", "LOCA_TYPE", ...]`).
-    pub headings: Vec<String>,
-    /// Units row aligned with `headings`. Padded with empty strings if the
-    /// UNIT row was shorter than the heading list (some AGS4 emitters).
-    pub units: Vec<String>,
+    pub(crate) code: String,
+    /// Heading names in declaration order, trimmed, duplicate policy applied.
+    pub(crate) headings: Vec<String>,
+    /// Units row aligned with `headings` when the UNIT row was present
+    /// (padded with empty strings); empty when it was absent.
+    pub(crate) units: Vec<String>,
     /// TYPE row aligned with `headings` — AGS4 type codes (X / ID / 2DP / …).
-    pub types: Vec<String>,
-    /// Each DATA row as a `{heading_name: raw_string_value}` map.
-    ///
-    /// Keys are `Arc<str>` so a group's heading names are allocated ONCE and
-    /// shared by every row, not re-allocated per cell. `Arc<str>: Borrow<str>`,
-    /// so lookups are unchanged: `row["LOCA_ID"]` and `row.get("LOCA_ID")` work
-    /// exactly as before.
-    pub rows: Vec<HashMap<Arc<str>, String>>,
+    pub(crate) types: Vec<String>,
+    pub(crate) repr: GroupRepr,
+}
+
+/// Where a group's cells live. Exactly two shapes, by design
+/// (dec-read-projection-representation): the span-backed parse, and the ONE
+/// owned positional shape that copy-on-write and the builders construct.
+#[derive(Clone)]
+pub(crate) enum GroupRepr {
+    /// Cells resolve from the leaf group's span arena against the shared
+    /// decoded buffer, trimmed on read. Nothing per-cell is owned.
+    Spans(ParsedGroup),
+    /// Owned positional rows, each padded to the heading count. Values are
+    /// held **verbatim** (a materialised cell was trimmed when it was copied
+    /// out of the spans; a mutated cell keeps exactly what the caller set).
+    Owned(Vec<Vec<String>>),
+}
+
+impl AgsGroup {
+    /// A group built from owned data — the builders' door (excel's
+    /// `from_excel`, hand-built test groups). Each row is padded/truncated
+    /// to the heading count; values are stored verbatim.
+    #[must_use]
+    pub fn from_owned_rows(
+        code: String,
+        headings: Vec<String>,
+        units: Vec<String>,
+        types: Vec<String>,
+        mut rows: Vec<Vec<String>>,
+    ) -> AgsGroup {
+        for r in &mut rows {
+            r.resize(headings.len(), String::new());
+        }
+        AgsGroup {
+            code,
+            headings,
+            units,
+            types,
+            repr: GroupRepr::Owned(rows),
+        }
+    }
+
+    /// The 4-letter group code (trimmed).
+    #[must_use]
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    /// Heading names in declaration order.
+    #[must_use]
+    pub fn headings(&self) -> &[String] {
+        &self.headings
+    }
+
+    /// Units row aligned with [`Self::headings`] when the UNIT row was
+    /// present (padded); empty when it was absent.
+    #[must_use]
+    pub fn units(&self) -> &[String] {
+        &self.units
+    }
+
+    /// TYPE row aligned with [`Self::headings`].
+    #[must_use]
+    pub fn types(&self) -> &[String] {
+        &self.types
+    }
+
+    /// How many DATA rows.
+    #[must_use]
+    pub fn n_rows(&self) -> usize {
+        match &self.repr {
+            GroupRepr::Spans(pg) => pg.rows.len(),
+            GroupRepr::Owned(rows) => rows.len(),
+        }
+    }
+
+    /// Column index of a heading by name.
+    #[must_use]
+    pub fn col(&self, heading: &str) -> Option<usize> {
+        self.headings.iter().position(|h| h == heading)
+    }
+
+    /// The cell at `(row, col)` — `Some("")` for a short row's missing tail
+    /// (the positional contract), `None` when `row` or `col` is out of range.
+    /// A parsed cell comes back trimmed; a mutated one verbatim.
+    #[must_use]
+    pub fn cell(&self, row: usize, col: usize) -> Option<&str> {
+        if col >= self.headings.len() {
+            return None;
+        }
+        match &self.repr {
+            GroupRepr::Spans(pg) => pg
+                .rows
+                .get(row)
+                .map(|r| pg.value_at(r, col).unwrap_or("").trim()),
+            GroupRepr::Owned(rows) => rows.get(row)?.get(col).map(String::as_str).or(Some("")),
+        }
+    }
+
+    /// [`Self::cell`] by heading name.
+    #[must_use]
+    pub fn cell_named(&self, row: usize, heading: &str) -> Option<&str> {
+        self.cell(row, self.col(heading)?)
+    }
+
+    /// One row's cells, padded to the heading count — the borrowing
+    /// projection every read surface renders from. Yields nothing for an
+    /// out-of-range row.
+    pub fn row_cells(&self, row: usize) -> impl Iterator<Item = &str> + '_ {
+        let n = if row < self.n_rows() {
+            self.headings.len()
+        } else {
+            0
+        };
+        (0..n).map(move |c| self.cell(row, c).unwrap_or(""))
+    }
+
+    /// One row's cells as owned `String`s — the ONE owned convenience, for
+    /// the callers that hand rows to an owning boundary (the render writers,
+    /// the bindings' array builders). Everything else should borrow.
+    #[must_use]
+    pub fn padded_row(&self, row: usize) -> Vec<String> {
+        self.row_cells(row).map(str::to_string).collect()
+    }
+
+    /// Overwrite one cell. The first mutation of any kind materialises the
+    /// group into its owned shape (copy-on-write — one group's worth, only
+    /// on the paths that asked). Returns `false` when `row`/`col` is out of
+    /// range, mutating nothing.
+    pub fn set_cell(&mut self, row: usize, col: usize, value: String) -> bool {
+        if row >= self.n_rows() || col >= self.headings.len() {
+            return false;
+        }
+        self.owned_rows_mut()[row][col] = value;
+        true
+    }
+
+    /// Append a row (positional; padded/truncated to the heading count).
+    /// Materialises like [`Self::set_cell`] — there is no spans-plus-tail
+    /// hybrid, by decision.
+    pub fn push_row(&mut self, mut cells: Vec<String>) {
+        cells.resize(self.headings.len(), String::new());
+        self.owned_rows_mut().push(cells);
+    }
+
+    /// The one mutation seam: materialise (idempotent) and hand back the
+    /// owned rows.
+    fn owned_rows_mut(&mut self) -> &mut Vec<Vec<String>> {
+        self.materialise();
+        let GroupRepr::Owned(rows) = &mut self.repr else {
+            unreachable!("materialise() always leaves the owned shape");
+        };
+        rows
+    }
+
+    /// Spans → the one owned shape, applying the read trim exactly as the
+    /// old eager conversion did. Idempotent.
+    fn materialise(&mut self) {
+        if let GroupRepr::Spans(pg) = &self.repr {
+            let n = self.headings.len();
+            let rows: Vec<Vec<String>> = pg
+                .rows
+                .iter()
+                .map(|r| {
+                    (0..n)
+                        .map(|c| pg.value_at(r, c).unwrap_or("").trim().to_string())
+                        .collect()
+                })
+                .collect();
+            self.repr = GroupRepr::Owned(rows);
+        }
+    }
+}
+
+/// Equality over the logical projection — code, resolved metadata, and every
+/// projected cell — so a span-backed group and its materialised twin compare
+/// equal, which is the contract the representation split must not leak.
+impl PartialEq for AgsGroup {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code
+            && self.headings == other.headings
+            && self.units == other.units
+            && self.types == other.types
+            && self.n_rows() == other.n_rows()
+            && (0..self.n_rows()).all(|r| self.row_cells(r).eq(other.row_cells(r)))
+    }
+}
+
+/// Shape, never contents: a derived Debug would print every cell of a
+/// delivery file into panic messages and logs.
+#[allow(clippy::missing_fields_in_debug)] // omitting `units`/`types`/`repr` is the point
+impl std::fmt::Debug for AgsGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgsGroup")
+            .field("code", &self.code)
+            .field("headings", &self.headings)
+            .field("rows", &self.n_rows())
+            .finish()
+    }
 }
 
 /// Whole-file parse result. `order` preserves the group-section order from
 /// the input file — useful for round-trip emission.
 #[derive(Debug, Clone)]
 pub struct ParsedAgs4 {
-    pub groups: HashMap<String, AgsGroup>,
-    pub order: Vec<String>,
+    pub(crate) groups: HashMap<String, AgsGroup>,
+    pub(crate) order: Vec<String>,
 }
 
 impl ParsedAgs4 {
+    /// Assemble from owned groups, preserving their sequence as the file
+    /// order (first-seen wins on a duplicate code) — the constructors' door
+    /// for callers that build a document from parts (the facade's sliced
+    /// path).
+    #[must_use]
+    pub fn from_groups(groups: Vec<AgsGroup>) -> ParsedAgs4 {
+        let mut map = HashMap::with_capacity(groups.len());
+        let mut order = Vec::with_capacity(groups.len());
+        for g in groups {
+            if !map.contains_key(&g.code) {
+                order.push(g.code.clone());
+                map.insert(g.code.clone(), g);
+            }
+        }
+        ParsedAgs4 { groups: map, order }
+    }
+
     #[must_use]
     pub fn get(&self, code: &str) -> Option<&AgsGroup> {
         self.groups.get(code)
+    }
+
+    #[must_use]
+    pub fn get_mut(&mut self, code: &str) -> Option<&mut AgsGroup> {
+        self.groups.get_mut(code)
+    }
+
+    /// The group codes in file order.
+    #[must_use]
+    pub fn order(&self) -> &[String] {
+        &self.order
+    }
+
+    /// Remove and return one group.
+    pub fn take_group(&mut self, code: &str) -> Option<AgsGroup> {
+        let g = self.groups.remove(code);
+        if g.is_some() {
+            self.order.retain(|c| c != code);
+        }
+        g
+    }
+
+    /// Keep only these groups, dropping the rest (the facade's `only`
+    /// filter).
+    pub fn retain_only(&mut self, codes: &[String]) {
+        self.groups.retain(|code, _| codes.contains(code));
+        self.order.retain(|code| codes.contains(code));
     }
 }
 
@@ -227,21 +472,26 @@ fn resolve_headings(
 }
 
 /// Project the shared leaf's positional, RAW [`ParsedFile`] into core's
-/// name-keyed, TRIMMED [`ParsedAgs4`] (#168 Phase 5). Re-applies the trims core
-/// has always done — the leaf leaves values raw (validator semantics) — on
-/// every heading/unit/type/value, pads UNIT to the heading count (empty) and
-/// TYPE (with `"X"`), and keys each DATA row by heading name. First-seen wins on
-/// a duplicate (trimmed) code, matching the csv reader this replaced.
+/// name-keyed, TRIMMED [`ParsedAgs4`] (#168 Phase 5) — **policy eagerly,
+/// strings lazily** (#900). The trims core has always applied to
+/// heading/unit/type happen here as before; cell values stay in the leaf's
+/// span arena and are trimmed by the accessors on read, so no whole-file
+/// owned materialisation exists on any read path (the #893-measured slab).
+/// First-seen wins on a duplicate (trimmed) code, matching the csv reader
+/// this replaced.
 ///
-/// Duplicate heading NAMES within a group are a different matter and are
-/// governed by [`ReadOptions::duplicate_headings`] — see [`resolve_headings`].
-/// A row with MORE fields than headings is governed by
-/// [`ReadOptions::excess_fields`], and is refused by default (#776).
+/// Duplicate heading NAMES within a group are governed by
+/// [`ReadOptions::duplicate_headings`] — see [`resolve_headings`]. A row
+/// with MORE fields than headings is governed by
+/// [`ReadOptions::excess_fields`] and refused by default (#776) — the walk
+/// below reads span COUNTS, allocating nothing, so the refusal still fires
+/// at read time, never deferred to first access. Under `Truncate` the
+/// excess simply never projects: every accessor is heading-count wide, so
+/// truncation is a property of the projection now, not an edit.
 fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, CliError> {
-    // Taken BY VALUE: the sole caller drops the parse immediately after, so
-    // every heading/unit/type/value can be moved rather than cloned. Reading it
-    // through a reference meant re-allocating the entire file's text a second
-    // time — ~8.4M Strings on a 25 MB delivery.
+    // Taken BY VALUE: each group's descriptor rows are moved (not cloned)
+    // into the resolved metadata, and the group's span structure moves whole
+    // into the group it backs.
     let ParsedFile {
         groups: mut pgroups,
         group_order,
@@ -257,9 +507,8 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         let Some(mut pg) = pgroups.remove(raw_code) else {
             continue; // group_order and groups are built together; defensive.
         };
-        // The shared decoded buffer the row spans index — cloned out so the
-        // descriptor fields can be moved while cells are still read through it.
-        let buf = Arc::clone(pg.shared_text());
+        // The leaf group's own descriptor copies are dead weight once moved
+        // out — the retained `pg` serves spans only.
         let headings: Vec<String> = std::mem::take(&mut pg.headings)
             .into_iter()
             .map(trim_owned)
@@ -285,41 +534,22 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
         if pg.type_line.is_some() {
             types.resize(headings.len(), "X".to_string());
         }
-        // Heading names allocated ONCE per group; each row's map shares them by
-        // refcount. Previously every cell cloned its heading String, so the same
-        // ~20 names were re-allocated for every row in the file.
-        let keys: Vec<Arc<str>> = headings.iter().map(|h| Arc::from(h.as_str())).collect();
-        let rows: Vec<HashMap<Arc<str>, String>> = pg
-            .rows
-            .iter()
-            .map(|r| {
-                let (line, found) = (r.line, r.n_values());
-                let mut row = HashMap::with_capacity(keys.len());
-                // Cell spans come from the group's arena; `Copy`, so nothing
-                // is moved — the owned Strings are built from the buffer.
-                let mut values = pg.row_spans(r).iter();
-                for key in &keys {
-                    // A short/ragged row yields "" for the missing tail, as
-                    // before — the positional contract is unchanged.
-                    let v = values
-                        .next()
-                        .map_or_else(String::new, |s| s.slice(&buf).trim().to_string());
-                    row.insert(Arc::clone(key), v);
-                }
-                // Whatever is LEFT in `values` bound to no heading. Dropping it
-                // here is how a row could come back shorter than it went in and
-                // still look complete all the way to a clean certificate (#776).
-                if values.next().is_some() && read_opts.excess_fields == ExcessFields::Error {
+        // The eager arity walk (#776): a value bound to no heading cannot be
+        // represented, so the default read still refuses it HERE — in group
+        // order, first offending row first, exactly as the eager conversion
+        // did — reading span counts only.
+        if read_opts.excess_fields == ExcessFields::Error {
+            for r in &pg.rows {
+                if r.n_values() > headings.len() {
                     return Err(CliError::ExcessFields {
-                        group: code.clone(),
-                        line,
-                        found,
-                        declared: keys.len(),
+                        group: code,
+                        line: r.line,
+                        found: r.n_values(),
+                        declared: headings.len(),
                     });
                 }
-                Ok(row)
-            })
-            .collect::<Result<_, CliError>>()?;
+            }
+        }
         order.push(code.clone());
         groups.insert(
             code.clone(),
@@ -328,7 +558,7 @@ fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, Cli
                 headings,
                 units,
                 types,
-                rows,
+                repr: GroupRepr::Spans(pg),
             },
         );
     }
@@ -406,14 +636,14 @@ mod tests {
         let proj = parsed.get("PROJ").unwrap();
         assert_eq!(proj.headings, vec!["PROJ_ID", "PROJ_NAME"]);
         assert_eq!(proj.types, vec!["X", "X"]);
-        assert_eq!(proj.rows.len(), 1);
-        assert_eq!(proj.rows[0]["PROJ_ID"], "P1");
+        assert_eq!(proj.n_rows(), 1);
+        assert_eq!(proj.cell_named(0, "PROJ_ID"), Some("P1"));
 
         let loca = parsed.get("LOCA").unwrap();
         assert_eq!(loca.headings, vec!["LOCA_ID", "LOCA_TYPE", "LOCA_NATE"]);
         assert_eq!(loca.units, vec!["", "", "m"]);
-        assert_eq!(loca.rows.len(), 2);
-        assert_eq!(loca.rows[1]["LOCA_NATE"], "200.75");
+        assert_eq!(loca.n_rows(), 2);
+        assert_eq!(loca.cell_named(1, "LOCA_NATE"), Some("200.75"));
     }
 
     #[test]
@@ -429,10 +659,8 @@ mod tests {
         for code in &from_path.order {
             let a = from_path.get(code).unwrap();
             let b = from_bytes.get(code).unwrap();
-            assert_eq!(a.headings, b.headings);
-            assert_eq!(a.types, b.types);
-            assert_eq!(a.units, b.units);
-            assert_eq!(a.rows, b.rows);
+            // PartialEq is the logical projection: metadata + every cell.
+            assert_eq!(a, b);
         }
     }
 
@@ -450,7 +678,7 @@ mod tests {
         );
         // a present TYPE row IS padded/aligned to the heading count
         assert_eq!(proj.types, vec!["ID", "X"]);
-        assert_eq!(proj.rows[0]["PROJ_ID"], "P1");
+        assert_eq!(proj.cell_named(0, "PROJ_ID"), Some("P1"));
     }
 
     #[test]
@@ -512,11 +740,7 @@ mod tests {
         let g = parsed.get("LOCA").expect("LOCA");
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL", "LOCA_ID__2"]);
 
-        let positional: Vec<&str> = g
-            .headings
-            .iter()
-            .map(|h| g.rows[0].get(h.as_str()).map_or("", String::as_str))
-            .collect();
+        let positional: Vec<&str> = g.row_cells(0).collect();
         assert_eq!(positional, ["FIRST", "1.00", "SECOND"]);
 
         // UNIT/TYPE still align: renaming must not change the column count.
@@ -602,7 +826,7 @@ mod tests {
         let parsed = read_ags4_bytes_with(EXCESS_FIELDS, opts).expect("truncates");
         let g = parsed.get("PROJ").expect("PROJ");
         assert_eq!(g.headings, ["PROJ_ID", "PROJ_CLNT"]);
-        assert_eq!(g.rows[0].get("PROJ_CLNT").map(String::as_str), Some("Acme"));
+        assert_eq!(g.cell_named(0, "PROJ_CLNT"), Some("Acme"));
     }
 
     /// The control that says the guard keys on the LOST QUOTES, not on the
@@ -615,10 +839,7 @@ mod tests {
 \"DATA\",\"P1\",\"Acme, Bloggs and Co\"\n";
         let g = read_ags4_bytes(src).expect("clean");
         let g = g.get("PROJ").expect("PROJ");
-        assert_eq!(
-            g.rows[0].get("PROJ_CLNT").map(String::as_str),
-            Some("Acme, Bloggs and Co")
-        );
+        assert_eq!(g.cell_named(0, "PROJ_CLNT"), Some("Acme, Bloggs and Co"));
     }
 
     /// The other direction is NOT symmetrical and must not become so. A row with
@@ -632,7 +853,7 @@ mod tests {
 \"DATA\",\"P1\"\n";
         let parsed = read_ags4_bytes(src).expect("short rows are fine");
         let g = parsed.get("PROJ").expect("PROJ");
-        assert_eq!(g.rows[0].get("PROJ_CLNT").map(String::as_str), Some(""));
+        assert_eq!(g.cell_named(0, "PROJ_CLNT"), Some(""));
     }
 
     /// `trim_owned`'s in-place path only runs when there is whitespace to strip —
@@ -670,5 +891,128 @@ mod tests {
             panic!("expected DuplicateHeading from the re-check, got {err:?}");
         };
         assert_eq!((group.as_str(), heading.as_str()), ("LOCA", "LOCA_ID__2"));
+    }
+
+    // ---- the #900 machinery: accessor edges + the copy-on-write seam ----
+
+    /// `cell`'s three range outcomes are load-bearing distinctions: `None`
+    /// only for a coordinate outside the projection, `Some("")` for a short
+    /// row's missing tail (the positional contract — a real row, an absent
+    /// value).
+    #[test]
+    fn cell_distinguishes_out_of_range_from_short_row_tail() {
+        // LOCA has 3 headings; give it a 1-value short row.
+        let src = b"\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_TYPE\",\"LOCA_NATE\"\n\
+\"DATA\",\"BH01\"\n";
+        let parsed = read_ags4_bytes(src).unwrap();
+        let g = parsed.get("LOCA").unwrap();
+        assert_eq!(g.cell(0, 0), Some("BH01"));
+        assert_eq!(g.cell(0, 2), Some(""), "short-row tail is present-empty");
+        assert_eq!(g.cell(0, 3), None, "column beyond the headings");
+        assert_eq!(g.cell(1, 0), None, "row beyond the data");
+        assert_eq!(g.row_cells(1).count(), 0, "OOB row yields nothing");
+        assert_eq!(
+            g.padded_row(0),
+            vec!["BH01".to_string(), String::new(), String::new()]
+        );
+    }
+
+    /// The copy-on-write seam: the first mutation flips a parsed group to the
+    /// owned shape, and that flip must apply the read trim to every cell it
+    /// copies — otherwise an unrelated `set_cell` would change what a
+    /// neighbouring cell reads back as.
+    #[test]
+    fn set_cell_materialises_without_disturbing_neighbours() {
+        // `  P1  ` reads trimmed from spans; it must STAY trimmed once an
+        // unrelated cell's mutation materialises the group.
+        let src = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\n\
+\"DATA\",\"  P1  \",\"Test project\"\n";
+        let mut parsed = read_ags4_bytes(src).unwrap();
+        let g = parsed.get_mut("PROJ").unwrap();
+        assert_eq!(g.cell(0, 0), Some("P1"));
+
+        assert!(g.set_cell(0, 1, "Renamed".into()));
+        assert_eq!(g.cell(0, 1), Some("Renamed"));
+        assert_eq!(g.cell(0, 0), Some("P1"), "materialise keeps the trim");
+
+        // A mutated cell is verbatim — the trim is a READ projection of the
+        // parse, not a normalisation of caller data.
+        assert!(g.set_cell(0, 0, "  spaced  ".into()));
+        assert_eq!(g.cell(0, 0), Some("  spaced  "));
+    }
+
+    /// An out-of-range `set_cell` refuses without mutating — and without
+    /// materialising, though only the refusal is observable.
+    #[test]
+    fn set_cell_out_of_range_refuses_and_changes_nothing() {
+        let src = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\"\n\
+\"DATA\",\"P1\"\n";
+        let mut parsed = read_ags4_bytes(src).unwrap();
+        let g = parsed.get_mut("PROJ").unwrap();
+        assert!(!g.set_cell(1, 0, "x".into()), "row out of range");
+        assert!(!g.set_cell(0, 1, "x".into()), "col out of range");
+        assert_eq!(g.cell(0, 0), Some("P1"));
+    }
+
+    /// `push_row` materialises too (no spans-plus-tail hybrid, by decision)
+    /// and pads/truncates the new row to the heading count.
+    #[test]
+    fn push_row_materialises_pads_and_truncates() {
+        let src = b"\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_TYPE\"\n\
+\"DATA\",\"BH01\",\"CP\"\n";
+        let mut parsed = read_ags4_bytes(src).unwrap();
+        let g = parsed.get_mut("LOCA").unwrap();
+        g.push_row(vec!["BH02".into()]); // short: padded
+        g.push_row(vec!["BH03".into(), "TP".into(), "surplus".into()]); // long: truncated
+        assert_eq!(g.n_rows(), 3);
+        assert_eq!(g.cell(0, 0), Some("BH01"), "parsed row survives the flip");
+        assert_eq!(g.cell(1, 1), Some(""));
+        assert_eq!(g.cell(2, 1), Some("TP"));
+        assert_eq!(g.cell(2, 2), None, "the surplus did not widen the group");
+    }
+
+    /// `PartialEq` is the logical projection, so a span-backed group and its
+    /// materialised twin compare equal — the representation split must not
+    /// leak through equality.
+    #[test]
+    fn a_materialised_twin_stays_equal() {
+        let src = b"\"GROUP\",\"PROJ\"\n\
+\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\n\
+\"DATA\",\"  P1  \",\"Test project\"\n";
+        let parsed = read_ags4_bytes(src).unwrap();
+        let spans = parsed.get("PROJ").unwrap();
+
+        let mut twin = spans.clone();
+        // Setting a cell to the value it already projects materialises the
+        // twin while changing nothing logical.
+        let kept = twin.cell(0, 1).unwrap().to_string();
+        assert!(twin.set_cell(0, 1, kept));
+        assert_eq!(spans, &twin);
+    }
+
+    /// `from_owned_rows` is the builders' door: rows resize to the heading
+    /// count and values are stored verbatim (no trim — the trim belongs to
+    /// the parse projection).
+    #[test]
+    fn from_owned_rows_resizes_and_keeps_values_verbatim() {
+        let g = AgsGroup::from_owned_rows(
+            "LOCA".into(),
+            vec!["LOCA_ID".into(), "LOCA_TYPE".into()],
+            vec![String::new(), String::new()],
+            vec!["ID".into(), "PA".into()],
+            vec![
+                vec!["  BH01  ".into()],                          // short: padded
+                vec!["BH02".into(), "TP".into(), "extra".into()], // long: truncated
+            ],
+        );
+        assert_eq!(g.n_rows(), 2);
+        assert_eq!(g.cell(0, 0), Some("  BH01  "), "verbatim, not trimmed");
+        assert_eq!(g.cell(0, 1), Some(""));
+        assert_eq!(g.cell(1, 1), Some("TP"));
+        assert_eq!(g.cell(1, 2), None);
     }
 }
