@@ -610,6 +610,130 @@ pub fn build_ags4_ipc(
     to_js(&report)
 }
 
+// ---- #892 M9 attribution SPIKE (throwaway branch; never lands) ----
+//
+// The #893 sweep priced the decode slab's removal at −20.7% of the door's
+// linear-memory high-water at 100 MB but 0.0% at 265 MB — the headline
+// rung's high-water is owned by something else, and naming it is the M9
+// mint's first step (masked vs mooted). Wasm linear memory only grows, so
+// a pages() reading at each internal boundary attributes the growth since
+// the previous one. Rule 13's instrument; these numbers never share a
+// table with peak RSS.
+
+/// Linear-memory size in 64 KiB pages, sampled inside the door.
+#[cfg(all(feature = "arrow", target_arch = "wasm32"))]
+fn spike_pages() -> u32 {
+    core::arch::wasm32::memory_size(0) as u32
+}
+
+/// What each staged door hands back: the text (so the probe can hold
+/// byte-identity against the shipped door) plus the boundary readings.
+#[cfg(all(feature = "arrow", target_arch = "wasm32"))]
+#[derive(Serialize)]
+struct SpikeStages {
+    text: String,
+    entry_pages: u32,
+    /// After the copy-in + decode loop — the slab live. For the jit door
+    /// (no slab phase) this equals `entry_pages` by construction.
+    after_decode_pages: u32,
+    /// After `emit_ags4_from_arrow` / `session.finish()` — `EmitResult`
+    /// live (output bytes), inputs consumed.
+    after_emit_pages: u32,
+    /// After `shape_report` — the report's owned `text` copy live BESIDE
+    /// `EmitResult.bytes` (the from_utf8_lossy clone at build.rs:390).
+    after_shape_pages: u32,
+}
+
+/// The shipped [`build_ags4_ipc`] shape with rule-13 stage checkpoints.
+#[cfg(all(feature = "arrow", target_arch = "wasm32"))]
+#[wasm_bindgen]
+pub fn build_ags4_ipc_spike_stages(
+    groups: JsValue,
+    opts: Option<BuildOptionsJs>,
+) -> Result<JsValue, JsError> {
+    use wasm_bindgen::JsCast;
+    console_error_panic_hook::set_once();
+    let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let entry_pages = spike_pages();
+    let arr = js_sys::Array::from(&groups);
+    let mut inputs: Vec<laterite_ags4_emit::ArrowGroup> = Vec::with_capacity(arr.length() as usize);
+    for item in arr.iter() {
+        let code = js_sys::Reflect::get(&item, &JsValue::from_str("code"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("each group needs a string `code`"))?;
+        let ipc_val = js_sys::Reflect::get(&item, &JsValue::from_str("ipc"))
+            .map_err(|_| JsError::new("each group needs an `ipc` Uint8Array"))?;
+        let ipc = ipc_val
+            .dyn_into::<js_sys::Uint8Array>()
+            .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
+            .to_vec();
+        inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
+    }
+    let after_decode_pages = spike_pages();
+    let (edition, mode, synth, tran) = build_parts(o).map_err(|e| JsError::new(&e))?;
+    let eopts =
+        emit_opts(edition.as_deref(), mode.as_deref(), synth, tran).map_err(|e| JsError::new(&e))?;
+    let res = laterite_ags4_emit::emit_ags4_from_arrow(inputs, &eopts)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    let after_emit_pages = spike_pages();
+    let report = shape_report(&res);
+    let after_shape_pages = spike_pages();
+    to_js(&SpikeStages {
+        text: report.text,
+        entry_pages,
+        after_decode_pages,
+        after_emit_pages,
+        after_shape_pages,
+    })
+}
+
+/// The #893 jit shape (decode as the emit consumes; no slab) with the same
+/// checkpoints, so the two doors' stage profiles compare cell for cell.
+#[cfg(all(feature = "arrow", target_arch = "wasm32"))]
+#[wasm_bindgen]
+pub fn build_ags4_ipc_spike_jit_stages(
+    groups: JsValue,
+    opts: Option<BuildOptionsJs>,
+) -> Result<JsValue, JsError> {
+    use wasm_bindgen::JsCast;
+    console_error_panic_hook::set_once();
+    let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let entry_pages = spike_pages();
+    let (edition, mode, synth, tran) = build_parts(o).map_err(|e| JsError::new(&e))?;
+    let eopts =
+        emit_opts(edition.as_deref(), mode.as_deref(), synth, tran).map_err(|e| JsError::new(&e))?;
+    let mut session = laterite_ags4_emit::ArrowEmitSession::new(eopts);
+    let arr = js_sys::Array::from(&groups);
+    for item in arr.iter() {
+        let code = js_sys::Reflect::get(&item, &JsValue::from_str("code"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("each group needs a string `code`"))?;
+        let ipc_val = js_sys::Reflect::get(&item, &JsValue::from_str("ipc"))
+            .map_err(|_| JsError::new("each group needs an `ipc` Uint8Array"))?;
+        let ipc = ipc_val
+            .dyn_into::<js_sys::Uint8Array>()
+            .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
+            .to_vec();
+        session
+            .push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?)
+            .map_err(|e| JsError::new(&e.to_string()))?;
+    }
+    let after_decode_pages = entry_pages; // no slab phase, by construction
+    let res = session.finish().map_err(|e| JsError::new(&e.to_string()))?;
+    let after_emit_pages = spike_pages();
+    let report = shape_report(&res);
+    let after_shape_pages = spike_pages();
+    to_js(&SpikeStages {
+        text: report.text,
+        entry_pages,
+        after_decode_pages,
+        after_emit_pages,
+        after_shape_pages,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

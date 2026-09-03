@@ -204,6 +204,40 @@ pub fn emit_ags4_from_arrow(
     stream.finish()
 }
 
+/// #893 M7 SPIKE (throwaway branch; never lands): a per-group push session
+/// over the streamed door, so a binding can hand groups across its boundary
+/// one at a time — no `Vec<ArrowGroup>` (the decode-then-materialise slab)
+/// ever accumulates. `Box::leak`s the opts (a few dozen bytes, once per
+/// session) to satisfy `EmitStream`'s borrows from a napi-held object;
+/// acceptable in a probe child measured to exit, never in shipped code.
+pub struct ArrowEmitSession {
+    stream: crate::emit::EmitStream<'static>,
+    dict: &'static Dictionary<'static>,
+}
+
+impl ArrowEmitSession {
+    #[must_use]
+    pub fn new(opts: EmitOpts) -> Self {
+        let opts: &'static EmitOpts = Box::leak(Box::new(opts));
+        let dict: &'static Dictionary<'static> =
+            Box::leak(Box::new(Dictionary::bundled(opts.edition)));
+        ArrowEmitSession {
+            stream: crate::emit::EmitStream::new(opts, dict),
+            dict,
+        }
+    }
+
+    /// Decode-and-write one group; its batches and formatted cells free on
+    /// return, exactly as the one-call door's loop frees them.
+    pub fn push(&mut self, g: ArrowGroup) -> Result<(), EmitError> {
+        self.stream.push(owned_group_from_arrow(g, self.dict))
+    }
+
+    pub fn finish(self) -> Result<EmitResult, EmitError> {
+        self.stream.finish()
+    }
+}
+
 /// [`emit_ags4_from_arrow`] with NO validity verdict — the Arrow half of the
 /// unchecked pair beside [`crate::emit_ags4_unchecked`] (#858).
 ///
