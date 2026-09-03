@@ -915,8 +915,8 @@ time** (epic decision 8) and never pre-written.
 | M4 | the parse leaf holds one owned `String` per cell, under **every read-shaped operation on every surface** | validate + read_typed (and every write door's input half) | dhat at the 25 MB rung (re-run 2026-08-31, byte-identical to T4's numbers — the mechanism has not moved since July): **~6.5× the input requested-live at the parse peak**, ~1 block per cell, against a whole-operation peak RSS of ~8.2×. A span rewrite's ceiling is **roughly half the peak of every read-shaped operation**, clearing the 20% invasive gate several times over | `RawLine.text` / `DataRow.values` become spans over one decoded buffer (`ParsedFile<'a>` or offset pairs). This is the SAME rewrite the time campaign priced at ~9.9 ms and declined (time queue #4, "Priced, declined") — rule 12 re-prices it: the decline was denominated in ms, this row in peak RSS, and neither verdict carries to the other's axis. Its "revisit when" condition is met by the axis change itself | **invasive** — the public `RawLine.text` type crosses `line_format`/`structure`/`fixes`/PyO3; design page DONE: [[dec-parse-cell-representation]] (2026-08-31 — the shape, the scope, and the spike-gated mint conditions); **minted as #838** (2026-08-31, taking the queue slot #834 vacated) |
 | M5 | the shipped pyarrow-free pandas hop paid a whole-file polars intermediate | read_strings (the default `[compat]` install only) | was priced at **~+3.0×-of-output** over the pyarrow hop at the 100 MB rung (#831 diagnosis children); **CLAIMED 2026-08-31 (#834) — and the price was misattributed**: removing the copy moved the shipped hop's read peak **−0.9% / −0.6%** at the 100/265 MB rungs (−1.9%/−4.2% at 25/5 MB; write ~0; A-legs bracket ±0.1%, the pyarrow control unmoved) and its read time −3–5%, while the premium itself — **~+2.4–2.6×-of-output at every rung** — survives the fix | the copy existed and is gone: the native table's own `__arrow_c_stream__` registers into DuckDB and the rename rides the SQL projection. But it was never sum-like at peak — each group's freed copy is reused by the next (the same heap-reuse behaviour #831's probe 2 measured), so the intermediate contributed ~one group's worth to peak, not the file's. The surviving premium is the **DuckDB bridge leg itself** (Arrow scan → engine vectors → NumPy `.df()`), sum-like on this instrument and **unattributed** — pricing it is a fresh diagnosis with its own code-reading, not a rider on this row | landed as an avoidance + simplification (#834; tests pin the no-intermediate path, hostile identifiers, the strict-zip raise and cross-hop frame equality). The owner's evidence trigger **FIRED**: post-fix the shipped hop still trails the pyarrow hop by **~+18–19% of the operation's peak** at the top rungs — recorded on #834 for the owner's dep-shape decision, nothing acted on |
 | M6 | the retained parse **structure** — per-row span-vec heap blocks plus source-byte fields the validator never reads | validate + read_typed (and every `ParsedFile` holder: every write door's input half, and M2's constructed verdict had it landed) | was priced by the #848 attribution as most of the retained hold beyond the buffer, sitting *at* rule 10's gate; the spike's A/B/A on the lane instrument measured the full flattening at **−6.9/−6.2% (25 MB) and −13.1/−10.7% (100 MB)** of the validate/read_typed peaks — **under the 20% floor on all four gate cells** (A-spread ≤ 0.035%; A-legs reproduce the committed cells within 0.25%), and the row stood declined on that verdict. **LANDED BY OWNER DECISION 2026-09-01 (#850)**: the measured ~10–13% plus the time rider — `parse_bytes` −9…−15%, `check_parsed` unchanged — was judged worth the remaining effort with the spike already built and contract-green. A dated waiver of the floor for this row, argued in absolute terms on #850; NOT a precedent that ~10% clears an invasive gate | the shape was built exactly as designed (per-group arena + slim 12-byte row index, `RawLine` 24 → 16 B, per-row/per-line offsets profile-gated — the inventory held: nothing outside the leaf's own tests reads them) and the structure is real — but the requested-bytes pricing OVERstated its RSS contribution, the inverse error to the undercount the design reasoned from: the span content itself (8 B/cell) survives in the arena by construction, and the old per-group rows-Vecs' doubling headroom was largely never-touched pages RSS never paid (requested 123.2 MB vs ~68 MB content at the 100 MB rung, #848's own table). What flattening removes — the row/line slimming plus allocator block overhead — is ~13% of the operation peak at 100 MB, ~7% at 25 MB where the import floor pads the denominator. dhat prices requests; RSS pays touched pages — in both directions | **landed** (owner decision, floor waived — the record and the waiver are both on #850): [[dec-parse-structure-layout]] back to `accepted` with the gate outcome noted; the one-arc migration is the #850 land PR, before/after refreshed in `tools/perf-results/python-lane.json` at the landed tree. M2's "re-price on the post-layout lane" precondition is live again — see its row |
-| M7 | the node write door stands the file up beside itself twice more than the engine needs: `buildAgs4` accumulates every group's IPC `Buffer` before the one native call (the `ipcGroups` slab in `rust-packages/laterite-node/ts/index.ts`), and the native side then decodes the whole vec into a second full typed materialisation before the streaming emit runs (`emit_ags4_from_ipc` → `group_from_ipc` in `rust-packages/laterite-node/src/lib.rs`, all groups up front) | write (node lane, #823) | door increment over the same lane's typed hold: **5.40×-of-output at 265 MB (10.25 − 4.85) and 5.06× at 100 MB, vs the rust door's 1.67×/1.62×** on the same run — the ~3.4–3.7× delta is ≈ **33–36% of the write stage's peak**, over the invasive gate *at ceiling* | mechanism as read, not yet priced: the post-M2 engine already streams per group, so a per-group handoff shape exists on the native side — but #848's co-peak lesson applies in full (shares are not contributions; the slabs may back each other up), so nothing here is a prize until variant children run alone *and* paired on the node lane | **unpriced** — a diagnosis round before any mint; reshapes the napi handoff, so invasive |
-| M8 | the codec read door stands the file up three times over: the span `ParsedFile`, then every group's rows re-materialised as `HashMap<Arc<str>, String>` — one owned `String` per cell plus per-row map overhead (`read_ags4_with`'s conversion, `rust-packages/laterite-ags4-core/src/ags4_codec.rs`, `AgsGroup.rows`) — then the dumped group's projection into `Vec<Vec<String>>` + rendered text (`rust-packages/laterite-cli/src/commands/read.rs`) | read (CLI lane, #825) | the door holds **10.92×-of-input at the 265 MB rung** (11.20× at 100 MB) against the engine's ~3.3× span-parse hold on the same tree — a ~7.6×-of-input increment, ≈ **69% of the operation's peak**, over the invasive gate *at ceiling* | mechanism as read, not yet priced: the map slab, the projection copy and the render buffer overlap in construction, and #848's co-peak lesson applies in full (shares are not contributions — the `ParsedFile` may already be gone at t-gmax), so variant children must run alone *and* paired before anything here is a prize | **unpriced** — a diagnosis round before any mint; `AgsGroup.rows` is core's public read projection with consumers beyond the CLI (excel, the surfaces' recover-flag paths), so invasive |
+| M7 | the node write door stands the file up beside itself twice more than the engine needs: `buildAgs4` accumulates every group's IPC `Buffer` before the one native call (the `ipcGroups` slab in `rust-packages/laterite-node/ts/index.ts`), and the native side then decodes the whole vec into a second full typed materialisation before the streaming emit runs (`emit_ags4_from_ipc` → `group_from_ipc` in `rust-packages/laterite-node/src/lib.rs`, all groups up front) | write (node lane, #823) | was read as ≈ **33–36% of the write stage's peak** from the door increment's *share*; **DECLINED 2026-09-03 (#893)** — the variant children measured the two slabs' whole pair at **−7.7% (100 MB) and −8…−14% (265 MB, bracketing both A-legs)** of the write peak at ceiling, under every floor the row must clear | the shares were not contributions, in the OPPOSITE direction to #848's: no co-peak backup — the singles compose ~additively (jit-decode alone −2.2/−4%, per-group handoff alone −4.7/≲drift) and their sum IS the pair — but both slabs together are only ~1.6×-of-output of the 5.7× door increment at t-gmax. Even a perfect-reclamation bound (both ~1× slabs vanishing from the peak outright, which no GC'd host delivers) lands at ~−19%, under the 20% invasive gate the row is flagged with. The residual increment lives in the engine's own writer-built verdict + output crossing and the GC'd host's marshalling behaviour — recorded, unattributed, no new row | **declined** on the #893 diagnosis (fresh-child `ru_maxrss` variant children, alone and paired, output sha-identical across all four, door time ±1%; record on #893, instruments on the spike branch). Reopens only per rule 12: a fresh attribution finding a mechanism that clears the floors against the measured hold |
+| M8 | the codec read door stands the file up three times over: the span `ParsedFile`, then every group's rows re-materialised as `HashMap<Arc<str>, String>` — one owned `String` per cell plus per-row map overhead (`read_ags4_with`'s conversion, `rust-packages/laterite-ags4-core/src/ags4_codec.rs`, `AgsGroup.rows`) — then the dumped group's projection into `Vec<Vec<String>>` + rendered text (`rust-packages/laterite-cli/src/commands/read.rs`) | read (CLI lane, #825) | **PRICED 2026-09-03 (#893)**: the rows-map slab ALONE is **−62…−65% of the read door's whole peak at every gate rung** (span-sourcing child at ceiling; the door falls ~11× → ~4.0×-of-input), clearing the 20% invasive gate three times over — with a **−38% wall-time rider** at 265 MB. The projection + render copy is a **no-prize**: removing it alone moves ≤ 0.4% (inside/near the A-spread) and renders ~8% *slower* — its recorded share was co-peak shadow, exactly the #848 lesson | measured, not read: the slab and the projection do NOT back each other up — slab-alone ≈ the pair (−63.3% vs −63.6% at 265 MB), so the map slab owns the prize outright and the third copy never touches t-gmax. The ceiling child still holds ~4×-of-input (raw bytes + decoded buffer + spans + the dumped group's projection + rendered text) against the engine's ~3.3× span-parse hold | **priced, over the invasive floor at ceiling** (#893: fresh-child `ru_maxrss` variant children, A-legs ≤ 0.15% spread reproducing the lane's cells, output sha-identical at every rung; record on #893). The campaign's next fix ticket mints from THIS row — `AgsGroup.rows` is core's public read projection with consumers beyond the CLI (excel, the surfaces' recover-flag paths), so the mint is design-gated (a `dec-*` page first), invasive floor already cleared at ceiling |
 
 > [!note] The time queue and this one never share a table, and neither do the
 > instruments behind them (rule 8). When an M-row is opened, the diagnosis
@@ -1076,7 +1076,9 @@ What the lane says:
   (the napi boundary has no capsule analog; the `Buffer`s ARE the boundary).
   The write door's increment over the same lane's typed hold is
   **5.40×-of-output vs the rust door's 1.67×** — that delta is the **M7**
-  queue row, mechanism read in the code, unpriced. (The doors are not quite
+  queue row, diagnosed and **declined** 2026-09-03 (#893; the queue row
+  carries the verdict — the increment's share vastly overstated the two
+  slabs' contribution). (The doors are not quite
   twins — node's dictionary-fills UNIT/TYPE where the rust leg carries the
   source's — but that difference is per-heading metadata, nowhere near
   ×-of-file scale.)
@@ -1237,8 +1239,9 @@ What the lane says:
   span `ParsedFile` it just built, and the CLI then projects the dumped
   group into a third copy (`Vec<Vec<String>>` + the rendered text,
   `laterite-cli/src/commands/read.rs`). **Minted as M8 in the memory
-  queue, unpriced** — the #848 co-peak rule applies before any prize is
-  claimed. Throughput *rises* with the rung (158 → 201 MB/s) as the fixed
+  queue, and priced by the #893 diagnosis round** — the map slab alone is
+  the prize (−62…−65% of the door's peak at ceiling; the queue row
+  carries the numbers). Throughput *rises* with the rung (158 → 201 MB/s) as the fixed
   spawn cost amortises.
 - **The merge door is the ladder's biggest hold on any lane: ~16×-of-output,
   ~24–27 MB/s, flat across rungs** (4.4 GB peak at 265 MB — the swap watch
@@ -1356,6 +1359,66 @@ What this moves, and what it does not:
   refuses a file whose size is not plausibly its rung before any pin or
   measurement (the check in `tools/bench-vs-python-ags4.py` is the
   authority on the band).
+
+### The 2026-09-03 M7/M8 diagnosis round (#893): one prize, one decline, one owner fork
+
+Campaign 2's first move (epic #892), run exactly as the #848 co-peak rule
+demands: the recorded shares of M7 and M8 were overlapping co-peaks, so
+each door's re-materialisations were removed **alone and paired** by
+env-gated variant children before anything was called a prize. Everything
+here is the **diagnosis instrument family** — fresh-child `ru_maxrss`
+variant children on the node and CLI doors, rule 13's linear-memory
+instrument on the wasm door — and never shares a table with the lanes'
+cells. Method held on every leg: A/B/A base passes bracketing the variants
+in one sitting on a quiet machine (starting load recorded), every child's
+output **sha256-identical to the shipped door's** at every rung, door wall
+time recorded as a rider (±1% everywhere — no variant bought or spent
+time). The full record — per-rung tables, all legs — lives on **#893**; the
+probe harnesses and the committed measurement files live on the spike
+branch (spike/m7-m8-diagnosis, never merges), the #848 pattern.
+
+**M8 (CLI read door): the map slab owns the whole prize — PRICED.** The
+span-sourcing child (the rows-map slab never builds) took the door from
+~11× to **~4.0×-of-input** — −62.4/−64.8/−63.3% of the operation's peak at
+25/100/265 MB — with a −38% wall-time rider at 265 MB. The
+projection-removal child moved ≤ 0.4% (inside/near the A-spread) and
+rendered ~8% slower; the pair matched slab-alone (−63.6% vs −63.3% at
+265 MB). So the third copy's recorded share was co-peak shadow, and the
+`HashMap<Arc<str>, String>` re-materialisation is the entire prize: over
+the 20% invasive gate three times, at ceiling, at every gate rung. The
+queue row carries the verdict; the fix mints from it, design-gated.
+
+**M7 (node write door): the shares overstated the slabs 3.5× — DECLINED.**
+The opposite lesson, same rule. Removing the native decode slab alone:
+−2.2/−4.0% (100/265 MB). The per-group handoff alone: −4.7% at 100 MB,
+inside the drift band at 265. The pair: **−7.7% (100 MB) and −8…−14%
+(265 MB, bracketing both A-legs — the V8 host's base legs spread ~7% at
+the top rung where the rust-child legs spread ≤ 0.15%)**. No co-peak
+backup this time — the singles compose ~additively into the pair — but
+both slabs together are only ~1.6×-of-output of the door's 5.7×
+increment: even the perfect-reclamation bound (~2× vanishing outright)
+lands under the 20% gate the row is flagged with. Two riders worth
+keeping: the `held` child (all groups' arrow-js Tables retained) measured
+**identical** to `typeAllGroups` — the Tables view the per-group IPC, so a
+caller holding them pays nothing extra; and the residual door increment
+(verdict + output crossing + the GC'd host's marshalling) is recorded
+unattributed, no row minted.
+
+**The wasm-door sweep: the class exists, the headline cell doesn't move —
+RETURNED TO THE OWNER** (the epic's condition, 2026-09-03: these findings
+enter no queue without an owner decision). By code-reading:
+`build_ags4_ipc` carries the same decode-then-materialise class as M7's
+native half (all groups decode eagerly into linear memory before the
+streamed emit; `rust-packages/laterite-ags4-wasm/src/build.rs`), while the
+**read door has no class member** — `arrow_ipc` frames one group
+transiently over the retained parse. The jit child (decode as the emit
+consumes, rule 13's instrument, byte-identical A-legs): **−6.6% at 25 MB,
+−20.7% at 100 MB, 0.0% at both the 5 MB and the 265 MB rungs** — the
+headline rung's high-water is owned by something other than the slab
+(consistent with the lane's recorded dlmalloc growth signature, and
+unattributed). Time neutral. A real-but-rung-dependent mechanism: whether
+a fix that pays at mid-scale and nothing at the headline rung is worth a
+queue row is the owner's call, put on #893.
 
 ## Decisions taken
 
