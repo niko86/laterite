@@ -1,0 +1,119 @@
+# The Linux memory-ratio gate (#894, campaign 2's T2).
+#
+# WHY this exists: the #826 close-out declined a ratio gate; the amended
+# revisit condition (owner call, 2026-09-03 — `ags-wiki/concepts/perf-campaign.md`)
+# met it for the MEMORY axis only, requiring the same hardware class run to
+# run, a baseline pair seeded fresh, and a dirty-run refusal guard. All
+# three live in tools/perf_ratio_gate.py; this workflow is its runner.
+#
+# Two checkouts, deliberately inverted from perf-probe.yml's single one:
+# the PRIMARY checkout is this workflow's own SHA — the instrument (the
+# gate script, the bench harness, forge's sources, the fixture manifest,
+# and the committed baseline the check compares against) — and `.measured`
+# is the ref whose WHEEL gets measured. What varies between a seed and a
+# check is the wheel; the instrument stays the family's own. Both SHAs are
+# recorded in the artifact.
+#
+#   gh workflow run perf-ratio.yml --ref main -f mode=seed  -f ref=<pre-campaign sha>
+#   gh workflow run perf-ratio.yml --ref main -f mode=check -f ref=main
+#
+# Runner: the Linux pool — peak memory, unlike timing, is robust to shared
+# hardware (perf-probe.yml's runner-choice note), and the guard degrades a
+# genuinely pressured run to a recorded skip. The concurrency group is
+# SHARED with perf-probe on purpose: two measurements on the pool would
+# share the container's 8 GB cap and measure each other.
+#
+# Cadence: dispatch-only today. Wiring a schedule is an owner call (pool
+# load policy) — the check mode is designed to be schedulable as-is.
+name: perf-ratio
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "seed (found the baseline pair) | check (gate against it)"
+        default: "check"
+      ref:
+        description: "ref whose wheel is measured (seed: the pre-campaign SHA)"
+        default: "main"
+      rungs:
+        description: "comma-separated memory rungs"
+        default: "5MB,25MB,100MB,265MB"
+
+permissions:
+  contents: read
+
+# One measurement at a time on the pool (see header).
+concurrency:
+  group: perf-probe
+  cancel-in-progress: false
+
+jobs:
+  ratio-linux:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 150
+    env:
+      UV_LINK_MODE: copy
+    steps:
+      # The instrument: this workflow's own SHA.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The measured tree: only its wheel is built and installed.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          path: .measured
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold so the maturin + forge compiles hit the shared cache.
+      - uses: ./.github/actions/build-accel
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      # The abi3 floor interpreter, same reasoning as ci.yml's wheel-smoke
+      # (self-hosted runners can't use actions/setup-python).
+      - name: Install Python 3.12 via uv
+        run: uv python install 3.12
+
+      - name: uv sync (build backend into the venv)
+        run: uv sync
+
+      - name: Build the measured wheel
+        run: (cd .measured/packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
+
+      - name: Build forge (fixture generator, from the instrument tree)
+        run: (cd rust-packages && cargo build --release -p laterite-ags4-forge)
+
+      # The SHIPPED dep shape plus the comparison target: wheel + pandas<3 +
+      # python-ags4, NO pyarrow — the pyarrow-free default is the measured
+      # contract, exactly as the darwin lane runs it.
+      - name: Probe venv (shipped [compat] shape + python-ags4)
+        run: |
+          set -euxo pipefail
+          uv venv --python 3.12 --clear "$GITHUB_WORKSPACE/.probe"
+          uv pip install --python "$GITHUB_WORKSPACE/.probe/bin/python" "$GITHUB_WORKSPACE"/dist/laterite-*.whl "pandas<3" python-ags4
+
+      - name: Run the gate
+        run: |
+          set -euxo pipefail
+          "$GITHUB_WORKSPACE/.probe/bin/python" tools/perf_ratio_gate.py \
+            --mode "${{ inputs.mode }}" \
+            --rungs "${{ inputs.rungs }}" \
+            --measured-sha "$(git -C .measured rev-parse HEAD)" \
+            --instrument-sha "$(git rev-parse HEAD)"
+
+      # if: always() — a failed run's partial JSON is the diagnosis; the M1
+      # probe's first drift-guard failure uploaded nothing and left only a
+      # log line.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: perf-ratio-linux
+          path: output/perf-ratio/
