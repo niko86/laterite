@@ -26,7 +26,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | **Total (live)** | **428** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 39 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 3 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 40 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -511,7 +511,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | [[dec-parse-cell-representation]] | accepted | — |
 | [[dec-parse-structure-layout]] | accepted | — |
 | [[dec-python-imports-rust-library]] | accepted | — |
-| [[dec-read-projection-representation]] | proposed | — |
+| [[dec-read-projection-representation]] | accepted | — |
 | [[dec-rust-api-crates-io]] | accepted | — |
 | [[dec-rust-drives-python]] | accepted | — |
 | [[dec-verdict-severity-split]] | accepted | — |
