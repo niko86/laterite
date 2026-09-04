@@ -26,11 +26,17 @@
 # SHARED with perf-probe on purpose: two measurements on the pool would
 # share the container's 8 GB cap and measure each other.
 #
-# Cadence: dispatch-only today. Wiring a schedule is an owner call (pool
-# load policy) — the check mode is designed to be schedulable as-is.
+# Cadence: weekly by owner decision (2026-09-04) — the cron below, chosen
+# clear of parity's Sunday-03:00 slot and the nightly's daily 04:00 so the
+# pool's measurement slot is quiet. A scheduled run is a `check` of `main`
+# with the default rungs (the input fallbacks below); dispatch remains for
+# seeds, re-checks, and off-cycle runs.
 name: perf-ratio
 
 on:
+  schedule:
+    # Saturdays, 02:00 UTC.
+    - cron: "0 2 * * 6"
   workflow_dispatch:
     inputs:
       mode:
@@ -61,10 +67,12 @@ jobs:
       # The instrument: this workflow's own SHA.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The measured tree: only its wheel is built and installed.
+      # The measured tree: only its wheel is built and installed. The `||`
+      # fallbacks here and below are what make a `schedule` firing (empty
+      # `inputs` context) a check of main with the default rungs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || 'main' }}
           path: .measured
 
       - name: Install Rust toolchain
@@ -115,8 +123,8 @@ jobs:
         run: |
           set -euxo pipefail
           "$GITHUB_WORKSPACE/.probe/bin/python" tools/perf_ratio_gate.py \
-            --mode "${{ inputs.mode }}" \
-            --rungs "${{ inputs.rungs }}" \
+            --mode "${{ inputs.mode || 'check' }}" \
+            --rungs "${{ inputs.rungs || '5MB,25MB,100MB,265MB' }}" \
             --measured-sha "$(git -C .measured rev-parse HEAD)" \
             --instrument-sha "$(git rev-parse HEAD)"
 

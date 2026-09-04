@@ -1450,7 +1450,9 @@ mint is next**, design-gated. *(It minted as #900 the same day and landed
 Campaign 2's T2, built as the revisit condition's three requirements
 (amended above): `tools/perf_ratio_gate.py` (seed + check over the
 `bench-vs-python-ags4.py` memory pass — wrapped as a child, #865's
-drift class) and the dispatch-only `perf-ratio` workflow on the pool,
+drift class) and the `perf-ratio` workflow on the pool (dispatch, plus a
+weekly scheduled `check` of main — an owner decision, 2026-09-04; the
+workflow header carries the slot beside its cron),
 sharing perf-probe's concurrency group. The gated quantity is the
 ours-door ×-of-output per (axis, rung, door), banded at 10% relative
 (the tranche floor) past the founding pair's worse leg; a pressured
