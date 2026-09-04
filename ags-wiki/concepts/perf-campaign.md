@@ -1467,8 +1467,20 @@ sub-1% leg spread on most cells) and the pair is committed as
 `tools/perf-results/linux-mem-baseline.json` — the family's founding
 record, rule 8's own history: these Linux cells never share a table with
 the darwin lane's. The first `check` dispatch against current main
-doubles as the gate's end-to-end validation and records M8's read-door
-effect in this family — a second-OS view of the #900 claim.
+(2026-09-04, run 33820279543) validated the gate end-to-end: **PASS — 24
+verdict cells, zero regressions, zero pressured**, with the family's
+cells level with the founding pair to sub-1% (the instrument's
+stability, measured rather than hoped). One expectation this run
+**corrected**: this record originally predicted the check would show
+M8's read-door effect as a second-OS view of the #900 claim — it does
+not, and cannot: the family's ops are the wheel's own doors
+(`bench-vs-python-ags4`'s axes), and none of them ever built the
+rows-map slab M8 deleted — that slab was the CLI read door's and the
+core string-projection consumers'. A Linux view of M8's claim would need
+the CLI lane's instrument (`tools/perf-cli.py`) run on the pool — a
+possible future family, founded like this one was, not a cell this
+family can hold. The level cells are therefore the *expected* result,
+and the gate's first live verdict.
 
 ## Decisions taken
 
