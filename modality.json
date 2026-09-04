@@ -1949,12 +1949,31 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.",
-          "facade_verdict": "planned"
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "to_excel",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present",
+            "text": "absent",
+            "file-like": "absent"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "note": "Landed 2026-09-04 (dec-facade-parity phase 7) behind the optional `excel` feature, exactly as the 2026-08-04 reversal planned: `to_excel(path)` / `to_excel_bytes` → `ToExcel::to_path` (file) or `ToExcel::run` → `Workbook` bytes. An optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it."
         },
         {
           "surface": "cli",
@@ -2097,12 +2116,30 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.",
-          "facade_verdict": "planned"
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "from_excel",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present",
+            "handle": "absent"
+          },
+          "note": "Landed 2026-09-04 with to_excel (dec-facade-parity phase 7), behind the same `excel` feature: `from_excel(path)` / `from_excel_bytes` → `FromExcel::to_path` (file) or `FromExcel::run` → `Converted` (bytes/text). The bytes-out door exceeds the floor — the floor is a minimum, not a cap — and a Document handle stays a compose (`read_bytes(converted.bytes())`) rather than a door."
         },
         {
           "surface": "cli",

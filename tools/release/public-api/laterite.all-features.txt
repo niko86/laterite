@@ -196,6 +196,25 @@ impl<'a> core::marker::Unpin for laterite::ags4::Certify<'a>
 impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Certify<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Certify<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Certify<'a>
+pub struct laterite::ags4::Converted
+impl laterite::ags4::Converted
+pub fn laterite::ags4::Converted::bytes(&self) -> &[u8]
+pub fn laterite::ags4::Converted::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Converted::into_text(self) -> alloc::string::String
+pub fn laterite::ags4::Converted::rows_written(&self) -> usize
+pub fn laterite::ags4::Converted::save(&self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Converted::sheets_written(&self) -> usize
+pub fn laterite::ags4::Converted::text(&self) -> &str
+pub fn laterite::ags4::Converted::warnings(&self) -> &[alloc::string::String]
+impl core::fmt::Debug for laterite::ags4::Converted
+pub fn laterite::ags4::Converted::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Converted
+impl core::marker::Send for laterite::ags4::Converted
+impl core::marker::Sync for laterite::ags4::Converted
+impl core::marker::Unpin for laterite::ags4::Converted
+impl core::marker::UnsafeUnpin for laterite::ags4::Converted
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Converted
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Converted
 pub struct laterite::ags4::Delta
 impl laterite::ags4::Delta
 pub fn laterite::ags4::Delta::added(&self) -> usize
@@ -309,6 +328,20 @@ impl core::marker::Unpin for laterite::ags4::Fixed
 impl core::marker::UnsafeUnpin for laterite::ags4::Fixed
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Fixed
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Fixed
+pub struct laterite::ags4::FromExcel
+impl laterite::ags4::FromExcel
+pub fn laterite::ags4::FromExcel::format_numeric_columns(self, bool) -> laterite::ags4::FromExcel
+pub fn laterite::ags4::FromExcel::run(self) -> core::result::Result<laterite::ags4::Converted, laterite::Error>
+pub fn laterite::ags4::FromExcel::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::ags4::Converted, laterite::Error>
+impl core::fmt::Debug for laterite::ags4::FromExcel
+pub fn laterite::ags4::FromExcel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::FromExcel
+impl core::marker::Send for laterite::ags4::FromExcel
+impl core::marker::Sync for laterite::ags4::FromExcel
+impl core::marker::Unpin for laterite::ags4::FromExcel
+impl core::marker::UnsafeUnpin for laterite::ags4::FromExcel
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::FromExcel
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::FromExcel
 pub struct laterite::ags4::Group<'a>
 impl<'a> laterite::ags4::Group<'a>
 pub fn laterite::ags4::Group<'a>::code(&self) -> &'a str
@@ -544,6 +577,22 @@ impl<'a> core::marker::Unpin for laterite::ags4::Rows<'a>
 impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Rows<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Rows<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Rows<'a>
+pub struct laterite::ags4::ToExcel
+impl laterite::ags4::ToExcel
+pub fn laterite::ags4::ToExcel::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::ToExcel
+pub fn laterite::ags4::ToExcel::recover_duplicate_headings(self, bool) -> laterite::ags4::ToExcel
+pub fn laterite::ags4::ToExcel::run(self) -> core::result::Result<laterite::ags4::Workbook, laterite::Error>
+pub fn laterite::ags4::ToExcel::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::ags4::Workbook, laterite::Error>
+pub fn laterite::ags4::ToExcel::truncate_excess_fields(self, bool) -> laterite::ags4::ToExcel
+impl core::fmt::Debug for laterite::ags4::ToExcel
+pub fn laterite::ags4::ToExcel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::ToExcel
+impl core::marker::Send for laterite::ags4::ToExcel
+impl core::marker::Sync for laterite::ags4::ToExcel
+impl core::marker::Unpin for laterite::ags4::ToExcel
+impl core::marker::UnsafeUnpin for laterite::ags4::ToExcel
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::ToExcel
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::ToExcel
 pub struct laterite::ags4::Validate
 impl laterite::ags4::Validate
 pub fn laterite::ags4::Validate::check_files(self, bool) -> laterite::ags4::Validate
@@ -563,6 +612,23 @@ impl core::marker::Unpin for laterite::ags4::Validate
 impl core::marker::UnsafeUnpin for laterite::ags4::Validate
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Validate
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Validate
+pub struct laterite::ags4::Workbook
+impl laterite::ags4::Workbook
+pub fn laterite::ags4::Workbook::bytes(&self) -> &[u8]
+pub fn laterite::ags4::Workbook::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Workbook::rows_written(&self) -> usize
+pub fn laterite::ags4::Workbook::save(&self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Workbook::sheets_written(&self) -> usize
+pub fn laterite::ags4::Workbook::warnings(&self) -> &[alloc::string::String]
+impl core::fmt::Debug for laterite::ags4::Workbook
+pub fn laterite::ags4::Workbook::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Workbook
+impl core::marker::Send for laterite::ags4::Workbook
+impl core::marker::Sync for laterite::ags4::Workbook
+impl core::marker::Unpin for laterite::ags4::Workbook
+impl core::marker::UnsafeUnpin for laterite::ags4::Workbook
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Workbook
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Workbook
 pub struct laterite::ags4::Write<'a>
 impl<'a> laterite::ags4::Write<'a>
 pub fn laterite::ags4::Write<'a>::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Write<'a>
@@ -607,12 +673,16 @@ pub fn laterite::ags4::fix(impl core::convert::AsRef<std::path::Path>) -> lateri
 pub fn laterite::ags4::fix_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Fix
 pub fn laterite::ags4::fix_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Fix
 pub fn laterite::ags4::fixable_rules() -> alloc::vec::Vec<&'static str>
+pub fn laterite::ags4::from_excel(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::FromExcel
+pub fn laterite::ags4::from_excel_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::FromExcel
 pub fn laterite::ags4::merge<I, P>(I) -> laterite::ags4::Merge<'static> where I: core::iter::traits::collect::IntoIterator<Item = P>, P: core::convert::AsRef<std::path::Path>
 pub fn laterite::ags4::merge_bytes<I, B>(I) -> laterite::ags4::Merge<'static> where I: core::iter::traits::collect::IntoIterator<Item = B>, B: core::convert::Into<alloc::vec::Vec<u8>>
 pub fn laterite::ags4::merge_documents<'a, I>(I) -> laterite::ags4::Merge<'a> where I: core::iter::traits::collect::IntoIterator<Item = &'a laterite::ags4::Document>
 pub fn laterite::ags4::read(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Read
 pub fn laterite::ags4::read_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Read
 pub fn laterite::ags4::read_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Read
+pub fn laterite::ags4::to_excel(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::ToExcel
+pub fn laterite::ags4::to_excel_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::ToExcel
 pub fn laterite::ags4::validate(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
 pub fn laterite::ags4::validate_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
 pub fn laterite::ags4::validate_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate

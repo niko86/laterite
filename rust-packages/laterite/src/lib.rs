@@ -80,14 +80,14 @@
 //!
 //! # Scope
 //!
-//! Read, validate, fix, build, write, certify, diff, merge, and [`transport`]
-//! (compress / encrypt any file).
+//! Read, validate, fix, build, write, certify, diff, merge, [`transport`]
+//! (compress / encrypt any file), and — behind the optional `excel` feature —
+//! XLSX conversion in both directions.
 //!
 //! The crate is completing to **parity** with the Python and Node surfaces —
 //! offering, per capability, at least what the weaker of those two offers — and
-//! joins the product version line when it gets there. Only Excel is still to
-//! arrive, behind an optional feature; it is additive, so nothing here has to
-//! change to admit it.
+//! joins the product version line when it gets there. Excel arrived additively,
+//! exactly as promised: nothing else changed to admit it.
 //!
 //! There is no 0.2. This paragraph used to promise one; the milestone was
 //! retired in favour of going to parity once, because a 0.2 would have been a

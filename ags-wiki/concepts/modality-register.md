@@ -432,8 +432,6 @@ _Notes:_
 
 *Offered anywhere — in: bytes, file-like, path, text · out: bytes, file*
 
-*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like |
@@ -441,7 +439,7 @@ _Notes:_
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ |   |
 | browser (free) |   |   | ✓ |   |
-| rust (absent) |   |   |   |   |
+| rust (free) | ✓ | — | ✓ | — |
 | cli (free) | ✓ |   | — |   |
 | duckdb (n/a) | — | — | — | — |
 
@@ -452,7 +450,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
-| rust (absent) |   |   |
+| rust (free) | ✓ | ✓ |
 | cli (free) | ✓ |   |
 | duckdb (n/a) | — | — |
 
@@ -462,15 +460,13 @@ _Findings:_
 _Notes:_
 - _python_: to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered.
 - _node_: #391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel.
-- _rust_: Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.
+- _rust_: Landed 2026-09-04 (dec-facade-parity phase 7) behind the optional `excel` feature, exactly as the 2026-08-04 reversal planned: `to_excel(path)` / `to_excel_bytes` → `ToExcel::to_path` (file) or `ToExcel::run` → `Workbook` bytes. An optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.
 - _cli_: one subcommand carries both directions: the direction is inferred from the OUTPUT extension (`.xlsx` ⇒ export), overridable with `--export`. So this cell and from_excel/cli describe the same `lat excel` verb read two ways, not two subcommands.
 - _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
 ### from_excel — Convert an AGS4-shaped .xlsx back to AGS4.
 
 *Offered anywhere — in: bytes, path · out: bytes, file, handle*
-
-*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -479,7 +475,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
-| rust (absent) |   |   |
+| rust (free) | ✓ | ✓ |
 | cli (free) | ✓ | — |
 | duckdb (n/a) | — | — |
 
@@ -490,7 +486,7 @@ _Notes:_
 | python (free) | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | — |
 | browser (free) |   | ✓ |   |
-| rust (absent) |   |   |   |
+| rust (free) | ✓ | ✓ | — |
 | cli (free) | ✓ |   |   |
 | duckdb (n/a) | — | — | — |
 
@@ -500,7 +496,7 @@ _Findings:_
 
 _Notes:_
 - _python_: from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first.
-- _rust_: Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.
+- _rust_: Landed 2026-09-04 with to_excel (dec-facade-parity phase 7), behind the same `excel` feature: `from_excel(path)` / `from_excel_bytes` → `FromExcel::to_path` (file) or `FromExcel::run` → `Converted` (bytes/text). The bytes-out door exceeds the floor — the floor is a minimum, not a cap — and a Document handle stays a compose (`read_bytes(converted.bytes())`) rather than a door.
 - _cli_: the import half of the same `lat excel` verb — `.ags` output ⇒ import, overridable with `--import`. `--no-format-numeric` leaves numeric-looking columns as text.
 - _duckdb_: **by-design.** The Excel crate is deliberately extracted so its `calamine`/`rust_xlsxwriter` deps do not ride into every consumer. A SQL reader of AGS4 is not the place to reverse that.
 
