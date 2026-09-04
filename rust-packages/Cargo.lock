@@ -2221,6 +2221,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "laterite-ags4-emit",
  "laterite-ags4-parity",
  "laterite-ags4-parse",
  "laterite-ags4-types",

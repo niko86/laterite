@@ -9,6 +9,9 @@
 
 #[cfg(feature = "arrow")]
 mod arrow_in;
+// The Rule 15/17 catalog-collection rule, shared with forge's whole-file
+// minting (#924). Public: forge reads it through its path dependency.
+pub mod catalog;
 mod emit;
 mod error;
 pub mod hostopts;

@@ -1,6 +1,14 @@
 pub mod laterite_ags4_emit
 pub use laterite_ags4_emit::Cell
 pub use laterite_ags4_emit::DictVersion
+pub mod laterite_ags4_emit::catalog
+pub trait laterite_ags4_emit::catalog::GroupView
+pub fn laterite_ags4_emit::catalog::GroupView::cell(&self, usize, usize) -> core::option::Option<&str>
+pub fn laterite_ags4_emit::catalog::GroupView::row_count(&self) -> usize
+pub fn laterite_ags4_emit::catalog::GroupView::types(&self) -> &[alloc::string::String]
+pub fn laterite_ags4_emit::catalog::GroupView::units(&self) -> &[alloc::string::String]
+pub fn laterite_ags4_emit::catalog::types_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
+pub fn laterite_ags4_emit::catalog::units_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
 pub mod laterite_ags4_emit::hostopts
 pub struct laterite_ags4_emit::hostopts::DictFlags
 pub laterite_ags4_emit::hostopts::DictFlags::replace: &'static str

@@ -101,7 +101,15 @@ One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs:
 Node, both wasm paths) inherit it with zero per-binding work; `"report"`/`"strict"`
 are unchanged (they show/reject the gaps). Mirrors the existing forge synthesizer
 (`repo:rust-packages/laterite-ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
-— a parallel flagged for convergence in [[reliquary]].
+— a parallel flagged for convergence in [[reliquary]]. **Converged (#924):** the
+drift trigger fired (forge kept padded units emit trimmed, and never learned the
+PU harvest), so the Rule 15/17 *collection rule* now lives once in
+`repo:rust-packages/laterite-ags4-emit/src/catalog.rs` (`units_used`/`types_used`
+over a `GroupView` trait; emit's `OwnedGroup` and forge's `Group` are its two
+adapters — homed in emit rather than the types leaf because a packaged emit
+cannot call a types module the registry does not carry yet). The synthesizers themselves stay separate — emit fills gaps in a real
+build, forge mints whole files — and TRAN/ABBR were not drifting, so reliquary
+row 14's scope holds for them.
 
 ## Update (2026-07-24): metadata synthesis is OPT-IN — LANDED
 
