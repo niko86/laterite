@@ -23,7 +23,10 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import urllib.error
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 TOOL = REPO / "tools" / "release" / "trusted_publishing.py"
@@ -72,6 +75,40 @@ def test_the_payload_names_a_workflow_that_exists() -> None:
     assert f"environment: {cfg['environment']}" in workflow.read_text(
         encoding="utf-8"
     ), "the workflow does not use the environment the configs pin it to"
+
+
+def test_a_crate_the_registry_does_not_know_is_partitioned_not_fatal(
+    monkeypatch,
+) -> None:
+    """The config API 404s for a name with no release — confirmed live when
+    `laterite-ags4-excel` was being armed (2026-09-04), where it aborted the
+    whole run. That is a state of publish prep, not an API failure: the config
+    can only exist after the crate's first publish, so the listing must name
+    the crate and carry on for the ones that do exist."""
+
+    def fake_call(method, url, token, body=None):
+        if url.endswith("crate=laterite-ags4-excel"):
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        return {"github_configs": []}
+
+    monkeypatch.setattr(tp, "call", fake_call)
+    have, unpublished = tp.existing("token")
+    assert unpublished == ["laterite-ags4-excel"]
+    assert "laterite-ags4-excel" not in have
+    assert set(have) | set(unpublished) == set(tp.crates())
+
+
+def test_other_http_errors_still_abort(monkeypatch) -> None:
+    """Only the 404 is a fact about the crate. A 403 is a credential fault (a
+    publish-scoped token got exactly that, live) — treating it like the 404
+    would print a wall of NO CRATE rows over a bad token."""
+
+    def fake_call(method, url, token, body=None):
+        raise urllib.error.HTTPError(url, 403, "Forbidden", None, None)
+
+    monkeypatch.setattr(tp, "call", fake_call)
+    with pytest.raises(urllib.error.HTTPError):
+        tp.existing("token")
 
 
 def test_the_crate_list_is_derived_and_real() -> None:

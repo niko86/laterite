@@ -14,6 +14,17 @@ out and cannot be withdrawn. So the crate list here is not a list: it is
 script derives its waves from the manifests rather than hard-coding them — a
 second statement of the set is a second thing to keep true.
 
+One ordering constraint, learned live (`laterite-ags4-excel`, 2026-09-04): the
+config API is keyed on the crate EXISTING — for a name with no release, both
+the listing and the create answer 404. So a config cannot predate a crate's
+first publish, and that first publish cannot ride the OIDC workflow at all: it
+goes out with a publish token (`tools/publish_crates.py --execute`), and the
+config is created right after, which is what lets every later publish of the
+crate run unattended.
+
+Exit 0 when every publishable crate has a config, 1 when one is missing — or
+cannot exist yet because its crate has no release — and 2 on an API error.
+
 The token this needs is NOT the publish credential. `publish-crates.yml` stores
 nothing; it mints a short-lived token over OIDC. This one is a `trusted-publishing`
 scoped token used once, to write the configs, and revoked afterwards:
@@ -25,9 +36,6 @@ Usage:
     export CRATES_IO_TOKEN=...
     uv run --no-project python tools/release/trusted_publishing.py            # what is missing
     uv run --no-project python tools/release/trusted_publishing.py --create   # create it
-
-Exit 0 when every publishable crate has a config, 1 when one is missing on a
-listing run, 2 on an API error.
 """
 
 from __future__ import annotations
@@ -82,16 +90,30 @@ def call(method: str, url: str, token: str, body: dict | None = None) -> dict:
         return json.loads(resp.read() or b"{}")
 
 
-def existing(token: str) -> dict[str, list[dict]]:
+def existing(token: str) -> tuple[dict[str, list[dict]], list[str]]:
+    """crate -> its configs, plus the crates the registry does not know.
+
+    A 404 here is a fact about the crate, not an API failure: the config
+    endpoints are keyed on the crate existing, so a crate ahead of its first
+    publish 404s on the listing — and would 404 on the create too. Confirmed
+    live on `laterite-ags4-excel` (2026-09-04); the docstring above carries the
+    publish ordering that follows. Every OTHER error still aborts: a 403 is a
+    credential fault (a publish-scoped token got exactly that, live), and
+    carrying on would print a wall of wrong rows over a bad token.
+    """
     out: dict[str, list[dict]] = {}
+    unpublished: list[str] = []
     for krate in crates():
         try:
             got = call("GET", f"{API}?crate={krate}", token)
         except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                unpublished.append(krate)
+                continue
             print(f"  {krate}: HTTP {exc.code} listing configs", file=sys.stderr)
             raise
         out[krate] = got.get("github_configs", [])
-    return out
+    return out, unpublished
 
 
 def body_for(krate: str) -> dict:
@@ -136,16 +158,28 @@ def main() -> int:
 
     create = "--create" in sys.argv
     try:
-        have = existing(token)
+        have, unpublished = existing(token)
     except urllib.error.HTTPError:
         return 2
 
     missing = [k for k, cfgs in have.items() if not any(matches(c) for c in cfgs)]
     for krate in crates():
-        mark = "MISSING" if krate in missing else "ok"
+        if krate in unpublished:
+            mark = "NO CRATE"
+        elif krate in missing:
+            mark = "MISSING"
+        else:
+            mark = "ok"
         print(f"  {mark:<8} {krate}")
+    if unpublished:
+        print(
+            f"\n{len(unpublished)} crate(s) have no release on crates.io, so no "
+            "config can exist for them yet: publish first "
+            "(tools/publish_crates.py --execute, with a publish token), then "
+            "re-run this."
+        )
 
-    if not missing:
+    if not missing and not unpublished:
         print(
             f"\nall {len(have)} publishable crate(s) trust "
             f"{REPOSITORY_OWNER}/{REPOSITORY_NAME} · {WORKFLOW_FILENAME} · "
@@ -154,7 +188,8 @@ def main() -> int:
         return 0
 
     if not create:
-        print(f"\n{len(missing)} crate(s) have no config. Re-run with --create.")
+        if missing:
+            print(f"\n{len(missing)} crate(s) have no config. Re-run with --create.")
         return 1
 
     for krate in missing:
@@ -166,8 +201,13 @@ def main() -> int:
             return 2
         print(f"  created {krate}")
 
-    print(f"\ncreated {len(missing)} config(s) — revoke the token now; it is done.")
-    return 0
+    if missing:
+        print(
+            f"\ncreated {len(missing)} config(s) — revoke the token; that part is done."
+        )
+    # A crate the registry does not know is still a config OWED, just one that
+    # cannot be paid yet — exiting 0 over it would read as "all armed".
+    return 1 if unpublished else 0
 
 
 if __name__ == "__main__":

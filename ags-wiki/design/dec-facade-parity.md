@@ -299,7 +299,7 @@ Excel, which needs a rename and full prep first.
 | **4c** | facade `fix` + `build` | 2 | — | 2026-08-05 |
 | **4d** | facade `diff` + `merge` | 2 | 2 | 2026-08-06 |
 | **5** | Excel publish prep · second facade snapshot | — | 3 | 2026-09-04 |
-| **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | — |
+| **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | 2026-09-04 |
 | **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | — |
 | **8** | **the jump** — facade onto the product line | — | 0–7 | — |
 
@@ -344,14 +344,19 @@ match the tree, and the phase-5 PR follows the tree:
   before the baseline check that would otherwise drop it, `--publish-owed`
   lists it, and the dispatched `publish-crates.yml` publishes the whole set
   with already-published versions skipped by `on_registry`, so the new crate
-  goes out in its computed wave. The residue is registry-side and is the
-  owner's one remaining act: a crates.io **Trusted Publishing config** for
-  the new name (`tools/release/trusted_publishing.py --create`) must exist
-  before the dispatched run reaches excel's wave, or that wave fails at the
-  registry — recoverable (the run is idempotent; earlier waves are skips),
-  and if crates.io refuses a config for a never-published crate, the first
-  publish is one owner run of `publish_crates.py --execute` with a token,
-  the phase-2 route, after which the config can be created.
+  goes out in its computed wave. The residue was registry-side and turned
+  out to be the deciding constraint, **resolved 2026-09-04**: crates.io's
+  Trusted Publishing API is keyed on the crate existing — for a name with
+  no release, both the config listing and the create answer HTTP 404
+  (`trusted_publishing.py` hit it live) — so no config can predate a first
+  publish, and a NEW crate's first publish cannot ride the OIDC dispatch
+  at all. Excel's went out the phase-2 route — one owner
+  `publish_crates.py --execute` with a token, carrying the owed emit
+  0.16.0 and merge 0.14.0 in the same run — and its config was created
+  immediately after, so every later excel publish runs unattended. The
+  sweep verification above stands for every re-publish; what a new crate
+  adds is exactly one token run, and the unattended sweep's own first
+  live dispatch now waits for the next owed publish.
 
 **Phase 0 carries the drift gate.** `repo:tools/gen_modality.py` renders
 `ags-wiki/concepts/modality-register.md` with nothing asserting the two agree —
@@ -436,8 +441,9 @@ tier both stay where they are. Publishing diff, merge and excel adds crates at
 
 **The engine tier grows to eleven published crates**, and the gates that ride on
 `PUBLISH_SET` — semver, public-API snapshot, packaging contents — grow with it.
-That is the standing cost decision 4 accepts. As of 2026-08-05 it is **ten**:
-phase 2 published diff and merge, and excel is the one still to come.
+That is the standing cost decision 4 accepts. As of 2026-08-05 it was **ten**
+(phase 2 published diff and merge); 2026-09-04 made it **eleven** — phase 6
+published excel, and the engine tier is complete.
 
 **The version gate changes shape at the jump.** `test_version_faithful` currently
 asserts the facade starts with `0.1.` and explains why. At parity that assertion

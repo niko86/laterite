@@ -94,8 +94,10 @@ from check_package_contents import PUBLISH_SET  # noqa: E402
 #: taking the engine tier to ten published crates. The mechanism
 #: stays because it will be wanted again — though the next prepared crate,
 #: `laterite-ags4-excel` (dec-facade-parity phase 5), never needed it: since
-#: #889 the PR merge is the human gate, so it joined `PUBLISH_SET` and rode the
-#: unattended sweep instead of waiting here.
+#: #889 the PR merge is the human gate, so it joined `PUBLISH_SET` and went out
+#: on the next token run. (Not the unattended sweep — a FIRST publish cannot:
+#: crates.io holds no Trusted Publishing config for a crate with no release,
+#: see tools/release/trusted_publishing.py.)
 DEFERRED: set[str] = set()
 
 #: How long to wait for an uploaded crate to become resolvable from the index.
