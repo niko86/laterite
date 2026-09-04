@@ -83,9 +83,9 @@ fn parse_bytes_strips_a_leading_bom_for_decode_only() {
     // still counted in the byte offsets. Group detection alone can't see this —
     // the tag is read BOM-tolerantly — so assert the decoded line-1 text directly.
     assert!(
-        pf.raw_lines[0].text.starts_with("\"GROUP\""),
+        pf.line_text(&pf.raw_lines[0]).starts_with("\"GROUP\""),
         "BOM leaked into the decoded line-1 text: {:?}",
-        pf.raw_lines[0].text
+        pf.line_text(&pf.raw_lines[0])
     );
     // the byte offsets still index the original bytes (BOM bytes are counted)
     assert!(pf.byte_offsets_source_true);
@@ -121,4 +121,78 @@ fn ags3_markers_are_reported_as_an_unsupported_edition() {
             "{marker:?} should be flagged as AGS3"
         );
     }
+}
+
+#[test]
+fn escaped_cells_read_unescaped_through_the_fixup_region() {
+    // The dec-parse-cell-representation contract: a cell whose source carries
+    // `""` escapes is unescaped ONCE at parse into the buffer's fix-up region,
+    // so cell() hands back the logical value while the retained line text
+    // stays raw — and both profiles agree on the value.
+    let src = "\"GROUP\",\"PROJ\"\r\n\
+               \"HEADING\",\"PROJ_ID\",\"PROJ_MEMO\"\r\n\
+               \"DATA\",\"P1\",\"say \"\"hi\"\" twice\"\r\n";
+    let rich = laterite_ags4_parse::parse_str(src).unwrap();
+    let g = &rich.groups["PROJ"];
+    assert_eq!(g.cell(0, 0), Some("P1"));
+    assert_eq!(g.cell(1, 0), Some("say \"hi\" twice"));
+    // The raw-line overlay keeps the source form, escapes included.
+    let data_line = rich.raw_lines.last().unwrap();
+    assert!(rich.line_text(data_line).contains("\"\"hi\"\""));
+    // Same logical values under the lean profile (no raw-line overlay).
+    let lean = laterite_ags4_parse::parse_bytes_opts(
+        src.as_bytes(),
+        laterite_ags4_parse::ParseOptions::lean(),
+    )
+    .unwrap();
+    assert_eq!(lean.groups["PROJ"].cell(1, 0), Some("say \"hi\" twice"));
+    // And the span reads agree with the owned tokenizer, field for field.
+    let line = "\"DATA\",\"P1\",\"say \"\"hi\"\" twice\"";
+    let owned = laterite_ags4_parse::split_ags_line(line);
+    let vals: Vec<&str> = (0..owned.len() - 1)
+        .map(|c| g.cell(c, 0).unwrap())
+        .collect();
+    assert_eq!(
+        vals,
+        owned[1..].iter().map(String::as_str).collect::<Vec<_>>()
+    );
+}
+
+/// LOCA with a ragged DATA row (one value short of the two headings) and a
+/// long DATA row (one value past them) — the shapes `value_at` /
+/// `padded_row_strings` exist to make safe (#844).
+const LOCA_RAGGED: &str = "\"GROUP\",\"LOCA\"\r\n\
+                           \"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+                           \"UNIT\",\"\",\"m\"\r\n\
+                           \"TYPE\",\"ID\",\"2DP\"\r\n\
+                           \"DATA\",\"BH01\"\r\n\
+                           \"DATA\",\"BH02\",\"1.00\",\"extra\"\r\n";
+
+#[test]
+fn value_at_reads_row_relative_against_the_owning_buffer() {
+    let pf = parse_str(LOCA_RAGGED).unwrap();
+    let g = &pf.groups["LOCA"];
+    let short = &g.rows[0];
+    let long = &g.rows[1];
+    assert_eq!(g.value_at(short, 0), Some("BH01"));
+    assert_eq!(g.value_at(short, 1), None, "past the ragged row's width");
+    assert_eq!(
+        g.value_at(long, 2),
+        Some("extra"),
+        "past the headings is fine"
+    );
+    // agrees with the (col, row) accessor where both apply
+    assert_eq!(g.value_at(short, 0), g.cell(0, 0));
+}
+
+#[test]
+fn padded_row_strings_pads_and_truncates_to_n() {
+    let pf = parse_str(LOCA_RAGGED).unwrap();
+    let g = &pf.groups["LOCA"];
+    // a short row's tail fills with ""
+    assert_eq!(g.padded_row_strings(&g.rows[0], 2), vec!["BH01", ""]);
+    // a long row truncates to n
+    assert_eq!(g.padded_row_strings(&g.rows[1], 2), vec!["BH02", "1.00"]);
+    // n = 0 materialises nothing
+    assert!(g.padded_row_strings(&g.rows[0], 0).is_empty());
 }

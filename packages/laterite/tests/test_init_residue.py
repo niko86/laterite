@@ -105,6 +105,58 @@ def test_build_from_capsule_only_frame() -> None:
     assert '"GROUP","PROJ"' in br.text
 
 
+# --- a `.columns` property that RAISES (#852) --------------------------------
+#
+# `getattr(frame, "columns", None)` only swallows AttributeError, but a property
+# can raise anything: pyo3-arrow's `PyTable.columns` raises ModuleNotFoundError
+# without its arro3 companion package installed. The probes' answer was going to
+# be discarded for a non-columnar input anyway, so a raising `.columns` must
+# read as "no columns", not crash the build with a foreign import error.
+
+
+class _RaisingColumns(_CapsuleOnly):
+    """A capsule-bearing frame whose `.columns` raises a non-AttributeError —
+    the deterministic stand-in for a pyo3-arrow PyTable in an arro3-free venv."""
+
+    @property
+    def columns(self) -> Any:
+        raise ModuleNotFoundError("No module named 'arro3'")
+
+
+def test_build_from_frame_with_raising_columns_property() -> None:
+    inner = pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    br = L.build_ags4({"PROJ": _RaisingColumns(inner)}, synthesise_metadata=True)
+    # The capsule path is the only thing consulted — output matches the plain frame's.
+    assert br.bytes == L.build_ags4({"PROJ": inner}, synthesise_metadata=True).bytes
+
+
+def test_build_from_raw_pyo3_arrow_table() -> None:
+    # The #852 repro, now through the PUBLIC seam (#860): the handle's own
+    # raw Arrow table, passed straight back in — the private two-hop reach
+    # this test used to carry existed only because no public door did.
+    handle = L.read(str(_CLEAN))
+    table = handle.arrow("PROJ")
+    br = L.build_ags4({"PROJ": table}, synthesise_metadata=True)
+    assert (
+        br.bytes
+        == L.build_ags4({"PROJ": handle["PROJ"]}, synthesise_metadata=True).bytes
+    )
+
+
+def test_units_heading_validation_skips_unreadable_columns() -> None:
+    # The accepted cost of treating a raising `.columns` as "no columns": the
+    # units=/types= heading check can only vouch for frames it can read, so a
+    # capsule-only input's headings go unchecked (as they already did for
+    # `_CapsuleOnly`) — but the unknown-group check still fires.
+    frame = _RaisingColumns(pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]}))
+    br = L.build_ags4(
+        {"PROJ": frame}, units={"PROJ": {"PROJ_ID": ""}}, synthesise_metadata=True
+    )
+    assert '"GROUP","PROJ"' in br.text
+    with pytest.raises(ValueError, match="unknown group"):
+        L.build_ags4({"PROJ": frame}, units={"ZZZZ": {"ZZZZ_ID": ""}})
+
+
 # --- certify from a data= handle --------------------------------------------
 
 

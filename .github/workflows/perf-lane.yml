@@ -1,0 +1,171 @@
+# The cross-OS python-ags4 comparison lane (#878).
+#
+# WHY this exists: the darwin ledger machine cannot see the per-group release
+# M1 landed (#831/#833 — madvise'd returns never leave residency there), so
+# the published cross-library memory comparison understates the shipped
+# library exactly where most users run it. This runs the SAME instrument as
+# the darwin lane — tools/bench-vs-python-ags4.py, one fresh subprocess per
+# memory cell, both libraries through their public APIs — on hosted-class
+# Linux and Windows. Each OS's results are their OWN claim family (campaign
+# rule 8): never a shared table with the darwin lane, the M1 probe, or each
+# other.
+#
+# Corpus: since the corpus-v2 re-pin (#873) there is ONE manifest —
+# tools/readme-bench-fixtures.json, mintable by the current forge on any
+# machine — so this lane pins against it like every other lane, keeping its
+# own cache directory via --fixtures-dir. The per-OS drift checks double as
+# the cross-OS byte-identity proof, exactly as they do for the M1 probe.
+#
+# Timing caveat, recorded here because it cannot be recorded loudly enough:
+# the Linux pool is shared hardware and windows-2022 is a hosted VM — peak
+# memory is robust to that, timing is not (the perf-probe runner-choice note
+# is the same fact). The memory columns are the deliverable; the time cells
+# ride along as indicative only.
+#
+# Dispatch-only:
+#   gh workflow run perf-lane.yml --ref <branch-with-this-file> -f ref=<ref>
+#
+# Windows runs only after Linux completes (needs:) — owner sequencing
+# (#878), and it keeps the two long jobs from competing for the dispatch
+# window's attention.
+name: perf-lane
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "ref to measure"
+        default: "main"
+      rungs:
+        description: "comma-separated fixture rungs"
+        default: "5MB,25MB,100MB"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-lane
+  cancel-in-progress: false
+
+jobs:
+  lane-linux:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 60
+    env:
+      UV_LINK_MODE: copy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold so the maturin + forge compiles hit the shared cache.
+      - uses: ./.github/actions/build-accel
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      # The abi3 floor interpreter, same reasoning as ci.yml's wheel-smoke
+      # (self-hosted runners can't use actions/setup-python).
+      - name: Install Python 3.12 via uv
+        run: uv python install 3.12
+
+      - name: uv sync (build backend into the venv)
+        run: uv sync
+
+      - name: Build the release wheel
+        run: (cd packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
+
+      - name: Build forge (fixture generator)
+        run: (cd rust-packages && cargo build --release -p laterite-ags4-forge)
+
+      # The SHIPPED dep shape plus the comparison target: wheel + pandas<3 +
+      # python-ags4, NO pyarrow — the compat cells measure what
+      # `pip install laterite[compat]` users actually get, and the run's own
+      # notes record which hop ran.
+      - name: Lane venv (shipped [compat] shape + python-ags4)
+        run: |
+          set -euxo pipefail
+          uv venv --python 3.12 --clear "$GITHUB_WORKSPACE/.lane"
+          uv pip install --python "$GITHUB_WORKSPACE/.lane/bin/python" "$GITHUB_WORKSPACE"/dist/laterite-*.whl "pandas<3" "python-ags4==1.2.0"
+
+      - name: Run the lane
+        run: '"$GITHUB_WORKSPACE/.lane/bin/python" tools/bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/readme-bench-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/linux.json'
+
+      # if: always() — a failed lane's partial JSON is the diagnosis (the
+      # first M1 probe dispatch uploaded nothing and left only a log line).
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: perf-lane-linux
+          path: output/perf-lane/
+
+  lane-windows:
+    runs-on: windows-2022
+    needs: lane-linux
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      # PowerShell 5.1 with a per-step ExecutionPolicy bypass, exactly the
+      # release.yml Windows-leg pattern (see its comments for the why).
+      - name: Install Python 3.12 (Windows)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          uv python install 3.12
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.local\bin"
+
+      - name: Setup Rust (Windows)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          rustup default stable-x86_64-pc-windows-msvc
+          rustc --version
+
+      - name: Install maturin (uv pip path — see release.yml for why not the action)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          uv tool install maturin
+          maturin --version
+
+      - name: Build the release wheel (Windows, direct)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: packages/laterite
+        run: |
+          $py = uv python find 3.12
+          maturin build --release -i "$py" --out ../../dist
+
+      - name: Build forge (fixture generator)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: rust-packages
+        run: cargo build --release -p laterite-ags4-forge
+
+      - name: Lane venv (shipped [compat] shape + python-ags4)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          uv venv --python 3.12 --clear .lane
+          $wheel = (Get-ChildItem dist\laterite-*.whl | Select-Object -First 1).FullName
+          uv pip install --python .lane\Scripts\python.exe "$wheel" "pandas<3" "python-ags4==1.2.0"
+
+      - name: Run the lane
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          .lane\Scripts\python.exe tools\bench-vs-python-ags4.py --rungs "${{ inputs.rungs }}" --mem-rungs "${{ inputs.rungs }}" --manifest tools/readme-bench-fixtures.json --fixtures-dir output/perf-lane-fixtures --out output/perf-lane/windows.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: perf-lane-windows
+          path: output/perf-lane/

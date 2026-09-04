@@ -96,7 +96,12 @@ fn loca_gl(r: &MergeResult) -> (String, Vec<(String, String)>) {
     let rows = g
         .rows
         .iter()
-        .map(|r| (r.values[id].clone(), r.values[gl].clone()))
+        .map(|r| {
+            (
+                g.value_at(r, id).unwrap().to_string(),
+                g.value_at(r, gl).unwrap().to_string(),
+            )
+        })
         .collect();
     (g.types[gl].clone(), rows)
 }

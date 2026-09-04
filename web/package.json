@@ -34,6 +34,7 @@
     "test": "vitest run",
     "test:wasm": "vitest run --config vitest.wasm.config.ts",
     "bench:wasm": "vitest bench --run --config vitest.wasm-bench.config.ts",
+    "bench:matrix": "node bench/perf-matrix.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",

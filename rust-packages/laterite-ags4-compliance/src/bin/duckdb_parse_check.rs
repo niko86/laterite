@@ -101,13 +101,16 @@ struct GroupParse {
 /// registry) have no spec keys, so they're omitted here and left un-key-checked.
 fn file_declared_groups(pa: &laterite_ags4_core::ags4_codec::ParsedAgs4) -> BTreeSet<String> {
     pa.get("DICT")
-        .map(|d| {
-            d.rows
-                .iter()
-                .filter_map(|r| r.get("DICT_GRP"))
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-                .collect()
+        .and_then(|d| {
+            // Name→column once per group, positional per row (#900's pattern).
+            let grp = d.col("DICT_GRP")?;
+            Some(
+                (0..d.n_rows())
+                    .filter_map(|i| d.cell(i, grp))
+                    .map(|v| v.trim().to_string())
+                    .filter(|v| !v.is_empty())
+                    .collect(),
+            )
         })
         .unwrap_or_default()
 }
@@ -117,20 +120,16 @@ fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
     let file_declared = file_declared_groups(&pa);
     let mut groups: BTreeMap<String, Vec<(String, Option<String>)>> = BTreeMap::new();
     let mut non_registry = Vec::new();
-    for code in &pa.order {
-        let g = &pa.groups[code]; // `pa.order` holds trimmed codes; `groups` is keyed by them
+    for code in pa.order() {
+        let g = pa.get(code).unwrap(); // order holds trimmed codes; groups are keyed by them
         if reg.get(code).is_none() {
             non_registry.push((code.clone(), file_declared.contains(code)));
             continue;
         }
-        let mut ids = group_row_ids(reg, code, &g.headings, g.rows.len(), |col, row| {
-            // core's rows are name-keyed maps; a short/ragged row lacks the
-            // heading → None → `group_row_ids` treats it as "" (same as duckdb's
-            // padded short rows).
-            g.rows
-                .get(row)
-                .and_then(|r| r.get(g.headings[col].as_str()))
-                .map(String::as_str)
+        let mut ids = group_row_ids(reg, code, g.headings(), g.n_rows(), |col, row| {
+            // Span-backed accessors (#900): a short/ragged row projects "" for
+            // its missing tail (same as duckdb's padded short rows).
+            g.cell(row, col)
         });
         ids.sort();
         groups.insert(code.clone(), ids);

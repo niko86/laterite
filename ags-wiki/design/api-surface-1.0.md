@@ -59,7 +59,7 @@ One door per task:
 |---|---|---|
 | `read(path, backend="polars"\|"pandas")` | `Ags4File` | the door; engine is lazy |
 | `ags["LOCA"]` / `ags.table("LOCA")` | eager **polars** (default) / **pandas** frame | born-typed; pyarrow-free |
-| `ags.sql("SELECT … WHERE …")` | a **DuckDB relation** | cross-group joins + filter pushdown; finish with `.df()` / `pl.from_arrow(rel)` or chain SQL |
+| `ags.sql("SELECT … WHERE …")` | a **DuckDB relation** | cross-group joins + filter pushdown; finish with `.df()` / `pl.DataFrame(rel)` or chain SQL |
 | `ags.at("LOCA", ids)` / `ags.query("SELECT …")` | an `AgsQuery` (lazy) | fan-out: `sub[code]` / `.frames()` / `.groups`; single-result: `.filter(sql)` / `.select()` → `.frame()` / `.to_polars()` / `.to_pandas()` / `.relation()` |
 | `ags.connection` | the raw `duckdb` connection | every engine feature (parquet, Arrow via `.arrow()`, …) |
 | `ags.register(name, frame)` | — | join your own frames in `sql()` |
@@ -80,7 +80,8 @@ Rust parses → typed Arrow per group (`laterite-ags4-types::arrow_cols`, the *s
 explorer frames as IPC) → handed to Python zero-copy as an **Arrow PyCapsule** (`pyo3-arrow`,
 abi3-safe) → loaded into DuckDB as a **native CTAS table** (NOT a view over external Arrow —
 that tripped pyarrow's `string_view` `is_in` kernel on joins). Group frames come back out
-**pyarrow-free**: polars via `pl.from_arrow(rel)` (the capsule), pandas via DuckDB's NumPy
+**pyarrow-free**: polars via `pl.DataFrame(rel)` (the capsule; `from_arrow` flips to Series
+for streams in polars 2.0 — #861), pandas via DuckDB's NumPy
 `rel.df()`. Born-typed dtypes survive the round-trip identically (String / Float64 / Int64,
 dirty cell → null). Writes are byte-faithful from the retained parse, independent of which
 groups were read. `laterite-ags4-wasm` is unaffected — it links no DuckDB; the same Arrow emitter

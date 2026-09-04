@@ -276,13 +276,16 @@ pub fn laterite_ags4_validator::fixes::fix_document_selective(&[u8], &laterite_a
 pub type laterite_ags4_validator::fixes::Fixes = alloc::vec::Vec<laterite_ags4_validator::fixes::Fix>
 pub mod laterite_ags4_validator::parse
 pub use laterite_ags4_validator::parse::DataRow
+pub use laterite_ags4_validator::parse::FieldSpan
 pub use laterite_ags4_validator::parse::ParseError
 pub use laterite_ags4_validator::parse::ParsedFile
 pub use laterite_ags4_validator::parse::ParsedGroup
 pub use laterite_ags4_validator::parse::RawLine
+pub use laterite_ags4_validator::parse::Span
 pub use laterite_ags4_validator::parse::field_span
 pub use laterite_ags4_validator::parse::line_spans
 pub use laterite_ags4_validator::parse::split_ags_line
+pub use laterite_ags4_validator::parse::split_ags_line_spans
 pub fn laterite_ags4_validator::parse::parse_bytes(&[u8], &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::parse::parse_file(&std::path::Path) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::parse::parse_file_with_encoding(&std::path::Path, &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_validator::error::ValidatorError>

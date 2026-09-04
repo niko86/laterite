@@ -7,7 +7,7 @@
 # (newline scan). Additive in Phase 1 — nothing consumes it yet.
 [package]
 name = "laterite-ags4-parse"
-version = "0.11.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "Shared, source-true AGS4 line/field parser (the convergence leaf)"

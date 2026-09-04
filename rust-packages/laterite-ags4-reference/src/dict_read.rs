@@ -28,12 +28,14 @@ pub(crate) fn read_ags_dict(
     enc: &'static encoding_rs::Encoding,
 ) -> Result<DictionaryFile, DictError> {
     let opts = ParseOptions {
-        retain_raw_lines: false,
         encoding: enc,
         on_invalid_utf8: InvalidUtf8::LossyReplace,
         strict_structure: false,
         // Needs the DICT group's HEADING/DATA rows, not just its location.
         locate_only: false,
+        // A dictionary read consumes cell values only — no source-byte
+        // coordinates.
+        retain_source_offsets: false,
     };
     let parsed = parse_bytes_opts(bytes, opts).map_err(|e| match e {
         // No GROUP rows at all → this isn't a dictionary we can read.
@@ -58,7 +60,7 @@ pub(crate) fn read_ags_dict(
 
     for row in &dict.rows {
         let cell = |ci: Option<usize>| -> &str {
-            ci.and_then(|i| row.values.get(i)).map_or("", |s| s.trim())
+            ci.and_then(|i| dict.value_at(row, i)).map_or("", str::trim)
         };
         let grp = cell(Some(ci_grp));
         if grp.is_empty() {

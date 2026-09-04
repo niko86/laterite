@@ -30,13 +30,8 @@ const INTERIOR_WS: &str = concat!(
 fn from_shared_trims_where_the_leaf_keeps_verbatim() {
     let core = read_ags4_bytes(INTERIOR_WS.as_bytes()).unwrap();
     let val = parse_str(INTERIOR_WS).unwrap();
-    let cv = core.get("PROJ").unwrap().rows[0]
-        .get("PROJ_ID")
-        .map(String::as_str);
-    let vv = val.groups.get("PROJ").unwrap().rows[0]
-        .values
-        .first()
-        .map(String::as_str);
+    let cv = core.get("PROJ").unwrap().cell_named(0, "PROJ_ID");
+    let vv = val.groups.get("PROJ").unwrap().cell(0, 0);
     assert_eq!(
         cv,
         Some("P1"),

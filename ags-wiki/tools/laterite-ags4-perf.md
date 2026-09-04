@@ -81,12 +81,45 @@ bindings take**.
 flowchart LR
   forge[laterite-ags4-forge] -->|size ladder| ladder[tools/perf-ladder.py]
   ladder -->|manifest.json| perf[laterite-ags4-perf]
+  ladder -->|manifest.json| nodelane[laterite-node bench/perf-matrix.mjs]
+  ladder -->|manifest.json| wasmlane[web bench/perf-matrix.mjs]
+  ladder -->|manifest.json| clilane[tools/perf-cli.py]
   val[laterite-ags4-validator lib] --> perf
   parse[laterite-ags4-parse] --> perf
   types[laterite-ags4-types arrow] --> perf
   emit[laterite-ags4-emit arrow] --> perf
+  latbin[lat release binary] --> clilane
   perf -->|rust.json| matrix[tools/perf-matrix.py]
+  nodelane -->|node.json| matrix
+  wasmlane -->|wasm.json| matrix
+  clilane -->|cli.json| matrix
 ```
+
+The Node lane (#823) is this bin's sibling, not a consumer: the same three
+ops, the same fresh-child peak-RSS instrument and refusal semantics, driven
+through the npm package's public API (napi marshalling and arrow-js decode
+included) — see [[laterite-node]]. The wasm lane (#824,
+`web/bench/perf-matrix.mjs`) is the next sibling, through the browser
+cdylib's public API — same schema, but its memory column is the
+**linear-memory high-water instrument**, a separately labelled claim that
+the merger never folds into a peak-RSS column ([[perf-campaign]] rule 13).
+The CLI lane (#825, `tools/perf-cli.py`) closes the surface set: it drives
+an explicitly named release `lat` binary (`--lat-bin` / `$LAT_BIN` / this
+checkout's build — never `PATH`, three programs answer to `lat`) with one
+fresh subprocess per cell, so the timed child IS the memory child's shape.
+Its `validate` shares the axis block; its read and write doors are the
+CLI's own (`lat read <bulk-group> --csv --out`, and `lat merge` self-merge
+— the one verb that drives the emit engine), so they carry their own op
+names (`read`, `merge`) and a per-row `door` string instead of borrowing
+`parse-to-typed`/`write` rows they would misrepresent.
+
+The lanes' shared measurement contract — the rung cap, the refusal
+vocabulary, the swap watch, the statistics — is held by **each copy's own
+unit tests**, the accepted mechanism per the decision recorded on #865
+(owner, 2026-09-02): the rust bin, the node and wasm lanes each pin their copy, and
+the CLI lane needs no copy at all — it imports the python harness's
+machinery outright, which is also what finally put tests on the python
+copy.
 
 ## Related
 [[laterite-ags4-forge]] · [[laterite-ags4-validator]] · [[perf-campaign]] · [[crate-map]]

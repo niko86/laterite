@@ -463,7 +463,7 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
     let line_index: std::collections::HashMap<u32, &str> = parsed
         .raw_lines
         .iter()
-        .map(|rl| (rl.number, rl.text.as_str()))
+        .map(|rl| (rl.number, parsed.line_text(rl)))
         .collect();
     let raw_line = |line: Option<u32>| -> Option<&str> { line_index.get(&line?).copied() };
     // Cap per rule on *serialization* only — every rule already ran over

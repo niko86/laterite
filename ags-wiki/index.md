@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-31
-counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 38}
+generated: 2026-09-03
+counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 38 |
-| **Total (live)** | **425** |
+| Design | 41 |
+| **Total (live)** | **428** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 37 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 40 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -497,6 +497,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | [[dec-duckdb-perf-architecture]] | accepted | — |
 | [[dec-edition-selection]] | accepted | — |
 | [[dec-emit-cell-representation]] | accepted | — |
+| [[dec-emit-streamed-verdict]] | accepted | — |
 | [[dec-engine-publish-automation]] | accepted | — |
 | [[dec-engine-tiering]] | accepted | — |
 | [[dec-example-header-environment]] | accepted | — |
@@ -508,7 +509,9 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | [[dec-launcher-contract]] | accepted | — |
 | [[dec-monorepo-structure]] | accepted | — |
 | [[dec-parse-cell-representation]] | accepted | — |
+| [[dec-parse-structure-layout]] | accepted | — |
 | [[dec-python-imports-rust-library]] | accepted | — |
+| [[dec-read-projection-representation]] | accepted | — |
 | [[dec-rust-api-crates-io]] | accepted | — |
 | [[dec-rust-drives-python]] | accepted | — |
 | [[dec-verdict-severity-split]] | accepted | — |

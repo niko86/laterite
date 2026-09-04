@@ -26,7 +26,7 @@ fn rows_with<'a>(g: &'a ParsedGroup, h: &str, v: &str) -> Vec<&'a DataRow> {
         Some(ci) => g
             .rows
             .iter()
-            .filter(|r| r.values.get(ci).map(String::as_str) == Some(v))
+            .filter(|r| g.value_at(r, ci) == Some(v))
             .collect(),
         None => vec![],
     }
@@ -34,7 +34,7 @@ fn rows_with<'a>(g: &'a ParsedGroup, h: &str, v: &str) -> Vec<&'a DataRow> {
 
 fn cell(g: &ParsedGroup, r: &DataRow, h: &str) -> Option<String> {
     let ci = g.headings.iter().position(|x| x == h)?;
-    r.values.get(ci).cloned()
+    g.value_at(r, ci).map(str::to_string)
 }
 
 // --- Task #1: unkeyed groups don't explode under N-file schema widening ---

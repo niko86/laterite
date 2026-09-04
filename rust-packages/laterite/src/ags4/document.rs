@@ -61,14 +61,13 @@ impl Document {
     /// Keep only these groups, dropping the rest. The filter half of
     /// [`crate::ags4::Read::only`].
     pub(crate) fn retain_only(&mut self, codes: &[String]) {
-        self.parsed.groups.retain(|code, _| codes.contains(code));
-        self.parsed.order.retain(|code| codes.contains(code));
+        self.parsed.retain_only(codes);
     }
 
     /// The group codes, in file order.
     #[must_use]
     pub fn codes(&self) -> Vec<&str> {
-        self.parsed.order.iter().map(String::as_str).collect()
+        self.parsed.order().iter().map(String::as_str).collect()
     }
 
     /// Every group, in file order.
@@ -81,7 +80,7 @@ impl Document {
     #[must_use]
     pub fn groups(&self) -> Vec<Group<'_>> {
         self.parsed
-            .order
+            .order()
             .iter()
             .filter_map(|code| self.group(code))
             .collect()
@@ -90,25 +89,25 @@ impl Document {
     /// One group by its 4-letter code, e.g. `"LOCA"`.
     #[must_use]
     pub fn group(&self, code: &str) -> Option<Group<'_>> {
-        self.parsed.groups.get(code).map(|g| Group { inner: g })
+        self.parsed.get(code).map(|g| Group { inner: g })
     }
 
     /// Is this group present?
     #[must_use]
     pub fn contains(&self, code: &str) -> bool {
-        self.parsed.groups.contains_key(code)
+        self.parsed.get(code).is_some()
     }
 
     /// How many groups.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.parsed.order.len()
+        self.parsed.order().len()
     }
 
     /// Are there no groups at all?
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.parsed.order.is_empty()
+        self.parsed.order().is_empty()
     }
 
     /// Overwrite one cell.
@@ -124,33 +123,29 @@ impl Document {
         heading: &str,
         value: impl Into<String>,
     ) -> Result<(), Error> {
-        let g = self.parsed.groups.get_mut(group).ok_or_else(|| {
+        let g = self.parsed.get_mut(group).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidArgument,
                 format!("no group `{group}` in this document"),
             )
         })?;
-        if !g.headings.iter().any(|h| h == heading) {
+        let Some(col) = g.col(heading) else {
             return Err(Error::new(
                 ErrorKind::InvalidArgument,
                 format!("group `{group}` has no heading `{heading}`"),
             ));
-        }
-        let n = g.rows.len();
-        let r = g.rows.get_mut(row).ok_or_else(|| {
-            Error::new(
+        };
+        let n = g.n_rows();
+        if row >= n {
+            return Err(Error::new(
                 ErrorKind::InvalidArgument,
                 format!("group `{group}` has {n} row(s); no row {row}"),
-            )
-        })?;
-        // Reuse the group's existing `Arc<str>` key rather than allocating a new
-        // one — the whole point of the shared-key representation underneath.
-        let key = r
-            .keys()
-            .find(|k| &***k == heading)
-            .cloned()
-            .unwrap_or_else(|| heading.into());
-        r.insert(key, value.into());
+            ));
+        }
+        // Copy-on-write underneath: the group's first mutation materialises
+        // it (one group's worth); bounds were checked above, so this cannot
+        // refuse.
+        g.set_cell(row, col, value.into());
         Ok(())
     }
 
@@ -159,7 +154,7 @@ impl Document {
     /// Headings not named are written empty. A pair naming a heading the group
     /// does not have is an error for the same reason as [`Document::set_cell`].
     pub fn push_row(&mut self, group: &str, cells: &[(&str, &str)]) -> Result<(), Error> {
-        let g = self.parsed.groups.get_mut(group).ok_or_else(|| {
+        let g = self.parsed.get_mut(group).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidArgument,
                 format!("no group `{group}` in this document"),
@@ -167,30 +162,30 @@ impl Document {
         })?;
         if let Some((bad, _)) = cells
             .iter()
-            .find(|(h, _)| !g.headings.iter().any(|x| x == h))
+            .find(|(h, _)| !g.headings().iter().any(|x| x == h))
         {
             return Err(Error::new(
                 ErrorKind::InvalidArgument,
                 format!("group `{group}` has no heading `{bad}`"),
             ));
         }
-        let mut row = std::collections::HashMap::with_capacity(g.headings.len());
-        for h in &g.headings {
-            let v = cells
-                .iter()
-                .find(|(name, _)| name == h)
-                .map_or("", |(_, v)| *v);
-            row.insert(std::sync::Arc::<str>::from(h.as_str()), v.to_string());
-        }
-        g.rows.push(row);
+        let row: Vec<String> = g
+            .headings()
+            .iter()
+            .map(|h| {
+                cells
+                    .iter()
+                    .find(|(name, _)| name == h)
+                    .map_or(String::new(), |(_, v)| (*v).to_string())
+            })
+            .collect();
+        g.push_row(row);
         Ok(())
     }
 
     /// Remove a group entirely. Returns whether it was there.
     pub fn remove_group(&mut self, code: &str) -> bool {
-        let existed = self.parsed.groups.remove(code).is_some();
-        self.parsed.order.retain(|c| c != code);
-        existed
+        self.parsed.take_group(code).is_some()
     }
 }
 
@@ -204,43 +199,46 @@ impl<'a> Group<'a> {
     /// The 4-letter group code, e.g. `"LOCA"`.
     #[must_use]
     pub fn code(&self) -> &'a str {
-        &self.inner.code
+        self.inner.code()
     }
 
     /// Heading names in declaration order.
     #[must_use]
     pub fn headings(&self) -> Vec<&'a str> {
-        self.inner.headings.iter().map(String::as_str).collect()
+        self.inner.headings().iter().map(String::as_str).collect()
     }
 
     /// The UNIT row, aligned with [`Group::headings`].
     #[must_use]
     pub fn units(&self) -> Vec<&'a str> {
-        self.inner.units.iter().map(String::as_str).collect()
+        self.inner.units().iter().map(String::as_str).collect()
     }
 
     /// The TYPE row (AGS4 type codes), aligned with [`Group::headings`].
     #[must_use]
     pub fn types(&self) -> Vec<&'a str> {
-        self.inner.types.iter().map(String::as_str).collect()
+        self.inner.types().iter().map(String::as_str).collect()
     }
 
     /// How many DATA rows.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.inner.rows.len()
+        self.inner.n_rows()
     }
 
     /// Are there no DATA rows? (Which is itself an AGS4 rule violation.)
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.inner.rows.is_empty()
+        self.inner.n_rows() == 0
     }
 
     /// One row by index.
     #[must_use]
     pub fn row(&self, i: usize) -> Option<Row<'a>> {
-        self.inner.rows.get(i).map(|r| Row { cells: r })
+        (i < self.inner.n_rows()).then_some(Row {
+            group: self.inner,
+            idx: i,
+        })
     }
 
     /// Every row, in file order.
@@ -282,7 +280,8 @@ impl ExactSizeIterator for Rows<'_> {}
 /// One DATA row.
 #[derive(Clone, Copy)]
 pub struct Row<'a> {
-    cells: &'a std::collections::HashMap<std::sync::Arc<str>, String>,
+    group: &'a laterite_ags4_core::ags4_codec::AgsGroup,
+    idx: usize,
 }
 
 impl<'a> Row<'a> {
@@ -295,19 +294,19 @@ impl<'a> Row<'a> {
     /// than a change to this one.
     #[must_use]
     pub fn cell(&self, heading: &str) -> Option<&'a str> {
-        self.cells.get(heading).map(String::as_str)
+        self.group.cell_named(self.idx, heading)
     }
 
     /// How many cells this row carries.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.cells.len()
+        self.group.headings().len()
     }
 
     /// Does the row carry no cells at all?
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.cells.is_empty()
+        self.group.headings().is_empty()
     }
 }
 
@@ -322,7 +321,7 @@ impl<'a> Row<'a> {
 impl std::fmt::Debug for Document {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Document")
-            .field("groups", &self.parsed.order.len())
+            .field("groups", &self.parsed.order().len())
             .field("codes", &self.codes())
             // Length, never contents: this is the whole source file, and a
             // `dbg!` of a document should not print a delivery.

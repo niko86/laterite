@@ -188,6 +188,52 @@ themselves live on #788/#789/#790, where the instrument
 (`repo:rust-packages/laterite-ags4-emit/examples/heap_profile.rs`) can
 recompute them.
 
+## Update (2026-09-02): the unchecked door — the verdict becomes declinable (#858)
+
+The main door's contract stands as a **principle**: `build_ags4`'s output is
+never unjudged, and `out=` never holds unchecked bytes. What #858 settled is
+that the verdict is a *purchase*, and an adult caller may decline it — through
+a separate, loudly-named door, never a mode:
+
+- **Engine**: `emit_ags4_unchecked` / `emit_ags4_from_arrow_unchecked`
+  (`repo:rust-packages/laterite-ags4-emit/src/emit.rs`,
+  `repo:rust-packages/laterite-ags4-emit/src/arrow_in.rs`). Both are the
+  judged pipeline's own `EmitStream` with a `finish_unchecked` that stops at
+  `assemble()` — no `check_parsed`, no mode dispatch. The contract is **byte
+  identity with the `Report` build**, pinned per door by test; a zero-group
+  build refuses identically through both finishers.
+- **Python** (first surface): top-level `build_ags4_unchecked`
+  (`repo:packages/laterite/python/laterite/__init__.py`) — same
+  `groups`/`dict_version`/`units=`/`types=` as `build_ags4`, the
+  judge-coupled knobs (`mode`, `synthesise_metadata`, `tran`) **gone, not
+  defaulted**; returns plain `bytes` (deliberately not a `BuildResult`:
+  empty findings would read as "judged clean"), or with `out=` the same
+  staged atomic write minus the verdict gate. The docstring is the consent
+  form.
+- **Node + wasm** (#881, landed one release behind Python): node's
+  `buildAgs4Unchecked` (`repo:rust-packages/laterite-node/ts/index.ts`)
+  returns a `Buffer` or the `out` path via the shared staged rename, with
+  the judge-coupled knobs refused at runtime **by name** — absence from the
+  TS type alone would let a JS caller's `mode: "strict"` be silently
+  dropped; wasm's flat `build_ags4_unchecked`
+  (`repo:rust-packages/laterite-ags4-wasm/src/build.rs`) takes the judged
+  door's own `groups_json` and returns a `Uint8Array`, its `decode_opts`
+  KEYS guard doing the same refusal. Both surfaces pin the byte-identity
+  contract against their own judged `report` builds, and each shares its
+  marshalling with its judged door (node's `marshalGroups`, wasm's
+  `groups_from_json`) so the doors cannot drift at the input.
+- **Why it exists**: the write-verdict decomposition (the per-module cost
+  table is on #858) showed the relational rules dominating the verdict,
+  irreducibly data-dependent, killing the "scoped verdict" alternative — the
+  by-construction-safe slice measured too thin to sell as a cheaper
+  judgement (the figures live on #858 and in [[perf-campaign]]'s declined
+  row, not here). Skip-it-entirely is the honest fast path; predicting
+  validity without running the rules is not on offer.
+
+The one-suffix naming (`build_ags4_unchecked` / `buildAgs4Unchecked` /
+`build_ags4_unchecked`) travels across surfaces because wasm exports are
+flat — a submodule spelling would not.
+
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
 The typed-graph walk used to emit *every declared heading* of each class (null →

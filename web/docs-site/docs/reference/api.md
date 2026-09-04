@@ -18,9 +18,13 @@ recipe set. Cross-references below are clickable.
 
 ::: laterite.build_ags4
 
+::: laterite.build_ags4_unchecked
+
 ::: laterite.TranStamp
 
 ::: laterite.BuildResult
+
+::: laterite.BuildSaved
 
 ::: laterite.fix
 

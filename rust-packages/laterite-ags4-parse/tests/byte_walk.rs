@@ -29,7 +29,7 @@ fn line_numbers_and_total() {
     assert_eq!(proj.heading_line, Some(2));
     assert_eq!(proj.headings, vec!["X_ID"]);
     assert_eq!(proj.rows[0].line, 5);
-    assert_eq!(proj.rows[0].values, vec!["v"]);
+    assert_eq!(proj.cell(0, 0), Some("v"));
     // PROJ(5) + blank(1) + TRAN(5) = 11; no phantom trailing line.
     assert_eq!(pf.total_lines, 11);
     assert_eq!(pf.groups["TRAN"].group_line, 7);
@@ -48,7 +48,7 @@ fn tracks_crlf_vs_lf_per_line() {
 fn final_line_without_newline_is_not_crlf() {
     let pf = parse_str("\"GROUP\",\"PROJ\"\r\n\"DATA\",\"P1\"").unwrap();
     let last = pf.raw_lines.last().unwrap();
-    assert_eq!(last.text, "\"DATA\",\"P1\"");
+    assert_eq!(pf.line_text(last), "\"DATA\",\"P1\"");
     assert!(!last.had_crlf);
 }
 
@@ -75,7 +75,7 @@ fn invalid_utf8_lossy_vs_reject() {
     bytes.push(0xB0);
     bytes.extend_from_slice(b"\"\r\n");
     let pf = parse_bytes(&bytes, encoding_rs::UTF_8).unwrap(); // validating = lossy
-    assert_eq!(pf.groups["PROJ"].rows[0].values[0], "P1\u{FFFD}");
+    assert_eq!(pf.groups["PROJ"].cell(0, 0), Some("P1\u{FFFD}"));
     assert!(
         !pf.byte_offsets_source_true,
         "a replacement clears source-true"
@@ -116,23 +116,41 @@ fn walk_emits_true_group_offsets() {
 
 #[test]
 fn byte_offsets_monotonic_and_in_bounds() {
-    let pf = parse_bytes(&lf(), encoding_rs::UTF_8).unwrap();
+    // Per-line source offsets are profile-gated now: the lean profile
+    // retains them (dec-parse-structure-layout); `parse_bytes`' validating
+    // profile drops them — asserted at the end.
+    let bytes = lf();
+    let pf =
+        laterite_ags4_parse::parse_bytes_opts(&bytes, laterite_ags4_parse::ParseOptions::lean())
+            .unwrap();
+    assert_eq!(pf.line_byte_offsets.len(), pf.raw_lines.len());
     let mut prev = 0u64;
-    for rl in &pf.raw_lines {
-        assert!(rl.byte_offset >= prev, "raw-line offsets must be monotonic");
-        assert!(rl.byte_offset < pf.total_bytes);
-        prev = rl.byte_offset;
+    for (i, _rl) in pf.raw_lines.iter().enumerate() {
+        let off = pf.line_byte_offset(i).expect("lean retains offsets");
+        assert!(off >= prev, "raw-line offsets must be monotonic");
+        assert!(off < pf.total_bytes);
+        prev = off;
     }
     // Three-coordinate consistency: each line's offset = sum of prior line
     // byte lengths (content + its terminator).
-    let bytes = lf();
     let mut expect = 0u64;
-    for rl in &pf.raw_lines {
-        assert_eq!(rl.byte_offset, expect, "line {} offset", rl.number);
+    for (i, rl) in pf.raw_lines.iter().enumerate() {
+        assert_eq!(
+            pf.line_byte_offset(i),
+            Some(expect),
+            "line {} offset",
+            rl.number
+        );
         let term = if rl.had_crlf { 2 } else { 1 };
         expect += rl.text.len() as u64 + term;
     }
     assert_eq!(expect, bytes.len() as u64, "lines tile the whole buffer");
+
+    // The validating profile drops the per-line/per-row source offsets —
+    // no rule reads them, so retaining them was pure weight.
+    let pf = parse_bytes(&bytes, encoding_rs::UTF_8).unwrap();
+    assert!(pf.line_byte_offsets.is_empty());
+    assert!(pf.groups.values().all(|g| g.row_byte_offsets.is_empty()));
 }
 
 #[test]
@@ -149,7 +167,7 @@ fn slice_reparse_recovers_the_group() {
     );
     let re = parse_bytes(&bytes[s..e], encoding_rs::UTF_8).unwrap();
     assert_eq!(re.group_order, vec!["PROJ"]);
-    assert_eq!(re.groups["PROJ"].rows[0].values, vec!["v"]);
+    assert_eq!(re.groups["PROJ"].cell(0, 0), Some("v"));
 }
 
 #[test]
@@ -166,15 +184,21 @@ fn embedded_quoted_newline_does_not_split_record() {
 }
 
 #[test]
-fn lean_drops_raw_lines_but_keeps_byte_offsets() {
-    // 6e: lean ↔ rich differ ONLY in raw_lines retention; group/row byte
-    // offsets + structure are identical.
+fn lean_and_validating_agree_on_the_whole_model_for_clean_input() {
+    // The profiles collapsed with the span rewrite: lean vs validating is now
+    // ONLY a decode policy (Reject vs LossyReplace), so on clean UTF-8 the two
+    // produce the SAME model — raw lines included, span for span. Only
+    // locate_only skips retention (pinned in tests/locate_only.rs).
     let bytes = lf();
     let rich = parse_bytes_opts(&bytes, ParseOptions::validating()).unwrap();
     let lean = parse_bytes_opts(&bytes, ParseOptions::lean()).unwrap();
-    assert!(lean.raw_lines.is_empty());
-    assert!(!rich.raw_lines.is_empty());
+    assert!(
+        !lean.raw_lines.is_empty(),
+        "raw lines are part of the base model now"
+    );
+    assert_eq!(lean.raw_lines, rich.raw_lines);
     assert_eq!(lean.total_lines, rich.total_lines);
+    assert_eq!(lean.text, rich.text, "one retained buffer, same both ways");
     assert_eq!(
         lean.groups["TRAN"].group_byte,
         rich.groups["TRAN"].group_byte

@@ -22,7 +22,7 @@ actually needs and leaves the rest to a from-source build:
 
 | | in `@laterite/ags4-wasm` |
 |---|---|
-| `validate` · `read` · `build_ags4` | ✅ |
+| `validate` · `read` · `build_ags4` · `build_ags4_unchecked` | ✅ |
 | `compute_fixes` · `apply_fixes` | ✅ |
 | `list_rules` · `dictionary` · `version` · `engine_version` · `engine_fingerprint` | ✅ |
 | `arrow_ipc` (Arrow IPC for duckdb-wasm) · `build_ags4_ipc` | build from source |
@@ -197,6 +197,15 @@ _satisfies_ Rule 14, so a recipient could not tell an invented transmission
 record from a real one and nothing downstream would flag it. Who produced a file,
 for whom, when and at what status is knowable only to you: state it via
 `tran`, or let Rule 14 report the gap.
+
+`build_ags4_unchecked(groupsJson, { dictVersion? })` is the same build with the
+verdict declined: it takes the judged door's own `groups_json` and returns a
+`Uint8Array` byte-identical to the `mode: "report"` build's text, with no rule
+engine run, no findings, and nothing downstream checking the bytes either.
+`dictVersion` is the only option; passing `mode`, `synthesiseMetadata` or `tran`
+is refused by name rather than silently ignored. You are choosing to ship
+unchecked bytes: see the
+[three-doors comparison](../learn/produce.md#three-write-doors-one-honest-difference).
 
 ## Keep it off the main thread
 

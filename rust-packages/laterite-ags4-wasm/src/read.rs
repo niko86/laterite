@@ -385,10 +385,7 @@ mod tests {
         let col = g.headings.iter().position(|h| h == name).expect("heading");
         let ags_type = &g.types[col];
         laterite_ags4_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
-            g.rows
-                .get(row)
-                .and_then(|r| r.values.get(col))
-                .map(String::as_str)
+            g.cell(col, row)
         })
     }
 

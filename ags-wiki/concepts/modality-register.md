@@ -149,7 +149,9 @@ _Notes:_
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
-*Offered anywhere — in: bytes, handle, text, value · out: bytes, value*
+*Offered anywhere — in: bytes, handle, text, value · out: bytes, file, value*
+
+*Below the facade floor — the Rust crate does not yet offer out: file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -164,22 +166,60 @@ _Notes:_
 
 **Output**
 
-| surface (spelling) | bytes | value |
-|---|---|---|
-| python (free) |   | ✓ |
-| node (free) |   | ✓ |
-| browser (free) | ✓ |   |
-| rust (chained) |   | ✓ |
-| duckdb (n/a) | — | — |
-| cli (absent) |   |   |
+| surface (spelling) | file | bytes | value |
+|---|---|---|---|
+| python (free) | ✓ |   | ✓ |
+| node (free) | ✓ |   | ✓ |
+| browser (free) |   | ✓ |   |
+| rust (chained) |   |   | ✓ |
+| duckdb (n/a) |   | — | — |
+| cli (absent) |   |   |   |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
 _Notes:_
+- _python_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
+- _node_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
 - _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 - _cli_: **by-design.** "Construct from caller-supplied data" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
+
+### build-unchecked — Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).
+
+*Offered anywhere — in: handle, text, value · out: bytes, file*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle, value · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
+
+**Input**
+
+| surface (spelling) | text | handle | value |
+|---|---|---|---|
+| python (free) |   | ✓ | ✓ |
+| node (free) |   | ✓ | ✓ |
+| browser (free) | ✓ |   |   |
+| rust (absent) |   |   |   |
+| duckdb (n/a) |   |   |   |
+| cli (absent) |   |   |   |
+
+**Output**
+
+| surface (spelling) | file | bytes |
+|---|---|---|
+| python (free) | ✓ | ✓ |
+| node (free) | ✓ | ✓ |
+| browser (free) |   | ✓ |
+| rust (absent) |   |   |
+| duckdb (n/a) |   |   |
+| cli (absent) |   |   |
+
+_Notes:_
+- _python_: Byte-identical to build_ags4(mode="report") — pinned by test — with the verdict skipped; the docstring is the consent form ("you are choosing to ship unchecked bytes"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as "judged clean". The file form is build's staged write minus the verdict gate in front of it.
+- _node_: Landed via #881, one release behind Python's door. Byte-identical to buildAgs4({ mode: "report" }) — pinned by test — returning a plain Buffer (deliberately not a BuildResult), or the path with out= via the same staged rename minus the verdict gate. The judge-coupled knobs are refused at runtime by name, never silently ignored — absence from the TS type alone would let a JS caller's mode: "strict" be dropped on the floor.
+- _browser_: Landed via #881. Takes the judged door's own groups_json (the build capability's recorded JSON-text outlier rides along unchanged — reconciling it is that cell's gap, not this one's) and returns a Uint8Array, byte-identical to the judged report build's text. dictVersion is the only option; the decode_opts KEYS guard refuses mode/synthesiseMetadata/tran by name. No filesystem, so no file rider — bytes being the universal output form is what lets this door exist in a browser at all.
+- _rust_: Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now.
+- _duckdb_: **by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes.
+- _cli_: **by-design.** Same as build: "construct from caller-supplied data" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files.
 
 ### diff — Compare two AGS4 revisions.
 
@@ -607,6 +647,42 @@ _Notes:_
 - _cli_: **by-design.** `lat read` emits strings; there is no numeric coercion to offer a view over. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
 - _node_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records — there is no Node sibling for it to be a view over.
 - _browser_: **by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it.
+
+### read-output-arrow — A group's born-typed raw Arrow output from the read handle.
+
+*Offered anywhere — in: handle · out: bytes, table*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle · out: table, which python and node both do. A minimum to clear, not a gate*
+
+**Input**
+
+| surface (spelling) | handle |
+|---|---|
+| python (free) | ✓ |
+| node (free) | ✓ |
+| rust (absent) |   |
+| duckdb (n/a) |   |
+| cli (absent) |   |
+| browser (free) | ✓ |
+
+**Output**
+
+| surface (spelling) | bytes | table |
+|---|---|---|
+| python (free) |   | ✓ |
+| node (free) |   | ✓ |
+| rust (absent) |   |   |
+| duckdb (n/a) |   |   |
+| cli (absent) |   |   |
+| browser (free) | ✓ |   |
+
+_Notes:_
+- _python_: The capsule-bearing pyo3-arrow table, born-typed from the file's TYPE row, zero-copy over the Arrow PyCapsule interface — the exact shape build_ags4 consumes, so the read half of the zero-copy round trip #852 opened the write half of (#860). keys= is the same tri-state as .table()'s; no frame is materialised and the SQL engine is never touched.
+- _node_: Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). **Settled by #871 (2026-09-02): by-design — each boundary's Arrow shape is its own answer, and node's is the decoded arrow-js Table.** A public un-decoded-IPC door (`arrowIpc`) was spiked and REJECTED: arrow-js decode/re-encode are zero-copy and cost loose milliseconds per whole-file sweep, while the door would hand out raw MUTABLE Buffers beside a zero-copy decoder (aliasing and postMessage-detach hazards against every decoded view), be uncached by contract (silent keychain rebuilds on repeat keyed calls — caching instead would alias mutable memory across callers, worse), and make the IPC framing itself public contract. The spike — accessor, time bench, peak-RSS/retention probe — is preserved on `prototype/node-arrow-ipc`; the measured cells are on #871.
+- _rust_: Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.
+- _duckdb_: **by-design.** read_ags already returns a typed RELATION — the engine's own Arrow-speaking object, recorded under read; a separate raw-table door would duplicate it.
+- _cli_: **by-design.** The CLI hands back files and text, not in-process objects; lat read --csv/--json is its data-out door.
+- _browser_: Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). **Settled by #871 (2026-09-02): by-design** — each boundary's Arrow shape is its own answer: Python the capsule, node the decoded arrow-js Table, the browser these IPC bytes. No surface owes another surface's shape; the node cell's note records the spiked-and-rejected pass-through.
 
 ## Legend
 

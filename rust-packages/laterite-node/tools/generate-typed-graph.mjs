@@ -41,8 +41,10 @@ const STRING_TYPES = new Set([
   "XN",
 ]);
 
-/** AGS spec type code → the TS type a typed-graph field carries. */
-export function tsType(agsType) {
+/** AGS spec type code → the TS type a typed-graph field carries. (Only this
+ * generator calls it — the drift test imports the generate* entry points, so
+ * the former `export` decoration was the unused bit; knip, #866.) */
+function tsType(agsType) {
   const t = (agsType || "").trim().toUpperCase();
   if (STRING_TYPES.has(t)) return "string";
   if (t === "0DP") return "number";

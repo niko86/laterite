@@ -122,9 +122,19 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 REPO = Path(__file__).resolve().parent.parent
+# Both rebindable via --fixtures-dir / --manifest (#878). Since the corpus-v2
+# re-pin (#873) this manifest IS the current-forge corpus — any machine can
+# mint it — so there is one manifest for every lane; the flags remain for
+# runners that want their own cache directory.
 OUT_DIR = REPO / "output" / "readme-bench"
 MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
-FORGE = REPO / "rust-packages" / "target" / "release" / "laterite-ags4-forge"
+FORGE = (
+    REPO
+    / "rust-packages"
+    / "target"
+    / "release"
+    / ("laterite-ags4-forge.exe" if sys.platform == "win32" else "laterite-ags4-forge")
+)
 
 # The README's rungs. Seed 0 and the `wide` scaffold everywhere — the point is a
 # FIXED file, not a varied one.
@@ -153,6 +163,10 @@ SWAP_REFUSAL_BYTES = 64 * 1024 * 1024
 UPSTREAM_DOOR = "python_ags4"
 NATIVE_DOOR = "laterite"
 COMPAT_DOOR = "laterite_compat"
+# The write axis's fourth door (#881): build_ags4_unchecked — the judged
+# build's assembly with the verdict declined. python-ags4's write checks
+# nothing either, so this is the closest like-for-like write cell.
+UNCHECKED_DOOR = "laterite_unchecked"
 
 
 def die(msg: str) -> None:
@@ -207,6 +221,20 @@ def fixture(size: str) -> Path:
             ],
             check=True,
             stdout=subprocess.DEVNULL,
+        )
+    # A file present on disk is not evidence it is the rung: a killed mint
+    # leaves a truncated-but-parseable file that a later --update-manifest
+    # run would bless as the pin (the 524MB rung's own history, #873). The
+    # band is generous — calibration lands within a few percent of target —
+    # so only a wrong file trips it.
+    target = float(size.removesuffix("MB")) * 1e6
+    got = path.stat().st_size
+    if not 0.9 * target <= got <= 1.1 * target:
+        die(
+            f"{path.name} is {got:,} bytes but the {size} rung targets "
+            f"~{int(target):,} — a stale or truncated fixture (a killed "
+            f"generation leaves one behind). Delete it (and its .zst twin) "
+            f"and re-run to re-mint."
         )
     return path
 
@@ -353,6 +381,142 @@ def refusal_cell(reason: str, detail: str) -> dict[str, Any]:
     return {"refusal": reason, "detail": detail}
 
 
+# --- README table rendering (pure, pinned by tests/test_bench_python_lane.py)
+#
+# The READMEs may hold only what this instrument prints (the house rule against
+# measured values in prose: the tables stay legal because this tool regenerates
+# them and `tools/check_speed_claims.py` reads them). So every README-format
+# table — the wheel's per-axis tables, the root's condensed pair, and the
+# memory tables the #826 close-out promoted — is rendered here, by the run
+# that measured it, and pasted verbatim.
+
+# (title, axis key in mem_cells, ours-door key, left header, right header)
+MEM_README_PLAN: list[tuple[str, str, str, str, str]] = [
+    (
+        "Validation — peak RSS",
+        "validate",
+        NATIVE_DOOR,
+        "`python-ags4 check_file`",
+        "`laterite.validate`",
+    ),
+    (
+        "Read → typed — peak RSS",
+        "read_typed",
+        NATIVE_DOOR,
+        "`python-ags4` + `convert_to_numeric`",
+        "`laterite.read`",
+    ),
+    (
+        "Read → strings — peak RSS",
+        "read_strings",
+        COMPAT_DOOR,
+        "`python-ags4 AGS4_to_dataframe`",
+        "`laterite.compat`",
+    ),
+]
+
+
+def mem_ratio(pa_cell: dict[str, Any], ours_cell: dict[str, Any]) -> float | None:
+    """python-ags4's peak over ours — above 1 means laterite holds less.
+    None when either side is a recorded refusal (a vetoed rung renders as no
+    row, never as a number)."""
+    if "refusal" in pa_cell or "refusal" in ours_cell:
+        return None
+    return pa_cell["peak_rss_bytes"] / ours_cell["peak_rss_bytes"]
+
+
+def memory_readme_tables(
+    mem_cells: dict[str, dict[str, dict[str, Any]]],
+    labels: dict[str, str],
+    compat_hop: str,
+) -> list[str]:
+    """The wheel README's per-axis peak-RSS tables. The bolded ratio is the
+    value `check_speed_claims.py` bands, and 'peak RSS' in the header row is
+    how it tells a memory table from the time table sharing the API name."""
+    lines: list[str] = []
+    for title, axis, ours_door, left, right in MEM_README_PLAN:
+        rows: list[str] = []
+        for size, cell in mem_cells.get(axis, {}).items():
+            ratio = mem_ratio(cell[UPSTREAM_DOOR], cell[ours_door])
+            if ratio is None:
+                continue
+            pa, ours = cell[UPSTREAM_DOOR], cell[ours_door]
+            rows.append(
+                f"| {labels.get(size, size)} "
+                f"| {fmt_mb(pa['peak_rss_bytes'])} "
+                f"| {fmt_mb(ours['peak_rss_bytes'])} "
+                f"| **{ratio:.2f}×** |"
+            )
+        if not rows:
+            continue
+        lines += [f"\n**{title}**\n"]
+        lines += [f"| File | {left} peak RSS | {right} peak RSS | ratio |"]
+        lines += ["|---:|---:|---:|:---:|"]
+        lines += rows
+    if lines:
+        lines += [
+            "",
+            "Peak RSS of one fresh process per cell; the ratio is python-ags4's",
+            "peak over laterite's, so above 1 laterite holds less. The largest",
+            "rung is time-only (epic #820 decision 7). Read → strings measured",
+            f"on the {compat_hop} hop.",
+        ]
+    return lines
+
+
+def condensed_time_table(rows: dict[str, list]) -> list[str]:
+    """The root README's one-table summary, from the same run as the wheel's
+    per-axis tables so the two can never quote different measurements."""
+    lines = [
+        "| File (123 groups) | `laterite.validate` | `laterite.read` (typed) "
+        "| `laterite.compat` (strings) |",
+        "|---:|---:|---:|---:|",
+    ]
+    for (label, v_up, v_ours), (_, t_up, t_ours), (_, s_up, s_ours) in zip(
+        rows["validate"], rows["read_typed"], rows["read_strings"], strict=True
+    ):
+        lines.append(
+            f"| {label} "
+            f"| {fmt(v_ours)} · **{v_up / v_ours:.1f}×** "
+            f"| {fmt(t_ours)} · **{t_up / t_ours:.1f}×** "
+            f"| {fmt(s_ours)} · **{s_up / s_ours:.1f}×** |"
+        )
+    return lines
+
+
+def condensed_memory_table(
+    mem_cells: dict[str, dict[str, dict[str, Any]]], labels: dict[str, str]
+) -> list[str]:
+    """The root README's memory summary — same axes, cells `ours · ratio`,
+    rendered only for rungs where every door measured (a refusal anywhere
+    drops the rung rather than printing a partial row)."""
+    plan = [(axis, door) for _, axis, door, _, _ in MEM_README_PLAN]
+    sizes = [
+        size
+        for size in mem_cells.get("validate", {})
+        if all(
+            mem_ratio(mem_cells[axis][size][UPSTREAM_DOOR], mem_cells[axis][size][door])
+            is not None
+            for axis, door in plan
+        )
+    ]
+    if not sizes:
+        return []
+    lines = [
+        "| File | `laterite.validate` | `laterite.read` (typed) "
+        "| `laterite.compat` (strings) |",
+        "|---:|---:|---:|---:|",
+    ]
+    for size in sizes:
+        cells = []
+        for axis, door in plan:
+            ours = mem_cells[axis][size][door]
+            ratio = mem_ratio(mem_cells[axis][size][UPSTREAM_DOOR], ours)
+            cells.append(f"{fmt_mb(ours['peak_rss_bytes'])} · **{ratio:.2f}×**")
+        lines.append(f"| {labels.get(size, size)} | " + " | ".join(cells) + " |")
+    return lines
+
+
 def parse_swap_used(text: str) -> int:
     """The `used = 512.50M` field of Darwin's `vm.swapusage` sysctl, in bytes."""
     m = re.search(r"used\s*=\s*([0-9.]+)([KMG])", text)
@@ -393,6 +557,10 @@ def mem_total_bytes() -> int | None:
             ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, check=False
         )
         return int(out.stdout.strip()) if out.returncode == 0 else None
+    # Windows has no os.sysconf — absent context, not a crash (#878; the
+    # first windows lane leg died right here building its results block).
+    if not hasattr(os, "sysconf"):
+        return None
     try:
         return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     except (ValueError, OSError):
@@ -427,15 +595,19 @@ def build_results(
             "arch": platform.machine(),
             "cpu_count": os.cpu_count(),
             "mem_total_bytes": mem_total_bytes(),
-            "load_avg_start": list(os.getloadavg()),
+            # No load average on Windows — absent, not zero (#878).
+            "load_avg_start": (
+                list(os.getloadavg()) if hasattr(os, "getloadavg") else None
+            ),
         },
         "versions": versions,
         "protocol": {
             "time": "mean of N warm in-process runs, first run discarded",
             "memory": (
-                "peak RSS (ru_maxrss) of a fresh subprocess running one "
-                "end-to-end operation through the library's public API — the "
-                "same instrument both sides; dhat/tracemalloc numbers are a "
+                "peak RSS of a fresh subprocess running one end-to-end "
+                "operation through the library's public API — ru_maxrss on "
+                "POSIX, PeakWorkingSetSize on Windows, the same instrument "
+                "both sides of every cell; dhat/tracemalloc numbers are a "
                 "different claim and never share a table with these"
             ),
             "refusals": (
@@ -567,6 +739,15 @@ def _op_write_native(path: str, out: str | None) -> None:
     laterite.build_ags4(frames).save(out)
 
 
+def _op_write_native_unchecked(path: str, out: str | None) -> None:
+    import laterite
+
+    assert out is not None  # the write plan always supplies a destination
+    handle = laterite.read(path)
+    frames = {code: handle[code] for code in handle.groups}
+    laterite.build_ags4_unchecked(frames, out=out)
+
+
 WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
     "baseline_upstream": _op_baseline_upstream,
     "baseline_native": _op_baseline_native,
@@ -579,19 +760,110 @@ WORKER_OPS: dict[str, Callable[[str, str | None], None]] = {
     "write_upstream": _op_write_upstream,
     "write_compat": _op_write_compat,
     "write_native": _op_write_native,
+    "write_native_unchecked": _op_write_native_unchecked,
 }
 
 
-def worker_main(spec_json: str) -> int:
+def parse_vm_hwm_bytes(status_text: str) -> int | None:
+    """`VmHWM:  123456 kB` from a /proc/<pid>/status dump, in bytes."""
+    m = re.search(r"^VmHWM:\s*(\d+)\s*kB", status_text, re.MULTILINE)
+    return int(m.group(1)) * 1024 if m else None
+
+
+def reset_peak_accounting() -> bool:
+    """Linux only: reset this process's VmHWM high-water (`echo 5 >
+    /proc/self/clear_refs`), so the peak read at exit is the peak of THIS
+    process's own work.
+
+    Why it exists (#878, lane run 33610286305): Linux `ru_maxrss` is
+    inherited across fork() and never resets on exec, so a child spawned by
+    a fat parent — this tool, right after timing the biggest rung
+    in-process — starts with the parent's high-water already stamped, and
+    every memory cell reads the parent's RSS as one constant. darwin's
+    spawn semantics reset accounting (the committed lane never saw this)
+    and the M1 probe's parent is thin (nor did it); the Linux lane's parent
+    is exactly the fat case. VmHWM is the resettable twin of ru_maxrss.
+    Returns False where the mechanism doesn't exist (not Linux, or /proc
+    withheld) — the reader below falls back to ru_maxrss there."""
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        Path("/proc/self/clear_refs").write_text("5")
+    except OSError:
+        return False
+    return True
+
+
+def peak_rss_self_bytes() -> int:
+    """This process's peak RSS in bytes — the one instrument, per platform.
+
+    Linux prefers `VmHWM` (the resettable twin of `ru_maxrss` — see
+    `reset_peak_accounting` for why resettable matters) with `ru_maxrss` as
+    the fallback; darwin reads `ru_maxrss` (bytes there, KiB on Linux —
+    `maxrss_to_bytes` owns that split). Windows has no `resource` module;
+    the equivalent high-water is `PeakWorkingSetSize` via ctypes, with
+    declared signatures — without them ctypes marshals the 64-bit
+    pseudo-handle through `c_int` and every call fails ERROR_INVALID_HANDLE
+    (perf_probe_m1.py learned this on run 33585274632; this is the same
+    instrument, kept in step)."""
+    if sys.platform.startswith("linux"):
+        try:
+            hwm = parse_vm_hwm_bytes(Path("/proc/self/status").read_text())
+        except OSError:
+            hwm = None
+        if hwm is not None:
+            return hwm
+    if sys.platform == "win32":
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wt.DWORD),
+                ("PageFaultCount", wt.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(counters)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wt.HANDLE
+        kernel32.K32GetProcessMemoryInfo.argtypes = [
+            wt.HANDLE,
+            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+            wt.DWORD,
+        ]
+        kernel32.K32GetProcessMemoryInfo.restype = wt.BOOL
+        ok = kernel32.K32GetProcessMemoryInfo(
+            kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+        if not ok:
+            raise OSError(ctypes.get_last_error(), "K32GetProcessMemoryInfo failed")
+        return int(counters.PeakWorkingSetSize)
     import resource
 
-    spec = json.loads(spec_json)
-    WORKER_OPS[spec["op"]](spec.get("path", ""), spec.get("out"))
     raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return maxrss_to_bytes(raw, sys.platform)
+
+
+def worker_main(spec_json: str) -> int:
+    spec = json.loads(spec_json)
+    # Before the op, so the peak read at exit belongs to this child's own
+    # work, not to the accounting the fork stamped on it (see
+    # reset_peak_accounting — this line is the #878 fix).
+    reset_peak_accounting()
+    WORKER_OPS[spec["op"]](spec.get("path", ""), spec.get("out"))
     out = spec.get("out")
     result = {
         "ok": True,
-        "maxrss_bytes": maxrss_to_bytes(raw, sys.platform),
+        "maxrss_bytes": peak_rss_self_bytes(),
         "out_bytes": Path(out).stat().st_size if out and Path(out).exists() else None,
     }
     Path(spec["result_path"]).write_text(json.dumps(result))
@@ -641,6 +913,10 @@ def measure_mem(op: str, path: Path | None, out: Path | None) -> dict[str, Any]:
 
 
 def main() -> int:
+    # Rebound from --fixtures-dir / --manifest below; declared up top because
+    # the argparse defaults read the same names.
+    global OUT_DIR, MANIFEST
+
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--rungs",
@@ -676,11 +952,44 @@ def main() -> int:
         default=DEFAULT_OUT,
         help="results file to write (default: %(default)s)",
     )
+    ap.add_argument(
+        "--manifest",
+        type=Path,
+        default=MANIFEST,
+        help="fixture pin manifest (default: %(default)s). Since corpus-v2 "
+        "(#873) the default manifest is mintable on any machine, so every "
+        "lane pins against it; the per-OS drift checks double as the "
+        "cross-OS byte-identity proof (#878)",
+    )
+    ap.add_argument(
+        "--fixtures-dir",
+        type=Path,
+        default=OUT_DIR,
+        help="fixture cache directory (default: %(default)s). A lane that "
+        "pins a different --manifest must pass a fresh directory with it: "
+        "cached rungs are trusted by name against the active manifest",
+    )
     ap.add_argument("--worker", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     if args.worker:
         return worker_main(args.worker)
+
+    if sys.platform == "win32":
+        # The tables carry '→' and '×', which a cp1252 console cannot encode
+        # — and dying while PRINTING already-measured results is the worst
+        # possible exit (run 33612539765 measured everything, then crashed
+        # on this glyph). Reconfigure the streams rather than strip the
+        # glyphs: the printed tables are the README paste source and must be
+        # byte-identical across platforms.
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
+    # Rebind the module's fixture config before anything touches a rung —
+    # fixture(), check_manifest() and the mem harness all read these.
+    OUT_DIR = args.fixtures_dir
+    MANIFEST = args.manifest
 
     try:
         from python_ags4 import AGS4 as UPSTREAM
@@ -738,6 +1047,13 @@ def main() -> int:
         f"default [compat] install is pyarrow-free (DuckDB hop) — see the "
         f"memory queue's M5 row (#834)"
     ]
+    if swap_used_bytes() is None:
+        # A watch that silently is not watching is a blind spot with a green
+        # tick on it — say so in the record (Windows has no swap instrument).
+        run_notes.append(
+            "no swap instrument on this platform: memory cells carry no "
+            "swapped-refusal protection this run"
+        )
     # Report both versions: a speedup is meaningless without knowing what it
     # was measured against, and neither package exposes __version__ reliably.
     print(
@@ -781,6 +1097,14 @@ def main() -> int:
         frames = {code: handle[code] for code in handle.groups}
         return best_of(
             lambda: laterite.build_ags4(frames).save(str(write_out)), args.runs
+        )
+
+    def timed_write_unchecked(target: str) -> float:
+        handle = laterite.read(target)
+        frames = {code: handle[code] for code in handle.groups}
+        return best_of(
+            lambda: laterite.build_ags4_unchecked(frames, out=str(write_out)),
+            args.runs,
         )
 
     def record_time(axis: str, size: str, door: str, seconds: float) -> None:
@@ -879,20 +1203,23 @@ def main() -> int:
         gc.collect()
         w_native = timed_write_native(p)
         gc.collect()
+        w_unchecked = timed_write_unchecked(p)
+        gc.collect()
         write_out.unlink(missing_ok=True)
         for door, seconds in (
             (UPSTREAM_DOOR, w_up),
             (COMPAT_DOOR, w_compat),
             (NATIVE_DOOR, w_native),
+            (UNCHECKED_DOOR, w_unchecked),
         ):
             record_time("write", size, door, seconds)
-        rows["write"].append((label, w_up, w_compat, w_native))
+        rows["write"].append((label, w_up, w_compat, w_native, w_unchecked))
         flush()
         print(
             f"  [{label}] done — validate {fmt(cells[0][2])}/{fmt(cells[1][2])}, "
             f"read {fmt(cells[2][2])}/{fmt(cells[3][2])}, "
             f"typed {fmt(cells[4][2])}/{fmt(cells[5][2])}, "
-            f"write {fmt(w_up)}/{fmt(w_compat)}/{fmt(w_native)} "
+            f"write {fmt(w_up)}/{fmt(w_compat)}/{fmt(w_native)}/{fmt(w_unchecked)} "
             f"(upstream/ours) — checkpointed",
             flush=True,
         )
@@ -927,6 +1254,7 @@ def main() -> int:
                 (UPSTREAM_DOOR, "write_upstream", True),
                 (COMPAT_DOOR, "write_compat", True),
                 (NATIVE_DOOR, "write_native", True),
+                (UNCHECKED_DOOR, "write_native_unchecked", True),
             ],
         ),
     ]
@@ -962,6 +1290,40 @@ def main() -> int:
                     )
             flush()
 
+        # A broken peak instrument does not scatter, it repeats: when fork
+        # accounting (or an emulated kernel) hands every child the same
+        # inherited high-water, every cell reads one constant and the
+        # numbers LOOK precise (#878 — lane run 33610286305 published
+        # fifteen byte-identical cells before this guard existed). The
+        # checkpointed results file keeps the raw cells for diagnosis; the
+        # run itself must not conclude success over them.
+        measured = {
+            cell["peak_rss_bytes"]
+            for by_size in mem_cells.values()
+            for by_door in by_size.values()
+            for cell in by_door.values()
+            if "peak_rss_bytes" in cell
+        }
+        if (
+            len(measured) == 1
+            and sum(
+                1
+                for by_size in mem_cells.values()
+                for by_door in by_size.values()
+                for cell in by_door.values()
+                if "peak_rss_bytes" in cell
+            )
+            >= 4
+        ):
+            die(
+                "every memory cell measured the same peak "
+                f"({next(iter(measured))} bytes) — that is an instrument "
+                "reading one inherited constant, not a set of measurements. "
+                "Per-process peak accounting is not working in this "
+                "environment; the checkpointed results file carries the raw "
+                "cells for diagnosis."
+            )
+
     # --- output -------------------------------------------------------------
 
     def table(title: str, left: str, right: str, key: str) -> None:
@@ -976,8 +1338,13 @@ def main() -> int:
         print("README-format tables — paste into the Performance section")
         print("=" * 62)
         table("Validation", "python-ags4 check_file", "laterite.validate", "validate")
+        # `laterite.compat`, not `compat`: the claims gate keys the axis off
+        # this header token, and the README paste must carry it verbatim.
         table(
-            "Read, strings", "python-ags4 AGS4_to_dataframe", "compat", "read_strings"
+            "Read, strings",
+            "python-ags4 AGS4_to_dataframe",
+            "laterite.compat",
+            "read_strings",
         )
         table(
             "Read, typed",
@@ -988,14 +1355,43 @@ def main() -> int:
         print("\n**Write**\n")
         print(
             "| File | `python-ags4 dataframe_to_AGS4` | `compat` | speedup "
-            "| `build_ags4` | speedup |"
+            "| `build_ags4` | speedup | `build_ags4_unchecked` | speedup |"
         )
-        print("|---:|---:|---:|:---:|---:|:---:|")
-        for label, a, b, c in rows["write"]:
+        print("|---:|---:|---:|:---:|---:|:---:|---:|:---:|")
+        for label, a, b, c, d in rows["write"]:
             print(
                 f"| {label} | {fmt(a)} | {fmt(b)} | **{a / b:.1f}×** "
-                f"| {fmt(c)} | **{a / c:.1f}×** |"
+                f"| {fmt(c)} | **{a / c:.1f}×** "
+                f"| {fmt(d)} | **{a / d:.1f}×** |"
             )
+
+    if mem_cells:
+        from laterite import _frames
+
+        compat_hop = (
+            "pyarrow accelerator"
+            if _frames._pyarrow_available()
+            else "shipped pyarrow-free DuckDB"
+        )
+        print("\n" + "=" * 62)
+        print("README-format memory tables — the #826 promotion paste source")
+        print("=" * 62)
+        for line in memory_readme_tables(mem_cells, labels, compat_hop):
+            print(line)
+
+    if time_sizes:
+        print("\n" + "=" * 62)
+        print("root-README condensed tables — paste into its Performance section")
+        print("=" * 62)
+        print()
+        for line in condensed_time_table(rows):
+            print(line)
+        if mem_cells:
+            mem_lines = condensed_memory_table(mem_cells, labels)
+            if mem_lines:
+                print("\nPeak memory (same run, one fresh process per cell):\n")
+                for line in mem_lines:
+                    print(line)
 
     flush()
     print(f"\nresults written: {args.out}")

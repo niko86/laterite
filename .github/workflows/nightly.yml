@@ -250,14 +250,16 @@ jobs:
   # bump / publish / needs-a-human — from ONE registry sweep, and then:
   #   * drives its own tracking issue (`issue_tracker.py --tracker release`) —
   #     an owed act opens an issue that a human sees, not a summary they don't;
-  #   * dispatches the approval-gated publish for anything stamped but absent,
-  #     cancelling any stale pending run first so there is exactly one pending
-  #     approval and it is never more than a night old;
+  #   * dispatches the publish for anything stamped but absent — unattended
+  #     since 2026-09-03 (the `crates` environment carries no required
+  #     reviewer; the PR merge is the human gate), cancelling any run still
+  #     queued first as a defensive bound;
   #   * in PR mode (`vars.ENGINE_CUT_MODE == 'pr'`) applies the owed bumps and
-  #     opens/updates ONE cut PR on a fixed branch. Until that variable is set
-  #     the cut is answer-only, per the rollout row on
-  #     ags-wiki/design/dec-engine-publish-automation.md — it must be seen to
-  #     agree with a human across real cuts before it acts.
+  #     opens/updates ONE cut PR on a fixed branch. PROMOTED 2026-09-03: the
+  #     rollout row's condition — seen to agree with a human across real cuts —
+  #     was met by the #849 round, where the two human-run cuts (#886, #888)
+  #     matched the derivation exactly. The PR still lands only through the
+  #     owner's merge; that merge is the human gate.
   #
   # `needs: [coverage]` is the design's "no clean build, no cut": coverage
   # compiles the whole workspace, so a night the tree does not build skips the
@@ -316,7 +318,7 @@ jobs:
           fi
           [ "$code" = "0" ] || exit "$code"
           ITEMS="$(cat /tmp/items.txt)" python3 tools/issue_tracker.py --tracker release
-      - name: publish owed -> exactly one pending approval, never older than tonight
+      - name: publish owed -> dispatch a fresh run, cancelling any stale one
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -326,16 +328,18 @@ jobs:
             exit 0
           fi
           echo "publish owed for: $(tr '\n' ' ' < /tmp/publish.txt)"
-          # A pending approval publishes main AS OF APPROVAL TIME, not dispatch
-          # time — the stale run cancelled by hand on 2026-08-30 would have
-          # published a tree the rehearsal never saw. Cancelling nightly bounds
-          # that staleness to one night.
+          # Since 2026-09-03 the `crates` environment has no required reviewer,
+          # so a dispatched run executes immediately and no run should ever sit
+          # `waiting`. The cancel loop stays as defence: a run stuck waiting
+          # (a reviewer re-added, a platform wobble) would otherwise publish
+          # main AS OF APPROVAL TIME — the staleness that bit on 2026-08-30
+          # and again on 2026-09-02 (#887's race).
           for id in $(gh run list --workflow publish-crates.yml --status waiting --json databaseId --jq '.[].databaseId'); do
             echo "cancelling stale pending publish run $id"
             gh run cancel "$id"
           done
           gh workflow run publish-crates.yml --ref main -f execute=true
-          echo "dispatched publish-crates (execute=true) — now waiting on the crates environment approval"
+          echo "dispatched publish-crates (execute=true) — runs unattended (no environment reviewer)"
       - name: Install Rust toolchain (PR mode — bump_crate regenerates the lock)
         if: vars.ENGINE_CUT_MODE == 'pr'
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable

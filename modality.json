@@ -705,7 +705,8 @@
                 "value"
               ],
               "out_forms": [
-                "value"
+                "value",
+                "file"
               ]
             }
           ],
@@ -714,9 +715,11 @@
             "value": "present"
           },
           "output": {
-            "value": "present"
+            "value": "present",
+            "file": "present"
           },
-          "gaps": []
+          "gaps": [],
+          "note": "The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap."
         },
         {
           "surface": "node",
@@ -729,7 +732,8 @@
                 "value"
               ],
               "out_forms": [
-                "value"
+                "value",
+                "file"
               ]
             }
           ],
@@ -738,9 +742,11 @@
             "value": "present"
           },
           "output": {
-            "value": "present"
+            "value": "present",
+            "file": "present"
           },
-          "gaps": []
+          "gaps": [],
+          "note": "The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap."
         },
         {
           "surface": "browser",
@@ -842,6 +848,116 @@
           "output": {},
           "gaps": [],
           "note": "**by-design.** \"Construct from caller-supplied data\" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures."
+        }
+      ]
+    },
+    {
+      "capability": "build-unchecked",
+      "summary": "Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4_unchecked",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "bytes",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "bytes": "present",
+            "file": "present"
+          },
+          "gaps": [],
+          "note": "Byte-identical to build_ags4(mode=\"report\") — pinned by test — with the verdict skipped; the docstring is the consent form (\"you are choosing to ship unchecked bytes\"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as \"judged clean\". The file form is build's staged write minus the verdict gate in front of it."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "buildAgs4Unchecked",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "bytes",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "bytes": "present",
+            "file": "present"
+          },
+          "gaps": [],
+          "note": "Landed via #881, one release behind Python's door. Byte-identical to buildAgs4({ mode: \"report\" }) — pinned by test — returning a plain Buffer (deliberately not a BuildResult), or the path with out= via the same staged rename minus the verdict gate. The judge-coupled knobs are refused at runtime by name, never silently ignored — absence from the TS type alone would let a JS caller's mode: \"strict\" be dropped on the floor."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4_unchecked",
+              "in_forms": [
+                "text"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "text": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "Landed via #881. Takes the judged door's own groups_json (the build capability's recorded JSON-text outlier rides along unchanged — reconciling it is that cell's gap, not this one's) and returns a Uint8Array, byte-identical to the judged report build's text. dictVersion is the only option; the decode_opts KEYS guard refuses mode/synthesiseMetadata/tran by name. No filesystem, so no file rider — bytes being the universal output form is what lets this door exist in a browser at all."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now."
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** Same as build: \"construct from caller-supplied data\" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files."
         }
       ]
     },
@@ -2579,6 +2695,108 @@
           "output": {},
           "gaps": [],
           "note": "**by-design.** `xn` numeric coercion is a python-only dataframe-backend view, as the `rust` cell already records. The browser's read returns Arrow, whose typing is settled at the read, not shaped after it."
+        }
+      ]
+    },
+    {
+      "capability": "read-output-arrow",
+      "summary": "A group's born-typed raw Arrow output from the read handle.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "Ags4File.arrow",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": [],
+          "note": "The capsule-bearing pyo3-arrow table, born-typed from the file's TYPE row, zero-copy over the Arrow PyCapsule interface — the exact shape build_ags4 consumes, so the read half of the zero-copy round trip #852 opened the write half of (#860). keys= is the same tri-state as .table()'s; no frame is materialised and the SQL engine is never touched."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "Ags4File.table",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": [],
+          "note": "Arrow by construction — table() returns an arrow-js Table — but a DECODE of the boundary's IPC bytes, not a capsule hand-over: napi has no capsule analog (the Buffers ARE the boundary; the perf ledger's node lane records the cost). **Settled by #871 (2026-09-02): by-design — each boundary's Arrow shape is its own answer, and node's is the decoded arrow-js Table.** A public un-decoded-IPC door (`arrowIpc`) was spiked and REJECTED: arrow-js decode/re-encode are zero-copy and cost loose milliseconds per whole-file sweep, while the door would hand out raw MUTABLE Buffers beside a zero-copy decoder (aliasing and postMessage-detach hazards against every decoded view), be uncached by contract (silent keychain rebuilds on repeat keyed calls — caching instead would alias mutable memory across callers, worse), and make the IPC framing itself public contract. The spike — accessor, time bench, peak-RSS/retention probe — is preserved on `prototype/node-arrow-ipc`; the measured cells are on #871."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.",
+          "facade_verdict": "planned"
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "n/a",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** read_ags already returns a typed RELATION — the engine's own Arrow-speaking object, recorded under read; a separate raw-table door would duplicate it."
+        },
+        {
+          "surface": "cli",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "gaps": [],
+          "note": "**by-design.** The CLI hands back files and text, not in-process objects; lat read --csv/--json is its data-out door."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "arrow_ipc",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "Arrow IPC bytes — the browser boundary's Arrow shape (a capsule cannot cross wasm). **Settled by #871 (2026-09-02): by-design** — each boundary's Arrow shape is its own answer: Python the capsule, node the decoded arrow-js Table, the browser these IPC bytes. No surface owes another surface's shape; the node cell's note records the spiked-and-rejected pass-through."
         }
       ]
     }

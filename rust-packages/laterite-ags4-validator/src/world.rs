@@ -77,7 +77,7 @@ fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
     let nci = file_g.headings.iter().position(|h| h == "FILE_NAME");
 
     for row in &file_g.rows {
-        let Some(fset) = row.values.get(fci).map(String::as_str) else {
+        let Some(fset) = file_g.value_at(row, fci) else {
             continue;
         };
         if fset.is_empty() {
@@ -94,9 +94,7 @@ fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
             );
             continue;
         }
-        let name = nci
-            .and_then(|c| row.values.get(c))
-            .map_or("", String::as_str);
+        let name = nci.and_then(|c| file_g.value_at(row, c)).unwrap_or("");
         if name.is_empty() {
             continue;
         }

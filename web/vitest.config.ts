@@ -36,10 +36,14 @@ export default defineConfig({
     // `scripts/**` joins them for the same reason (#401): the docs' copy of the
     // shared token layer is generated, and the rules deciding what that copy
     // says are pure functions that must not be tested by eyeballing the output.
+    // `bench/**` joins for the perf-matrix harness's pure seams (#824): the
+    // wasm matrix lane is a plain-node script whose cap/refusal/median logic
+    // must agree with the rust/node harnesses, and only a unit test pins that.
     include: [
       "src/**/*.test.ts",
       "landing/**/*.test.ts",
       "scripts/**/*.test.mjs",
+      "bench/**/*.test.mjs",
     ],
     exclude: [
       ...configDefaults.exclude,
@@ -61,7 +65,18 @@ export default defineConfig({
       // whether the developer happened to have built wasm: with it present the
       // run reports ~47% and FAILS the 95 floor, for no reason anyone changed.
       // Excluded so a local run and the CI run measure the same denominator.
-      exclude: ["src/wasm/**", "src/wasm-full/**", "src/wasm-tokenizer/**"],
+      // `bench/**` is measurement harness, not app code: its pure seams are
+      // unit-tested above, but its main() spawns children and drives the
+      // built wasm artifact — process-level work this lane cannot execute.
+      // The node package makes the same call structurally (its coverage
+      // include is `ts/**`, so its bench/ never enters the denominator);
+      // this exclude is that decision in this config's idiom.
+      exclude: [
+        "src/wasm/**",
+        "src/wasm-full/**",
+        "src/wasm-tokenizer/**",
+        "bench/**",
+      ],
       // Floor gate, not a target. Introduced at 65 (68.76% baseline); ratcheted to
       // 95, and now to 99 after duckTypes / loadSensitive / the relationship
       // walkers got suites. A new untested pure module — or deleting a tested one

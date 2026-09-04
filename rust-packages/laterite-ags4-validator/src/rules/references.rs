@@ -199,7 +199,7 @@ fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
         // byte-offset casts for the same reasoning on file-scale bounds).
         #[allow(clippy::cast_possible_truncation)]
         for (ri, row) in g.rows.iter().enumerate() {
-            if let Some(v) = row.values.get(ci) {
+            if let Some(v) = g.value_at(row, ci) {
                 if v.chars().any(|c| c.is_ascii_alphanumeric()) {
                     used.push((code, v, row.line, ci as u32, ri as u32 + 1));
                 }
@@ -229,7 +229,7 @@ fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
             file_g
                 .rows
                 .iter()
-                .filter_map(|r| r.values.get(ci).map(String::as_str))
+                .filter_map(|r| file_g.value_at(r, ci))
                 .collect()
         })
         .unwrap_or_default();

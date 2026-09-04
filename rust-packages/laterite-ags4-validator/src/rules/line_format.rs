@@ -75,7 +75,7 @@ pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
         }
     }
     for rl in &parsed.raw_lines {
-        let line = rl.text.as_str();
+        let line = parsed.line_text(rl);
         let n = rl.number;
 
         rule_1(line, n, opts, found);

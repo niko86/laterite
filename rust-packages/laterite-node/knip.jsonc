@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Named exceptions with their reasons (#866): a filter nobody can see is a
+  // blind spot, so each ignore says what it covers and why knip cannot.
+  "ignoreDependencies": [
+    // Reached only through dynamic import() — ts/duckdb.ts isolates the
+    // optional peer so install-time consumers never need it — which knip
+    // cannot trace. The dev copy is what lets test/p3-duckdb.test.ts and
+    // test/duckdb-typing.test.ts exercise the real engine.
+    "@duckdb/node-api",
+    // The napi-rs per-platform payload packages (@laterite/native-<platform>):
+    // referenced from the generated loader, only ever installed on the
+    // matching platform.
+    "@laterite/native-.+",
+  ],
+  // The wasi loader is emitted by napi-rs at build time; it does not exist in
+  // a clean checkout for knip to resolve.
+  "ignoreUnresolved": ["./laterite-node.wasi.cjs"],
+}

@@ -10,7 +10,8 @@ a `read()` returns. This is the full surface; for the guided tour, see the
 | ----------- | --------------------------------------------------------- | --------------- |
 | `read`      | `read(source?, opts?)`                                    | `Ags4File`      |
 | `validate`  | `validate(source?, opts?)`                                | `Report`        |
-| `buildAgs4` | `buildAgs4(groups, opts?)`                                | `Ags4File`      |
+| `buildAgs4` | `buildAgs4(groups, opts?)`                                | `BuildResult` (or `BuildSaved` with `out`) |
+| `buildAgs4Unchecked` | `buildAgs4Unchecked(groups, opts?)`              | `Buffer` (or the `out` path) |
 | `fix`       | `fix(source?, opts?)`                                     | `FixResult`     |
 | `diff`      | `diff(a, b, opts?)`                                       | `RevisionDelta` |
 | `listRules` | `listRules()`                                             | `RuleMeta[]`    |
@@ -25,9 +26,18 @@ a `read()` returns. This is the full surface; for the guided tour, see the
 import { read, validate, buildAgs4 } from "laterite";
 ```
 
+`buildAgs4Unchecked` is `buildAgs4` with the verdict declined: byte-identical
+output to `buildAgs4(groups, { mode: "report" })`, with no findings, no fixes
+and no strict gate. It hands back a plain `Buffer` (or, with `out`, the same
+staged atomic write minus the verdict gate in front of it, returning the path),
+and takes `dictVersion` / `units` / `types` / `out` only; passing `mode`,
+`synthesiseMetadata` or `tran` is refused rather than silently ignored. You are
+choosing to ship unchecked bytes: see the
+[three-doors comparison](../learn/produce.md#three-write-doors-one-honest-difference).
+
 ## `Ags4File`
 
-Returned by `read()` and `buildAgs4()`. The read handle is **fluent**: the
+Returned by `read()`. The read handle is **fluent**: the
 chained verbs return something you keep working on.
 
 ### Inspect

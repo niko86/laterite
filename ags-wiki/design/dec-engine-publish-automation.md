@@ -149,9 +149,41 @@ stamp that never published reports a bump as owed when the standing number
 already covers it, which is a wrong verdict a human shrugs at and a machine acts
 on. #806 carries that as a prerequisite rather than a follow-up.
 
-**What the decision does not change.** The dispatch becomes automatic; the
+**What the decision does not change.** The dispatch becomes automatic; ~~the
 `crates` environment approval does not. That gate is the reason this page's
-earlier consequence could be struck through, and nothing here reopens it.
+earlier consequence could be struck through, and nothing here reopens it.~~
+**Overtaken 2026-09-03** — the approval retired; see the section below. The
+struck-through consequence stays honoured by a different gate: the PR merge.
+
+## The approval retires (2026-09-03)
+
+The `crates` environment keeps its branch policy and its Trusted Publishing
+OIDC binding, and loses its required reviewer: a dispatched run executes
+unattended. Owner-decided, on the observation that every version stamp reaches
+`main` through a PR the owner reviews and merges — so the environment approval
+was a second look by the same person, adding latency and no judgement.
+
+The trigger was the 2026-09-02/03 release round (#849), where the approval
+gate's pending window did active harm twice:
+
+- A run approved **before** its bump PR merged published `laterite-ags4-merge`
+  0.12.2 and `laterite-ags4-trust` 0.13.2 with the old floors, minting a
+  second ring of owed bumps (#888) that one merged-first run would not have —
+  the "publishes `main` as of approval time" staleness this page already
+  recorded, exercised in the other direction.
+- The same mid-CI publish raced `cargo semver-checks`' baseline choice on the
+  open PR and stranded two superseded versions (#887).
+
+With no reviewer there is no pending window: a dispatched run reflects `main`
+at dispatch time, and the nightly's cancel-stale-then-dispatch loop becomes a
+defensive no-op rather than a staleness bound. What still stands between a
+keystroke and the append-only registry: the PR gates on everything that moves
+a stamp, the owner's merge, `check_package_contents --verify-buildable` inside
+the publish workflow before the first upload, and the publisher's own
+wave-by-wave build-and-resolve discipline. What is deliberately given up: a
+human pause between "stamped on `main`" and "on crates.io". `pypi` and `npm`
+keep their reviewers — the product trains are tag-driven and carry no
+equivalent per-stamp PR review.
 
 ## Consequences
 
@@ -164,8 +196,10 @@ earlier consequence could be struck through, and nothing here reopens it.
   the one registry that cannot be corrected after the fact.~~ **Paid, in #463.**
   The publish runs from GitHub behind the `crates` environment's reviewer, so the
   append-only registry is now the one with an approval in front of it rather than
-  the one without. What stays manual is the *dispatch* and the approval, which is
-  the point of them.
+  the one without. ~~What stays manual is the *dispatch* and the approval, which
+  is the point of them.~~ **Overtaken twice:** the dispatch went automatic with
+  the nightly cut (2026-08-30, below), and the approval retired 2026-09-03
+  (section above) — the manual act is the PR merge that moves a stamp.
 - **The cut is ours to build (#806), and the nightly gains a second duty.**
   The same report that says a bump is owed also says a publish is owed, so one
   derivation drives both — opening a cut PR, and dispatching the approval-gated
@@ -194,14 +228,32 @@ earlier consequence could be struck through, and nothing here reopens it.
   - **Publish dispatch is automatic nightly** for stamped-but-absent crates,
     cancelling any stale pending run first — a pending approval publishes
     `main` as of *approval* time, so nightly re-dispatch bounds that staleness
-    to one night. The `crates` environment approval is unchanged.
-- **Rollout state: answer-only, as the design row requires.** The PR-opening
-  path is built and armed behind the repo variable `ENGINE_CUT_MODE=pr`;
-  promotion is that one variable, plus `ENGINE_CUT_TOKEN` (a fine-grained PAT,
-  contents + pull-requests write) — with the default `github.token` a
-  bot-created PR triggers **no** workflows, its required checks never report,
-  and it cannot merge. That answers the spike's "can a bot PR satisfy every
-  required check" unverified item: not with the default token, by design.
+    to one night. ~~The `crates` environment approval is unchanged.~~
+    **Overtaken 2026-09-03** — the approval retired (section above); the
+    cancel loop stays as defence against a run ever stuck `waiting` again.
+- **Rollout state: ~~answer-only, as the design row requires~~ PROMOTED to PR
+  mode, 2026-09-03.** The design row's condition — the cut must be seen to
+  agree with a human across real cuts before it acts — was met by the #849
+  round: the two cuts a human ran by hand (#886: emit + validator; #888: the
+  merge + trust floor cascade) matched the nightly's derivation command for
+  command. `ENGINE_CUT_MODE=pr` is set, with `ENGINE_CUT_TOKEN` (a
+  fine-grained PAT, contents + pull-requests write) — with the default
+  `github.token` a bot-created PR triggers **no** workflows, its required
+  checks never report, and it cannot merge. That answers the spike's "can a
+  bot PR satisfy every required check" unverified item: not with the default
+  token, by design. Two operational notes from the promotion:
+  - The PAT's **expiry is the mode's maintenance point**: an expired token
+    fails the cut-PR step loudly in the nightly rather than falling back, so
+    the failure is heard (`notify` needs the job), but the fix is a human
+    re-minting the token.
+  - `repo:tools/release/bump_crate.py`'s faithfulness check runs
+    **project-free** (`--no-project --with pytest --with pyyaml`, addopts
+    shed): the engine-cut job deliberately never syncs the dev environment —
+    a sync would build the PyO3 wheel — and the first promoted run would have
+    found `--no-sync` pointing at an environment that does not exist there.
+  The nightly cut PR lands only through the owner's merge; with the `crates`
+  approval retired (above), that merge is the one human act in an engine
+  release.
 - **Pre-upload build verification is wired** (`check_package_contents.py
   --verify-buildable` in publish-crates.yml, before the first upload): a
   wave-3 compile failure no longer strands waves 1–2 on the append-only

@@ -70,5 +70,81 @@ than silently dropping the rows you built up.
     in memory, check `res.findings` for any caveats autofix couldn't resolve, or
     `res.save("out.ags")` to persist a byte-faithful AGS4 file to disk.
 
+## Straight to disk
+
+When the file's destination is a path anyway, say so in the call:
+
+```python
+saved = laterite.build_ags4({"PROJ": proj, "LOCA": loca}, out="delivery.ags")
+saved.path           # where the judged document landed
+saved.findings       # the same verdict a BuildResult carries
+```
+
+`out=` returns a `BuildSaved`: the path plus the findings/fixes verdict, and
+deliberately **no** `bytes`. It exists for long-lived processes that don't
+want the whole file resident on the result after the call. Build-and-judge
+survives the trip to disk: the document is staged to a temporary file beside
+the destination and moved into place only after the verdict allows, so the
+path never holds unjudged output, and a `mode="strict"` refusal raises with
+nothing written. Node mirrors it as `buildAgs4(groups, { out })`; the browser
+build has no filesystem, so there is nothing to mirror there.
+
+## Three write doors, one honest difference
+
+Three ways out of laterite produce an AGS4 file, and what separates them is
+what each one *claims* about its output:
+
+- **`compat`'s writer** is the faithful blind write: your string frames go to
+  disk exactly as you hold them, matching python-ags4's behaviour byte for
+  byte. It claims nothing: fidelity to your data *is* the contract.
+- **`build_ags4`** is build-and-judge: canonical formatting, dictionary
+  fills, and then the full rule engine over the result. The verdict (the
+  `findings` on the object you get back) is the premium you are paying for,
+  and it is most of what the call spends its time on.
+- **`build_ags4_unchecked`** is the same build with the verdict declined:
+
+```python
+raw = laterite.build_ags4_unchecked({"PROJ": proj, "LOCA": loca})   # bytes
+laterite.build_ags4_unchecked({"PROJ": proj, "LOCA": loca}, out="delivery.ags")
+```
+
+The bytes are **identical to `build_ags4(mode="report")`'s**: same fills,
+same canonical cells, same order, with a test pinning the identity. But
+nothing has checked them against any AGS4 rule, and nothing will. There is
+no `mode=` (there is no verdict for a mode to act on), no
+`synthesise_metadata=`/`tran=` (synthesis fills gaps only a report would
+surface), and the return is plain `bytes` rather than a `BuildResult`,
+because an empty findings list would read as "judged clean" when nothing
+judged anything. With `out=` it stages and renames exactly as above, minus
+the verdict gate in front of the write.
+
+Reach for it when the verdict is genuinely spent elsewhere: a pipeline's
+inner loop whose final output gets validated once, a file bound for an
+external checker. You are choosing to ship unchecked bytes; that is the whole
+feature, and the choice is yours to make.
+
+The door exists on all three data surfaces under one name: Python's
+`build_ags4_unchecked` above, Node's `buildAgs4Unchecked` (a `Buffer` back, or
+the path with `out`), and the browser wasm build's `build_ags4_unchecked`
+(a `Uint8Array`; no filesystem, so no `out` rider). Each surface pins the
+same byte-identity contract against its own judged `report` build.
+
+## Keeping the build's memory peak down
+
+`build_ags4` judges its own writing as it streams, so the door's side of the
+peak is lean. What usually dominates a build-from-a-read workflow is the
+**caller's own holds**, live across the call:
+
+- **Drop the read handle once your frames exist.** A handle from
+  `laterite.read` retains the parsed file; if you only needed it to make the
+  frames, `del handle` before building. The door never needed it.
+- **Pass Arrow-capsule tables rather than materialised frames** where you
+  have them: anything exposing `__arrow_c_stream__` goes straight through,
+  without a whole-file frame materialisation beside it.
+
+Both were measured on the perf campaign's write workflow (the variant table
+on #848 records each hold's share); they are the caller's allocations, which
+is why they live here as a recipe rather than inside the door.
+
 → See the whole fluent API assembled in the
 [Chaining Showcase](../chaining/index.md).

@@ -41,15 +41,15 @@ pub fn run(args: &ReadArgs, json: bool) -> ! {
     };
 
     let body = match args.group.as_deref() {
-        None => list_groups(&parsed.order, json),
+        None => list_groups(parsed.order(), json),
         Some(code) => {
             if let Some(group) = parsed.get(code) {
                 render_group(group, json, args.csv)
             } else {
-                let present = if parsed.order.is_empty() {
+                let present = if parsed.order().is_empty() {
                     "none".to_string()
                 } else {
-                    parsed.order.join(", ")
+                    parsed.order().join(", ")
                 };
                 eprintln!(
                     "error: group {code:?} not found in {} (present: {present})",
@@ -91,32 +91,21 @@ fn list_groups(order: &[String], json: bool) -> String {
     }
 }
 
-/// One group's rows. Rows are `HashMap`s, so project through `group.headings`
-/// for deterministic column order — never iterate the map directly.
+/// One group's rows, projected positionally off the span-backed accessors
+/// (#900) — ONE group's owned copy, which the #893 diagnosis measured as
+/// co-peak shadow (the whole-file slab was the prize, and it is gone).
 fn render_group(group: &AgsGroup, json: bool, csv: bool) -> String {
-    // Project the HashMap rows through `headings` once — the shared renderers
-    // take positional rows (the shape the bindings already hand every surface).
-    let rows: Vec<Vec<String>> = group
-        .rows
-        .iter()
-        .map(|row| {
-            group
-                .headings
-                .iter()
-                .map(|h| row.get(h.as_str()).cloned().unwrap_or_default())
-                .collect()
-        })
-        .collect();
+    let rows: Vec<Vec<String>> = (0..group.n_rows()).map(|i| group.padded_row(i)).collect();
     if json {
         // JSON + CSV come from core's `read_render` — the same writers Node and
         // Python now call, so `read --json`/`--csv` is one format, not three
         // hand-synced ones (laterite-dev#530). The table stays local: it renders through
         // `laterite-cliutil`'s styled grid, a CLI-only concern.
-        read_render::render_rows_json(&group.headings, &rows)
+        read_render::render_rows_json(group.headings(), &rows)
     } else if csv {
-        read_render::render_rows_csv(&group.headings, &rows)
+        read_render::render_rows_csv(group.headings(), &rows)
     } else {
-        let headers: Vec<&str> = group.headings.iter().map(String::as_str).collect();
+        let headers: Vec<&str> = group.headings().iter().map(String::as_str).collect();
         styled_table(&headers, rows, colour_enabled(false)).to_string() + "\n"
     }
 }
@@ -125,20 +114,15 @@ fn render_group(group: &AgsGroup, json: bool, csv: bool) -> String {
 mod tests {
     use super::*;
     use serde_json::Value;
-    use std::collections::HashMap;
-    use std::sync::Arc;
 
     fn group() -> AgsGroup {
-        let mut r1 = HashMap::new();
-        r1.insert(Arc::from("LOCA_ID"), "BH01".to_string());
-        r1.insert(Arc::from("LOCA_REM"), "has, a \"comma\"".to_string());
-        AgsGroup {
-            code: "LOCA".to_string(),
-            headings: vec!["LOCA_ID".to_string(), "LOCA_REM".to_string()],
-            units: vec![],
-            types: vec![],
-            rows: vec![r1],
-        }
+        AgsGroup::from_owned_rows(
+            "LOCA".to_string(),
+            vec!["LOCA_ID".to_string(), "LOCA_REM".to_string()],
+            vec![],
+            vec![],
+            vec![vec!["BH01".to_string(), "has, a \"comma\"".to_string()]],
+        )
     }
 
     #[test]
@@ -158,14 +142,15 @@ mod tests {
 
     #[test]
     fn missing_cell_becomes_empty_not_absent() {
-        // A row lacking a heading's value renders "" (never a dropped column).
-        let g = AgsGroup {
-            code: "X".into(),
-            headings: vec!["A".into(), "B".into()],
-            units: vec![],
-            types: vec![],
-            rows: vec![HashMap::from([(Arc::from("A"), "1".to_string())])],
-        };
+        // A short row renders "" for the missing tail (never a dropped column) —
+        // `from_owned_rows` pads to the heading count by construction.
+        let g = AgsGroup::from_owned_rows(
+            "X".into(),
+            vec!["A".into(), "B".into()],
+            vec![],
+            vec![],
+            vec![vec!["1".to_string()]],
+        );
         assert_eq!(render_group(&g, false, true), "A,B\n1,\n");
     }
 }

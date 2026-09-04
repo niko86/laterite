@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Aggregate the per-surface perf-matrix results into one document.
 
-Each surface's harness — `laterite-ags4-perf` (rust) today, the Node/wasm/CLI
-lanes to follow (#823-#825) — writes the matrix's uniform per-surface schema
+Each surface's harness — `laterite-ags4-perf` (rust), the Node lane
+(`rust-packages/laterite-node/bench/perf-matrix.mjs`, #823), the wasm lane
+(`web/bench/perf-matrix.mjs`, #824) and the CLI lane (`tools/perf-cli.py`,
+#825) — writes the matrix's uniform per-surface schema
 (`{surface, results: [{op, rung, bytes, median_ms, throughput_mb_s, mem?}]}`)
 into `output/perf-results/`. This script is the dumb merger those files were
 shaped for: it folds them into one matrix document and prints the table. It
@@ -22,8 +24,16 @@ Matrix schema `laterite-perf-matrix/1`:
     surfaces    {surface: {tool, iters, schema}} — each contributor's stamp
     cells       {op: {rung: {surface: {bytes, median_ms, throughput_mb_s, mem?}}}}
 
-A `mem` cell is either `{peak_rss_bytes, x_output}` or a recorded refusal
-`{refusal, detail}` — distinguishable by shape, and rendered as such.
+A `mem` cell is a measurement or a recorded refusal `{refusal, detail}`,
+distinguishable by shape and rendered as such. Measurements carry their
+instrument's own key — `{peak_rss_bytes, x_output}` for the fresh-child
+peak-RSS lanes, `{instrument: "wasm-linear-memory", peak_linear_memory_bytes,
+x_output}` for the wasm lane (#824) — because the two are DIFFERENT CLAIMS
+that never fold into one cross-surface memory column: every rendered row
+names its instrument. The mem-cell union is OPEN by design: a new lane
+adding another labelled measurement variant is additive (consumers switch
+on cell shape, and this renderer falls through loudly on a shape it does
+not know), so it widens this list rather than bumping the schema string.
 
 Usage:
     uv run python tools/perf-matrix.py                # output/perf-results/
@@ -98,11 +108,22 @@ def merge(docs: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 def fmt_mem(mem: dict[str, Any] | None) -> str:
+    """One memory cell, its instrument named on the row (#824's two-claims
+    rule): peak RSS and wasm linear-memory high-water are different claims,
+    so neither may render as an unlabelled default the reader could take
+    for the other. A cell shaped like neither claim renders loudly."""
     if mem is None:
         return "—"
     if "refusal" in mem:
         return f"refused: {mem['refusal']}"
-    return f"{mem['peak_rss_bytes'] / 1e6:,.0f} MB ({mem['x_output']}×)"
+    if "peak_rss_bytes" in mem:
+        return f"{mem['peak_rss_bytes'] / 1e6:,.0f} MB ({mem['x_output']}× peak RSS)"
+    if "peak_linear_memory_bytes" in mem:
+        return (
+            f"{mem['peak_linear_memory_bytes'] / 1e6:,.0f} MB "
+            f"({mem['x_output']}× wasm linear memory)"
+        )
+    return f"unrecognised mem cell (keys: {sorted(mem)})"
 
 
 def render_table(matrix: dict[str, Any]) -> str:
@@ -110,7 +131,7 @@ def render_table(matrix: dict[str, Any]) -> str:
     lines: list[str] = []
     ops = [op for op in OP_ORDER if op in matrix["cells"]]
     ops += sorted(op for op in matrix["cells"] if op not in OP_ORDER)
-    header = f"{'rung':>8}  {'surface':<10} {'median':>10}  {'MB/s':>8}  peak RSS"
+    header = f"{'rung':>8}  {'surface':<10} {'median':>10}  {'MB/s':>8}  memory (instrument per row)"
     for op in ops:
         lines.append(f"\n== {op} ==")
         lines.append(header)

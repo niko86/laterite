@@ -290,15 +290,7 @@ impl Reading {
                     headings: g.headings.clone(),
                     units: g.units.clone(),
                     types: g.types.clone(),
-                    rows: g
-                        .rows
-                        .iter()
-                        .map(|r| {
-                            (0..n)
-                                .map(|i| r.values.get(i).cloned().unwrap_or_default())
-                                .collect()
-                        })
-                        .collect(),
+                    rows: g.rows.iter().map(|r| g.padded_row_strings(r, n)).collect(),
                 })
             })
             .collect();
@@ -970,27 +962,20 @@ pub fn read_groups_raw(
     )
     .map_err(|e| Error::from_reason(e.to_string()))?;
     let mut groups = Map::new();
-    for code in &parsed.order {
+    for code in parsed.order() {
         if let Some(g) = parsed.get(code) {
-            let rows: Vec<Value> = g
-                .rows
-                .iter()
-                .map(|row| {
-                    Value::Array(
-                        g.headings
-                            .iter()
-                            .map(|h| Value::from(row.get(h.as_str()).cloned().unwrap_or_default()))
-                            .collect(),
-                    )
-                })
+            // Positional projection straight off the span-backed accessors
+            // (#900) — one row's worth of owned cells at a time.
+            let rows: Vec<Value> = (0..g.n_rows())
+                .map(|i| Value::Array(g.row_cells(i).map(Value::from).collect()))
                 .collect();
             let mut gd = Map::new();
-            gd.insert("headings".to_string(), Value::from(g.headings.clone()));
+            gd.insert("headings".to_string(), Value::from(g.headings().to_vec()));
             gd.insert("rows".to_string(), Value::Array(rows));
             groups.insert(code.clone(), Value::Object(gd));
         }
     }
-    let out = serde_json::json!({ "order": parsed.order, "groups": Value::Object(groups) });
+    let out = serde_json::json!({ "order": parsed.order(), "groups": Value::Object(groups) });
     serde_json::to_string(&out).map_err(|e| Error::from_reason(e.to_string()))
 }
 
@@ -1464,15 +1449,10 @@ pub fn emit_ags4_from_ipc(
             .unwrap_or(DictVersion::V4_1_1),
         synthesise_metadata: synthesise_metadata.unwrap_or(false),
     };
-    let mut inputs = Vec::with_capacity(groups.len());
-    for g in groups {
-        let u = units.as_ref().and_then(|m| m.get(&g.code)).cloned();
-        let t = types.as_ref().and_then(|m| m.get(&g.code)).cloned();
-        inputs.push(group_from_ipc(g.code, &g.ipc, u, t)?);
-    }
     // The streaming Arrow door (#790): each cell formats straight off its
     // array — no row-major input copy, and this surface stops holding every
     // group borrowed across the write + validating re-parse as a bonus.
+    let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
     let res = laterite_ags4_emit::emit_ags4_from_arrow(inputs, &opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
@@ -1485,6 +1465,48 @@ pub fn emit_ags4_from_ipc(
         applied: to_applied_fixes(&res.applied),
         fixes_applied,
     })
+}
+
+/// The unchecked door (#881): [`emit_ags4_from_ipc`]'s marshalling handed to
+/// the engine's judge-free entry — bytes out, nothing validated, pinned
+/// byte-identical to the `report` build (the #858 contract). No mode /
+/// synthesis / TRAN parameters on purpose: there is no verdict for a mode to
+/// act on, and synthesis fills gaps only a report would surface.
+#[napi]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::implicit_hasher)]
+pub fn emit_ags4_from_ipc_unchecked(
+    groups: Vec<GroupIpc>,
+    edition: Option<String>,
+    units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+) -> Result<Buffer> {
+    let edition = resolve_edition(edition.as_deref())
+        .map_err(Error::from_reason)?
+        .unwrap_or(DictVersion::V4_1_1);
+    let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
+    let bytes = laterite_ags4_emit::emit_ags4_from_arrow_unchecked(inputs, edition)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    Ok(bytes.into())
+}
+
+/// The two IPC doors' shared input marshalling (#881): per-group units/types
+/// alignment + IPC decode in ONE place, so the judged and unchecked doors
+/// cannot drift at the input — the same split the TS layer's `marshalGroups`
+/// and the wasm door's `groups_from_json` make.
+#[allow(clippy::type_complexity)]
+fn inputs_from_ipc(
+    groups: Vec<GroupIpc>,
+    units: Option<&std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    types: Option<&std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+) -> Result<Vec<laterite_ags4_emit::ArrowGroup>> {
+    let mut inputs = Vec::with_capacity(groups.len());
+    for g in groups {
+        let u = units.and_then(|m| m.get(&g.code)).cloned();
+        let t = types.and_then(|m| m.get(&g.code)).cloned();
+        inputs.push(group_from_ipc(g.code, &g.ipc, u, t)?);
+    }
+    Ok(inputs)
 }
 
 fn group_from_ipc(

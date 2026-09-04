@@ -1,9 +1,15 @@
 {
  "schema": "laterite-python-lane-bench/1",
- "generated": "2026-08-31T16:39:35+00:00",
- "commit": "2e4367b21f7a3dae06321d31c28d08fafa26c873",
+ "generated": "2026-09-02T18:39:00+00:00",
+ "commit": "37b234842a9751eab54f89be32975f6d6b8dccc4",
  "invocation": {
-  "rungs": [],
+  "rungs": [
+   "5MB",
+   "25MB",
+   "100MB",
+   "265MB",
+   "524MB"
+  ],
   "mem_rungs": [
    "5MB",
    "25MB",
@@ -18,9 +24,9 @@
   "cpu_count": 10,
   "mem_total_bytes": 25769803776,
   "load_avg_start": [
-   1.6669921875,
-   1.33203125,
-   1.41455078125
+   1.70556640625,
+   1.92529296875,
+   1.75341796875
   ]
  },
  "versions": {
@@ -28,85 +34,85 @@
   "python-ags4": "1.2.0",
   "laterite": "0.12.0",
   "pandas": "2.3.3",
-  "polars": "1.43.2",
+  "polars": "1.44.1",
   "pyarrow": "25.0.1"
  },
  "protocol": {
   "time": "mean of N warm in-process runs, first run discarded",
-  "memory": "peak RSS (ru_maxrss) of a fresh subprocess running one end-to-end operation through the library's public API \u2014 the same instrument both sides; dhat/tracemalloc numbers are a different claim and never share a table with these",
+  "memory": "peak RSS of a fresh subprocess running one end-to-end operation through the library's public API \u2014 ru_maxrss on POSIX, PeakWorkingSetSize on Windows, the same instrument both sides of every cell; dhat/tracemalloc numbers are a different claim and never share a table with these",
   "refusals": "a cell whose run swapped, died, or sits past the memory cap is recorded as {refusal, detail}, never skipped"
  },
  "rungs": {
   "5MB": {
-   "sha256": "a8358c5d0eb67948b7393205f9391691d97f7e4ca84975c06f37f18b7c9e41c1",
-   "bytes": 4866777
+   "sha256": "79b56a583b57b308ecdc39289241740a4912e954a6e495afad64e7f4360b9b1e",
+   "bytes": 4886318
   },
   "25MB": {
-   "sha256": "8f60617e4e66947f47bdc8c61c51b12b321eec797d99d7f0a49fc142f5dbf615",
-   "bytes": 24912584
+   "sha256": "dea05e74d8b858e7530921ab7865b371fd8c3c76fb7e27388c7f6445077d89a4",
+   "bytes": 25009164
   },
   "100MB": {
-   "sha256": "4e3a873b82435305a8d1b98c6ec4c5e5ce54c0f4cdd8934bfb4deb69c50856e9",
-   "bytes": 102653016
+   "sha256": "bf81d339d096172f4219a1ee086154092de5108f89e9579910b27ede34b5429d",
+   "bytes": 103024062
   },
   "265MB": {
-   "sha256": "a8f5fb5df9b907e82e21f919e38dc87df3db9372159c0dde374a662989cd8323",
-   "bytes": 275510179
+   "sha256": "b68d454c2d014bdae028f1f9c5431319aae9532bd057742c31a169c021d164e2",
+   "bytes": 276462834
   },
   "524MB": {
-   "sha256": "30b720ec517fdd867f5c4818775e1518e28731a1631bb0d47553ec119339a8ec",
-   "bytes": 549703139
+   "sha256": "24c6c30236e372e94c66494210448c0b8437efa5ab0bc7677a5f7cf88b5d5f0f",
+   "bytes": 551560078
   }
  },
  "time": {
   "validate": {
    "5MB": {
     "python_ags4": {
-     "seconds": 1.4956,
+     "seconds": 1.5067,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0483,
+     "seconds": 0.0409,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 3.6743,
+     "seconds": 3.6707,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.2258,
+     "seconds": 0.188,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 12.1034,
+     "seconds": 12.233,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.932,
+     "seconds": 0.7815,
      "runs": 5
     }
    },
    "265MB": {
     "python_ags4": {
-     "seconds": 31.5353,
+     "seconds": 31.4326,
      "runs": 5
     },
     "laterite": {
-     "seconds": 2.4409,
+     "seconds": 1.9742,
      "runs": 5
     }
    },
    "524MB": {
     "python_ags4": {
-     "seconds": 66.2865,
+     "seconds": 67.1285,
      "runs": 5
     },
     "laterite": {
-     "seconds": 5.1104,
+     "seconds": 4.0912,
      "runs": 5
     }
    }
@@ -114,51 +120,51 @@
   "read_strings": {
    "5MB": {
     "python_ags4": {
-     "seconds": 0.1404,
+     "seconds": 0.1415,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.0467,
+     "seconds": 0.0383,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.6739,
+     "seconds": 0.6723,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.1904,
+     "seconds": 0.1476,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 2.6961,
+     "seconds": 2.7292,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.7605,
+     "seconds": 0.589,
      "runs": 5
     }
    },
    "265MB": {
     "python_ags4": {
-     "seconds": 7.1,
+     "seconds": 7.1572,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 1.9872,
+     "seconds": 1.4605,
      "runs": 5
     }
    },
    "524MB": {
     "python_ags4": {
-     "seconds": 15.4808,
+     "seconds": 15.256,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 4.2785,
+     "seconds": 2.9983,
      "runs": 5
     }
    }
@@ -166,51 +172,51 @@
   "read_typed": {
    "5MB": {
     "python_ags4": {
-     "seconds": 0.1845,
+     "seconds": 0.188,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0239,
+     "seconds": 0.0153,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.764,
+     "seconds": 0.7846,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.1175,
+     "seconds": 0.0741,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 3.1789,
+     "seconds": 3.2022,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.477,
+     "seconds": 0.3001,
      "runs": 5
     }
    },
    "265MB": {
     "python_ags4": {
-     "seconds": 8.0631,
+     "seconds": 8.7232,
      "runs": 5
     },
     "laterite": {
-     "seconds": 1.2939,
+     "seconds": 0.7801,
      "runs": 5
     }
    },
    "524MB": {
     "python_ags4": {
-     "seconds": 18.8173,
+     "seconds": 18.3366,
      "runs": 5
     },
     "laterite": {
-     "seconds": 2.7199,
+     "seconds": 1.6491,
      "runs": 5
     }
    }
@@ -222,67 +228,87 @@
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.0593,
+     "seconds": 0.06,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.0745,
+     "seconds": 0.0568,
+     "runs": 5
+    },
+    "laterite_unchecked": {
+     "seconds": 0.0339,
      "runs": 5
     }
    },
    "25MB": {
     "python_ags4": {
-     "seconds": 0.5834,
+     "seconds": 0.5776,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.2001,
+     "seconds": 0.206,
      "runs": 5
     },
     "laterite": {
-     "seconds": 0.3554,
+     "seconds": 0.2613,
+     "runs": 5
+    },
+    "laterite_unchecked": {
+     "seconds": 0.1394,
      "runs": 5
     }
    },
    "100MB": {
     "python_ags4": {
-     "seconds": 1.9166,
+     "seconds": 1.9607,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 0.7194,
+     "seconds": 0.748,
      "runs": 5
     },
     "laterite": {
-     "seconds": 1.4626,
+     "seconds": 1.0662,
+     "runs": 5
+    },
+    "laterite_unchecked": {
+     "seconds": 0.574,
      "runs": 5
     }
    },
    "265MB": {
     "python_ags4": {
-     "seconds": 5.4237,
+     "seconds": 5.0798,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 1.8859,
+     "seconds": 1.8956,
      "runs": 5
     },
     "laterite": {
-     "seconds": 3.8571,
+     "seconds": 2.8437,
+     "runs": 5
+    },
+    "laterite_unchecked": {
+     "seconds": 1.5367,
      "runs": 5
     }
    },
    "524MB": {
     "python_ags4": {
-     "seconds": 13.8304,
+     "seconds": 14.1889,
      "runs": 5
     },
     "laterite_compat": {
-     "seconds": 3.7166,
+     "seconds": 3.8225,
      "runs": 5
     },
     "laterite": {
-     "seconds": 7.8655,
+     "seconds": 5.8226,
+     "runs": 5
+    },
+    "laterite_unchecked": {
+     "seconds": 3.1223,
      "runs": 5
     }
    }
@@ -292,42 +318,42 @@
   "validate": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 169836544,
-     "x_output": 34.9
+     "peak_rss_bytes": 170590208,
+     "x_output": 34.91
     },
     "laterite": {
-     "peak_rss_bytes": 111099904,
-     "x_output": 22.83
+     "peak_rss_bytes": 94601216,
+     "x_output": 19.36
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 342065152,
-     "x_output": 13.73
+     "peak_rss_bytes": 343195648,
+     "x_output": 13.72
     },
     "laterite": {
-     "peak_rss_bytes": 263274496,
-     "x_output": 10.57
+     "peak_rss_bytes": 175357952,
+     "x_output": 7.01
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 1008566272,
-     "x_output": 9.83
+     "peak_rss_bytes": 1019232256,
+     "x_output": 9.89
     },
     "laterite": {
-     "peak_rss_bytes": 848003072,
-     "x_output": 8.26
+     "peak_rss_bytes": 470335488,
+     "x_output": 4.57
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2669527040,
-     "x_output": 9.69
+     "peak_rss_bytes": 2664169472,
+     "x_output": 9.64
     },
     "laterite": {
-     "peak_rss_bytes": 2087632896,
-     "x_output": 7.58
+     "peak_rss_bytes": 1121075200,
+     "x_output": 4.06
     }
    },
    "524MB": {
@@ -344,42 +370,42 @@
   "read_strings": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 148750336,
-     "x_output": 30.56
+     "peak_rss_bytes": 149241856,
+     "x_output": 30.54
     },
     "laterite_compat": {
-     "peak_rss_bytes": 214581248,
-     "x_output": 44.09
+     "peak_rss_bytes": 198017024,
+     "x_output": 40.52
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 312754176,
+     "peak_rss_bytes": 313819136,
      "x_output": 12.55
     },
     "laterite_compat": {
-     "peak_rss_bytes": 476102656,
-     "x_output": 19.11
+     "peak_rss_bytes": 387858432,
+     "x_output": 15.51
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 914898944,
+     "peak_rss_bytes": 918011904,
      "x_output": 8.91
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1469906944,
-     "x_output": 14.32
+     "peak_rss_bytes": 1097613312,
+     "x_output": 10.65
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2202763264,
-     "x_output": 8.0
+     "peak_rss_bytes": 2204598272,
+     "x_output": 7.97
     },
     "laterite_compat": {
-     "peak_rss_bytes": 3522592768,
-     "x_output": 12.79
+     "peak_rss_bytes": 2555756544,
+     "x_output": 9.24
     }
    },
    "524MB": {
@@ -396,42 +422,42 @@
   "read_typed": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 155041792,
-     "x_output": 31.86
+     "peak_rss_bytes": 155926528,
+     "x_output": 31.91
     },
     "laterite": {
-     "peak_rss_bytes": 111738880,
-     "x_output": 22.96
+     "peak_rss_bytes": 94928896,
+     "x_output": 19.43
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 314064896,
-     "x_output": 12.61
+     "peak_rss_bytes": 315146240,
+     "x_output": 12.6
     },
     "laterite": {
-     "peak_rss_bytes": 269434880,
-     "x_output": 10.82
+     "peak_rss_bytes": 182353920,
+     "x_output": 7.29
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 934363136,
+     "peak_rss_bytes": 937525248,
      "x_output": 9.1
     },
     "laterite": {
-     "peak_rss_bytes": 872120320,
-     "x_output": 8.5
+     "peak_rss_bytes": 504922112,
+     "x_output": 4.9
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2444689408,
-     "x_output": 8.87
+     "peak_rss_bytes": 2445574144,
+     "x_output": 8.85
     },
     "laterite": {
-     "peak_rss_bytes": 2262564864,
-     "x_output": 8.21
+     "peak_rss_bytes": 1266286592,
+     "x_output": 4.58
     }
    },
    "524MB": {
@@ -448,58 +474,74 @@
   "write": {
    "5MB": {
     "python_ags4": {
-     "peak_rss_bytes": 157614080,
-     "x_output": 32.39
+     "peak_rss_bytes": 158433280,
+     "x_output": 32.42
     },
     "laterite_compat": {
-     "peak_rss_bytes": 237076480,
-     "x_output": 48.71
+     "peak_rss_bytes": 220037120,
+     "x_output": 45.03
     },
     "laterite": {
-     "peak_rss_bytes": 186056704,
-     "x_output": 38.23
+     "peak_rss_bytes": 138379264,
+     "x_output": 28.32
+    },
+    "laterite_unchecked": {
+     "peak_rss_bytes": 134479872,
+     "x_output": 27.52
     }
    },
    "25MB": {
     "python_ags4": {
-     "peak_rss_bytes": 317194240,
-     "x_output": 12.73
+     "peak_rss_bytes": 318537728,
+     "x_output": 12.74
     },
     "laterite_compat": {
-     "peak_rss_bytes": 537755648,
-     "x_output": 21.59
+     "peak_rss_bytes": 449396736,
+     "x_output": 17.97
     },
     "laterite": {
-     "peak_rss_bytes": 568393728,
-     "x_output": 22.82
+     "peak_rss_bytes": 350191616,
+     "x_output": 14.0
+    },
+    "laterite_unchecked": {
+     "peak_rss_bytes": 343703552,
+     "x_output": 13.74
     }
    },
    "100MB": {
     "python_ags4": {
-     "peak_rss_bytes": 937279488,
-     "x_output": 9.13
+     "peak_rss_bytes": 939573248,
+     "x_output": 9.12
     },
     "laterite_compat": {
-     "peak_rss_bytes": 1642135552,
-     "x_output": 16.0
+     "peak_rss_bytes": 1266237440,
+     "x_output": 12.29
     },
     "laterite": {
-     "peak_rss_bytes": 2047246336,
-     "x_output": 19.94
+     "peak_rss_bytes": 1129906176,
+     "x_output": 10.97
+    },
+    "laterite_unchecked": {
+     "peak_rss_bytes": 1109508096,
+     "x_output": 10.77
     }
    },
    "265MB": {
     "python_ags4": {
-     "peak_rss_bytes": 2443853824,
-     "x_output": 8.87
+     "peak_rss_bytes": 2445508608,
+     "x_output": 8.85
     },
     "laterite_compat": {
-     "peak_rss_bytes": 3914235904,
-     "x_output": 14.21
+     "peak_rss_bytes": 2943434752,
+     "x_output": 10.65
     },
     "laterite": {
-     "peak_rss_bytes": 5171527680,
-     "x_output": 18.77
+     "peak_rss_bytes": 3004874752,
+     "x_output": 10.87
+    },
+    "laterite_unchecked": {
+     "peak_rss_bytes": 2963652608,
+     "x_output": 10.72
     }
    },
    "524MB": {
@@ -520,10 +562,10 @@
  },
  "import_baselines": {
   "python_ags4": {
-   "peak_rss_bytes": 31899648
+   "peak_rss_bytes": 32751616
   },
   "laterite": {
-   "peak_rss_bytes": 72613888
+   "peak_rss_bytes": 74055680
   }
  },
  "notes": [
@@ -587,6 +629,151 @@
    "commit": "2e4367b21f7a3dae06321d31c28d08fafa26c873",
    "invocation": {
     "rungs": [],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T21:40:37+00:00",
+   "commit": "e0bd9419bfb96633947782c7d948bd2286464540",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-08-31T21:46:47+00:00",
+   "commit": "b42b95484c7f9e253ac0513026d4c66ab6c965f3",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-01T15:57:32+00:00",
+   "commit": "8a5d540538c5e74b6180829ac6b75ef46dcc49ab",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-01T18:53:32+00:00",
+   "commit": "62fed24589c27ae8d82f663ea48e1cdaae671149",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-02T03:50:39+00:00",
+   "commit": "b2088417cdf6754c72d86fa8b62d7c0b1bcfb774",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-02T04:13:52+00:00",
+   "commit": "b2088417cdf6754c72d86fa8b62d7c0b1bcfb774",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB",
+     "524MB"
+    ],
+    "mem_rungs": [],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-02T18:11:33+00:00",
+   "commit": "37b234842a9751eab54f89be32975f6d6b8dccc4",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB",
+     "524MB"
+    ],
+    "mem_rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB"
+    ],
+    "runs": 5
+   }
+  },
+  {
+   "generated": "2026-09-02T18:39:00+00:00",
+   "commit": "37b234842a9751eab54f89be32975f6d6b8dccc4",
+   "invocation": {
+    "rungs": [
+     "5MB",
+     "25MB",
+     "100MB",
+     "265MB",
+     "524MB"
+    ],
     "mem_rungs": [
      "5MB",
      "25MB",

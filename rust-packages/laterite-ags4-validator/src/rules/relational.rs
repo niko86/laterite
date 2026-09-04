@@ -142,9 +142,13 @@ fn cols(g: &ParsedGroup, names: &[String]) -> Vec<Option<usize>> {
 /// row yields `""` so tuples stay positional — but it no longer clones every
 /// cell. These tuples exist only to be hashed and compared; the rows already
 /// own the text, so the clone bought nothing.
-fn tuple_at<'a>(idx: &[Option<usize>], row: &'a crate::parse::DataRow) -> Vec<&'a str> {
+fn tuple_at<'a>(
+    idx: &[Option<usize>],
+    row: &crate::parse::DataRow,
+    g: &'a crate::parse::ParsedGroup,
+) -> Vec<&'a str> {
     idx.iter()
-        .map(|i| i.and_then(|i| row.values.get(i)).map_or("", String::as_str))
+        .map(|i| i.and_then(|i| g.value_at(row, i)).unwrap_or(""))
         .collect()
 }
 
@@ -186,10 +190,10 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
     let idx = cols(g, &keys);
     let mut counts: HashMap<Vec<&str>, usize> = HashMap::new();
     for row in &g.rows {
-        *counts.entry(tuple_at(&idx, row)).or_default() += 1;
+        *counts.entry(tuple_at(&idx, row, g)).or_default() += 1;
     }
     for (ri, row) in g.rows.iter().enumerate() {
-        let t = tuple_at(&idx, row);
+        let t = tuple_at(&idx, row, g);
         if counts.get(&t).copied().unwrap_or(0) > 1 {
             add_at(
                 found,
@@ -248,7 +252,7 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
     for (ri, row) in g.rows.iter().enumerate() {
         let any_empty = req_cols
             .iter()
-            .any(|(i, _)| row.values.get(*i).is_none_or(|v| v.trim().is_empty()));
+            .any(|(i, _)| g.value_at(row, *i).is_none_or(|v| v.trim().is_empty()));
         if !any_empty {
             continue;
         }
@@ -259,12 +263,12 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
         let empty_at: std::collections::HashMap<usize, &str> = req_cols
             .iter()
             .copied()
-            .filter(|(i, _)| row.values.get(*i).is_none_or(|v| v.trim().is_empty()))
+            .filter(|(i, _)| g.value_at(row, *i).is_none_or(|v| v.trim().is_empty()))
             .collect();
         let mut parts: Vec<String> = Vec::with_capacity(g.headings.len() + 1);
         parts.push("DATA".to_string());
         for (i, _) in g.headings.iter().enumerate() {
-            let v = row.values.get(i).map_or("", String::as_str);
+            let v = g.value_at(row, i).unwrap_or("");
             if let Some(name) = empty_at.get(&i) {
                 parts.push(format!("??{name}??"));
             } else {
@@ -387,10 +391,10 @@ fn rule_10c<'p>(
     let cidx = cols(g, &pkeys);
     let ptuples = parent_tuples.entry(parent.to_string()).or_insert_with(|| {
         let pidx = cols(pg, &pkeys);
-        pg.rows.iter().map(|r| tuple_at(&pidx, r)).collect()
+        pg.rows.iter().map(|r| tuple_at(&pidx, r, pg)).collect()
     });
     for (ri, row) in g.rows.iter().enumerate() {
-        let t = tuple_at(&cidx, row);
+        let t = tuple_at(&cidx, row, g);
         // O-39: a child row whose parent KEY cells are ALL empty is
         // "standalone" by the file's own design (a lab-control SAMP with
         // no LOCA borehole, an off-site sample), so the link requirement
@@ -573,8 +577,8 @@ fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
     let (Some(di), Some(ci)) = (col(tran, "TRAN_DLIM"), col(tran, "TRAN_RCON")) else {
         return;
     };
-    let delim = data.values.get(di).map_or("", String::as_str);
-    let concat = data.values.get(ci).map_or("", String::as_str);
+    let delim = tran.value_at(data, di).unwrap_or("");
+    let concat = tran.value_at(data, ci).unwrap_or("");
 
     let mut blocked = false;
     if delim.is_empty() {
@@ -617,7 +621,7 @@ fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut Findings
                 continue;
             }
             for (ri, row) in g.rows.iter().enumerate() {
-                let Some(rl) = row.values.get(ci) else {
+                let Some(rl) = g.value_at(row, ci) else {
                     continue;
                 };
                 if rl.is_empty() {
@@ -691,7 +695,7 @@ fn fetch_count(parsed: &ParsedFile, parts: &[&str]) -> usize {
         .filter(|r| {
             keys.iter()
                 .enumerate()
-                .all(|(i, k)| r.values.get(i).map_or("", String::as_str) == *k)
+                .all(|(i, k)| g.value_at(r, i).unwrap_or("") == *k)
         })
         .count()
 }

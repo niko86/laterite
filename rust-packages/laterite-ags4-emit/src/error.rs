@@ -11,9 +11,16 @@ use laterite_ags4_validator::findings::Findings;
 pub enum EmitError {
     /// Writing the AGS4 bytes failed (io on the in-memory/streamed writer).
     Write(String),
-    /// Re-parsing the emitter's own output for validation failed. The
-    /// emitter produces well-formed AGS4, so this is defensive — it would
-    /// only fire on a genuine internal bug.
+    /// The output's VERDICT leg failed: assembling the writer-built
+    /// `ParsedFile` over the emitted bytes, running the rules over it, or —
+    /// on `AutoFix`'s rare actual-fixes branch only — genuinely re-parsing
+    /// the rewritten output. The name predates the streamed verdict (#855,
+    /// which made not re-parsing the point): two of its four raise sites
+    /// never parse anything, but the RENAME is a breaking change on a crate
+    /// level with the registry, so it waits for emit's next breaking window
+    /// and this doc describes what the variant actually covers (#857). The
+    /// emitter produces well-formed AGS4, so any of these firing is
+    /// defensive — a genuine internal bug.
     Reparse(String),
     /// `EmitMode::Strict`: the generated output violates one or more
     /// error-severity AGS4 rules. Carries the findings so the caller sees
@@ -35,7 +42,7 @@ impl fmt::Display for EmitError {
         match self {
             EmitError::Write(m) => write!(f, "ags4 emit: write failed: {m}"),
             EmitError::Reparse(m) => {
-                write!(f, "ags4 emit: re-parse for validation failed: {m}")
+                write!(f, "ags4 emit: building the output's verdict failed: {m}")
             }
             EmitError::Invalid(found) => {
                 let n: usize = found.values().map(Vec::len).sum();
@@ -70,7 +77,7 @@ mod tests {
         assert!(
             EmitError::Reparse("bad utf8".into())
                 .to_string()
-                .contains("re-parse")
+                .contains("verdict")
         );
         let nl = EmitError::EmbeddedNewline {
             tag: "DATA".into(),

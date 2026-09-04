@@ -14,13 +14,15 @@ mod error;
 mod writer;
 
 #[cfg(feature = "arrow")]
-pub use arrow_in::{ArrowGroup, emit_ags4_from_arrow};
+pub use arrow_in::{
+    ArrowEmitSession, ArrowGroup, emit_ags4_from_arrow, emit_ags4_from_arrow_unchecked,
+};
 pub use emit::{
     EmitMode, EmitOpts, EmitResult, GroupInput, TranStamp, TranStampError, emit_ags4,
-    emit_ags4_owned,
+    emit_ags4_owned, emit_ags4_unchecked,
 };
 pub use error::EmitError;
-pub use writer::{EmitGroup, MatrixStream, write_ags4, write_ags4_matrix};
+pub use writer::{EmitGroup, MatrixStream, canonical_matrix_blocks, write_ags4, write_ags4_matrix};
 
 // Re-export the edition enum so callers configure emit without taking a
 // direct `laterite-ags4-validator` dependency just for the type.

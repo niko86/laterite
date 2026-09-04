@@ -130,9 +130,9 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         return; // malformed ABBR — main Rule 16 / Rule 9 report it
     };
     for row in &abbr.rows {
-        let hdng = row.values.get(hi).map_or("", String::as_str);
-        let code = row.values.get(ci).map_or("", String::as_str);
-        let file_desc = row.values.get(di).map_or("", String::as_str);
+        let hdng = abbr.value_at(row, hi).unwrap_or("");
+        let code = abbr.value_at(row, ci).unwrap_or("");
+        let file_desc = abbr.value_at(row, di).unwrap_or("");
         if hdng.is_empty() || code.is_empty() {
             continue;
         }
@@ -187,8 +187,8 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
         return; // malformed ABBR — main Rule 16 / Rule 9 report it
     };
     for row in &abbr.rows {
-        let hdng = row.values.get(hi).map_or("", String::as_str);
-        let code = row.values.get(ci).map_or("", String::as_str);
+        let hdng = abbr.value_at(row, hi).unwrap_or("");
+        let code = abbr.value_at(row, ci).unwrap_or("");
         if hdng.is_empty() || code.is_empty() {
             continue;
         }
@@ -235,7 +235,7 @@ fn tran_ags_unrecognised(
     let Some(ci) = tran.headings.iter().position(|h| h == "TRAN_AGS") else {
         return;
     };
-    let Some(v) = tran.rows.first().and_then(|r| r.values.get(ci)) else {
+    let Some(v) = tran.rows.first().and_then(|r| tran.value_at(r, ci)) else {
         return;
     };
     let t = v.trim();
@@ -265,7 +265,7 @@ fn col(g: &ParsedGroup, name: &str) -> Option<usize> {
 fn column_values(g: &ParsedGroup, ci: usize) -> BTreeSet<&str> {
     g.rows
         .iter()
-        .filter_map(|r| r.values.get(ci).map(String::as_str))
+        .filter_map(|r| g.value_at(r, ci))
         .filter(|v| !v.is_empty())
         .collect()
 }
@@ -371,7 +371,7 @@ fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
         (Some(hi), Some(ci)) => abbr
             .rows
             .iter()
-            .filter_map(|r| Some((r.values.get(hi)?.as_str(), r.values.get(ci)?.as_str())))
+            .filter_map(|r| Some((abbr.value_at(r, hi)?, abbr.value_at(r, ci)?)))
             .collect(),
         _ => return, // malformed ABBR — Rule 10a/4 reports it
     };
@@ -381,8 +381,7 @@ fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
         .groups
         .get("TRAN")
         .and_then(|t| col(t, "TRAN_RCON").map(|ci| (t, ci)))
-        .and_then(|(t, ci)| t.rows.first().and_then(|r| r.values.get(ci)))
-        .map(String::as_str)
+        .and_then(|(t, ci)| t.rows.first().and_then(|r| t.value_at(r, ci)))
         .filter(|s| !s.is_empty());
 
     for code in &parsed.group_order {
@@ -522,7 +521,7 @@ fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
 
     // (2) Per-row defects.
     for row in &dictg.rows {
-        let grp = row.values.get(gi).map_or("", String::as_str);
+        let grp = dictg.value_at(row, gi).unwrap_or("");
         if grp.is_empty() {
             add_at(
                 found,
@@ -539,12 +538,8 @@ fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
         }
         // A HEADING-type row must name the heading it defines (a GROUP-type row
         // legitimately has a blank DICT_HDNG, so branch on DICT_TYPE first).
-        let dtype = ti
-            .and_then(|ti| row.values.get(ti))
-            .map_or("", String::as_str);
-        let hdng = hi
-            .and_then(|hi| row.values.get(hi))
-            .map_or("", String::as_str);
+        let dtype = ti.and_then(|ti| dictg.value_at(row, ti)).unwrap_or("");
+        let hdng = hi.and_then(|hi| dictg.value_at(row, hi)).unwrap_or("");
         if dtype.eq_ignore_ascii_case("HEADING") && hdng.is_empty() {
             add_at(
                 found,

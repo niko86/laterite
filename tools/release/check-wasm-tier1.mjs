@@ -77,6 +77,7 @@ import { checkWasmArtifact, pkgDirArg } from "./wasm-artifact-gate.mjs";
 const EXPECTED_FUNCTIONS = [
   "apply_fixes",
   "build_ags4",
+  "build_ags4_unchecked",
   "censor",
   "certify",
   "compute_fixes",

@@ -11,6 +11,14 @@
 //! 1-indexed **line** number, and (via [`field_span`]) **char** spans —
 //! none back-derived from another.
 //!
+//! **Representation** (`dec-parse-cell-representation`): the decoded text is
+//! retained ONCE, in [`ParsedFile::text`], and every line and cell is a
+//! `u32` [`Span`] into it — a THIRD coordinate space (decoded-buffer bytes),
+//! distinct from both the original-byte offsets above and `field_span`'s
+//! char spans. A cell whose source carried `""` escapes is unescaped once at
+//! parse into a fix-up region of the same buffer, so every read stays a
+//! plain `&str`.
+//!
 //! Both consumers adopted it: the validator re-exports the leaf's types from
 //! its own `parse` module, and core's `ags4_codec` builds its lean projection
 //! on the same walk. The legacy [`parse_bytes`] / [`parse_str`] signatures are
@@ -23,40 +31,106 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 // --- output types (§3.3) --------------------------------------------
 
-/// One physical source line (rich overlay; retained only when
-/// [`ParseOptions::retain_raw_lines`]).
+/// A byte span into [`ParsedFile::text`] — the retained DECODED buffer, a
+/// second coordinate system beside the original-byte `byte_offset` fields
+/// (`dec-parse-cell-representation`). The two genuinely diverge for non-UTF-8
+/// encodings and lossy replacement; never read one with the other's offsets.
+/// Also distinct from [`field_span`], which returns CHAR offsets.
+///
+/// Equality compares COORDINATES, not text: two spans (and therefore two
+/// [`DataRow`]s or [`RawLine`]s) are equal when they point at the same
+/// offsets, which is meaningful within one parse, or across parses of
+/// byte-identical input — never as a cross-file text comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl Span {
+    /// The spanned text. `buf` must be the [`ParsedFile::text`] this span was
+    /// parsed into ([`ParsedGroup::text`] is the same buffer).
+    #[must_use]
+    pub fn slice<'a>(&self, buf: &'a str) -> &'a str {
+        &buf[self.start as usize..self.end as usize]
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        (self.end - self.start) as usize
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.start == self.end
+    }
+}
+
+/// One physical source line. Always retained — a line is a [`Span`] over a
+/// buffer the parse keeps anyway, so the old opt-in overlay collapsed into
+/// the base model — except under [`ParseOptions::locate_only`], which
+/// retains no text at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawLine {
     /// 1-indexed, matching how editors + the AGS4 validator report.
     pub number: u32,
-    /// Line content with the trailing CR/LF stripped.
-    pub text: String,
+    /// Line content with the trailing CR/LF stripped: a span into
+    /// [`ParsedFile::text`] (read via [`ParsedFile::line_text`]).
+    pub text: Span,
     /// Whether the line was CR+LF terminated (the `text` loses the CR, so
     /// the evidence is captured here — Rule 2a).
     pub had_crlf: bool,
-    /// Absolute byte offset of this line's start in the ORIGINAL bytes
-    /// (BOM included — byte 0 is genuinely byte 0).
-    pub byte_offset: u64,
+    // The per-line source byte offset moved to
+    // [`ParsedFile::line_byte_offsets`], profile-gated (dec-parse-structure-
+    // layout): the validator never read it, and 8 bytes per physical line was
+    // most of this struct's weight.
 }
 
-/// One DATA row.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One DATA row: the slim index into its group's span arena
+/// ([`ParsedGroup::row_spans`]). The cells themselves live contiguously in
+/// the arena — a per-row `Vec<Span>` heap block was the retained-structure
+/// cost queue M6 exists to remove (`dec-parse-structure-layout`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataRow {
     /// 1-indexed physical line (the validator's findings/fixes join key).
     pub line: u32,
-    /// Record start byte offset in source bytes (record-granular index).
-    pub byte_offset: u64,
-    /// Field values after the leading tag, unquoted + unescaped,
-    /// positionally aligned with [`ParsedGroup::headings`]. RAW (untrimmed).
-    pub values: Vec<String>,
+    /// First cell's index in [`ParsedGroup`]'s span arena.
+    first: u32,
+    /// Cell count (fields after the leading tag).
+    n: u32,
+}
+
+impl DataRow {
+    /// Number of fields after the leading tag — what `values.len()` was.
+    #[must_use]
+    pub fn n_values(&self) -> usize {
+        self.n as usize
+    }
+
+    /// This row's index range in its group's span arena. Meaningful only
+    /// against the [`ParsedGroup`] that produced the row.
+    #[must_use]
+    pub fn span_range(&self) -> std::ops::Range<usize> {
+        self.first as usize..(self.first + self.n) as usize
+    }
 }
 
 /// One GROUP and its descriptor rows + data.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Equality compares the MODEL — code, lines, descriptor values and span
+/// coordinates — and deliberately not the shared buffer: comparing it would
+/// make byte-identical groups from different files unequal and cost an
+/// O(file) memcmp per comparison. Span-coordinate caveat as on [`Span`].
+#[derive(Clone)]
 pub struct ParsedGroup {
+    /// The shared decoded buffer — the same `Arc` as [`ParsedFile::text`],
+    /// cloned in so a group handed out alone (the three long-lived FFI
+    /// holders) can still resolve its rows' spans.
+    buf: Arc<String>,
     pub code: String,
     pub group_line: u32,
     /// THE cert datum: byte offset of the `"GROUP",…` record start.
@@ -65,11 +139,20 @@ pub struct ParsedGroup {
     pub unit_line: Option<u32>,
     pub type_line: Option<u32>,
     pub headings: Vec<String>,
-    /// NOT padded — raw `rest()` (Rule 4/8 arity needs the real length).
+    /// NOT padded — the raw descriptor tail (Rule 4/8 arity needs the real length).
     pub units: Vec<String>,
     /// NOT padded.
     pub types: Vec<String>,
     pub rows: Vec<DataRow>,
+    /// The span arena: every DATA row's cells, contiguous, in row order.
+    /// Row `i` owns `spans[rows[i].span_range()]` — one allocation per group
+    /// instead of one per row (`dec-parse-structure-layout`).
+    spans: Vec<Span>,
+    /// Source byte offset of each DATA row's record start, parallel to
+    /// `rows` — PROFILE-GATED: filled only under
+    /// [`ParseOptions::retain_source_offsets`] (the lean/certify profiles),
+    /// empty under `validating()` (the rule engine never reads it).
+    pub row_byte_offsets: Vec<u64>,
 }
 
 impl ParsedGroup {
@@ -77,10 +160,47 @@ impl ParsedGroup {
     /// row. Borrowing accessor every typed-Arrow host feeds to
     /// `laterite_ags4_types::arrow_cols` — keeps typing out of the parse leaf.
     pub fn cell(&self, col: usize, row: usize) -> Option<&str> {
-        self.rows
-            .get(row)
-            .and_then(|r| r.values.get(col))
-            .map(String::as_str)
+        self.rows.get(row).and_then(|r| self.value_at(r, col))
+    }
+
+    /// The row's cell spans, resolved against this group's arena. Meaningful
+    /// only for a row this group produced — the arena indices are group-local.
+    #[must_use]
+    pub fn row_spans(&self, row: &DataRow) -> &[Span] {
+        &self.spans[row.span_range()]
+    }
+
+    /// Source byte offset of DATA row `i`'s record start, if this parse's
+    /// profile retained the per-row source-byte coordinate
+    /// ([`ParseOptions::retain_source_offsets`]).
+    #[must_use]
+    pub fn row_byte_offset(&self, i: usize) -> Option<u64> {
+        self.row_byte_offsets.get(i).copied()
+    }
+
+    /// Raw value of `row` at `col`, resolved against this group's shared
+    /// buffer — the row-relative sibling of [`Self::cell`] for callers
+    /// already holding a `&DataRow`. Owning the span/buffer pairing here is
+    /// the point: a span read against the wrong buffer is silent corruption,
+    /// not an error, so the group the row came from does the read (#844).
+    #[must_use]
+    pub fn value_at(&self, row: &DataRow, col: usize) -> Option<&str> {
+        if col >= row.n_values() {
+            return None;
+        }
+        self.spans
+            .get(row.first as usize + col)
+            .map(|s| s.slice(&self.buf))
+    }
+
+    /// `row`'s values materialised as owned strings, padded/truncated to
+    /// exactly `n` columns (a ragged row's missing tail fills with `""`) —
+    /// the shape every matrix-building emitter re-implemented by hand (#844).
+    #[must_use]
+    pub fn padded_row_strings(&self, row: &DataRow, n: usize) -> Vec<String> {
+        (0..n)
+            .map(|i| self.value_at(row, i).unwrap_or("").to_string())
+            .collect()
     }
 
     /// Column index of a heading by name (de-dups the `position()` dance
@@ -88,6 +208,70 @@ impl ParsedGroup {
     #[must_use]
     pub fn col(&self, name: &str) -> Option<usize> {
         self.headings.iter().position(|h| h == name)
+    }
+
+    /// The decoded buffer this group's arena spans index — the slicing base
+    /// for direct [`Self::row_spans`] reads.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.buf
+    }
+
+    /// The shared buffer by refcount (for holders that outlive `&self`).
+    #[must_use]
+    pub fn shared_text(&self) -> &Arc<String> {
+        &self.buf
+    }
+}
+
+impl PartialEq for ParsedGroup {
+    fn eq(&self, other: &Self) -> bool {
+        // `buf` deliberately excluded — see the type doc.
+        self.code == other.code
+            && self.group_line == other.group_line
+            && self.group_byte == other.group_byte
+            && self.heading_line == other.heading_line
+            && self.unit_line == other.unit_line
+            && self.type_line == other.type_line
+            && self.headings == other.headings
+            && self.units == other.units
+            && self.types == other.types
+            && self.rows == other.rows
+            && self.spans == other.spans
+            && self.row_byte_offsets == other.row_byte_offsets
+    }
+}
+
+impl Eq for ParsedGroup {}
+
+impl std::fmt::Debug for ParsedGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Manual: the derive would print the WHOLE shared buffer once per
+        // group (a 25 MB file floods a test-failure message group_count times).
+        f.debug_struct("ParsedGroup")
+            .field(
+                "buf",
+                &format_args!("Arc<String>({} bytes)", self.buf.len()),
+            )
+            .field("code", &self.code)
+            .field("group_line", &self.group_line)
+            .field("group_byte", &self.group_byte)
+            .field("heading_line", &self.heading_line)
+            .field("unit_line", &self.unit_line)
+            .field("type_line", &self.type_line)
+            .field("headings", &self.headings)
+            .field("units", &self.units)
+            .field("types", &self.types)
+            .field("rows", &self.rows)
+            .field(
+                "spans",
+                &format_args!("Vec<Span>({} cells)", self.spans.len()),
+            )
+            .field(
+                "row_byte_offsets",
+                &format_args!("Vec<u64>({} rows)", self.row_byte_offsets.len()),
+            )
+            .finish()
     }
 }
 
@@ -111,8 +295,22 @@ pub struct GroupRecord {
 
 /// A parsed AGS4 file. The validator's `ParsedFile` plus byte fields,
 /// `total_bytes`, and `byte_offsets_source_true`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ParsedFile {
+    /// The retained decoded text, ONE copy for the whole file: every line's
+    /// body (terminators dropped — [`RawLine::had_crlf`] keeps the evidence),
+    /// with the once-unescaped value of every `""`-escaped cell appended as
+    /// a fix-up run directly after its own line's body — fix-ups are
+    /// INTERLEAVED between line bodies, so consecutive [`RawLine`] spans are
+    /// NOT contiguous; slice per span, never across spans. Every [`Span`]
+    /// indexes this buffer; each [`ParsedGroup`] shares it by refcount.
+    ///
+    /// `Arc<String>` rather than `Arc<str>` deliberately: `Arc<str>::from`
+    /// COPIES the buffer, and that whole-file transient sat exactly at the
+    /// operation peak the M4 spike was minted to lower — `Arc::new(String)`
+    /// adopts the built buffer zero-copy. The capacity slack it keeps is the
+    /// dropped terminators, ~a few % of the file.
+    pub text: Arc<String>,
     /// First-seen wins on duplicate GROUP codes.
     pub groups: BTreeMap<String, ParsedGroup>,
     /// GROUP codes in appearance order.
@@ -121,8 +319,13 @@ pub struct ParsedFile {
     /// is the de-duplicated view of this; anything that needs to LOCATE bytes must
     /// read this instead (see [`GroupRecord`]).
     pub group_records: Vec<GroupRecord>,
-    /// Every line — empty unless [`ParseOptions::retain_raw_lines`].
+    /// Every line — empty only under [`ParseOptions::locate_only`].
     pub raw_lines: Vec<RawLine>,
+    /// Source byte offset of each physical line's start in the ORIGINAL
+    /// bytes (BOM included — byte 0 is genuinely byte 0), parallel to
+    /// `raw_lines`. PROFILE-GATED: filled only under
+    /// [`ParseOptions::retain_source_offsets`], empty under `validating()`.
+    pub line_byte_offsets: Vec<u64>,
     pub total_lines: u32,
     /// File began with a UTF-8 BOM (`EF BB BF`).
     pub has_bom: bool,
@@ -133,6 +336,47 @@ pub struct ParsedFile {
     /// against corruption — note: NOT gated on `!has_bom` (the BOM's bytes
     /// are counted, so offsets stay true through it).
     pub byte_offsets_source_true: bool,
+}
+
+impl ParsedFile {
+    /// A retained line's text ([`RawLine::text`] resolved against the shared
+    /// decoded buffer).
+    #[must_use]
+    pub fn line_text<'a>(&'a self, line: &RawLine) -> &'a str {
+        line.text.slice(&self.text)
+    }
+
+    /// Source byte offset of physical line `i` (0-based index into
+    /// `raw_lines`), if this parse's profile retained the per-line
+    /// source-byte coordinate ([`ParseOptions::retain_source_offsets`]).
+    #[must_use]
+    pub fn line_byte_offset(&self, i: usize) -> Option<u64> {
+        self.line_byte_offsets.get(i).copied()
+    }
+}
+
+impl std::fmt::Debug for ParsedFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Manual: the derive would print the whole retained buffer.
+        f.debug_struct("ParsedFile")
+            .field(
+                "text",
+                &format_args!("Arc<String>({} bytes)", self.text.len()),
+            )
+            .field("groups", &self.groups)
+            .field("group_order", &self.group_order)
+            .field("group_records", &self.group_records)
+            .field("raw_lines", &self.raw_lines)
+            .field(
+                "line_byte_offsets",
+                &format_args!("Vec<u64>({} lines)", self.line_byte_offsets.len()),
+            )
+            .field("total_lines", &self.total_lines)
+            .field("has_bom", &self.has_bom)
+            .field("total_bytes", &self.total_bytes)
+            .field("byte_offsets_source_true", &self.byte_offsets_source_true)
+            .finish()
+    }
 }
 
 // --- options + errors (§3.2) ----------------------------------------
@@ -151,9 +395,6 @@ pub enum InvalidUtf8 {
 /// the lean profile.
 #[derive(Debug, Clone, Copy)]
 pub struct ParseOptions {
-    /// Retain `raw_lines` (the heavy per-line `String` overlay). Off in the
-    /// lean cert/sliced-read path.
-    pub retain_raw_lines: bool,
     pub encoding: &'static encoding_rs::Encoding,
     pub on_invalid_utf8: InvalidUtf8,
     /// Hard-fail on a structural violation — a HEADING/UNIT/TYPE/DATA row before
@@ -174,31 +415,44 @@ pub struct ParseOptions {
     /// then drops. `groups` comes back with empty headings/units/types/rows,
     /// so it is NOT a read profile; `index_ags4_bytes` is the only caller.
     pub locate_only: bool,
+    /// Retain the per-row/per-line SOURCE byte offsets
+    /// ([`ParsedGroup::row_byte_offsets`], [`ParsedFile::line_byte_offsets`]).
+    /// ON under `lean()` (the certify/read profiles keep the source-byte
+    /// coordinate system), OFF under `validating()` — the rule engine reads
+    /// none of them, and their per-row/per-line `u64`s were most of the
+    /// retained structure's weight beyond the arena
+    /// (`dec-parse-structure-layout`). The group-level coordinates
+    /// (`group_byte`, `group_records`, `total_bytes`,
+    /// `byte_offsets_source_true`) are NOT gated: every profile records
+    /// them, so the cert index works from any parse.
+    pub retain_source_offsets: bool,
 }
 
 impl ParseOptions {
-    /// Lean: no raw-line retention, UTF-8, reject invalid bytes loudly, lenient
-    /// structure (the caller opts into `strict_structure` if it wants hard-fails).
+    /// Lean: UTF-8, reject invalid bytes loudly, lenient structure (the
+    /// caller opts into `strict_structure` if it wants hard-fails). Since the
+    /// span rewrite the profiles differ ONLY in decode policy — the old
+    /// raw-line-retention knob died with the representation that made it
+    /// expensive (a retained line costs ~a span).
     #[must_use]
     pub fn lean() -> Self {
         ParseOptions {
-            retain_raw_lines: false,
             encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::Reject,
             strict_structure: false,
             locate_only: false,
+            retain_source_offsets: true,
         }
     }
-    /// Validating: keep raw lines, UTF-8, lossy-replace, lenient structure (the
-    /// validator twin — never crashes, reports problems as findings).
+    /// Validating: UTF-8, lossy-replace, lenient structure (the validator
+    /// twin — never crashes, reports problems as findings). Drops the
+    /// per-row/per-line source byte offsets: no rule reads them.
     #[must_use]
     pub fn validating() -> Self {
         ParseOptions {
-            retain_raw_lines: true,
-            encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::LossyReplace,
-            strict_structure: false,
-            locate_only: false,
+            retain_source_offsets: false,
+            ..ParseOptions::lean()
         }
     }
 }
@@ -220,6 +474,9 @@ pub enum ParseError {
     /// pins these). The lenient default never raises this — the validator keeps
     /// parsing so its rule engine can report *every* problem as a finding.
     Structure(String),
+    /// The retained decoded buffer would exceed the `u32` span space (≈4 GiB
+    /// of decoded text). Raised instead of silently truncating an offset.
+    TooLarge,
 }
 
 // --- legacy entry points (signatures preserved verbatim) -------------
@@ -305,8 +562,8 @@ fn decode_line<'a>(
     let borrowed = matches!(cow, Cow::Borrowed(_));
     // Deliberately NOT `into_owned()`. Every line used to allocate a String
     // here even when the caller only needed a `&str` to tokenize and then
-    // dropped it — 418k allocations on a 25 MB file. The one caller that
-    // genuinely needs ownership (`retain_raw_lines`) takes it at the push.
+    // dropped it. Retention is one append into the shared buffer now, so no
+    // per-line ownership exists anywhere.
     Ok((cow, had_repl, borrowed))
 }
 
@@ -534,21 +791,51 @@ pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
     }
 }
 
-/// The unified parser. Drives [`split_ags_line`] over the raw bytes,
-/// decoding each line, so every record carries its absolute source-byte
-/// offset while line/char positions are against the decoded text.
-/// Take everything after the leading tag, MOVING the values out of `fields`.
-///
-/// This used to be `fields[1..].to_vec()`, which clones every `String` the
-/// tokenizer just allocated — so each cell was heap-allocated twice, once by
-/// `split_ags_line` and once here, on every descriptor and DATA row. Nothing
-/// reads `fields` after its arm, so the tail can simply be handed over.
-fn rest(fields: &mut Vec<String>) -> Vec<String> {
-    if fields.len() > 1 {
-        fields.split_off(1)
-    } else {
-        Vec::new()
+/// Append one run of decoded text to the retained buffer, returning the
+/// offset it landed at. The ONE site that guards the `u32` span space — past
+/// it, an offset would silently truncate, so the parse refuses instead.
+fn append_text(buf: &mut String, s: &str) -> Result<u32, ParseError> {
+    let base = buf.len();
+    // checked_add, not `+`: on a 32-bit target (wasm is a shipped surface)
+    // `u32::MAX as usize == usize::MAX`, so a plain addition would wrap
+    // before the comparison could ever refuse.
+    match base.checked_add(s.len()) {
+        Some(end) if u32::try_from(end).is_ok() => {}
+        _ => return Err(ParseError::TooLarge),
     }
+    buf.push_str(s);
+    // In range by the guard two lines up — the one place that proves it.
+    #[allow(clippy::cast_possible_truncation)]
+    Ok(base as u32)
+}
+
+/// Build a [`Span`] from `usize` bounds already proven in range: every bound
+/// here is ≤ a buffer length [`append_text`] guarded against `u32::MAX`.
+#[allow(clippy::cast_possible_truncation)]
+fn span_at(start: usize, end: usize) -> Span {
+    Span {
+        start: start as u32,
+        end: end as u32,
+    }
+}
+
+/// One field's logical value materialised: the span's slice, unescaped only
+/// when the tokenizer flagged a `""` (the rare case pays; the common one is
+/// a plain copy).
+fn owned_field(line: &str, f: &FieldSpan) -> String {
+    let s = &line[f.start..f.end];
+    if f.has_escape {
+        unescape_doubled(s)
+    } else {
+        s.to_string()
+    }
+}
+
+/// Everything after the leading tag, as owned unescaped values — the
+/// descriptor rows (HEADING/UNIT/TYPE) stay `Vec<String>`: one line per
+/// group, nowhere near the cell hold the span rewrite exists to kill.
+fn owned_rest(line: &str, spans: &[FieldSpan]) -> Vec<String> {
+    spans.iter().skip(1).map(|f| owned_field(line, f)).collect()
 }
 
 pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, ParseError> {
@@ -559,9 +846,24 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     let mut group_order: Vec<String> = Vec::new();
     let mut group_records: Vec<GroupRecord> = Vec::new();
     let mut raw_lines: Vec<RawLine> = Vec::new();
+    let mut line_byte_offsets: Vec<u64> = Vec::new();
+    // The locator profile retains no lines/rows, so there is nothing to
+    // hang an offset on — the group-level records carry its coordinates.
+    let retain_offsets = opts.retain_source_offsets && !opts.locate_only;
     let mut current: Option<String> = None;
     let mut looks_ags3 = false;
     let mut source_true = true;
+
+    // The retained decoded buffer (`ParsedFile::text`). Reserved at the
+    // source size once: decoded output tracks it closely for the
+    // ASCII-compatible encodings this walk accepts, and the locate-only
+    // profile retains nothing so reserves nothing.
+    let mut buf = String::new();
+    if !opts.locate_only {
+        buf.reserve(bytes.len());
+    }
+    // Tokenizer scratch, reused across lines — bounds, not Strings.
+    let mut fspans: Vec<FieldSpan> = Vec::new();
 
     let mut number = 0u32;
     for span in line_spans(bytes) {
@@ -583,6 +885,16 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             source_true = false;
         }
 
+        // Retain the line body up front; the DATA arm below reuses the same
+        // copy for its value spans, so a line's bytes are resident ONCE (the
+        // doubled residency the old owned overlay paid is gone). The locator
+        // profile retains no text at all.
+        let line_base: Option<u32> = if opts.locate_only {
+            None
+        } else {
+            Some(append_text(&mut buf, &text)?)
+        };
+
         // No phantom trailing blank: `line_spans` stops when the buffer ends
         // exactly at a terminator (a file ending in `\r\n`/`\n`/`\r` yields no
         // extra empty line), matching the old memchr walk's behaviour.
@@ -595,9 +907,11 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             // row on lines whose tag alone decides the outcome.
             //
             // `first_field` cannot unescape (a borrowed slice can't shrink), so
-            // it differs from `split_ags_line[0]` only on a tag containing `""`.
-            // No AGS4 descriptor and no AGS3 marker (`**`, `<UNITS>`, `<CONT>`)
-            // contains a quote, so every arm below reads the same either way.
+            // it differs from `split_ags_line[0]` on a tag containing `""` — and
+            // on junk before an opening quote (`junk"DATA"`), where it reads the
+            // quoted content and the splitter keeps the raw field. No AGS4
+            // descriptor and no AGS3 marker (`**`, `<UNITS>`, `<CONT>`) contains
+            // a quote, so every arm below reads the same either way.
             //
             // Non-empty after trim ⇒ non-empty field 0, so this never skips a
             // line the old `!fields.is_empty()` guard would have processed.
@@ -610,14 +924,17 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" | "UNIT" | "TYPE" | "DATA" => !opts.locate_only,
                     _ => false,
                 };
-                let mut fields = if needs_fields {
-                    split_ags_line(&text)
+                if needs_fields {
+                    split_ags_line_spans(&text, &mut fspans);
                 } else {
-                    Vec::new()
-                };
+                    fspans.clear();
+                }
                 match tag {
                     "GROUP" => {
-                        let code = fields.get(1).cloned().unwrap_or_default();
+                        let code = fspans
+                            .get(1)
+                            .map(|f| owned_field(&text, f))
+                            .unwrap_or_default();
                         if opts.strict_structure && code.is_empty() {
                             return Err(ParseError::Structure(
                                 "GROUP row missing group code".into(),
@@ -633,6 +950,11 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                         groups.entry(code.clone()).or_insert_with(|| {
                             group_order.push(code.clone());
                             ParsedGroup {
+                                // Placeholder until the buffer is complete —
+                                // every group is re-pointed at the shared Arc
+                                // at the end of the walk (unrelated to the
+                                // buffer's escape fix-up runs).
+                                buf: Arc::default(),
                                 code: code.clone(),
                                 group_line: number,
                                 group_byte: byte_offset,
@@ -643,6 +965,8 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                                 units: Vec::new(),
                                 types: Vec::new(),
                                 rows: Vec::new(),
+                                spans: Vec::new(),
+                                row_byte_offsets: Vec::new(),
                             }
                         });
                         // A duplicate GROUP still re-points "current" so its
@@ -671,7 +995,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.heading_line = Some(number);
-                            g.headings = rest(&mut fields);
+                            g.headings = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure(
                                 "HEADING row before any GROUP".into(),
@@ -681,7 +1005,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "UNIT" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.unit_line = Some(number);
-                            g.units = rest(&mut fields);
+                            g.units = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("UNIT row before any GROUP".into()));
                         }
@@ -689,18 +1013,49 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "TYPE" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.type_line = Some(number);
-                            g.types = rest(&mut fields);
+                            g.types = owned_rest(&text, &fspans);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("TYPE row before any GROUP".into()));
                         }
                     }
                     "DATA" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
+                            // locate_only is the only profile that skips the
+                            // buffer, and it never reaches this arm.
+                            let base = line_base.expect("DATA arm implies a retained line");
+                            // Cells append to the group's arena, not a per-row
+                            // Vec: one heap block per GROUP, not per row
+                            // (dec-parse-structure-layout). The arena index is
+                            // u32 like the span space it points into; a file
+                            // dense enough to overflow it refuses like the
+                            // buffer would.
+                            let first =
+                                u32::try_from(g.spans.len()).map_err(|_| ParseError::TooLarge)?;
+                            for f in fspans.iter().skip(1) {
+                                if f.has_escape {
+                                    // Unescaped ONCE, here, into the buffer's
+                                    // fix-up region; every later read of this
+                                    // cell is a plain `&str` slice.
+                                    let fixed = unescape_doubled(&text[f.start..f.end]);
+                                    let start = append_text(&mut buf, &fixed)? as usize;
+                                    g.spans.push(span_at(start, start + fixed.len()));
+                                } else {
+                                    let base = base as usize;
+                                    g.spans.push(span_at(base + f.start, base + f.end));
+                                }
+                            }
+                            // Fits u32: bounded by the arena growth just
+                            // guarded above.
+                            #[allow(clippy::cast_possible_truncation)]
+                            let n = (g.spans.len() - first as usize) as u32;
                             g.rows.push(DataRow {
                                 line: number,
-                                byte_offset,
-                                values: rest(&mut fields),
+                                first,
+                                n,
                             });
+                            if retain_offsets {
+                                g.row_byte_offsets.push(byte_offset);
+                            }
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("DATA row before any GROUP".into()));
                         }
@@ -714,15 +1069,15 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             }
         }
 
-        if opts.retain_raw_lines {
+        if let Some(base) = line_base {
             raw_lines.push(RawLine {
                 number,
-                // The one site that genuinely needs ownership — so it is the
-                // one site that pays for it.
-                text: text.into_owned(),
+                text: span_at(base as usize, base as usize + text.len()),
                 had_crlf,
-                byte_offset,
             });
+            if retain_offsets {
+                line_byte_offsets.push(byte_offset);
+            }
         }
     }
 
@@ -736,11 +1091,20 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     }
 
     let total_lines = number; // every line counted (raw_lines may be empty)
+    // ONE buffer of decoded text for the whole file, ADOPTED (not copied)
+    // into the Arc and shared into each group by refcount so a group handed
+    // out alone can still resolve its spans.
+    let text = Arc::new(buf);
+    for g in groups.values_mut() {
+        g.buf = Arc::clone(&text);
+    }
     Ok(ParsedFile {
+        text,
         groups,
         group_order,
         group_records,
         raw_lines,
+        line_byte_offsets,
         total_lines,
         has_bom,
         total_bytes,
@@ -748,6 +1112,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     })
 }
 
+pub mod builder;
 pub mod scan;
 
 // --- tokenizer + char-span tracker (lifted verbatim from the validator) ---
@@ -756,66 +1121,118 @@ pub mod scan;
 /// and doubles embedded quotes (`""`). Tolerant: an unquoted field is read
 /// up to the next comma; an unterminated quote consumes to end-of-line.
 /// Returns owned, unescaped values.
+///
+/// A thin adapter over [`split_ags_line_spans`] — ONE state machine decides
+/// the field bounds, and this materialises them. The two cannot disagree by
+/// construction, which is what lets the parser keep cells as spans while
+/// every legacy caller keeps its owned `Vec<String>`.
 #[must_use]
 pub fn split_ags_line(line: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut chars = line.chars().peekable();
+    let mut spans: Vec<FieldSpan> = Vec::new();
+    split_ags_line_spans(line, &mut spans);
+    spans.iter().map(|f| owned_field(line, f)).collect()
+}
 
+/// One field's LOGICAL-value bounds within a line, in BYTE offsets relative
+/// to the line start (the quotes excluded; junk between a closing quote and
+/// the next comma excluded). `has_escape` marks a quoted value that still
+/// carries doubled `""` escapes, so a span alone cannot represent it — the
+/// reader must unescape (the parser does, once, into the buffer's fix-up
+/// region).
+///
+/// Distinct from `scan::RawField`, which is the display/judging scanner with
+/// its own policy axis; THIS is the tolerant reader's tokenizer
+/// ([`split_ags_line`] semantics, exactly — mid-field quotes read verbatim
+/// in unquoted fields, unterminated quotes salvage to end-of-line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldSpan {
+    pub start: usize,
+    pub end: usize,
+    pub has_escape: bool,
+}
+
+/// Collapse doubled quotes (`""` → `"`), left to right — the unescape
+/// [`split_ags_line`] has always applied to quoted fields.
+fn unescape_doubled(s: &str) -> String {
+    s.replace("\"\"", "\"")
+}
+
+/// The tokenizer's span core: [`split_ags_line`]'s exact state machine, in
+/// bytes, yielding bounds instead of allocating. `out` is cleared and reused
+/// so a caller walking many lines allocates nothing in the steady state.
+/// Byte offsets are safe to slice with: every bound lands on an ASCII
+/// delimiter or the position after one, which UTF-8 guarantees is a char
+/// boundary.
+pub fn split_ags_line_spans(line: &str, out: &mut Vec<FieldSpan>) {
+    out.clear();
+    let b = line.as_bytes();
+    let n = b.len();
+    let mut i = 0usize;
     loop {
-        match chars.peek() {
-            None => break,
-            Some('"') => {
-                chars.next(); // consume opening quote
-                let mut field = String::new();
-                loop {
-                    match chars.next() {
-                        None => break, // unterminated — tolerate
-                        Some('"') => {
-                            if chars.peek() == Some(&'"') {
-                                chars.next();
-                                field.push('"'); // escaped quote
-                            } else {
-                                break; // closing quote
-                            }
-                        }
-                        Some(c) => field.push(c),
-                    }
+        if i >= n {
+            break;
+        }
+        if b[i] == b'"' {
+            i += 1; // consume opening quote
+            let start = i;
+            let mut has_escape = false;
+            let end;
+            loop {
+                if i >= n {
+                    end = i; // unterminated — tolerate, salvage to end-of-line
+                    break;
                 }
-                out.push(field);
-                if let Some(',') = chars.peek() {
-                    chars.next();
-                    continue;
-                }
-                while let Some(&c) = chars.peek() {
-                    if c == ',' {
-                        chars.next();
+                if b[i] == b'"' {
+                    if b.get(i + 1) == Some(&b'"') {
+                        has_escape = true; // escaped quote
+                        i += 2;
+                    } else {
+                        end = i; // closing quote
+                        i += 1;
                         break;
                     }
-                    chars.next();
+                } else {
+                    i += 1;
                 }
-                if chars.peek().is_none() {
+            }
+            out.push(FieldSpan {
+                start,
+                end,
+                has_escape,
+            });
+            if i < n && b[i] == b',' {
+                i += 1;
+                continue;
+            }
+            // Junk between a closing quote and the next comma is skipped,
+            // exactly as the owned splitter always has.
+            while i < n {
+                let c = b[i];
+                i += 1;
+                if c == b',' {
                     break;
                 }
             }
-            Some(_) => {
-                let mut field = String::new();
-                while let Some(&c) = chars.peek() {
-                    if c == ',' {
-                        break;
-                    }
-                    field.push(c);
-                    chars.next();
-                }
-                out.push(field);
-                if chars.peek() == Some(&',') {
-                    chars.next();
-                    continue;
-                }
+            if i >= n {
                 break;
             }
+        } else {
+            let start = i;
+            while i < n && b[i] != b',' {
+                i += 1;
+            }
+            out.push(FieldSpan {
+                start,
+                end: i,
+                has_escape: false,
+            });
+            if i < n && b[i] == b',' {
+                i += 1;
+                continue;
+            }
+            break;
         }
     }
-    out
 }
 
 /// Char-offset span of the content INSIDE the quotes of the raw-line field

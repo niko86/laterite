@@ -14,7 +14,7 @@
 
 [package]
 name = "laterite-ags4-trust"
-version = "0.13.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.15.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "The certificate trust model for AGS4: one door for check + mint"

@@ -35,7 +35,7 @@ downstream `df.shape`, indexing, and `.to_numeric` code keeps working.
 
 **It's also faster.** `AGS4_to_dataframe` reads a Rust-built Arrow table (no
 per-cell Python boxing) and materialises pandas through DuckDB. That comes out
-**~3× faster than python-ags4** on the pyarrow-free `[compat]` install, more
+**~4× faster than python-ags4** on the pyarrow-free `[compat]` install, more
 with the pyarrow accelerator. The frames are **object dtype** by default, byte-identical to
 python-ags4 today. Want pandas' Arrow-backed `str` dtype (what python-ags4
 returns on pandas 3)? Install `[compat,pyarrow]` and pass `string_dtype="string"`

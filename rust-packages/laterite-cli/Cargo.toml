@@ -64,23 +64,23 @@ mimalloc = { version = "0.1", features = ["v2"] }
 # has zero code-consumer breakage (every call site uses the re-exported
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /
 # check_file / findings).
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.13.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.14.0" }
 # `--diff` (#204): parse both files via the shared parse leaf + the
 # KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
-laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.11.0" }
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.1" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `lat merge` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Reuses the same parse/emit/reference leaves.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.12.1" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.13.0" }
 # `--emit-index` (#294 F#10): mint an `.ags.idx` validity certificate after a
 # clean check (`Sidecar::assemble`). `default-features = false` drops core's
 # `transport` feature, so the CLI does NOT pull age/zstd — only the index +
 # registry it needs.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.13.1", default-features = false }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.14.0", default-features = false }
 # The trust model: `check` (validate, with or without a certificate) and `mint`. The
 # binary no longer owns a `try_certified_skip` of its own — that conjunction was one of
 # five across the surfaces, and no two agreed.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.13.1" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
 # Timestamp the certificate (`ValidationStamp.checked_at`, RFC-3339). Already in
 # the tree via the validator; declared here to stamp the mint directly.
 chrono = "0.4"

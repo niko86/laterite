@@ -943,7 +943,13 @@ fn parse_primitives(
         for r in &g.rows {
             let ro = PyDict::new(py);
             ro.set_item("line", r.line)?;
-            ro.set_item("values", r.values.clone())?;
+            ro.set_item(
+                "values",
+                g.row_spans(r)
+                    .iter()
+                    .map(|s| s.slice(g.text()))
+                    .collect::<Vec<_>>(),
+            )?;
             rows.append(ro)?;
         }
         gd.set_item("rows", rows)?;
@@ -1054,8 +1060,8 @@ fn parse_compat_arrow(
         let ragged: Vec<(u32, usize)> = g
             .rows
             .iter()
-            .filter(|r| r.values.len() != n_head)
-            .map(|r| (r.line, r.values.len()))
+            .filter(|r| r.n_values() != n_head)
+            .map(|r| (r.line, r.n_values()))
             .collect();
         gd.set_item("ragged", ragged)?;
 
@@ -1098,36 +1104,10 @@ impl Reading {
     /// every field quoted, blank line between groups) — byte-faithful to
     /// the source DATA values it re-emits.
     fn emit(&self) -> String {
-        let blocks: Vec<(String, Vec<Vec<String>>)> = self
-            .parsed
-            .group_order
-            .iter()
-            .filter_map(|code| {
-                let g = self.parsed.groups.get(code)?;
-                let n = g.headings.len();
-                // tag + each of the n columns, padded/truncated like the old
-                // Python `_matrix` (a ragged DATA row fills its tail with "").
-                let pad = |tag: &str, src: &[String]| {
-                    let mut row = Vec::with_capacity(n + 1);
-                    row.push(tag.to_string());
-                    for i in 0..n {
-                        row.push(src.get(i).cloned().unwrap_or_default());
-                    }
-                    row
-                };
-                let mut matrix: Vec<Vec<String>> = Vec::with_capacity(3 + g.rows.len());
-                let mut heading = Vec::with_capacity(n + 1);
-                heading.push("HEADING".to_string());
-                heading.extend(g.headings.iter().cloned());
-                matrix.push(heading);
-                matrix.push(pad("UNIT", &g.units));
-                matrix.push(pad("TYPE", &g.types));
-                for r in &g.rows {
-                    matrix.push(pad("DATA", &r.values));
-                }
-                Some((code.clone(), matrix))
-            })
-            .collect();
+        // The block build is the shared constructor beside the writer — one
+        // copy for this surface and the xcheck reference leg, so the two
+        // cannot drift apart (#847 retired the byte-identical pair).
+        let blocks = laterite_ags4_emit::canonical_matrix_blocks(&self.parsed);
         // The ONE guarded verbatim writer (was this crate's private `emit::emit`, now
         // gone). `trailing_blank_line = false` — the canonical shape every other surface
         // emits, so `.text` no longer carries the trailing blank line that made the Python
@@ -1634,19 +1614,17 @@ fn read_groups_raw(
         laterite_ags4_core::ags4_codec::read_ags4_with(std::path::Path::new(&path), read_opts)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     let d = PyDict::new(py);
-    d.set_item("order", PyList::new(py, &parsed.order)?)?;
+    d.set_item("order", PyList::new(py, parsed.order())?)?;
     let groups = PyDict::new(py);
-    for code in &parsed.order {
+    for code in parsed.order() {
         if let Some(g) = parsed.get(code) {
             let gd = PyDict::new(py);
-            gd.set_item("headings", PyList::new(py, &g.headings)?)?;
+            gd.set_item("headings", PyList::new(py, g.headings())?)?;
             let rows = PyList::empty(py);
-            for row in &g.rows {
-                let cells: Vec<&str> = g
-                    .headings
-                    .iter()
-                    .map(|h| row.get(h.as_str()).map_or("", String::as_str))
-                    .collect();
+            // Positional projection straight off the span-backed accessors
+            // (#900) — one row's worth of borrowed cells at a time.
+            for i in 0..g.n_rows() {
+                let cells: Vec<&str> = g.row_cells(i).collect();
                 rows.append(PyList::new(py, &cells)?)?;
             }
             gd.set_item("rows", rows)?;
@@ -1715,6 +1693,10 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        emit_typed::emit_ags4_from_arrow_unchecked,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat_to_path, m)?)?;
     m.add_class::<PySidecar>()?;

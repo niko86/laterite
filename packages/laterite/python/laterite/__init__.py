@@ -16,7 +16,7 @@ import dataclasses
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self, overload
 
 import polars as pl
 
@@ -63,6 +63,7 @@ __all__ = [
     "BadDictError",
     "BuildMode",
     "BuildResult",
+    "BuildSaved",
     "Edition",
     "FixResult",
     "FixableRule",
@@ -76,6 +77,7 @@ __all__ = [
     "WorldCheckRequiresSourceError",
     "XnMode",
     "build_ags4",
+    "build_ags4_unchecked",
     "dict_for",
     "diff",
     "engine_fingerprint",
@@ -459,7 +461,7 @@ class Ags4File:
       (**polars** by default, **pandas** if ``read(..., backend="pandas")``);
       both pyarrow-free. Groups load into the engine on first touch.
     - ``ags.sql("SELECT … WHERE …")`` → a **DuckDB relation** — cross-group
-      joins + filter pushdown; finish with ``.df()`` / ``pl.from_arrow(rel)``.
+      joins + filter pushdown; finish with ``.df()`` / ``pl.DataFrame(rel)``.
     - ``ags.connection`` → the raw duckdb connection (every engine feature).
 
     UNIT/TYPE/HEADING are side metadata, not pseudo-rows (use ``compat`` for the
@@ -679,9 +681,9 @@ class Ags4File:
             self._register(code)
 
     def _materialize(self, rel: duckdb.DuckDBPyRelation) -> Any:
-        # polars via the Arrow capsule (pl.from_arrow) and pandas via DuckDB's
-        # NumPy .df() are BOTH pyarrow-free; rel.pl() and polars->pandas would
-        # both pull pyarrow, so we never take those.
+        # polars via the Arrow capsule (pl.DataFrame(rel)) and pandas via
+        # DuckDB's NumPy .df() are BOTH pyarrow-free; rel.pl() and
+        # polars->pandas would both pull pyarrow, so we never take those.
         if self._backend == "pandas":
             return rel.df()
         return frame_from_arrow(rel)
@@ -725,6 +727,25 @@ class Ags4File:
         handle's ``keys=`` default governs whether ``_id``/``_parent_id`` show."""
         return self.table(code)
 
+    def arrow(self, code: str, *, keys: bool | None = None) -> Any:
+        """One group's born-typed **raw Arrow table** — capsule-bearing
+        (``__arrow_c_stream__``), zero-copy, engine-free, exactly the shape
+        ``build_ags4`` consumes — so a read → write round trip over the
+        handle's own tables pays no frame materialisation (#860; the write
+        half landed with #852). Typing comes from the file's TYPE row, like
+        every other accessor; unlike ``.table()`` nothing is materialised to
+        polars/pandas and the SQL engine is never touched. ``keys=`` is the
+        same tri-state as ``.table()``'s: the handle default, overridable per
+        call — with keys the table carries the synthetic ``_id``/``_parent_id``
+        columns, without them the keying work is skipped entirely. Hand the
+        result to anything speaking the Arrow PyCapsule interface (DuckDB,
+        polars, pyarrow, ``build_ags4``)."""
+        want = self._keys if keys is None else keys
+        table = self._p["_handle"].table_for(code, self._content_hash, want)
+        if table is None:
+            raise KeyError(f"group {code!r} not in file")
+        return table
+
     @property
     def connection(self) -> duckdb.DuckDBPyConnection:
         """The raw ``duckdb`` connection — every engine feature (parquet export,
@@ -738,7 +759,7 @@ class Ags4File:
         ``ags.sql("SELECT * FROM LOCA JOIN SAMP USING (LOCA_ID) WHERE ...")`` —
         returning a **DuckDB relation**. The WHERE/SELECT push into the engine
         (filter a big file down before materialising); finish with ``.df()`` /
-        ``pl.from_arrow(rel)`` or chain more SQL. A query may reference any
+        ``pl.DataFrame(rel)`` or chain more SQL. A query may reference any
         group, so this registers them all."""
         self._register_all()
         return self._engine().sql(query)
@@ -781,7 +802,7 @@ class Ags4File:
     def close(self) -> None:
         """Close the in-memory DuckDB engine if one was created. Idempotent.
         NOTE: relations from ``sql()`` become invalid once closed — materialise
-        (``.df()`` / ``pl.from_arrow``) before closing."""
+        (``.df()`` / ``pl.DataFrame(rel)``) before closing."""
         if self._con is not None:
             self._con.close()
             self._con = None
@@ -1396,7 +1417,7 @@ class AgsQuery:
     # --- single-result terminals (from .query / .filter / .select) ------------
 
     def relation(self) -> duckdb.DuckDBPyRelation:
-        """The built DuckDB relation (lazy — ``.df()`` / ``pl.from_arrow`` to
+        """The built DuckDB relation (lazy — ``.df()`` / ``pl.DataFrame(rel)`` to
         materialise, or chain more SQL). Requires a base set via [`Ags4File.query`][laterite.Ags4File.query]
         / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
         the base's columns narrow it, and ``.select()`` projects."""
@@ -2048,6 +2069,47 @@ class BuildResult:
         )
 
 
+class BuildSaved:
+    """What ``build_ags4(..., out=path)`` hands back: the verdict on a file already on disk.
+
+    The to-disk twin of [`BuildResult`][laterite.BuildResult] — same
+    [`findings`][laterite.BuildResult.findings] /
+    [`applied`][laterite.BuildResult.applied] /
+    [`fixes_applied`][laterite.BuildResult.fixes_applied] verdict, but the
+    document lives at [`path`][laterite.BuildSaved.path] rather than on the
+    result. There is deliberately no ``bytes`` here: the point of ``out=`` is
+    a long-lived caller that does not want the whole file resident after the
+    call, and a result quietly carrying it anyway would defeat that.
+
+    Build-and-judge survives the trip to disk: the bytes are staged to a
+    temporary file beside the destination and moved into place only after
+    the verdict allows, so ``path`` never holds unjudged output — a
+    ``mode="strict"`` failure raises with nothing written.
+
+    Attributes:
+        path: Where the judged AGS4 document was written.
+        findings: The validator findings on the written bytes — post-fix in
+            ``"autofix"`` mode, the full set in ``"report"`` mode.
+        applied: The ledger of safe mechanical fixes made during the build
+            (empty outside ``"autofix"`` mode).
+        fixes_applied: Count of safe fixes applied — ``len(applied)``.
+    """
+
+    __slots__ = ("applied", "findings", "fixes_applied", "path")
+
+    def __init__(self, path: Path, findings: list[dict], applied: list[dict]) -> None:
+        self.path = path
+        self.findings = findings
+        self.applied = applied
+        self.fixes_applied = len(applied)
+
+    def __repr__(self) -> str:
+        return (
+            f"<BuildSaved {str(self.path)!r}, "
+            f"{len(self.findings)} finding(s), fixes_applied={self.fixes_applied}>"
+        )
+
+
 def _typed_group_code(obj: Any) -> str | None:
     """The AGS group code if ``obj`` is a typed-graph node, else ``None``.
 
@@ -2161,13 +2223,27 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     return items
 
 
+def _columns_of(frame: Any) -> Any:
+    """``frame.columns`` if it can actually be read, else ``None``. A plain
+    ``getattr`` default only swallows AttributeError, but ``.columns`` may be a
+    *property that raises* — pyo3-arrow's ``PyTable.columns`` imports its arro3
+    companion package and dies with ModuleNotFoundError in a venv without it,
+    even though the object's ``__arrow_c_stream__`` capsule (the only thing the
+    build consumes) is fine. Both probes below want "no columns", not a foreign
+    import error, for such inputs. (#852)"""
+    try:
+        return getattr(frame, "columns", None)
+    except Exception:
+        return None
+
+
 def _drop_synth_keys(frame: Any) -> Any:
     """Drop the synthetic ``_``-prefixed key columns (``_id`` / ``_parent_id``) a
     user frame may carry from ``read(keys=True)[code]`` — AGS4 emit is byte-faithful
     to the DATA and must never write a synthetic column out. AGS headings never
     start with ``_``, so this is safe; a frame with none is returned unchanged.
     Handles polars and pandas (the two frame types ``read`` ever hands back). (#303)"""
-    cols = getattr(frame, "columns", None)
+    cols = _columns_of(frame)
     if cols is None:
         return frame  # not a columnar frame (e.g. an Arrow capsule) — nothing to strip
     synth = [c for c in cols if isinstance(c, str) and c.startswith("_")]
@@ -2178,6 +2254,7 @@ def _drop_synth_keys(frame: Any) -> Any:
     return frame.drop(columns=synth)  # pandas
 
 
+@overload
 def build_ags4(
     groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
     *,
@@ -2187,12 +2264,39 @@ def build_ags4(
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
-) -> BuildResult:
+    out: None = None,
+) -> BuildResult: ...
+@overload
+def build_ags4(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    mode: BuildMode = "autofix",
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    synthesise_metadata: bool = False,
+    tran: TranStamp | None = None,
+    out: str | os.PathLike[str],
+) -> BuildSaved: ...
+def build_ags4(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    mode: BuildMode = "autofix",
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    synthesise_metadata: bool = False,
+    tran: TranStamp | None = None,
+    out: str | os.PathLike[str] | None = None,
+) -> BuildResult | BuildSaved:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
 
     Where [`read`][laterite.read] loads an *existing* file, ``build_ags4`` *constructs* a new
     one (and autofixes + validates it); persist the result with
-    [`BuildResult.save`][laterite.BuildResult.save].
+    [`BuildResult.save`][laterite.BuildResult.save]. The verdict is the point
+    of this door; if you have weighed its cost and declined it,
+    [`build_ags4_unchecked`][laterite.build_ags4_unchecked] is the same
+    construction with no judgement at all.
 
     ``groups`` arrives in one of two shapes — the same two laterite-node's
     ``buildAgs4`` accepts:
@@ -2227,7 +2331,11 @@ def build_ags4(
             ``#[pyclass]`` group or a `laterite.dynamic` passthrough node with
             its children attached), a mapping of ``{code: frame}``, or a list of
             ``(code, frame)`` pairs. Each ``frame`` is a polars or pandas
-            ``DataFrame`` whose column names are the AGS headings.
+            ``DataFrame`` whose column names are the AGS headings — or any
+            object exposing an Arrow C-stream capsule (``__arrow_c_stream__``),
+            e.g. an Arrow table, which is handed to the emitter zero-copy. The
+            ``units=``/``types=`` heading check only vouches for frames whose
+            ``.columns`` it can read; capsule-only inputs skip it.
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
             Defaults to ``"4.1.1"`` when ``None``.
@@ -2291,12 +2399,25 @@ def build_ags4(
             recipient no way to tell it from a real transmission record. A missing
             TRAN that reports honestly is strictly better than a present one that
             lies. Same five arguments [`merge`][laterite.merge] takes.
+        out: Destination path — the ``fix(out=)`` idiom for the build door.
+            Given, the judged document is written there and the result is a
+            [`BuildSaved`][laterite.BuildSaved] carrying ``path`` and the
+            verdict but **no** ``bytes`` — for a long-lived caller that wants
+            the file on disk, not a whole-file ``bytes`` held on the result.
+            The write stages to a temporary file in the destination's
+            directory and ``os.replace``s it into place only after the
+            verdict allows, so ``out`` never holds unjudged output: a
+            ``mode="strict"`` failure raises with nothing written, and any
+            autofix rewrite happens before the path exists. ``None``
+            (default) returns the bytes-carrying ``BuildResult`` as always.
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
         ``findings`` on those bytes (post-fix in ``"autofix"`` mode), and
         ``fixes_applied`` — the count of safe fixes made. ``.text`` decodes the
-        bytes; ``.save(path)`` writes them.
+        bytes; ``.save(path)`` writes them. With ``out=`` given, a
+        [`BuildSaved`][laterite.BuildSaved] instead — the same verdict fields
+        plus the ``path`` written, and no ``bytes``.
 
     Raises:
         TypeError: If a typed-graph node isn't a known AGS group instance, or its
@@ -2309,6 +2430,47 @@ def build_ags4(
         dict_version = "4.1.1"
     import json
 
+    # `_bridge` (the DuckDB fallback connection, usually None) must outlive
+    # the native call — its registered relations stream lazily.
+    tables, _bridge = _frames_to_tables(groups, units, types, caller="build_ags4")
+    data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
+        tables,
+        dict_version,
+        mode,
+        {k: dict(v) for k, v in units.items()} if units else None,
+        {k: dict(v) for k, v in types.items()} if types else None,
+        synthesise_metadata,
+        tran.issue if tran else None,
+        tran.date if tran else None,
+        tran.producer if tran else None,
+        tran.recipient if tran else None,
+        tran.status if tran else None,
+        tran.description if tran else None,
+        tran.remarks if tran else None,
+    )
+    by_rule: dict[str, list[dict]] = json.loads(findings_json)
+    findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
+    if out is None:
+        return BuildResult(data, findings, list(applied))
+    # The to-disk rider (dec-emit-streamed-verdict): the engine has already
+    # judged `data` (a strict failure raised above, autofix rewrote in
+    # memory), so the destination path never holds unjudged bytes.
+    return BuildSaved(_staged_write(data, out), findings, list(applied))
+
+
+def _frames_to_tables(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    units: Mapping[str, Mapping[str, str]] | None,
+    types: Mapping[str, Mapping[str, str]] | None,
+    *,
+    caller: str,
+) -> tuple[list[tuple[str, Any]], Any]:
+    """The build doors' shared marshalling (#858): a typed graph, mapping or
+    ``(code, frame)`` list → ordered Arrow-capsule tables, with the
+    ``units=``/``types=`` typo check spoken in the caller's name. Returns
+    ``(tables, bridge)`` — ``bridge`` is the DuckDB fallback connection
+    (usually ``None``) and must outlive the native call consuming the
+    tables, because its registered relations stream lazily."""
     if _typed_group_code(groups) is not None:
         items = _typed_graph_to_items(groups)
     elif isinstance(groups, Mapping):
@@ -2323,7 +2485,7 @@ def build_ags4(
     _cols = {
         code: set(cols)
         for code, frame in items
-        if (cols := getattr(frame, "columns", None)) is not None
+        if (cols := _columns_of(frame)) is not None
     }
 
     def _check_meta(meta: Mapping[str, Mapping[str, str]] | None, name: str) -> None:
@@ -2331,13 +2493,13 @@ def build_ags4(
             return
         for code, hmap in meta.items():
             if code not in _codes:
-                raise ValueError(f"build_ags4 {name}=: unknown group {code!r}")
+                raise ValueError(f"{caller} {name}=: unknown group {code!r}")
             known = _cols.get(code)
             if known is not None:
                 for heading in hmap:
                     if heading not in known:
                         raise ValueError(
-                            f"build_ags4 {name}=: group {code!r} has no heading {heading!r}"
+                            f"{caller} {name}=: group {code!r} has no heading {heading!r}"
                         )
 
     _check_meta(units, "units")
@@ -2350,7 +2512,7 @@ def build_ags4(
     # branch never burdens a base polars user. (#111 base-surface audit: the old
     # code registered EVERY frame into DuckDB, whose polars ingest goes via
     # polars `.to_arrow()` → pyarrow, leaking [compat] into a base call.)
-    tables = []
+    tables: list[tuple[str, Any]] = []
     con = None
     for i, (code, frame) in enumerate(items):
         frame = _drop_synth_keys(frame)  # never emit a read(keys=True) _id/_parent_id
@@ -2386,24 +2548,109 @@ def build_ags4(
         name = f"_emit_{i}"  # pragma: no cover
         con.register(name, frame)  # pragma: no cover
         tables.append((code, con.sql(f'SELECT * FROM "{name}"')))  # pragma: no cover
-    data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
+    return tables, con
+
+
+def _staged_write(data: bytes, out: str | os.PathLike[str]) -> Path:
+    """Write ``data`` to ``out`` via a temp file in the destination's own
+    directory + ``os.replace`` — atomic on one filesystem, so ``out`` never
+    holds a partial write. Shared by the two build doors' ``out=`` riders;
+    what each door lets REACH this write is the doors' difference, not the
+    write's."""
+    import contextlib
+    import tempfile
+
+    out_path = Path(out)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=".laterite-build-", suffix=".tmp", dir=out_path.parent
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        tmp.replace(out_path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+    return out_path
+
+
+@overload
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: None = None,
+) -> bytes: ...
+@overload
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: str | os.PathLike[str],
+) -> Path: ...
+def build_ags4_unchecked(
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
+    *,
+    dict_version: Edition | None = None,
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
+    out: str | os.PathLike[str] | None = None,
+) -> bytes | Path:
+    """[`build_ags4`][laterite.build_ags4] without the verdict — you are choosing to ship
+    unchecked bytes.
+
+    Builds exactly what ``build_ags4(mode="report")`` builds — the same
+    dictionary UNIT/TYPE fills, the same canonical cell formatting, the same
+    section order, byte for byte (a test pins the identity) — and skips the
+    validation that follows. **Nothing here confirms the output satisfies any
+    AGS4 rule, and nothing downstream will**: no findings, no fixes, no
+    strict gate. The rule engine is most of what ``build_ags4`` spends its
+    time on (the decomposition is recorded on issue #858), so this door
+    exists for the caller who validates elsewhere or has decided not to — a
+    pipeline's inner loop whose output the pipeline's end validates once, a
+    file bound for an external checker.
+
+    The judge-coupled knobs are gone, not defaulted: no ``mode=`` (there is
+    no verdict for a mode to act on), no ``synthesise_metadata=`` / ``tran=``
+    (synthesis fills gaps a report would have told you about; with no report,
+    a silently minted catalog is a statement nobody checked). ``groups``,
+    ``dict_version``, ``units=`` and ``types=`` behave exactly as on
+    ``build_ags4`` — they shape the data, not the verdict.
+
+    Returns the AGS4 ``bytes``. With ``out=`` given, writes them to that path
+    instead — the same staged temp-file + ``os.replace`` as
+    ``build_ags4(out=)``, minus the verdict gate in front of it — and returns
+    the ``Path`` written. Deliberately **not** a
+    [`BuildResult`][laterite.BuildResult]: its empty ``findings`` would read
+    as "judged clean", and nothing here judged anything.
+
+    If you want the fastest *checked* build, ``build_ags4(mode="report")`` is
+    the same construction with the verdict attached; ``compat``'s writer is
+    the byte-faithful door for data you hold as strings. This one is for when
+    you have weighed the verdict's cost and declined it.
+    """
+    # `_bridge` (the DuckDB fallback connection, usually None) must outlive
+    # the native call — its registered relations stream lazily.
+    tables, _bridge = _frames_to_tables(
+        groups, units, types, caller="build_ags4_unchecked"
+    )
+    # `dict_version=None` passes straight through: the binding's own fallback
+    # (generated from the dictionary) is the single source of the default.
+    data = _native.emit_ags4_from_arrow_unchecked(
         tables,
         dict_version,
-        mode,
         {k: dict(v) for k, v in units.items()} if units else None,
         {k: dict(v) for k, v in types.items()} if types else None,
-        synthesise_metadata,
-        tran.issue if tran else None,
-        tran.date if tran else None,
-        tran.producer if tran else None,
-        tran.recipient if tran else None,
-        tran.status if tran else None,
-        tran.description if tran else None,
-        tran.remarks if tran else None,
     )
-    by_rule: dict[str, list[dict]] = json.loads(findings_json)
-    findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
-    return BuildResult(data, findings, list(applied))
+    if out is None:
+        return data
+    return _staged_write(data, out)
 
 
 class FixResult:

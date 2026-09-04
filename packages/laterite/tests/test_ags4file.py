@@ -236,13 +236,13 @@ def test_sql_returns_a_duckdb_relation_with_pushdown():
     rel = f.sql("SELECT * FROM LOCA WHERE LOCA_FDEP > 5")
     assert "duckdb" in type(rel).__module__.lower()
     # The WHERE pushed into the engine — only the matching row materialises.
-    assert pl.from_arrow(rel)["LOCA_FDEP"].to_list() == [10.5]
+    assert pl.DataFrame(rel)["LOCA_FDEP"].to_list() == [10.5]
 
 
 def test_sql_one_liner_survives_unbound_handle():
     # No __del__ close: the relation keeps the connection alive, so a one-liner
     # where the handle is never bound to a variable still materialises.
-    df = pl.from_arrow(laterite.read(text=_NUMERIC_SRC).sql("SELECT * FROM LOCA"))
+    df = pl.DataFrame(laterite.read(text=_NUMERIC_SRC).sql("SELECT * FROM LOCA"))
     assert len(df) == 3
 
 
@@ -640,3 +640,44 @@ def test_read_write_read_preserves_data_values(group, headings, type_choices, da
         v1 = [r["values"] for r in g1["rows"]]
         v2 = [r["values"] for r in g2["rows"]]
         assert v1 == v2, (code, v1, v2)
+
+
+# --- the raw Arrow accessor (#860) -----------------------------------------
+
+
+def test_arrow_is_capsule_bearing_and_born_typed():
+    # The read half of the zero-copy round trip: a capsule-bearing table,
+    # typed from the file's TYPE row, no frame materialisation, no engine.
+    f = laterite.read(text=_NUMERIC_SRC)
+    t = f.arrow("LOCA")
+    assert hasattr(t, "__arrow_c_stream__")
+    df = pl.DataFrame(t)
+    assert df.columns == ["LOCA_ID", "LOCA_FDEP"]  # keys stripped by default
+    assert df.schema["LOCA_FDEP"] == pl.Float64
+    assert df["LOCA_FDEP"].to_list() == [10.5, None, 3.25]
+
+
+def test_arrow_keys_tristate_mirrors_table():
+    # Same tri-state as .table(): the handle default governs, a per-call
+    # keys= overrides in both directions, and content_hash= rides along.
+    keyed = laterite.read(text=_RELATED_SRC, keys=True)
+    cols = pl.DataFrame(keyed.arrow("SAMP")).columns
+    assert cols[:2] == ["_id", "_parent_id"]
+    assert pl.DataFrame(keyed.arrow("SAMP", keys=False)).columns == [
+        "LOCA_ID",
+        "SAMP_REF",
+    ]
+    plain = laterite.read(text=_RELATED_SRC)
+    assert pl.DataFrame(plain.arrow("SAMP")).columns == ["LOCA_ID", "SAMP_REF"]
+    assert pl.DataFrame(plain.arrow("SAMP", keys=True)).columns[:2] == [
+        "_id",
+        "_parent_id",
+    ]
+    hashed = laterite.read(text=_RELATED_SRC, content_hash=True)
+    assert pl.DataFrame(hashed.arrow("SAMP")).columns[-1] == "_content_hash"
+
+
+def test_arrow_missing_group_raises_keyerror():
+    f = laterite.read(text=_NUMERIC_SRC)
+    with pytest.raises(KeyError, match="NOPE"):
+        f.arrow("NOPE")

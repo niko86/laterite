@@ -709,6 +709,7 @@ module.exports.diff = nativeBinding.diff
 module.exports.displayHint = nativeBinding.displayHint
 module.exports.editions = nativeBinding.editions
 module.exports.emitAgs4FromIpc = nativeBinding.emitAgs4FromIpc
+module.exports.emitAgs4FromIpcUnchecked = nativeBinding.emitAgs4FromIpcUnchecked
 module.exports.engineFingerprint = nativeBinding.engineFingerprint
 module.exports.engineVersion = nativeBinding.engineVersion
 module.exports.excelToAgs4 = nativeBinding.excelToAgs4

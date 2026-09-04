@@ -222,7 +222,7 @@ pub fn canonical(text: &str) -> Result<Vec<CanonGroup>, String> {
             headings: g.headings.clone(),
             units: pad(&g.units),
             types: pad(&g.types),
-            rows: g.rows.iter().map(|r| pad(&r.values)).collect(),
+            rows: g.rows.iter().map(|r| g.padded_row_strings(r, n)).collect(),
         });
     }
     Ok(out)

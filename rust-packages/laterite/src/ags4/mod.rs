@@ -367,8 +367,7 @@ impl Read {
             // guard above holds them equal — and hides the fact that the guard
             // is what makes slicing safe. Mutation testing found exactly that.
             if let (true, Some(ranges)) = (sidecar.is_fresh_for(&raw_for_cert), ranges) {
-                let mut groups = std::collections::HashMap::with_capacity(ranges.len());
-                let mut order = Vec::with_capacity(ranges.len());
+                let mut groups = Vec::with_capacity(ranges.len());
                 for (code, range) in ranges {
                     let group = laterite_ags4_core::index::parse_group_slice_with(
                         &bytes, range, &code, opts,
@@ -380,10 +379,9 @@ impl Read {
                             e,
                         )
                     })?;
-                    order.push(code.clone());
-                    groups.insert(code, group);
+                    groups.push(group);
                 }
-                let parsed = laterite_ags4_core::ags4_codec::ParsedAgs4 { groups, order };
+                let parsed = laterite_ags4_core::ags4_codec::ParsedAgs4::from_groups(groups);
                 let mut doc = Document::new(parsed, raw_for_cert, self.encoding.clone());
                 doc.sliced = true;
                 return Ok(doc);

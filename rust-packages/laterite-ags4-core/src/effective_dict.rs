@@ -28,17 +28,30 @@ pub fn file_dict_of(parsed: &ParsedAgs4) -> FileDict {
     let Some(d) = parsed.get("DICT") else {
         return FileDict::default();
     };
-    FileDict::from_rows(d.rows.iter().map(|row| {
-        let get = |n: &str| row.get(n).map_or("", String::as_str);
+    // Name→column resolves once per group, positional after that — the
+    // accessor contract's pattern, not a per-row name scan.
+    let [typ, grp, hdng, stat, dtyp, unit, pgrp, desc] = [
+        "DICT_TYPE",
+        "DICT_GRP",
+        "DICT_HDNG",
+        "DICT_STAT",
+        "DICT_DTYP",
+        "DICT_UNIT",
+        "DICT_PGRP",
+        "DICT_DESC",
+    ]
+    .map(|n| d.col(n));
+    FileDict::from_rows((0..d.n_rows()).map(|i| {
+        let get = |col: Option<usize>| col.and_then(|col| d.cell(i, col)).unwrap_or("");
         DictRow {
-            dict_type: get("DICT_TYPE"),
-            group: get("DICT_GRP"),
-            heading: get("DICT_HDNG"),
-            status: get("DICT_STAT"),
-            ags_type: get("DICT_DTYP"),
-            unit: get("DICT_UNIT"),
-            parent: get("DICT_PGRP"),
-            desc: get("DICT_DESC"),
+            dict_type: get(typ),
+            group: get(grp),
+            heading: get(hdng),
+            status: get(stat),
+            ags_type: get(dtyp),
+            unit: get(unit),
+            parent: get(pgrp),
+            desc: get(desc),
         }
     }))
 }

@@ -128,8 +128,7 @@ impl FileDict {
             return out; // nothing can be placed without a group column
         }
         for row in &dictg.rows {
-            let get =
-                |i: Option<usize>| i.and_then(|i| row.values.get(i)).map_or("", String::as_str);
+            let get = |i: Option<usize>| i.and_then(|i| dictg.value_at(row, i)).unwrap_or("");
             out.insert(&DictRow {
                 dict_type: get(ti),
                 group: get(gi),

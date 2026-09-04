@@ -416,8 +416,9 @@ fn rank(op: &Op) -> u8 {
 /// the canonical order [`rank`] describes, so the result does not depend on
 /// which order they were listed in.
 pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
-    // `validating()` is the profile that retains `raw_lines`, which is the whole
-    // basis of the byte-verbatim guarantee: no raw lines, no untouched lines.
+    // `validating()` for its lossy decode — this walk must never hard-fail.
+    // (Every profile retains `raw_lines` since the span rewrite; the
+    // byte-verbatim guarantee no longer hangs on the profile choice.)
     let parsed = parse_bytes_opts(text.as_bytes(), ParseOptions::validating())
         .map_err(|e| EditError::Parse(format!("{e:?}")))?;
 
@@ -459,7 +460,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
             .raw_lines
             .iter()
             .find(|l| l.number == n)
-            .map(|l| l.text.clone())
+            .map(|l| parsed.line_text(l).to_string())
             .unwrap_or_default()
     };
     // A line already edited by an earlier op must be edited FURTHER, not from
@@ -844,7 +845,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 out.push_str(terminator);
             }
             None => {
-                out.push_str(&line.text);
+                out.push_str(parsed.line_text(line));
                 out.push_str(terminator);
             }
         }
@@ -1246,7 +1247,7 @@ mod tests {
         let p = laterite_ags4_parse::parse_str(&out).unwrap();
         let g = &p.groups["PROJ"];
         assert_eq!(g.rows.len(), 2);
-        assert_eq!(g.rows[1].values.len(), g.headings.len());
+        assert_eq!(g.rows[1].n_values(), g.headings.len());
         assert_eq!(cell(&out, "PROJ", 2, "PROJ_ID"), "P2");
         assert_eq!(cell(&out, "PROJ", 2, "PROJ_NAME"), "");
         // …and the group it landed in front of is untouched.
@@ -1285,7 +1286,7 @@ mod tests {
         let g = &p.groups["LOCA"];
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_REM"]);
         assert_eq!(g.units.len(), 2, "the UNIT row loses its cell too");
-        assert!(g.rows.iter().all(|r| r.values.len() == 2));
+        assert!(g.rows.iter().all(|r| r.n_values() == 2));
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_REM"), "the \"good\" one");
     }
 
@@ -1510,7 +1511,7 @@ mod tests {
         let g = &p.groups["LOCA"];
         assert_eq!(g.headings.len(), 2);
         assert!(
-            g.rows.iter().all(|r| r.values.len() == 2),
+            g.rows.iter().all(|r| r.n_values() == 2),
             "no row may be left ragged: {:?}",
             g.rows
         );
@@ -1599,7 +1600,7 @@ mod tests {
             assert_eq!(g.headings.len(), 2);
             assert_eq!(g.rows.len(), 3);
             assert!(
-                g.rows.iter().all(|r| r.values.len() == 2),
+                g.rows.iter().all(|r| r.n_values() == 2),
                 "no row may be left ragged: {:?}",
                 g.rows
             );
@@ -1648,7 +1649,7 @@ mod tests {
         );
         let out = apply(ragged, &[set("LOCA", 1, "LOCA_ID", "BH9")]).unwrap();
         let p = laterite_ags4_parse::parse_str(&out).unwrap();
-        assert_eq!(p.groups["LOCA"].rows[0].values.len(), 3, "{out}");
+        assert_eq!(p.groups["LOCA"].rows[0].n_values(), 3, "{out}");
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_ID"), "BH9");
     }
 
@@ -1722,7 +1723,7 @@ mod tests {
         assert_eq!(p.groups["PROJ"].headings.len(), 2);
         assert_eq!(p.groups["PROJ"].rows.len(), 2);
         assert!(
-            p.groups["PROJ"].rows.iter().all(|r| r.values.len() == 2),
+            p.groups["PROJ"].rows.iter().all(|r| r.n_values() == 2),
             "PROJ's appended row must keep PROJ's arity: {:?}",
             p.groups["PROJ"].rows
         );
@@ -1753,7 +1754,7 @@ mod tests {
             let g = &p.groups["LOCA"];
             assert_eq!(g.headings, ["LOCA_ID"], "both columns must go: {out}");
             assert!(
-                g.rows.iter().all(|r| r.values.len() == 1),
+                g.rows.iter().all(|r| r.n_values() == 1),
                 "no row may be left ragged: {:?}",
                 g.rows
             );
@@ -2147,7 +2148,7 @@ type = "0DP"
         assert_eq!(g.units.len(), 4, "the UNIT row must keep pace: {out}");
         assert_eq!(g.types.len(), 4, "the TYPE row must keep pace: {out}");
         for (i, row) in g.rows.iter().enumerate() {
-            assert_eq!(row.values.len(), 4, "row {} must not be ragged", i + 1);
+            assert_eq!(row.n_values(), 4, "row {} must not be ragged", i + 1);
         }
         // Empty on purpose: the caller decides what goes in, not the tool.
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "");
@@ -2263,7 +2264,7 @@ type = "0DP"
         let g = &p.groups["LOCA"];
         assert_eq!(g.rows.len(), 3);
         for (i, row) in g.rows.iter().enumerate() {
-            assert_eq!(row.values.len(), 4, "row {} must not be ragged", i + 1);
+            assert_eq!(row.n_values(), 4, "row {} must not be ragged", i + 1);
         }
         assert_eq!(cell(&out, "LOCA", 3, "LOCA_ID"), "BH3");
         assert_eq!(cell(&out, "LOCA", 3, "LOCA_GL"), "");
@@ -2286,7 +2287,7 @@ type = "0DP"
         let g = &p.groups["LOCA"];
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE", "LOCA_GL"]);
         assert_eq!(g.units, ["", "", ""]);
-        assert_eq!(g.rows[0].values.len(), 3);
+        assert_eq!(g.rows[0].n_values(), 3);
     }
 
     /// Adding and dropping the same column in one patch is a no-op on the
@@ -2307,7 +2308,7 @@ type = "0DP"
         let p = laterite_ags4_parse::parse_str(&out).unwrap();
         let g = &p.groups["LOCA"];
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE", "LOCA_REM"]);
-        assert!(g.rows.iter().all(|r| r.values.len() == 3), "{out}");
+        assert!(g.rows.iter().all(|r| r.n_values() == 3), "{out}");
     }
 
     #[test]
@@ -2468,7 +2469,7 @@ type = "0DP"
         let p = laterite_ags4_parse::parse_str(&out).unwrap();
         let g = &p.groups["LOCA"];
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_NATE"]);
-        assert!(g.rows.iter().all(|r| r.values.len() == 2), "{out}");
+        assert!(g.rows.iter().all(|r| r.n_values() == 2), "{out}");
     }
 
     /// Deleting the group wins over inserting into it — the same reading the
@@ -2506,7 +2507,7 @@ type = "0DP"
         .unwrap();
         assert_eq!(cell(&out, "LOCA", 1, "LOCA_GL"), "9.99");
         let p = laterite_ags4_parse::parse_str(&out).unwrap();
-        assert!(p.groups["LOCA"].rows.iter().all(|r| r.values.len() == 4));
+        assert!(p.groups["LOCA"].rows.iter().all(|r| r.n_values() == 4));
     }
 
     #[test]
@@ -2586,7 +2587,7 @@ type = "0DP"
         assert_eq!(cell(&first, "LOCA", 1, "LOCA_GL"), "");
         assert_eq!(cell(&first, "LOCA", 2, "LOCA_GL"), "21.5");
         let p = laterite_ags4_parse::parse_str(&first).unwrap();
-        assert!(p.groups["LOCA"].rows.iter().all(|r| r.values.len() == 4));
+        assert!(p.groups["LOCA"].rows.iter().all(|r| r.n_values() == 4));
     }
 
     /// A projection does not care whether the file it is given came out of an

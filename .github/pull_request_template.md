@@ -10,7 +10,7 @@
 - [ ] `uv run ty check`
 - [ ] `cd rust-packages && cargo fmt --all -- --check`
 - [ ] `cargo clippy --workspace --all-targets --exclude laterite-ags4-wasm --exclude laterite-ags4-tokenizer-wasm -- -D warnings`
-- [ ] `uv run pytest tests/ packages/laterite/tests -q`
+- [ ] `uv run pytest packages/laterite/tests tests -n 4 -q`
 - [ ] `cargo test --workspace`
 
 ## Test plan

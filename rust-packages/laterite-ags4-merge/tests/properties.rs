@@ -38,7 +38,7 @@ fn loca_ids(f: &ParsedFile) -> BTreeSet<String> {
             let ci = g.headings.iter().position(|h| h == "LOCA_ID").unwrap();
             g.rows
                 .iter()
-                .filter_map(|r| r.values.get(ci).cloned())
+                .filter_map(|r| g.value_at(r, ci).map(str::to_string))
                 .collect()
         }
         None => BTreeSet::new(),

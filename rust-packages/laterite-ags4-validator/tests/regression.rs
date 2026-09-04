@@ -55,7 +55,7 @@ fn clean_minimal_fixture_structure() {
     assert_eq!(proj.group_line, 1);
     assert_eq!(proj.headings, vec!["PROJ_ID", "PROJ_NAME"]);
     assert_eq!(proj.rows.len(), 1);
-    assert_eq!(proj.rows[0].values[0], "P1");
+    assert_eq!(proj.cell(0, 0), Some("P1"));
     // CRLF, 25 content lines (incl. 3 blank separators), no phantom
     // trailing blank. TRAN now carries its KEY (TRAN_ISNO) + REQUIRED
     // fields so the file is conformant through Rule 10a/10b (V7).

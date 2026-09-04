@@ -180,3 +180,112 @@ def test_merge_keeps_runs_history() -> None:
     c = _doc({}, {}, {}, invocation={"rungs": ["100MB"]})
     m2 = bench.merge_results(m, c)
     assert len(m2["runs"]) == 3
+
+
+# --- README table rendering (the #826 promotion's paste source) -------------
+
+
+def _mc(peak: int) -> dict:
+    return {"peak_rss_bytes": peak, "x_output": 1.0}
+
+
+_REFUSED = {"refusal": "beyond-mem-cap", "detail": "time-only rung"}
+
+
+def test_mem_ratio_is_baseline_over_ours() -> None:
+    assert bench.mem_ratio(_mc(200), _mc(100)) == 2.0
+
+
+def test_mem_ratio_refusal_is_none_not_a_number() -> None:
+    assert bench.mem_ratio(_REFUSED, _mc(100)) is None
+    assert bench.mem_ratio(_mc(200), _REFUSED) is None
+
+
+_MEM_CELLS = {
+    "validate": {
+        "5MB": {"python_ags4": _mc(200_000_000), "laterite": _mc(100_000_000)},
+        "524MB": {"python_ags4": _REFUSED, "laterite": _REFUSED},
+    },
+    "read_typed": {
+        "5MB": {"python_ags4": _mc(150_000_000), "laterite": _mc(100_000_000)},
+        "524MB": {"python_ags4": _REFUSED, "laterite": _REFUSED},
+    },
+    "read_strings": {
+        "5MB": {
+            "python_ags4": _mc(100_000_000),
+            "laterite_compat": _mc(125_000_000),
+        },
+        "524MB": {"python_ags4": _REFUSED, "laterite_compat": _REFUSED},
+    },
+}
+_LABELS = {"5MB": "4.9 MB", "524MB": "549.7 MB"}
+
+
+def test_memory_tables_band_value_and_mem_marker() -> None:
+    lines = bench.memory_readme_tables(_MEM_CELLS, _LABELS, "pyarrow accelerator")
+    text = "\n".join(lines)
+    # Every header row carries the marker check_speed_claims splits tables on.
+    headers = [ln for ln in lines if ln.startswith("| File |")]
+    assert headers and all("peak RSS" in h for h in headers)
+    # The bolded ratio is baseline/ours to 2dp — including below 1 for the
+    # axis where laterite holds more (no flattering rounding, no omission).
+    assert "**2.00×**" in text and "**1.50×**" in text and "**0.80×**" in text
+    # A refused rung renders as no row, never as a number.
+    assert "549.7 MB" not in text
+    # The hop the compat cells measured is named in the caption.
+    assert "pyarrow accelerator" in text
+
+
+def test_memory_tables_empty_cells_render_nothing() -> None:
+    assert bench.memory_readme_tables({}, {}, "x") == []
+
+
+def test_condensed_time_table_pairs_rungs_across_axes() -> None:
+    rows = {
+        "validate": [("4.9 MB", 1.5, 0.05)],
+        "read_typed": [("4.9 MB", 0.187, 0.026)],
+        "read_strings": [("4.9 MB", 0.144, 0.049)],
+    }
+    lines = bench.condensed_time_table(rows)
+    assert lines[0].startswith("| File (123 groups) |")
+    assert "50 ms · **30.0×**" in lines[2]
+    assert "26 ms · **7.2×**" in lines[2]
+    assert "49 ms · **2.9×**" in lines[2]
+
+
+def test_condensed_memory_table_drops_partial_rungs() -> None:
+    lines = bench.condensed_memory_table(_MEM_CELLS, _LABELS)
+    text = "\n".join(lines)
+    assert "100 MB · **2.00×**" in text and "125 MB · **0.80×**" in text
+    assert "549.7 MB" not in text
+
+
+# --- the per-platform peak instrument (#878) --------------------------------
+
+
+def test_peak_rss_self_bytes_is_positive_bytes() -> None:
+    # POSIX here; the Windows branch (PeakWorkingSetSize via ctypes, declared
+    # signatures) is exercised by the perf-lane workflow's windows leg, where
+    # an instrument fault fails every cell loudly rather than silently.
+    peak = bench.peak_rss_self_bytes()
+    assert isinstance(peak, int)
+    # A live interpreter holds at least a few MB; a KiB-vs-bytes unit slip
+    # (the maxrss_to_bytes split) would land three orders below this.
+    assert peak > 10_000_000
+
+
+def test_parse_vm_hwm_bytes() -> None:
+    status = "Name:\tpython3\nVmPeak:\t  999 kB\nVmHWM:\t  123456 kB\nVmRSS:\t 5 kB\n"
+    assert bench.parse_vm_hwm_bytes(status) == 123456 * 1024
+    assert bench.parse_vm_hwm_bytes("Name:\tpython3\n") is None
+    # VmPeak (virtual) must never be mistaken for the RSS high-water.
+    assert bench.parse_vm_hwm_bytes("VmPeak:\t 42 kB\n") is None
+
+
+def test_reset_peak_accounting_is_linux_only() -> None:
+    # On darwin this is a recorded no-op (False), never an error; on Linux
+    # (CI) it must succeed — /proc/self/clear_refs is writable by self.
+    import sys
+
+    got = bench.reset_peak_accounting()
+    assert got is sys.platform.startswith("linux")

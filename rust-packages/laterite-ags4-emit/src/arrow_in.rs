@@ -28,9 +28,9 @@ use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_types::{Cell, ags4_str, dt_to_unit_precision};
-use laterite_ags4_validator::Dictionary;
+use laterite_ags4_validator::{DictVersion, Dictionary};
 
-use crate::emit::{OwnedGroup, emit_owned_groups, resolved_meta_parts};
+use crate::emit::{EmitStream, OwnedGroup, resolved_meta_parts};
 use crate::{EmitError, EmitOpts, EmitResult};
 
 /// One cell of an Arrow column → the [`Cell`] the orchestrator formats.
@@ -193,13 +193,74 @@ pub fn emit_ags4_from_arrow(
     opts: &EmitOpts,
 ) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
-    let owned: Vec<OwnedGroup> = groups
-        .into_iter()
+    let mut stream = EmitStream::new(opts, &dict);
+    for g in groups {
         // Consumed per iteration: a group's batches (our refs to them) drop
-        // here, not at return — the same peak discipline as `emit_ags4_owned`.
-        .map(|g| owned_group_from_arrow(g, &dict))
-        .collect();
-    emit_owned_groups(owned, opts, &dict)
+        // here, not at return — and the formatted `OwnedGroup` drops inside
+        // `push` once its section is written, so no whole-file slab of
+        // formatted cells ever exists (dec-emit-streamed-verdict).
+        stream.push(owned_group_from_arrow(g, &dict))?;
+    }
+    stream.finish()
+}
+
+/// A per-group push session over the streamed Arrow door — for a caller
+/// whose groups arrive one at a time across a boundary, so no whole-file
+/// `Vec<ArrowGroup>` ever accumulates (#905, queue M9: that decode slab was
+/// the wasm write door's whole prize at its gate rung). A group's batches
+/// and its formatted cells drop inside `push`, exactly as the one-call
+/// door's loop drops them; [`emit_ags4_from_arrow`] IS this session driven
+/// over a `Vec`, and a test pins the two byte-identical.
+///
+/// The caller owns `opts` and the bundled dictionary for `opts.edition`
+/// (the same pairing the one-call door constructs internally) and lends
+/// both for the session's lifetime — borrowing keeps this allocation-free
+/// where a self-owning session would leak or self-reference.
+pub struct ArrowEmitSession<'a> {
+    stream: EmitStream<'a>,
+    dict: &'a Dictionary<'a>,
+}
+
+impl<'a> ArrowEmitSession<'a> {
+    #[must_use]
+    pub fn new(opts: &'a EmitOpts, dict: &'a Dictionary<'a>) -> Self {
+        ArrowEmitSession {
+            stream: EmitStream::new(opts, dict),
+            dict,
+        }
+    }
+
+    /// Decode-and-write one group; its batches and formatted cells free on
+    /// return.
+    pub fn push(&mut self, g: ArrowGroup) -> Result<(), EmitError> {
+        self.stream.push(owned_group_from_arrow(g, self.dict))
+    }
+
+    pub fn finish(self) -> Result<EmitResult, EmitError> {
+        self.stream.finish()
+    }
+}
+
+/// [`emit_ags4_from_arrow`] with NO validity verdict — the Arrow half of the
+/// unchecked pair beside [`crate::emit_ags4_unchecked`] (#858).
+///
+/// The caller is choosing to ship unchecked bytes: nothing here confirms the
+/// output satisfies any AGS4 rule, and nothing downstream will. Everything
+/// up to the verdict is the judged door's — the same streaming conversion,
+/// the same #695 DT-precision rendering (it lives in the door, not the
+/// judge), the same fills and section order; a test pins the bytes equal to
+/// the judged `Report` build's.
+pub fn emit_ags4_from_arrow_unchecked(
+    groups: Vec<ArrowGroup>,
+    edition: DictVersion,
+) -> Result<Vec<u8>, EmitError> {
+    let opts = crate::emit::unchecked_opts(edition);
+    let dict = Dictionary::bundled(edition);
+    let mut stream = EmitStream::new(&opts, &dict);
+    for g in groups {
+        stream.push(owned_group_from_arrow(g, &dict))?;
+    }
+    stream.finish_unchecked()
 }
 
 /// One [`ArrowGroup`] → the formatted [`OwnedGroup`] — the Arrow door's half
@@ -649,6 +710,66 @@ mod tests {
         );
     }
 
+    /// #858: the Arrow door's unchecked variant returns exactly the judged
+    /// `Report` build's bytes — including the #695 DT-precision rendering,
+    /// which lives in the door conversion, upstream of the judge. The judged
+    /// build must OBJECT to the fixture (a data-only TRAN, no PROJ or
+    /// catalogs), or the identity proves nothing.
+    #[test]
+    fn unchecked_arrow_bytes_equal_the_judged_report_bytes() {
+        let mk = || {
+            let schema = Schema::new(vec![Field::new(
+                "TRAN_DATE",
+                arrow::datatypes::DataType::Timestamp(
+                    arrow::datatypes::TimeUnit::Millisecond,
+                    None,
+                ),
+                true,
+            )]);
+            let batch = RecordBatch::try_new(
+                Arc::new(schema.clone()),
+                vec![Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])) as ArrayRef],
+            )
+            .expect("batch");
+            vec![arrow_group("TRAN", schema, vec![batch])]
+        };
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            edition: DictVersion::V4_2,
+            ..EmitOpts::default()
+        };
+
+        let judged = emit_ags4_from_arrow(mk(), &opts).expect("judged door emits");
+        assert!(
+            judged.findings.values().flatten().count() > 0,
+            "the fixture must draw findings, or the identity proves nothing"
+        );
+        let bytes =
+            emit_ags4_from_arrow_unchecked(mk(), DictVersion::V4_2).expect("unchecked door emits");
+        assert_eq!(
+            bytes, judged.bytes,
+            "unchecked bytes must be the judged Report bytes, DT rendering included"
+        );
+    }
+
+    /// #858: the Arrow door's zero-group refusal matches its judged twin,
+    /// worded identically — same guarantee `emit.rs` pins for the cell-rows
+    /// pair; both finishers share `assemble`, where the refusal lives.
+    #[test]
+    fn unchecked_arrow_zero_group_build_fails_like_the_judged_door() {
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let Err(judged) = emit_ags4_from_arrow(vec![], &opts) else {
+            panic!("a zero-group judged build must refuse");
+        };
+        let Err(unchecked) = emit_ags4_from_arrow_unchecked(vec![], opts.edition) else {
+            panic!("a zero-group unchecked build must refuse");
+        };
+        assert_eq!(unchecked.to_string(), judged.to_string());
+    }
+
     /// The one INTENDED divergence, pinned so the join test above can never be
     /// "fixed" into hiding it: a typed temporal column renders at its
     /// heading's declared UNIT precision (#695), while the same instant
@@ -699,6 +820,65 @@ mod tests {
         assert!(
             cells_text.contains("\"2021-08-09T00:00:00\""),
             "a caller's string emits verbatim: {cells_text}"
+        );
+    }
+
+    /// [`ArrowEmitSession`] IS [`emit_ags4_from_arrow`] driven per group —
+    /// byte-identical output and the same verdict, pinned so the wasm door's
+    /// jit-decode loop (#905) cannot drift from the reference it replaced.
+    #[test]
+    fn the_push_session_matches_the_one_call_door_byte_for_byte() {
+        use arrow::array::{Float64Array, StringArray};
+
+        fn groups() -> Vec<ArrowGroup> {
+            let proj_schema = Schema::new(vec![Field::new("PROJ_ID", DataType::Utf8, true)]);
+            let proj_batch = RecordBatch::try_new(
+                Arc::new(proj_schema.clone()),
+                vec![Arc::new(StringArray::from(vec!["P1"]))],
+            )
+            .expect("valid batch");
+            let loca_schema = Schema::new(vec![
+                Field::new("LOCA_ID", DataType::Utf8, true),
+                Field::new("LOCA_NATE", DataType::Float64, true),
+            ]);
+            let loca_batch = RecordBatch::try_new(
+                Arc::new(loca_schema.clone()),
+                vec![
+                    Arc::new(StringArray::from(vec!["BH01", "BH02"])),
+                    Arc::new(Float64Array::from(vec![100.5, 200.75])),
+                ],
+            )
+            .expect("valid batch");
+            vec![
+                arrow_group("PROJ", proj_schema, vec![proj_batch]),
+                arrow_group("LOCA", loca_schema, vec![loca_batch]),
+            ]
+        }
+
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            edition: DictVersion::V4_2,
+            tran: None,
+            synthesise_metadata: false,
+        };
+        let one_call = emit_ags4_from_arrow(groups(), &opts).expect("the one-call door emits");
+
+        let dict = Dictionary::bundled(opts.edition);
+        let mut session = ArrowEmitSession::new(&opts, &dict);
+        for g in groups() {
+            session.push(g).expect("push emits");
+        }
+        let sessioned = session.finish().expect("finish emits");
+
+        assert_eq!(
+            one_call.bytes, sessioned.bytes,
+            "the session and the one-call door must write identical bytes"
+        );
+        assert_eq!(one_call.fixes_applied, sessioned.fixes_applied);
+        assert_eq!(
+            one_call.findings.len(),
+            sessioned.findings.len(),
+            "the verdicts must match finding for finding"
         );
     }
 }

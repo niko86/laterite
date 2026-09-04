@@ -153,7 +153,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
     let line_text: HashMap<u32, &str> = parsed
         .raw_lines
         .iter()
-        .map(|rl| (rl.number, rl.text.as_str()))
+        .map(|rl| (rl.number, parsed.line_text(rl)))
         .collect();
 
     let mut fixes: Fixes = Vec::new();
@@ -312,7 +312,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     // finding fired). field_span gives the inner span — for
                     // an empty `""` field that's a zero-width point just
                     // inside the quotes, exactly where the value belongs.
-                    let cur = data.values.get(ci).map_or("", String::as_str);
+                    let cur = tran.value_at(data, ci).unwrap_or("");
                     if !cur.is_empty() {
                         return;
                     }
@@ -504,7 +504,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 continue; // not a DATA row (UNIT/TYPE/GROUP arity) → skip
             };
             let want = group.headings.len();
-            let have = row.values.len();
+            let have = row.n_values();
             if have >= want {
                 continue; // exact, or too many — padding doesn't apply
             }
@@ -590,13 +590,13 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             else {
                 continue; // HEADING/UNIT/TYPE/GROUP row, or a row outside any group
             };
-            if row.values.len() > group.headings.len() {
+            if row.n_values() > group.headings.len() {
                 continue; // overflow — the one genuinely ambiguous case
             }
             if !row_is_clean(raw) {
                 continue; // the tokenizer dropped content — re-quoting bakes the loss in
             }
-            if raw.ends_with(',') && row.values.len() < group.headings.len() {
+            if raw.ends_with(',') && row.n_values() < group.headings.len() {
                 // Rule 4's pad edit for this same line assumes the trailing
                 // comma survives; our whole-line replacement consumes it, so
                 // the two edits would corrupt when composed. Rare enough to
@@ -1336,7 +1336,7 @@ mod tests {
         let parsed = parse_str(&src).unwrap();
         // Hand-built fixes: edit field 0 (AA→aa) and field 1 (BB→bb) on
         // line 5. field_span on the raw line gives the inner spans.
-        let raw = &parsed.raw_lines[4].text;
+        let raw = parsed.line_text(&parsed.raw_lines[4]);
         let (s0, e0) = field_span(raw, 0).unwrap();
         let (s1, e1) = field_span(raw, 1).unwrap();
         let fixes = vec![
@@ -1423,7 +1423,7 @@ mod tests {
         let src = "\"GROUP\",\"X\"\r\n\"HEADING\",\"P\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"HELLO\"\r\n";
         let parsed = parse_str(src).unwrap();
-        let raw = &parsed.raw_lines[4].text;
+        let raw = parsed.line_text(&parsed.raw_lines[4]);
         let (s, e) = field_span(raw, 0).unwrap(); // "HELLO"
         // Edit A: [s, e) HELLO→hi. Edit B: [s, s+2) HE→XX overlaps A.
         let fixes = vec![Fix {
@@ -1548,10 +1548,11 @@ mod tests {
         let row = proj
             .rows
             .iter()
-            .find(|r| r.values.first().map(String::as_str) == Some("P1"))
+            .find(|r| proj.value_at(r, 0) == Some("P1"))
             .expect("the P1 DATA row");
         assert_eq!(
-            row.values[1], "say \"hi\" now",
+            proj.value_at(row, 1),
+            Some("say \"hi\" now"),
             "cell truncated / mis-escaped"
         );
     }
@@ -1661,7 +1662,7 @@ mod tests {
         // The padded row now re-parses to exactly the 2 heading columns.
         let reparsed = parse_str(&out).expect("padded output parses");
         let row = &reparsed.groups["LOCA"].rows[0];
-        assert_eq!(row.values.len(), 2, "padded row should have 2 values");
+        assert_eq!(row.n_values(), 2, "padded row should have 2 values");
     }
 
     #[test]

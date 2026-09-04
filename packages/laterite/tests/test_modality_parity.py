@@ -561,6 +561,7 @@ _WASM_VERB_CAP = {
     "apply_fixes": "fix",
     "build_ags4": "build",
     "build_ags4_ipc": "build",
+    "build_ags4_unchecked": "build-unchecked",
     "diff": "diff",
     "merge": "merge",
     "censor": "censor",

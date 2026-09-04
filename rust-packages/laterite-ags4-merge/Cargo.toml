@@ -16,7 +16,7 @@
 #                                that typed a column differently still compare).
 [package]
 name = "laterite-ags4-merge"
-version = "0.12.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.13.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "AGS4 merge — reconcile N deliveries into one file (KEY-aware, recency by argument order, DuckDB-free)"
