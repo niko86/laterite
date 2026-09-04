@@ -1445,6 +1445,31 @@ tickets still mint one at a time from the queue, big-cheap first: **M8's
 mint is next**, design-gated. *(It minted as #900 the same day and landed
 — the M8 queue row carries the claim.)*
 
+### The Linux memory-ratio gate (#894, 2026-09-04): the family founds
+
+Campaign 2's T2, built as the revisit condition's three requirements
+(amended above): `tools/perf_ratio_gate.py` (seed + check over the
+`bench-vs-python-ags4.py` memory pass — wrapped as a child, #865's
+drift class) and the dispatch-only `perf-ratio` workflow on the pool,
+sharing perf-probe's concurrency group. The gated quantity is the
+ours-door ×-of-output per (axis, rung, door), banded at 10% relative
+(the tranche floor) past the founding pair's worse leg; a pressured
+check withholds its verdict as a recorded skip, and a hardware-class
+mismatch refuses the comparison by name.
+
+**A sequencing deviation, recorded (on #894): the M8 fix merged before
+the seed ran** — the ticket's "seed before any fix lands" was missed.
+The recovery preserved the constraint's substance: the founding pair was
+dispatched against the pre-campaign SHA (85ce26d6, the tree every
+campaign-2 fix branched from), so it measures pre-campaign code by
+construction. Both legs came back clean (no swap growth, quiet load,
+sub-1% leg spread on most cells) and the pair is committed as
+`tools/perf-results/linux-mem-baseline.json` — the family's founding
+record, rule 8's own history: these Linux cells never share a table with
+the darwin lane's. The first `check` dispatch against current main
+doubles as the gate's end-to-end validation and records M8's read-door
+effect in this family — a second-OS view of the #900 claim.
+
 ## Decisions taken
 
 Recorded here so the next session does not re-open them. Each was a genuine fork
