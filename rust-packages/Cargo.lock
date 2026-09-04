@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "arrow",
  "criterion",
