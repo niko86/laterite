@@ -69,10 +69,11 @@ needed the closed set of valid `--dict-version` strings.
 > parser could serve both once it had already decided. The fix is the pair in
 > `laterite_ags4_emit::hostopts`: `edition()` keeps `auto` deferrable,
 > `edition_or_fallback()` collapses to the generated `dict::FALLBACK`; every
-> surface (py, node, wasm, the CLI, the facade — and corpus-qa's
+> string-taking surface (py, node, wasm, the CLI — and corpus-qa's
 > `--dict-version`, whose *error text* was the last hand-written list) now
-> calls one of those two. See [[data-single-source-audit]] row 2 for the full
-> register entry.
+> calls one of those two. The facade parses no edition strings (its knob is
+> a typed `Option<Edition>`), so it was never in this class. See
+> [[data-single-source-audit]] row 2 for the full register entry.
 
 [[surface-census]] is what makes the convergence checkable *across
 launchers* rather than just within one crate: it gained a second table

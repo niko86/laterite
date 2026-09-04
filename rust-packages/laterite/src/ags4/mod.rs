@@ -19,7 +19,9 @@ mod report;
 
 use std::path::{Path, PathBuf};
 
-use laterite_ags4_core::ags4_codec::{ReadOptions, read_ags4_bytes_with};
+use laterite_ags4_core::ags4_codec::{
+    DuplicateHeadings, ExcessFields, ReadOptions, read_ags4_bytes_with,
+};
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, TranStamp, emit_ags4};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
@@ -323,8 +325,18 @@ impl Read {
             }
         };
 
-        let opts =
-            ReadOptions::from_flags(self.recover_duplicate_headings, self.truncate_excess_fields);
+        let opts = ReadOptions {
+            duplicate_headings: if self.recover_duplicate_headings {
+                DuplicateHeadings::Recover
+            } else {
+                DuplicateHeadings::Error
+            },
+            excess_fields: if self.truncate_excess_fields {
+                ExcessFields::Truncate
+            } else {
+                ExcessFields::Error
+            },
+        };
         // The sliced path, when a certificate can vouch for the byte index AND
         // the caller asked for specific groups. Every guard below is a reason to
         // fall back rather than to fail: the whole-file parse is always correct,
