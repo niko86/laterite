@@ -451,14 +451,7 @@ fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
     let io_err = |e: std::io::Error| {
         Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)
     };
-    // The temp file must be in the destination's directory, not the system
-    // temp dir: rename is only atomic within one filesystem. `create_new`
-    // makes a name collision an error instead of a silent overwrite of
-    // whatever was squatting on it.
-    let dir = match dest.parent() {
-        Some(p) if !p.as_os_str().is_empty() => p,
-        _ => Path::new("."),
-    };
+    let dir = staging_dir(dest);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.subsec_nanos());
@@ -478,6 +471,22 @@ fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
             let _ = std::fs::remove_file(&tmp);
             io_err(e)
         })
+}
+
+/// The directory the staging file goes in: the DESTINATION's own, never the
+/// system temp dir — rename is only atomic within one filesystem, and that
+/// atomicity is the door's whole promise. A bare filename has no parent (or an
+/// empty one), and both mean the current directory.
+///
+/// Its own function because the property is invisible to the integration
+/// tests: on one filesystem a mis-chosen directory still passes every
+/// end-to-end assertion, so the choice is pinned here, where a unit test can
+/// see it.
+fn staging_dir(dest: &Path) -> &Path {
+    match dest.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    }
 }
 
 // --- build_unchecked ----------------------------------------------------
@@ -610,5 +619,25 @@ impl std::fmt::Debug for BuildSaved {
             .field("findings", &self.findings.len())
             .field("fixes_applied", &self.fixes_applied)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::staging_dir;
+    use std::path::Path;
+
+    /// See `staging_dir` — the same-filesystem property cannot fail an
+    /// integration test on a single-filesystem machine, so the choice itself
+    /// is the thing asserted.
+    #[test]
+    fn the_staging_dir_is_the_destinations_own() {
+        assert_eq!(
+            staging_dir(Path::new("/a/b/out.ags")),
+            Path::new("/a/b"),
+            "staging anywhere else forfeits rename atomicity"
+        );
+        assert_eq!(staging_dir(Path::new("out.ags")), Path::new("."));
+        assert_eq!(staging_dir(Path::new("./out.ags")), Path::new("."));
     }
 }

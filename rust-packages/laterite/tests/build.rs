@@ -373,9 +373,20 @@ fn to_path_writes_what_run_produces() {
 
     assert_eq!(saved.path(), dest.as_path());
     assert_eq!(std::fs::read(&dest).unwrap(), in_memory.bytes());
-    // The verdict travels with the path: same fixes, same findings.
+    // The verdict travels with the path: same fixes, same findings — and the
+    // fixture is chosen so AutoFix genuinely fixes something, or the equality
+    // pins nothing.
+    assert!(in_memory.fixes_applied() > 0);
     assert_eq!(saved.fixes_applied(), in_memory.fixes_applied());
     assert_eq!(saved.findings().len(), in_memory.findings().len());
+
+    // And it varies with the mode through this door: Report fixes nothing, so
+    // a count that cannot reach zero is a count wired to a constant.
+    let reported = ags4::build(vec![proj(), loca()])
+        .mode(WriteMode::Report)
+        .to_path(scratch("to-path-report").join("out.ags"))
+        .unwrap();
+    assert_eq!(reported.fixes_applied(), 0);
 }
 
 /// The point of judging BEFORE writing: a strict refusal leaves the
