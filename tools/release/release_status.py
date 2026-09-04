@@ -170,12 +170,15 @@ def engine_crates() -> list[str]:
     (check_public_api refuses otherwise), so there is no second list to forget.
 
     One file there is NOT a crate: `laterite.all-features.txt`, the facade's
-    second snapshot (dec-facade-parity decision 4). A crates.io name cannot
-    carry a dot, so a dotted stem is that file and never a crate — filtered
-    here rather than special-cased downstream, or the sweep would ask the
-    registry about a crate that cannot exist.
+    second snapshot (dec-facade-parity decision 4; the name is
+    check_public_api.FACADE_ALL_FEATURES_SNAPSHOT). Exactly that file is
+    excluded — nothing broader — so an unexpected stray in the directory still
+    lands in the census and fails the tier guard loudly, instead of vanishing
+    into a filter nothing reports on.
     """
-    return sorted(f.stem for f in SNAPSHOTS.glob("*.txt") if "." not in f.stem)
+    return sorted(
+        f.stem for f in SNAPSHOTS.glob("*.txt") if f.name != "laterite.all-features.txt"
+    )
 
 
 def crate_manifest(crate: str) -> Path:

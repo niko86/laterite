@@ -13,7 +13,9 @@ for a stated reason — the crates went to crates.io for the first time on
 2026-08-01, and for most of this repo's history there was nothing to compare
 against — and this file carried its own switch-over condition: *"at the point
 where every publishable crate has a release the registry baseline should replace
-this."* All eleven have one, so it does.
+this."* Every crate then in the set had one, so it did — and a crate that joins
+the set ahead of its first release (excel, at dec-facade-parity phase 5) is the
+ABSENT case below, excluded and named, not a reason to reopen the switch.
 
 The git baseline had a defect that is easy to miss, because it looks like
 strictness. Both sides of the comparison carry the SAME version, so
@@ -46,13 +48,13 @@ inference changes.
 
 This is the reason this is a script and not one `cargo semver-checks` command. A
 crate that has never published has no baseline, and asking for one aborts the
-whole run rather than skipping that crate — taking the other ten crates' results
+whole run rather than skipping that crate — taking every other crate's results
 with it. That happened on the PR that added `laterite`, against the git baseline,
 for the same structural reason.
 
 So crates absent from the registry are excluded from the invocation and
-**reported by name**. A gate that quietly checked ten of eleven crates would look
-exactly like one that checked all eleven.
+**reported by name**. A gate that quietly checked all but one crate would look
+exactly like one that checked the whole set.
 
 Usage:
     python tools/check_semver.py                       # against the registry

@@ -204,7 +204,7 @@ def example_deps(readme_text: str, crate: str, ours: set[str]) -> tuple[str, ...
 def subjects() -> list[Subject]:
     """The crates a reader can `cargo add` and then copy an example from.
 
-    Discovered, so an eleventh crate joins by having a README fence and a
+    Discovered, so a new crate joins by having a README fence and a
     publishable manifest — not by being added to a list here. `publish = false`
     is the exclusion that matters: `laterite-ags4-wasm` carries examples too, but
     it reaches its readers through npm, and this asks the crates.io question.

@@ -98,9 +98,9 @@ def snapshot_path(crate: str) -> Path:
 #: feature-gated API, so the two files are byte-identical and the gate is
 #: provably inert: phase 7's diff then shows nothing but the Excel surface.
 #:
-#: The dotted stem is deliberate — a crates.io name cannot carry a dot, which is
-#: what lets `release_status.engine_crates()` keep reading the snapshot
-#: directory as a census of crates.
+#: The dotted stem is deliberate — a crates.io name cannot carry a dot, so this
+#: file can never shadow a real crate's snapshot. `release_status.engine_crates()`
+#: excludes exactly this name from its snapshot census.
 FACADE_ALL_FEATURES_SNAPSHOT = "laterite.all-features.txt"
 
 

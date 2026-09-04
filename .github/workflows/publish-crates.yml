@@ -27,9 +27,9 @@ name: publish-crates
 # substrate for. A dispatch job living among tag-gated ones would need an `if:`
 # excluding every train, which is the shape that goes wrong silently.
 #
-# ⚠️ The crates.io side pins THIS FILENAME. Each of the 12 crates carries a
+# ⚠️ The crates.io side pins THIS FILENAME. Every publish-set crate carries a
 # Trusted Publishing config naming `publish-crates.yml` and the `crates`
-# environment; renaming or moving this file breaks all 12 at once, and the
+# environment; renaming or moving this file breaks them all at once, and the
 # failure appears at publish time, on the registry that cannot be un-published.
 
 on:
