@@ -314,11 +314,12 @@ def summary(doc: dict) -> str:
     # stops measuring anything. What the verdict does is separate "still to do"
     # from "deliberately not doing", so the number can actually reach zero.
     #
-    # The `by-design` arm is KEPT with no current member — the phase-5 answer to
-    # the question dec-facade-parity left open (2026-09-04). Decision 7 retired
-    # the last two exclusions, but the tri-state is the door a future exclusion
-    # arrives through, and an always-printed "deliberately not adding (0)" is a
-    # statement about the surface, not dead code.
+    # The `by-design` arm was kept memberless at phase 5 as the door a future
+    # exclusion would arrive through — and one did: read-output-arrow's rust
+    # cell (owner verdict 2026-09-04, admitted by decision 7's revision on
+    # dec-facade-parity). A verdicted row still counts in the headline "below"
+    # number on purpose: the floor stays purely mechanical, and parity's
+    # predicate is the two OTHER buckets reading zero, not this number.
     buckets: dict[str, list[str]] = {"planned": [], "by-design": [], "undecided": []}
     clear = 0
     for cap in doc["capabilities"]:
