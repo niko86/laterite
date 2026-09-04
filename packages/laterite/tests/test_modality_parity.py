@@ -853,6 +853,20 @@ _RUST_BUILD_IN_DOORS = {
 }
 _RUST_BUILD_OUT_DOORS = {
     "value": "Build::run",
+    # The #855 rider's twin: verdict first, staged rename, no bytes on the
+    # result — `BuildSaved` is the door's product, `to_path` is the door.
+    "file": "Build::to_path",
+}
+#: build-unchecked's doors (adopted 2026-09-04 — the owner verdict that cleared
+#: the UNDECIDED floor row). Same input pair as build; the outputs are plain
+#: bytes (deliberately not a `Written`) or the staged file write.
+_RUST_BUILD_UNCHECKED_IN_DOORS = {
+    "value": "build_unchecked",
+    "handle": "build_unchecked_document",
+}
+_RUST_BUILD_UNCHECKED_OUT_DOORS = {
+    "bytes": "BuildUnchecked::run",
+    "file": "BuildUnchecked::to_path",
 }
 #: diff's INPUT forms. The handle door compares each document as it stands —
 #: edits included — which is why it is a distinct entry point rather than a
@@ -939,6 +953,8 @@ def test_rust_facade_reflects_the_register():
         ("fix", _RUST_FIX_OUT_DOORS, "out"),
         ("build", _RUST_BUILD_IN_DOORS, "in"),
         ("build", _RUST_BUILD_OUT_DOORS, "out"),
+        ("build-unchecked", _RUST_BUILD_UNCHECKED_IN_DOORS, "in"),
+        ("build-unchecked", _RUST_BUILD_UNCHECKED_OUT_DOORS, "out"),
         ("diff", _RUST_DIFF_IN_DOORS, "in"),
         ("diff", _RUST_DIFF_OUT_DOORS, "out"),
         ("merge", _RUST_MERGE_IN_DOORS, "in"),
@@ -974,6 +990,7 @@ def test_rust_source_doors_are_all_mapped():
         | set(_RUST_VALIDATE_DOORS.values())
         | set(_RUST_FIX_IN_DOORS.values())
         | set(_RUST_BUILD_IN_DOORS.values())
+        | set(_RUST_BUILD_UNCHECKED_IN_DOORS.values())
         | set(_RUST_DIFF_IN_DOORS.values())
         | set(_RUST_MERGE_IN_DOORS.values())
         | set(_RUST_TO_EXCEL_IN_DOORS.values())

@@ -351,3 +351,203 @@ fn a_group_reports_its_own_shape() {
     assert!(!one.is_empty());
     assert_eq!(one.len(), 1);
 }
+
+// --- the file door (`to_path`) ------------------------------------------
+
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("laterite-build-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// The file door delivers the same document `run` would, plus the verdict —
+/// and the result deliberately carries no bytes, so the file IS the output.
+#[test]
+fn to_path_writes_what_run_produces() {
+    let loca = || GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row(["BH01", "12.5"]);
+    let dest = scratch("to-path").join("out.ags");
+
+    let saved = ags4::build(vec![proj(), loca()]).to_path(&dest).unwrap();
+    let in_memory = ags4::build(vec![proj(), loca()]).run().unwrap();
+
+    assert_eq!(saved.path(), dest.as_path());
+    assert_eq!(std::fs::read(&dest).unwrap(), in_memory.bytes());
+    // The verdict travels with the path: same fixes, same findings — and the
+    // fixture is chosen so AutoFix genuinely fixes something, or the equality
+    // pins nothing.
+    assert!(in_memory.fixes_applied() > 0);
+    assert_eq!(saved.fixes_applied(), in_memory.fixes_applied());
+    assert_eq!(saved.findings().len(), in_memory.findings().len());
+
+    // And it varies with the mode through this door: Report fixes nothing, so
+    // a count that cannot reach zero is a count wired to a constant.
+    let reported = ags4::build(vec![proj(), loca()])
+        .mode(WriteMode::Report)
+        .to_path(scratch("to-path-report").join("out.ags"))
+        .unwrap();
+    assert_eq!(reported.fixes_applied(), 0);
+}
+
+/// The point of judging BEFORE writing: a strict refusal leaves the
+/// destination untouched — no partial file, no unjudged file, nothing.
+#[test]
+fn a_strict_refusal_writes_nothing() {
+    let dir = scratch("strict-refusal");
+    let dest = dir.join("out.ags");
+
+    // PROJ alone is short of TRAN/UNIT/TYPE, so strict has something to refuse.
+    let err = ags4::build(vec![proj()])
+        .mode(WriteMode::Strict)
+        .to_path(&dest)
+        .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Emit);
+    assert!(!dest.exists(), "a refused build must not reach the disk");
+    // Nor may the staging leave litter: the directory is exactly as it was.
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+}
+
+/// Overwrite is the contract (the same as the Python rider's `os.replace`),
+/// and the rename must also leave no staging file behind on success.
+#[test]
+fn to_path_replaces_an_existing_file_and_leaves_no_litter() {
+    let dir = scratch("replace");
+    let dest = dir.join("out.ags");
+    std::fs::write(&dest, b"stale previous delivery").unwrap();
+
+    ags4::build(vec![proj()]).to_path(&dest).unwrap();
+
+    let now = std::fs::read(&dest).unwrap();
+    assert!(
+        now.starts_with(b"\"GROUP\""),
+        "the old content must be gone"
+    );
+    assert_eq!(
+        std::fs::read_dir(&dir).unwrap().count(),
+        1,
+        "only the destination may remain — no temp file litter"
+    );
+}
+
+#[test]
+fn build_saved_debug_shows_path_and_counts_not_content() {
+    let dest = scratch("debug").join("out.ags");
+    let saved = ags4::build(vec![proj()]).to_path(&dest).unwrap();
+    let rendered = format!("{saved:?}");
+    assert!(rendered.contains("out.ags"), "{rendered}");
+    assert!(rendered.contains("fixes_applied"), "{rendered}");
+    assert!(!rendered.contains("A site"), "{rendered}");
+}
+
+// --- build_unchecked ----------------------------------------------------
+
+/// The identity the door is defined by: byte for byte what the judged
+/// `Report` build produces with metadata synthesis off, minus the verdict.
+/// The same pin the engine and the Python surface each carry, at this door.
+#[test]
+fn unchecked_bytes_equal_the_reported_build() {
+    let loca = || {
+        GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row([Cell::from("BH01"), Cell::from(12.5)])
+    };
+
+    let unchecked = ags4::build_unchecked(vec![proj(), loca()]).run().unwrap();
+    let judged = ags4::build(vec![proj(), loca()])
+        .mode(WriteMode::Report)
+        .synthesise_metadata(false)
+        .run()
+        .unwrap();
+
+    assert!(!unchecked.is_empty());
+    assert_eq!(unchecked, judged.into_bytes());
+}
+
+/// The judge-coupled conveniences are gone, not defaulted: no catalogue
+/// synthesis and no TRAN, because with no report a silently minted catalogue
+/// is a statement nobody checked. The checked default writes both.
+#[test]
+fn unchecked_writes_no_catalogues() {
+    let loca = || GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row(["BH01", "12.50"]);
+
+    let checked = ags4::build(vec![proj(), loca()]).run().unwrap();
+    let unchecked = ags4::build_unchecked(vec![proj(), loca()]).run().unwrap();
+    let text = String::from_utf8(unchecked).unwrap();
+
+    for group in ["\"GROUP\",\"UNIT\"", "\"GROUP\",\"TYPE\""] {
+        assert!(checked.text().contains(group), "{}", checked.text());
+        assert!(!text.contains(group), "{text}");
+    }
+    assert!(!text.contains("\"GROUP\",\"TRAN\""), "{text}");
+}
+
+/// The handle door reads the document the same way `build_document` does —
+/// they share the walk, so an edit reaches unchecked output too.
+#[test]
+fn unchecked_document_door_carries_the_edit() {
+    let source = concat!(
+        "\"GROUP\",\"PROJ\"\r\n",
+        "\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n",
+        "\"UNIT\",\"\",\"\"\r\n",
+        "\"TYPE\",\"ID\",\"X\"\r\n",
+        "\"DATA\",\"P1\",\"Old name\"\r\n",
+    );
+    let mut doc = ags4::read_str(source).run().unwrap();
+    doc.set_cell("PROJ", 0, "PROJ_NAME", "New name").unwrap();
+
+    let bytes = ags4::build_unchecked_document(&doc).run().unwrap();
+    let again = ags4::read_str(std::str::from_utf8(&bytes).unwrap())
+        .run()
+        .unwrap();
+    assert_eq!(
+        again
+            .group("PROJ")
+            .unwrap()
+            .row(0)
+            .unwrap()
+            .cell("PROJ_NAME"),
+        Some("New name")
+    );
+}
+
+/// Skipping the verdict does not skip the shaping checks: a miscounted row is
+/// still the caller's mistake, and an unknown edition is still refused by
+/// name. "Unchecked" is about AGS4 validity, not about input hygiene.
+#[test]
+fn unchecked_still_refuses_bad_input() {
+    let short = GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row(["BH01"]);
+    let err = ags4::build_unchecked(vec![proj(), short])
+        .run()
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidArgument);
+    assert!(err.to_string().contains("row 0"), "{err}");
+
+    let err = ags4::build_unchecked(vec![proj()])
+        .edition("4.9")
+        .run()
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::BadDictionary);
+    assert!(err.to_string().contains("4.9"), "{err}");
+}
+
+/// The unchecked file door: same staged write, no verdict gate, and the
+/// return is just the path — there is no verdict to carry.
+#[test]
+fn unchecked_to_path_writes_the_run_bytes() {
+    let dest = scratch("unchecked-to-path").join("out.ags");
+
+    let returned = ags4::build_unchecked(vec![proj()]).to_path(&dest).unwrap();
+    let in_memory = ags4::build_unchecked(vec![proj()]).run().unwrap();
+
+    assert_eq!(returned, dest);
+    assert_eq!(std::fs::read(&dest).unwrap(), in_memory);
+}
+
+#[test]
+fn unchecked_debug_shows_shape_not_data() {
+    let loca = GroupData::new("LOCA", ["LOCA_ID"]).row(["a-secret-borehole-id"]);
+    let rendered = format!("{:?}", ags4::build_unchecked(vec![loca]).edition("4.1"));
+
+    assert!(rendered.contains("LOCA x1"), "{rendered}");
+    assert!(rendered.contains("4.1"), "{rendered}");
+    assert!(!rendered.contains("a-secret-borehole-id"), "{rendered}");
+}

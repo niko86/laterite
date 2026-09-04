@@ -151,8 +151,6 @@ _Notes:_
 
 *Offered anywhere — in: bytes, handle, text, value · out: bytes, file, value*
 
-*Below the facade floor — the Rust crate does not yet offer out: file, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | text | bytes | handle | value |
@@ -171,7 +169,7 @@ _Notes:_
 | python (free) | ✓ |   | ✓ |
 | node (free) | ✓ |   | ✓ |
 | browser (free) |   | ✓ |   |
-| rust (chained) |   |   | ✓ |
+| rust (chained) | ✓ |   | ✓ |
 | duckdb (n/a) |   | — | — |
 | cli (absent) |   |   |   |
 
@@ -181,15 +179,13 @@ _Findings:_
 _Notes:_
 - _python_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
 - _node_: The `file` output form is the #855 to-disk rider (`build_ags4(out=)` / `buildAgs4({ out })`): the judged document is staged to a temp file beside the destination and moved into place only after the verdict allows, and the result (`BuildSaved`) carries the path and the verdict, deliberately no bytes. The browser cell has no counterpart for the same reason fix's doesn't — no filesystem; a modality fact, not a gap.
-- _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
+- _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it. The file form (added 2026-09-04, the floor-clearing PR after dec-facade-parity phase 7) is `to_path` — the #855 rider's semantics: the verdict runs FIRST (a Strict refusal errors with nothing written), the bytes are staged to a temp file in the destination's directory and renamed into place, and the result (`BuildSaved`) carries path + verdict, deliberately no bytes.
 - _duckdb_: **by-design.** The extension is a read-only reader: its canonical manifest (`../laterite-duckdb/functions.json`, gated against the `register_table()` calls by that repo's `tests/functions_manifest.rs`) declares `read_only: true`, and this capability writes.
 - _cli_: **by-design.** "Construct from caller-supplied data" has no shell shape. The surface promise is the reason: the CLI is a file tool — path in, file out, no in-memory objects, no caller-supplied data structures.
 
 ### build-unchecked — Construct AGS4 from caller-supplied data with NO validity verdict — build's assembly minus the judge (#858).
 
 *Offered anywhere — in: handle, text, value · out: bytes, file*
-
-*Below the facade floor — the Rust crate does not yet offer in: handle, value · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -198,7 +194,7 @@ _Notes:_
 | python (free) |   | ✓ | ✓ |
 | node (free) |   | ✓ | ✓ |
 | browser (free) | ✓ |   |   |
-| rust (absent) |   |   |   |
+| rust (chained) |   | ✓ | ✓ |
 | duckdb (n/a) |   |   |   |
 | cli (absent) |   |   |   |
 
@@ -209,7 +205,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
-| rust (absent) |   |   |
+| rust (chained) | ✓ | ✓ |
 | duckdb (n/a) |   |   |
 | cli (absent) |   |   |
 
@@ -217,7 +213,7 @@ _Notes:_
 - _python_: Byte-identical to build_ags4(mode="report") — pinned by test — with the verdict skipped; the docstring is the consent form ("you are choosing to ship unchecked bytes"). The judge-coupled knobs are gone, not defaulted: no mode, no synthesise_metadata/tran; edition/units/types stay. Returns plain bytes, deliberately NOT a BuildResult — an empty findings list would read as "judged clean". The file form is build's staged write minus the verdict gate in front of it.
 - _node_: Landed via #881, one release behind Python's door. Byte-identical to buildAgs4({ mode: "report" }) — pinned by test — returning a plain Buffer (deliberately not a BuildResult), or the path with out= via the same staged rename minus the verdict gate. The judge-coupled knobs are refused at runtime by name, never silently ignored — absence from the TS type alone would let a JS caller's mode: "strict" be dropped on the floor.
 - _browser_: Landed via #881. Takes the judged door's own groups_json (the build capability's recorded JSON-text outlier rides along unchanged — reconciling it is that cell's gap, not this one's) and returns a Uint8Array, byte-identical to the judged report build's text. dictVersion is the only option; the decode_opts KEYS guard refuses mode/synthesiseMetadata/tran by name. No filesystem, so no file rider — bytes being the universal output form is what lets this door exist in a browser at all.
-- _rust_: Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now.
+- _rust_: Adopted deliberately 2026-09-04 (the owner verdict this cell's previous note deferred to; the floor-clearing PR after dec-facade-parity phase 7). Same contract as the siblings: byte-identical to `build(..).mode(Report)` with metadata synthesis off — pinned by test — with the verdict skipped. The judge-coupled knobs are ABSENT FROM THE TYPE, not refused at runtime (stronger than node's runtime refusal): no `mode`, no `synthesise_metadata`/`transmission`; `edition` and `GroupData`'s units/types stay. `run()` returns plain `Vec<u8>`, deliberately not a `Written` — empty findings would read as "judged clean". `to_path` is the same staged temp-file + rename as build's, minus the verdict gate, and returns the path.
 - _duckdb_: **by-design.** Same as build: the extension is a read-only reader (its canonical manifest declares read_only: true), and this capability writes.
 - _cli_: **by-design.** Same as build: "construct from caller-supplied data" has no shell shape — and a shell caller who wants a no-verdict write has nothing to feed it anyway; the CLI's doors start from files.
 
