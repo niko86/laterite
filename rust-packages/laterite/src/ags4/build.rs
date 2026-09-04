@@ -1,8 +1,10 @@
 //! Constructing AGS4 from data you hold, rather than from a file you read.
 
+use std::path::{Path, PathBuf};
+
 use laterite_ags4_emit::GroupInput;
 
-use super::{Document, WriteMode, Written, emit_groups};
+use super::{Document, Finding, WriteMode, Written, emit_groups, resolve_edition};
 use crate::{Error, ErrorKind};
 
 /// One cell's value, before AGS4 formatting.
@@ -293,8 +295,16 @@ pub fn build(groups: Vec<GroupData>) -> Build {
 /// already formatted when the file was written.
 #[must_use]
 pub fn build_document(doc: &Document) -> Build {
-    let groups = doc
-        .groups()
+    build(document_groups(doc))
+}
+
+/// A document's groups as build input — shared by the two handle doors
+/// ([`build_document`] and [`build_unchecked_document`]) so they cannot come
+/// to read the same document differently. Cells carry across as text, because
+/// that is what a document holds: they were already formatted when the file
+/// was written.
+fn document_groups(doc: &Document) -> Vec<GroupData> {
+    doc.groups()
         .iter()
         .map(|g| {
             let headings = g.headings();
@@ -310,8 +320,7 @@ pub fn build_document(doc: &Document) -> Build {
             }
             data
         })
-        .collect();
-    build(groups)
+        .collect()
 }
 
 impl Build {
@@ -376,6 +385,183 @@ impl Build {
             self.tran,
         )
     }
+
+    /// Do it and write the judged document to `path`.
+    ///
+    /// The verdict comes first: under [`WriteMode::Strict`] a refusal returns
+    /// the error with **nothing written**. What does get written is staged to
+    /// a temporary file in the destination's own directory and renamed into
+    /// place — atomic on one filesystem — so `path` never holds a partial or
+    /// unjudged document.
+    ///
+    /// The result carries the verdict and the path, deliberately **not** the
+    /// bytes: this door exists for the caller who wants the document on disk
+    /// rather than resident, and a result quietly holding it anyway would
+    /// defeat that. Want both? [`Build::run`] then [`Written::bytes`].
+    pub fn to_path(self, path: impl AsRef<Path>) -> Result<BuildSaved, Error> {
+        let dest = path.as_ref();
+        let written = self.run()?;
+        staged_write(dest, written.bytes())?;
+        Ok(BuildSaved {
+            path: dest.to_path_buf(),
+            findings: written.findings,
+            fixes_applied: written.fixes_applied,
+        })
+    }
+}
+
+/// What [`Build::to_path`] produced: the verdict on a document already on disk.
+///
+/// The to-disk twin of [`Written`], minus the bytes — see
+/// [`Build::to_path`] for why they are withheld.
+pub struct BuildSaved {
+    path: PathBuf,
+    findings: Vec<Finding>,
+    fixes_applied: usize,
+}
+
+impl BuildSaved {
+    /// Where the judged AGS4 document was written.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Anything still wrong with the written document after the chosen
+    /// [`WriteMode`] ran — see [`Written::findings`].
+    #[must_use]
+    pub fn findings(&self) -> &[Finding] {
+        &self.findings
+    }
+
+    /// How many mechanical fixes were applied on the way out.
+    #[must_use]
+    pub fn fixes_applied(&self) -> usize {
+        self.fixes_applied
+    }
+}
+
+/// Write `bytes` to `dest` via a temporary file in the destination's own
+/// directory + rename — atomic on one filesystem, so `dest` never holds a
+/// partial write. Shared by the build doors' file forms; what each door lets
+/// REACH this write is the doors' difference, not the write's. (The same
+/// contract as the Python surface's `_staged_write`; `std::fs::rename`
+/// replaces an existing file on Unix and Windows alike.)
+fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
+    let io_err = |e: std::io::Error| {
+        Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)
+    };
+    // The temp file must be in the destination's directory, not the system
+    // temp dir: rename is only atomic within one filesystem. `create_new`
+    // makes a name collision an error instead of a silent overwrite of
+    // whatever was squatting on it.
+    let dir = match dest.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.subsec_nanos());
+    let tmp = dir.join(format!(
+        ".laterite-build-{}-{nanos}.tmp",
+        std::process::id()
+    ));
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, bytes))
+        .and_then(|()| std::fs::rename(&tmp, dest))
+        .map_err(|e| {
+            // Best-effort cleanup: the temp file is ours alone (create_new),
+            // and leaving it behind litters the caller's output directory.
+            let _ = std::fs::remove_file(&tmp);
+            io_err(e)
+        })
+}
+
+// --- build_unchecked ----------------------------------------------------
+
+/// A pending unchecked build. Configure it, then [`BuildUnchecked::run`] or
+/// [`BuildUnchecked::to_path`].
+pub struct BuildUnchecked {
+    groups: Vec<GroupData>,
+    edition: Option<String>,
+}
+
+/// [`build`] without the verdict — you are choosing to ship unchecked bytes.
+///
+/// Builds exactly what `build(groups).mode(WriteMode::Report)` with metadata
+/// synthesis off builds — the same dictionary `UNIT`/`TYPE` fills, the same
+/// cell formatting, the same section order, byte for byte (a test pins the
+/// identity) — and skips the validation that follows. **Nothing here confirms
+/// the output satisfies any AGS4 rule, and nothing downstream will**: no
+/// findings, no fixes, no strict gate. The rule engine is most of what a
+/// checked build spends its time on, so this door exists for the caller who
+/// validates elsewhere or has decided not to — a pipeline's inner loop whose
+/// output the pipeline's end validates once, a file bound for an external
+/// checker.
+///
+/// The judge-coupled knobs are not defaulted, they are **absent from the
+/// type**: no `mode` (there is no verdict for a mode to act on), no
+/// `synthesise_metadata` / `transmission` (synthesis fills gaps a report
+/// would have told you about; with no report, a silently minted catalogue is
+/// a statement nobody checked). [`BuildUnchecked::edition`] and the
+/// `units`/`types` on [`GroupData`] remain — they shape the data, not the
+/// verdict.
+///
+/// [`BuildUnchecked::run`] returns plain bytes, deliberately not a
+/// [`Written`]: its empty findings would read as "judged clean", and nothing
+/// here judged anything.
+#[must_use]
+pub fn build_unchecked(groups: Vec<GroupData>) -> BuildUnchecked {
+    BuildUnchecked {
+        groups,
+        edition: None,
+    }
+}
+
+/// [`build_unchecked`] fed from a [`Document`] — the same handle door as
+/// [`build_document`], minus the verdict. See [`build_unchecked`] for what
+/// you are choosing.
+#[must_use]
+pub fn build_unchecked_document(doc: &Document) -> BuildUnchecked {
+    build_unchecked(document_groups(doc))
+}
+
+impl BuildUnchecked {
+    /// Build against a specific AGS4 edition. See [`editions`](super::editions).
+    #[must_use]
+    pub fn edition(mut self, edition: impl Into<String>) -> BuildUnchecked {
+        self.edition = Some(edition.into());
+        self
+    }
+
+    /// Do it. The AGS4 bytes, with no verdict attached.
+    pub fn run(self) -> Result<Vec<u8>, Error> {
+        let edition = match self.edition.as_deref() {
+            Some(label) => resolve_edition(label)?,
+            None => laterite_ags4_reference::dict::FALLBACK,
+        };
+        let groups = self
+            .groups
+            .into_iter()
+            .map(GroupData::into_engine)
+            .collect::<Result<Vec<_>, _>>()?;
+        laterite_ags4_emit::emit_ags4_unchecked(groups, edition)
+            .map_err(|e| Error::with_source(ErrorKind::Emit, "cannot write as AGS4", e))
+    }
+
+    /// Do it and write the bytes to `path`, returning the path written.
+    ///
+    /// The same staged temp-file + rename as [`Build::to_path`], minus the
+    /// verdict gate in front of it — there is no verdict to gate on.
+    pub fn to_path(self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
+        let dest = path.as_ref().to_path_buf();
+        let bytes = self.run()?;
+        staged_write(&dest, &bytes)?;
+        Ok(dest)
+    }
 }
 
 // --- Debug -------------------------------------------------------------
@@ -397,6 +583,32 @@ impl std::fmt::Debug for Build {
             .field("edition", &self.edition)
             .field("synthesise_metadata", &self.synthesise_metadata)
             .field("transmission", &self.tran.is_some())
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for BuildUnchecked {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BuildUnchecked")
+            .field(
+                "groups",
+                &self
+                    .groups
+                    .iter()
+                    .map(|g| format!("{} x{}", g.code, g.rows.len()))
+                    .collect::<Vec<_>>(),
+            )
+            .field("edition", &self.edition)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for BuildSaved {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BuildSaved")
+            .field("path", &self.path)
+            .field("findings", &self.findings.len())
+            .field("fixes_applied", &self.fixes_applied)
             .finish()
     }
 }

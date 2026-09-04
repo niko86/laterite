@@ -811,6 +811,16 @@
               "out_forms": [
                 "value"
               ]
+            },
+            {
+              "name": "build().to_path / build_document().to_path",
+              "in_forms": [
+                "value",
+                "handle"
+              ],
+              "out_forms": [
+                "file"
+              ]
             }
           ],
           "input": {
@@ -818,9 +828,10 @@
             "value": "present"
           },
           "output": {
-            "value": "present"
+            "value": "present",
+            "file": "present"
           },
-          "note": "Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.",
+          "note": "Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it. The file form (added 2026-09-04, the floor-clearing PR after dec-facade-parity phase 7) is `to_path` — the #855 rider's semantics: the verdict runs FIRST (a Strict refusal errors with nothing written), the bytes are staged to a temp file in the destination's directory and renamed into place, and the result (`BuildSaved`) carries path + verdict, deliberately no bytes.",
           "gaps": []
         },
         {
@@ -934,12 +945,39 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "build_unchecked/build_unchecked_document",
+              "in_forms": [
+                "value",
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            },
+            {
+              "name": "build_unchecked().to_path",
+              "in_forms": [
+                "value",
+                "handle"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "bytes": "present",
+            "file": "present"
+          },
           "gaps": [],
-          "note": "Absent from the FACADE. The engine crate the facade wraps ships both entries (laterite-ags4-emit::emit_ags4_unchecked / emit_ags4_from_arrow_unchecked — they are what every surface binds), so a facade spelling is cheap, but the floor (python n node) does not owe it until node's #881 half lands; adopt deliberately then, not by reflex now."
+          "note": "Adopted deliberately 2026-09-04 (the owner verdict this cell's previous note deferred to; the floor-clearing PR after dec-facade-parity phase 7). Same contract as the siblings: byte-identical to `build(..).mode(Report)` with metadata synthesis off — pinned by test — with the verdict skipped. The judge-coupled knobs are ABSENT FROM THE TYPE, not refused at runtime (stronger than node's runtime refusal): no `mode`, no `synthesise_metadata`/`transmission`; `edition` and `GroupData`'s units/types stay. `run()` returns plain `Vec<u8>`, deliberately not a `Written` — empty findings would read as \"judged clean\". `to_path` is the same staged temp-file + rename as build's, minus the verdict gate, and returns the path."
         },
         {
           "surface": "duckdb",

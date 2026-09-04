@@ -69,7 +69,10 @@ This crate versions independently of the engine.
   says how many it held back.
 - **Build.** Construct AGS4 from data you hold — a query result, a spreadsheet,
   your own structs. Typed cells are formatted to their heading's declared AGS
-  TYPE; strings are written as given.
+  TYPE; strings are written as given. Writing to a path stages the judged
+  document and renames it into place, so a refusal leaves nothing behind. An
+  unchecked variant skips the verdict entirely, for output something else
+  validates — you are choosing to ship unchecked bytes, and its API says so.
 - **Write.** Emit valid AGS4, deriving the `UNIT` and `TYPE` catalogue groups
   from the data. Choose whether to auto-fix, report, or refuse outright.
 - **Certify.** Mint an `.ags.idx` certificate over a file's bytes, and offer one

@@ -155,6 +155,7 @@ pub fn laterite::ags4::Build::edition(self, impl core::convert::Into<alloc::stri
 pub fn laterite::ags4::Build::mode(self, laterite::ags4::WriteMode) -> laterite::ags4::Build
 pub fn laterite::ags4::Build::run(self) -> core::result::Result<laterite::ags4::Written, laterite::Error>
 pub fn laterite::ags4::Build::synthesise_metadata(self, bool) -> laterite::ags4::Build
+pub fn laterite::ags4::Build::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::ags4::BuildSaved, laterite::Error>
 pub fn laterite::ags4::Build::transmission(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Build
 impl core::fmt::Debug for laterite::ags4::Build
 pub fn laterite::ags4::Build::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -165,6 +166,34 @@ impl core::marker::Unpin for laterite::ags4::Build
 impl core::marker::UnsafeUnpin for laterite::ags4::Build
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Build
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Build
+pub struct laterite::ags4::BuildSaved
+impl laterite::ags4::BuildSaved
+pub fn laterite::ags4::BuildSaved::findings(&self) -> &[laterite::ags4::Finding]
+pub fn laterite::ags4::BuildSaved::fixes_applied(&self) -> usize
+pub fn laterite::ags4::BuildSaved::path(&self) -> &std::path::Path
+impl core::fmt::Debug for laterite::ags4::BuildSaved
+pub fn laterite::ags4::BuildSaved::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::BuildSaved
+impl core::marker::Send for laterite::ags4::BuildSaved
+impl core::marker::Sync for laterite::ags4::BuildSaved
+impl core::marker::Unpin for laterite::ags4::BuildSaved
+impl core::marker::UnsafeUnpin for laterite::ags4::BuildSaved
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::BuildSaved
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::BuildSaved
+pub struct laterite::ags4::BuildUnchecked
+impl laterite::ags4::BuildUnchecked
+pub fn laterite::ags4::BuildUnchecked::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::BuildUnchecked
+pub fn laterite::ags4::BuildUnchecked::run(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::ags4::BuildUnchecked::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<std::path::PathBuf, laterite::Error>
+impl core::fmt::Debug for laterite::ags4::BuildUnchecked
+pub fn laterite::ags4::BuildUnchecked::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::BuildUnchecked
+impl core::marker::Send for laterite::ags4::BuildUnchecked
+impl core::marker::Sync for laterite::ags4::BuildUnchecked
+impl core::marker::Unpin for laterite::ags4::BuildUnchecked
+impl core::marker::UnsafeUnpin for laterite::ags4::BuildUnchecked
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::BuildUnchecked
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::BuildUnchecked
 pub struct laterite::ags4::CellChange
 impl laterite::ags4::CellChange
 pub fn laterite::ags4::CellChange::ags_type(&self) -> &str
@@ -665,6 +694,8 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Written
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Written
 pub fn laterite::ags4::build(alloc::vec::Vec<laterite::ags4::GroupData>) -> laterite::ags4::Build
 pub fn laterite::ags4::build_document(&laterite::ags4::Document) -> laterite::ags4::Build
+pub fn laterite::ags4::build_unchecked(alloc::vec::Vec<laterite::ags4::GroupData>) -> laterite::ags4::BuildUnchecked
+pub fn laterite::ags4::build_unchecked_document(&laterite::ags4::Document) -> laterite::ags4::BuildUnchecked
 pub fn laterite::ags4::diff(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Diff<'static>
 pub fn laterite::ags4::diff_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Diff<'static>
 pub fn laterite::ags4::diff_documents<'a>(&'a laterite::ags4::Document, &'a laterite::ags4::Document) -> laterite::ags4::Diff<'a>

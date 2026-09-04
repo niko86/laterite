@@ -27,7 +27,10 @@ use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
 use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed_with_dict};
 
-pub use build::{Build, Cell, GroupData, build, build_document};
+pub use build::{
+    Build, BuildSaved, BuildUnchecked, Cell, GroupData, build, build_document, build_unchecked,
+    build_unchecked_document,
+};
 pub use cert::Certify;
 pub use diff::{
     CellChange, Change, Delta, Diff, GroupChange, RowChange, diff, diff_bytes, diff_documents,
