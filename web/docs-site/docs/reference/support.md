@@ -34,11 +34,7 @@ by assertion. Beta applies to the whole project or none of it.
 | **Browser** | `npm i @laterite/ags4-wasm` | ✅ |
 | **DuckDB** | `INSTALL laterite_ags4 FROM community` | ✅ |
 | **CLI** | the [`lat` binary](https://github.com/niko86/laterite/releases) | ✅ |
-| **Rust** | `cargo add laterite` | not yet |
-
-**The Rust crate is the one exception**, and the reason is completeness rather than
-quality: it is not yet at parity with the other surfaces, and its API will change more
-than theirs. It runs the same engine. It joins the claim when it is finished.
+| **Rust** | `cargo add laterite` | ✅ |
 
 The engine crates the surfaces are built from are published to crates.io and are part
 of the same source tree, so the same statement covers them. But they are machinery,
@@ -46,11 +42,11 @@ not a door, and you are not expected to depend on them directly.
 
 ### How versions move
 
-"Expect the API to change" is a warning, not a rule. This is the rule. The three
-version lines above answer it differently, because they are three different promises.
+"Expect the API to change" is a warning, not a rule. This is the rule. The two
+version lines above answer it differently, because they are two different promises.
 
-**The product line (Python, Node, browser, DuckDB, `lat`) is one number and one
-changelog.** While it is pre-1.0, a **breaking change takes the minor** and everything
+**The product line (Python, Node, browser, DuckDB, `lat`, and the Rust crate) is one
+number and one changelog.** While it is pre-1.0, a **breaking change takes the minor** and everything
 else takes the patch. So a patch is safe to take, and a minor is the one to look at
 before you take it. Which minors those were is the first thing in the changelog:
 [an index of every breaking change](https://github.com/niko86/laterite/blob/main/CHANGELOG.md#breaking-changes),
@@ -61,12 +57,6 @@ Whether an upgrade happens *to* you is your package manager's business, not ours
 and Cargo both treat a `0.x` minor as a wall once the requirement is written into your
 manifest; `pip install laterite` has no equivalent and takes the newest release every
 time. Pin it or lock it if you want that to be your decision.
-
-**The Rust crate keeps its own clock.** It is not on the product line, it is the one
-surface outside the beta claim, and it changes faster than the others because it is
-still being completed. Its API will change. Cargo will not carry you across a `0.x`
-minor on the caret requirement `cargo add` writes, so the upgrade is yours to take;
-don't force one.
 
 **The engine crates make no version promise at all, and they are on their own line.**
 Said above and worth saying as a rule: they are reshaped whenever the toolchain needs
@@ -87,5 +77,5 @@ readiness, and a version number held hostage to a user who never arrived is just
 forever under another name.
 
 When it happens, the whole product line moves together: the Python wheel, the Node
-and browser packages, the DuckDB extension and the `lat` binary already share one
-version number. The Rust crate keeps its own clock and is not carried along by it.
+and browser packages, the DuckDB extension, the `lat` binary and the Rust crate
+already share one version number.

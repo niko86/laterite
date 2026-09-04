@@ -1,14 +1,17 @@
 # The user-facing Rust API. Everything else in this workspace is an engine
 # crate; this is the one a stranger is expected to depend on.
 #
-# It carries its OWN version (0.1.x), deliberately NOT `version.workspace = true`.
-# The engine tier moves whenever the engine does; publishing this crate at the
-# engine's number would advertise minors of API history that never existed,
-# and would then drag the user-facing semver commitment along with every internal
-# reshape. Two clocks is the point of the two tiers.
+# It carries the PRODUCT number (stamped by `tools/release/bump-version.sh
+# product` like the four surface crates), deliberately NOT `version.workspace =
+# true` — that line is the unpublished members' number, and inheriting it would
+# put this crate back on the engine clock the two-tier split exists to keep it
+# off. It sat on its own 0.1.x until it reached parity with the Python and Node
+# surfaces (dec-facade-parity phase 8, 2026-09-04), then jumped straight onto
+# the product line — the version history on crates.io shows that jump, not a
+# gap.
 [package]
 name = "laterite"
-version = "0.1.3"
+version = "0.12.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Read, validate and write AGS4 — the geotechnical data transfer format"
@@ -70,7 +73,7 @@ serde_json = "1"
 workspace = true
 
 # Which release train cuts this crate (#806): `product` — excluded from the
-# nightly engine cut until it reaches parity (dec-facade-parity), then it
-# rides the product trains.
+# nightly engine cut. Since parity (dec-facade-parity phase 8, 2026-09-04) it
+# rides the product trains at the product number.
 [package.metadata.laterite]
 release_tier = "product"

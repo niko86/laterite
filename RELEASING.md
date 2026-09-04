@@ -25,8 +25,8 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 
 | | Covers | Resolved by | Bumped with |
 |---|---|---|---|
-| **product** | the Python wheel, the npm `laterite` package + its `@laterite/native-*` addons, the browser package, the `lat` binary, the DuckDB extension | `pip install laterite` · `npm i laterite` | `bump-version.sh product` |
-| **each engine crate** | itself — ten crates.io engine crates + the `laterite` facade, each on its own line | `cargo add laterite-ags4-validator` | `bump_crate.py <crate> <part>` |
+| **product** | the Python wheel, the npm `laterite` package + its `@laterite/native-*` addons, the browser package, the `lat` binary, the DuckDB extension, the `laterite` Rust crate (since parity — dec-facade-parity phase 8, 2026-09-04) | `pip install laterite` · `npm i laterite` · `cargo add laterite` | `bump-version.sh product` |
+| **each engine crate** | itself — the crates.io engine crates, each on its own line | `cargo add laterite-ags4-validator` | `bump_crate.py <crate> <part>` |
 
 Every **product** still shares one number, so `pip install laterite==X` and
 `npm i laterite@X` are the same release. Each engine crate moves when IT
@@ -105,9 +105,11 @@ lockfile regeneration). The DuckDB extension lives in
 its own repo and takes the **product** number when you cut it (below). The **docs
 site** carries the version too — it's derived at build and republishes on merge.
 
-The facade (`laterite`, its own `0.1.x` line) is just another per-crate line
-since #781 — it was the scheme's precedent, not an exception. `laterite-cli`
-carries the product number, so `lat --version` agrees with the wheel's `lat`.
+The facade (`laterite`) carries the **product** number since parity
+(dec-facade-parity phase 8, 2026-09-04) — `bump-version.sh product` stamps it
+with the four surface crates, and `cargo add laterite` and `pip install
+laterite` name the same release. `laterite-cli` carries the product number too,
+so `lat --version` agrees with the wheel's `lat`.
 
 **Never hand-edit a version string** — `test_version_faithful.py`, the compat
 guard, and the `release.yml` tag-check all catch drift.
@@ -307,25 +309,18 @@ or not the crates published. Engine changelog entries stay under `[Unreleased]`
 until that product release rolls them — which is the release a reader can
 actually install.
 
-The facade crate `laterite` is published by the same tool but carries its **own**
-`0.1.x`, bumped by hand in `rust-packages/laterite/Cargo.toml`. It is neither
-tier until it reaches parity with the Python and Node surfaces.
+The facade crate `laterite` is published by the same tool and carries the
+**product** number (since parity — dec-facade-parity phase 8, 2026-09-04),
+stamped by `bump-version.sh product`: publish it to crates.io as part of the
+product release, at the release's version.
 
-**When you bump it, name that number in the changelog entry.** The facade has no
-changelog of its own and is not owed one: #318 scoped *"read the changelog before
-upgrading"* to the product line, because Cargo will not resolve a caret
-requirement across a `0.x` minor, so a facade consumer is protected by the
-resolver whether they read anything or not. Its history therefore lives in
-`changelog.json` with everything else, and the only route from crates.io to
-*"what moved in 0.1.3"* is finding that number written in the prose. Product
-`0.10.0`'s facade entries do it — *"functional at 0.1.0"*, *"in 0.1.1"*,
-*"0.1.2"*. `0.11.0`'s do not, and that is the whole of #319: a route that worked
-stopped working, silently, at the last release.
-
-Nothing needs backfilling. The next facade cut carries everything landed since
-`0.1.2`, so its entry names that version and what went into it. And the
-convention retires itself — at `ags-wiki/design/dec-facade-parity.md` phase 8 the
-facade joins the product number and there is only one version left to name.
+A retired convention, kept for the record: while the facade sat on its own
+`0.1.x`, its changelog entries had to name that number in the prose, because
+that was the only route from a crates.io version to what moved in it (#318
+scoped "read the changelog before upgrading" to the product line, and #319 is
+what happened when the naming lapsed). The facade jumped `0.1.x` straight onto
+the product number at parity, so there is one version left to name and the
+convention has nothing to do — a facade entry is a product entry now.
 
 ### Pre-releases (RC / dev)
 

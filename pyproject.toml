@@ -435,6 +435,15 @@ filename = "rust-packages/laterite-ags4-wasm/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+# The facade joined the product line at parity (dec-facade-parity phase 8,
+# 2026-09-04), jumping off its own 0.1.x. It stays a literal version rather
+# than `version.workspace = true` — the workspace number belongs to the
+# unpublished members — so the product bump is what moves it from here on.
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
 # The wasm README's usage example PRINTS the version — `version(); // "0.11.0"`
 # — which makes it a version stamp in all but name, and it ships to npm where
 # the page is permanent. Exactly the class `laterite-cli`'s doc-output step

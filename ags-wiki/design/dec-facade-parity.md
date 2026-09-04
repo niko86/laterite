@@ -335,7 +335,7 @@ Excel, which needs a rename and full prep first.
 | **5** | Excel publish prep · second facade snapshot | — | 3 | 2026-09-04 |
 | **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | 2026-09-04 |
 | **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | 2026-09-04 |
-| **8** | **the jump** — facade onto the product line | — | 0–7 | — |
+| **8** | **the jump** — facade onto the product line | — | 0–7 | 2026-09-04 |
 
 Phases 1 and 3 are independent of each other and of everything in 4; 4a–4c are
 independent of both publish tracks.
