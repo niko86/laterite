@@ -42,6 +42,18 @@ impl core::marker::Unpin for laterite_ags4_emit::EmitMode
 impl core::marker::UnsafeUnpin for laterite_ags4_emit::EmitMode
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::EmitMode
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::EmitMode
+pub struct laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> laterite_ags4_emit::ArrowEmitSession<'a>
+pub fn laterite_ags4_emit::ArrowEmitSession<'a>::finish(self) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
+pub fn laterite_ags4_emit::ArrowEmitSession<'a>::new(&'a laterite_ags4_emit::EmitOpts, &'a laterite_ags4_reference::dict::Dictionary<'a>) -> Self
+pub fn laterite_ags4_emit::ArrowEmitSession<'a>::push(&mut self, laterite_ags4_emit::ArrowGroup) -> core::result::Result<(), laterite_ags4_emit::EmitError>
+impl<'a> core::marker::Freeze for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::marker::Send for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::marker::Sync for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::ArrowEmitSession<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::ArrowEmitSession<'a>
 pub struct laterite_ags4_emit::ArrowGroup
 pub laterite_ags4_emit::ArrowGroup::batches: alloc::vec::Vec<arrow_array::record_batch::RecordBatch>
 pub laterite_ags4_emit::ArrowGroup::code: alloc::string::String

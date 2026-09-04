@@ -14,7 +14,9 @@ mod error;
 mod writer;
 
 #[cfg(feature = "arrow")]
-pub use arrow_in::{ArrowGroup, emit_ags4_from_arrow, emit_ags4_from_arrow_unchecked};
+pub use arrow_in::{
+    ArrowEmitSession, ArrowGroup, emit_ags4_from_arrow, emit_ags4_from_arrow_unchecked,
+};
 pub use emit::{
     EmitMode, EmitOpts, EmitResult, GroupInput, TranStamp, TranStampError, emit_ags4,
     emit_ags4_owned, emit_ags4_unchecked,

@@ -5,6 +5,8 @@
 //! and run the shared `laterite-ags4-emit` orchestrator, so the browser cannot
 //! write a file the native surfaces would have written differently.
 use crate::boundary::{TranInput, WasmOptions, decode_opts, to_js};
+#[cfg(feature = "arrow")]
+use laterite_ags4_validator::Dictionary;
 use laterite_ags4_validator::{DictVersion, dict::FALLBACK, findings, fixes};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -484,10 +486,11 @@ pub(crate) fn build_ags4_core(
     )
 }
 
-/// The host-testable core of [`build_ags4_ipc`], taking the groups already
-/// decoded from the JS array (that walk is genuinely `Reflect` work and stays
-/// at the boundary).
-#[cfg(feature = "arrow")]
+/// The one-call reference for [`build_ags4_ipc`]'s per-group session loop
+/// (#905): same parts, same emit, driven over an already-decoded `Vec`. The
+/// differential test holds the two shapes together; nothing ships through
+/// this path any more, so it is test-only.
+#[cfg(all(test, feature = "arrow"))]
 fn build_ipc_core(
     inputs: Vec<laterite_ags4_emit::ArrowGroup>,
     o: BuildOptions,
@@ -591,8 +594,17 @@ pub fn build_ags4_ipc(
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    // Decode each group as the streamed emit consumes it (#905, queue M9):
+    // a whole-file `Vec<ArrowGroup>` here was the door's entire prize at its
+    // gate rung — one group's IPC copy, batches and formatted cells are live
+    // at a time, and they drop inside `push`. The one-call `build_ipc_core`
+    // stays as the differential tests' reference for this loop.
+    let (edition, mode, synth, tran) = build_parts(o).map_err(|e| JsError::new(&e))?;
+    let eopts = emit_opts(edition.as_deref(), mode.as_deref(), synth, tran)
+        .map_err(|e| JsError::new(&e))?;
+    let dict = Dictionary::bundled(eopts.edition);
+    let mut session = laterite_ags4_emit::ArrowEmitSession::new(&eopts, &dict);
     let arr = js_sys::Array::from(&groups);
-    let mut inputs: Vec<laterite_ags4_emit::ArrowGroup> = Vec::with_capacity(arr.length() as usize);
     for item in arr.iter() {
         let code = js_sys::Reflect::get(&item, &JsValue::from_str("code"))
             .ok()
@@ -604,9 +616,12 @@ pub fn build_ags4_ipc(
             .dyn_into::<js_sys::Uint8Array>()
             .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
             .to_vec();
-        inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
+        session
+            .push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?)
+            .map_err(|e| JsError::new(&e.to_string()))?;
     }
-    let report = build_ipc_core(inputs, o).map_err(|e| JsError::new(&e))?;
+    let res = session.finish().map_err(|e| JsError::new(&e.to_string()))?;
+    let report = shape_report(&res);
     to_js(&report)
 }
 
