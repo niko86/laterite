@@ -1,0 +1,608 @@
+{
+  "schema": "laterite-linux-mem-ratio/1",
+  "mode": "seed",
+  "generated": "2026-09-03T23:48:34+00:00",
+  "measured_sha": "85ce26d606bd9768cc534875a4da8bca49e1cbfb",
+  "instrument_sha": "8caf817f46a5388116378f3448a08f9f620e0779",
+  "hardware_class": {
+    "platform": "linux",
+    "machine": "x86_64",
+    "cpu_model": "Intel(R) Core(TM) i5-14500",
+    "cpu_count": 8,
+    "mem_total_gb": 17
+  },
+  "band": 0.1,
+  "rungs": "5MB,25MB,100MB,265MB",
+  "legs": [
+    {
+      "guard_start": {
+        "load_avg": [
+          1.87060546875,
+          0.98876953125,
+          0.59228515625
+        ],
+        "swap_used_bytes": 1022808064
+      },
+      "guard_end": {
+        "load_avg": [
+          1.5009765625,
+          1.21484375,
+          0.7744140625
+        ],
+        "swap_used_bytes": 1024454656
+      },
+      "dirty": null,
+      "result": {
+        "schema": "laterite-python-lane-bench/1",
+        "generated": "2026-09-03T23:52:02+00:00",
+        "commit": "8caf817f46a5388116378f3448a08f9f620e0779",
+        "invocation": {
+          "rungs": [],
+          "mem_rungs": [
+            "5MB",
+            "25MB",
+            "100MB",
+            "265MB"
+          ],
+          "runs": 5
+        },
+        "machine": {
+          "platform": "Linux-6.1.0-52-amd64-x86_64-with-glibc2.39",
+          "arch": "x86_64",
+          "cpu_count": 8,
+          "mem_total_bytes": 16747143168,
+          "load_avg_start": [
+            1.5009765625,
+            1.21484375,
+            0.7744140625
+          ]
+        },
+        "versions": {
+          "python": "3.12.14",
+          "python-ags4": "1.2.0",
+          "laterite": "0.12.0",
+          "pandas": "2.3.3",
+          "polars": "1.44.1",
+          "pyarrow": "?"
+        },
+        "protocol": {
+          "time": "mean of N warm in-process runs, first run discarded",
+          "memory": "peak RSS of a fresh subprocess running one end-to-end operation through the library's public API \u2014 ru_maxrss on POSIX, PeakWorkingSetSize on Windows, the same instrument both sides of every cell; dhat/tracemalloc numbers are a different claim and never share a table with these",
+          "refusals": "a cell whose run swapped, died, or sits past the memory cap is recorded as {refusal, detail}, never skipped"
+        },
+        "rungs": {
+          "5MB": {
+            "sha256": "79b56a583b57b308ecdc39289241740a4912e954a6e495afad64e7f4360b9b1e",
+            "bytes": 4886318
+          },
+          "25MB": {
+            "sha256": "dea05e74d8b858e7530921ab7865b371fd8c3c76fb7e27388c7f6445077d89a4",
+            "bytes": 25009164
+          },
+          "100MB": {
+            "sha256": "bf81d339d096172f4219a1ee086154092de5108f89e9579910b27ede34b5429d",
+            "bytes": 103024062
+          },
+          "265MB": {
+            "sha256": "b68d454c2d014bdae028f1f9c5431319aae9532bd057742c31a169c021d164e2",
+            "bytes": 276462834
+          }
+        },
+        "time": {
+          "validate": {},
+          "read_strings": {},
+          "read_typed": {},
+          "write": {}
+        },
+        "memory": {
+          "validate": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 134557696,
+                "x_output": 27.54
+              },
+              "laterite": {
+                "peak_rss_bytes": 103247872,
+                "x_output": 21.13
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 299151360,
+                "x_output": 11.96
+              },
+              "laterite": {
+                "peak_rss_bytes": 190017536,
+                "x_output": 7.6
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 960106496,
+                "x_output": 9.32
+              },
+              "laterite": {
+                "peak_rss_bytes": 502636544,
+                "x_output": 4.88
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2367266816,
+                "x_output": 8.56
+              },
+              "laterite": {
+                "peak_rss_bytes": 1222664192,
+                "x_output": 4.42
+              }
+            }
+          },
+          "read_strings": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 119701504,
+                "x_output": 24.5
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 230825984,
+                "x_output": 47.24
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 274649088,
+                "x_output": 10.98
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 410865664,
+                "x_output": 16.43
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 880275456,
+                "x_output": 8.54
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 1117257728,
+                "x_output": 10.84
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2148036608,
+                "x_output": 7.77
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 2365517824,
+                "x_output": 8.56
+              }
+            }
+          },
+          "read_typed": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 120856576,
+                "x_output": 24.73
+              },
+              "laterite": {
+                "peak_rss_bytes": 102985728,
+                "x_output": 21.08
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 276578304,
+                "x_output": 11.06
+              },
+              "laterite": {
+                "peak_rss_bytes": 195899392,
+                "x_output": 7.83
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 882536448,
+                "x_output": 8.57
+              },
+              "laterite": {
+                "peak_rss_bytes": 537784320,
+                "x_output": 5.22
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2146074624,
+                "x_output": 7.76
+              },
+              "laterite": {
+                "peak_rss_bytes": 1312960512,
+                "x_output": 4.75
+              }
+            }
+          },
+          "write": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 122040320,
+                "x_output": 24.98
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 260816896,
+                "x_output": 53.38
+              },
+              "laterite": {
+                "peak_rss_bytes": 153853952,
+                "x_output": 31.49
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 146804736,
+                "x_output": 30.05
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 278396928,
+                "x_output": 11.13
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 455254016,
+                "x_output": 18.2
+              },
+              "laterite": {
+                "peak_rss_bytes": 367636480,
+                "x_output": 14.7
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 366247936,
+                "x_output": 14.65
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 879575040,
+                "x_output": 8.54
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 1235902464,
+                "x_output": 12.0
+              },
+              "laterite": {
+                "peak_rss_bytes": 1168089088,
+                "x_output": 11.34
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 1135001600,
+                "x_output": 11.02
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2154622976,
+                "x_output": 7.79
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 2642395136,
+                "x_output": 9.56
+              },
+              "laterite": {
+                "peak_rss_bytes": 2731491328,
+                "x_output": 9.88
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 2763177984,
+                "x_output": 10.0
+              }
+            }
+          }
+        },
+        "import_baselines": {
+          "python_ags4": {
+            "peak_rss_bytes": 24240128
+          },
+          "laterite": {
+            "peak_rss_bytes": 80003072
+          }
+        },
+        "notes": [
+          "compat pandas cells measured the duckdb (the shipped default) hop this run; the shipped default [compat] install is pyarrow-free (DuckDB hop) \u2014 see the memory queue's M5 row (#834)"
+        ]
+      }
+    },
+    {
+      "guard_start": {
+        "load_avg": [
+          1.5009765625,
+          1.21484375,
+          0.7744140625
+        ],
+        "swap_used_bytes": 1024454656
+      },
+      "guard_end": {
+        "load_avg": [
+          1.3837890625,
+          1.2568359375,
+          0.88671875
+        ],
+        "swap_used_bytes": 1024454656
+      },
+      "dirty": null,
+      "result": {
+        "schema": "laterite-python-lane-bench/1",
+        "generated": "2026-09-03T23:55:23+00:00",
+        "commit": "8caf817f46a5388116378f3448a08f9f620e0779",
+        "invocation": {
+          "rungs": [],
+          "mem_rungs": [
+            "5MB",
+            "25MB",
+            "100MB",
+            "265MB"
+          ],
+          "runs": 5
+        },
+        "machine": {
+          "platform": "Linux-6.1.0-52-amd64-x86_64-with-glibc2.39",
+          "arch": "x86_64",
+          "cpu_count": 8,
+          "mem_total_bytes": 16747143168,
+          "load_avg_start": [
+            1.3837890625,
+            1.2568359375,
+            0.88671875
+          ]
+        },
+        "versions": {
+          "python": "3.12.14",
+          "python-ags4": "1.2.0",
+          "laterite": "0.12.0",
+          "pandas": "2.3.3",
+          "polars": "1.44.1",
+          "pyarrow": "?"
+        },
+        "protocol": {
+          "time": "mean of N warm in-process runs, first run discarded",
+          "memory": "peak RSS of a fresh subprocess running one end-to-end operation through the library's public API \u2014 ru_maxrss on POSIX, PeakWorkingSetSize on Windows, the same instrument both sides of every cell; dhat/tracemalloc numbers are a different claim and never share a table with these",
+          "refusals": "a cell whose run swapped, died, or sits past the memory cap is recorded as {refusal, detail}, never skipped"
+        },
+        "rungs": {
+          "5MB": {
+            "sha256": "79b56a583b57b308ecdc39289241740a4912e954a6e495afad64e7f4360b9b1e",
+            "bytes": 4886318
+          },
+          "25MB": {
+            "sha256": "dea05e74d8b858e7530921ab7865b371fd8c3c76fb7e27388c7f6445077d89a4",
+            "bytes": 25009164
+          },
+          "100MB": {
+            "sha256": "bf81d339d096172f4219a1ee086154092de5108f89e9579910b27ede34b5429d",
+            "bytes": 103024062
+          },
+          "265MB": {
+            "sha256": "b68d454c2d014bdae028f1f9c5431319aae9532bd057742c31a169c021d164e2",
+            "bytes": 276462834
+          }
+        },
+        "time": {
+          "validate": {},
+          "read_strings": {},
+          "read_typed": {},
+          "write": {}
+        },
+        "memory": {
+          "validate": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 130203648,
+                "x_output": 26.65
+              },
+              "laterite": {
+                "peak_rss_bytes": 103141376,
+                "x_output": 21.11
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 300531712,
+                "x_output": 12.02
+              },
+              "laterite": {
+                "peak_rss_bytes": 190181376,
+                "x_output": 7.6
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 962834432,
+                "x_output": 9.35
+              },
+              "laterite": {
+                "peak_rss_bytes": 502517760,
+                "x_output": 4.88
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2359316480,
+                "x_output": 8.53
+              },
+              "laterite": {
+                "peak_rss_bytes": 1235062784,
+                "x_output": 4.47
+              }
+            }
+          },
+          "read_strings": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 119726080,
+                "x_output": 24.5
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 231112704,
+                "x_output": 47.3
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 274898944,
+                "x_output": 10.99
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 412893184,
+                "x_output": 16.51
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 878501888,
+                "x_output": 8.53
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 1120161792,
+                "x_output": 10.87
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2146820096,
+                "x_output": 7.77
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 2347925504,
+                "x_output": 8.49
+              }
+            }
+          },
+          "read_typed": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 121376768,
+                "x_output": 24.84
+              },
+              "laterite": {
+                "peak_rss_bytes": 102543360,
+                "x_output": 20.99
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 276447232,
+                "x_output": 11.05
+              },
+              "laterite": {
+                "peak_rss_bytes": 195854336,
+                "x_output": 7.83
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 878305280,
+                "x_output": 8.53
+              },
+              "laterite": {
+                "peak_rss_bytes": 535887872,
+                "x_output": 5.2
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2166251520,
+                "x_output": 7.84
+              },
+              "laterite": {
+                "peak_rss_bytes": 1313259520,
+                "x_output": 4.75
+              }
+            }
+          },
+          "write": {
+            "5MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 121856000,
+                "x_output": 24.94
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 262979584,
+                "x_output": 53.82
+              },
+              "laterite": {
+                "peak_rss_bytes": 152932352,
+                "x_output": 31.3
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 149663744,
+                "x_output": 30.63
+              }
+            },
+            "25MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 277200896,
+                "x_output": 11.08
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 460529664,
+                "x_output": 18.41
+              },
+              "laterite": {
+                "peak_rss_bytes": 367423488,
+                "x_output": 14.69
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 369807360,
+                "x_output": 14.79
+              }
+            },
+            "100MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 880861184,
+                "x_output": 8.55
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 1199771648,
+                "x_output": 11.65
+              },
+              "laterite": {
+                "peak_rss_bytes": 1167208448,
+                "x_output": 11.33
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 1135800320,
+                "x_output": 11.02
+              }
+            },
+            "265MB": {
+              "python_ags4": {
+                "peak_rss_bytes": 2152091648,
+                "x_output": 7.78
+              },
+              "laterite_compat": {
+                "peak_rss_bytes": 2606075904,
+                "x_output": 9.43
+              },
+              "laterite": {
+                "peak_rss_bytes": 2724896768,
+                "x_output": 9.86
+              },
+              "laterite_unchecked": {
+                "peak_rss_bytes": 2741948416,
+                "x_output": 9.92
+              }
+            }
+          }
+        },
+        "import_baselines": {
+          "python_ags4": {
+            "peak_rss_bytes": 24391680
+          },
+          "laterite": {
+            "peak_rss_bytes": 80158720
+          }
+        },
+        "notes": [
+          "compat pandas cells measured the duckdb (the shipped default) hop this run; the shipped default [compat] install is pyarrow-free (DuckDB hop) \u2014 see the memory queue's M5 row (#834)"
+        ]
+      }
+    }
+  ]
+}

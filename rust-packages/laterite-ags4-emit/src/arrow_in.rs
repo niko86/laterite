@@ -204,6 +204,43 @@ pub fn emit_ags4_from_arrow(
     stream.finish()
 }
 
+/// A per-group push session over the streamed Arrow door — for a caller
+/// whose groups arrive one at a time across a boundary, so no whole-file
+/// `Vec<ArrowGroup>` ever accumulates (#905, queue M9: that decode slab was
+/// the wasm write door's whole prize at its gate rung). A group's batches
+/// and its formatted cells drop inside `push`, exactly as the one-call
+/// door's loop drops them; [`emit_ags4_from_arrow`] IS this session driven
+/// over a `Vec`, and a test pins the two byte-identical.
+///
+/// The caller owns `opts` and the bundled dictionary for `opts.edition`
+/// (the same pairing the one-call door constructs internally) and lends
+/// both for the session's lifetime — borrowing keeps this allocation-free
+/// where a self-owning session would leak or self-reference.
+pub struct ArrowEmitSession<'a> {
+    stream: EmitStream<'a>,
+    dict: &'a Dictionary<'a>,
+}
+
+impl<'a> ArrowEmitSession<'a> {
+    #[must_use]
+    pub fn new(opts: &'a EmitOpts, dict: &'a Dictionary<'a>) -> Self {
+        ArrowEmitSession {
+            stream: EmitStream::new(opts, dict),
+            dict,
+        }
+    }
+
+    /// Decode-and-write one group; its batches and formatted cells free on
+    /// return.
+    pub fn push(&mut self, g: ArrowGroup) -> Result<(), EmitError> {
+        self.stream.push(owned_group_from_arrow(g, self.dict))
+    }
+
+    pub fn finish(self) -> Result<EmitResult, EmitError> {
+        self.stream.finish()
+    }
+}
+
 /// [`emit_ags4_from_arrow`] with NO validity verdict — the Arrow half of the
 /// unchecked pair beside [`crate::emit_ags4_unchecked`] (#858).
 ///
@@ -783,6 +820,65 @@ mod tests {
         assert!(
             cells_text.contains("\"2021-08-09T00:00:00\""),
             "a caller's string emits verbatim: {cells_text}"
+        );
+    }
+
+    /// [`ArrowEmitSession`] IS [`emit_ags4_from_arrow`] driven per group —
+    /// byte-identical output and the same verdict, pinned so the wasm door's
+    /// jit-decode loop (#905) cannot drift from the reference it replaced.
+    #[test]
+    fn the_push_session_matches_the_one_call_door_byte_for_byte() {
+        use arrow::array::{Float64Array, StringArray};
+
+        fn groups() -> Vec<ArrowGroup> {
+            let proj_schema = Schema::new(vec![Field::new("PROJ_ID", DataType::Utf8, true)]);
+            let proj_batch = RecordBatch::try_new(
+                Arc::new(proj_schema.clone()),
+                vec![Arc::new(StringArray::from(vec!["P1"]))],
+            )
+            .expect("valid batch");
+            let loca_schema = Schema::new(vec![
+                Field::new("LOCA_ID", DataType::Utf8, true),
+                Field::new("LOCA_NATE", DataType::Float64, true),
+            ]);
+            let loca_batch = RecordBatch::try_new(
+                Arc::new(loca_schema.clone()),
+                vec![
+                    Arc::new(StringArray::from(vec!["BH01", "BH02"])),
+                    Arc::new(Float64Array::from(vec![100.5, 200.75])),
+                ],
+            )
+            .expect("valid batch");
+            vec![
+                arrow_group("PROJ", proj_schema, vec![proj_batch]),
+                arrow_group("LOCA", loca_schema, vec![loca_batch]),
+            ]
+        }
+
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            edition: DictVersion::V4_2,
+            tran: None,
+            synthesise_metadata: false,
+        };
+        let one_call = emit_ags4_from_arrow(groups(), &opts).expect("the one-call door emits");
+
+        let dict = Dictionary::bundled(opts.edition);
+        let mut session = ArrowEmitSession::new(&opts, &dict);
+        for g in groups() {
+            session.push(g).expect("push emits");
+        }
+        let sessioned = session.finish().expect("finish emits");
+
+        assert_eq!(
+            one_call.bytes, sessioned.bytes,
+            "the session and the one-call door must write identical bytes"
+        );
+        assert_eq!(one_call.fixes_applied, sessioned.fixes_applied);
+        assert_eq!(
+            one_call.findings.len(),
+            sessioned.findings.len(),
+            "the verdicts must match finding for finding"
         );
     }
 }
