@@ -93,6 +93,9 @@
       {
         "text": "**Breaking: core’s read projection hands out spans behind accessors — `AgsGroup`’s public fields are gone.** (#900, queue M8; shape: `dec-read-projection-representation`). `AgsGroup.rows` was `Vec<HashMap<Arc<str>, String>>` — one hash map per DATA row, every cell re-owned and re-keyed at read time on every surface, whether or not anything looked at it. The group now keeps the parse leaf’s span-backed structure and lends `&str` views through accessors (`cell` / `cell_named` / `row_cells` / `padded_row`, resolved once per group via `col`); the first mutation (`set_cell` / `push_row`) materialises that one group into the single owned shape (`Vec<Vec<String>>`) — copy-on-write at group granularity, no hybrid. Construction is private: `from_owned_rows` and `ParsedAgs4::from_groups` are the doors, so the next layout change pays no consumer tax. The `ExcessFields::Error` refusal moved from projection build to read time (an arity walk over the spans) with identical semantics. Who follows the break: a direct Rust consumer of the engine crate; the wheel, npm and CLI surfaces are behaviour-identical.",
         "breaking": true
+      },
+      {
+        "text": "**The compiled dependency set moves forward: `libc` 0.2.186 → 0.2.189 and `uuid` 1.25.0 → 1.26.0.** Declared rather than waved through for the same reason as every dependency move here — this repo ships BUILT artefacts, so these are the versions actually inside the wheel, the Node addon and `lat`. Both are patch/minor moves within the existing manifest ranges: only `Cargo.lock` changes, and no API a caller touches moves with them."
       }
     ],
     "deprecated": [],
