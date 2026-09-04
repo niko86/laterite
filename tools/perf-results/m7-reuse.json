@@ -1,0 +1,305 @@
+{
+  "schema": "m7-reuse/1",
+  "issue": 893,
+  "follow_up": "M7 fix-design spike: does forced boundary-byte reclamation close the stream->bound gap?",
+  "generated": "2026-09-04T02:01:26.868Z",
+  "git_sha": "65d1ff0002e893b98024e6beec87ee55966b43ed",
+  "instrument": "fresh-child peak RSS (process.resourceUsage().maxRSS) — diagnosis family",
+  "denominator": "x-of-output",
+  "reps": 3,
+  "loadavg_start": [
+    1.8642578125,
+    2.52685546875,
+    2.67724609375
+  ],
+  "passes": [
+    {
+      "leg": "A1",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 147980288,
+          "x_output": 30.29,
+          "peaks_bytes": [
+            144261120,
+            147980288,
+            148340736
+          ],
+          "door_ms_median": 56.8,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "peak_rss_bytes": 338198528,
+          "x_output": 13.52,
+          "peaks_bytes": [
+            337608704,
+            338198528,
+            341508096
+          ],
+          "door_ms_median": 243.7,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "peak_rss_bytes": 1070546944,
+          "x_output": 10.39,
+          "peaks_bytes": [
+            1069383680,
+            1070546944,
+            1070972928
+          ],
+          "door_ms_median": 983.2,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "peak_rss_bytes": 2821324800,
+          "x_output": 10.21,
+          "peaks_bytes": [
+            2820866048,
+            2821324800,
+            3038101504
+          ],
+          "door_ms_median": 2565.3,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "stream",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 146096128,
+          "x_output": 29.9,
+          "peaks_bytes": [
+            142917632,
+            146096128,
+            146194432
+          ],
+          "door_ms_median": 57.9,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "peak_rss_bytes": 315850752,
+          "x_output": 12.63,
+          "peaks_bytes": [
+            315621376,
+            315850752,
+            316063744
+          ],
+          "door_ms_median": 247.1,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "peak_rss_bytes": 977321984,
+          "x_output": 9.49,
+          "peaks_bytes": [
+            975732736,
+            977321984,
+            987381760
+          ],
+          "door_ms_median": 988.4,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "peak_rss_bytes": 2598420480,
+          "x_output": 9.4,
+          "peaks_bytes": [
+            2598109184,
+            2598420480,
+            2599157760
+          ],
+          "door_ms_median": 2564.1,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "reuse",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 141869056,
+          "x_output": 29.04,
+          "peaks_bytes": [
+            141770752,
+            141869056,
+            143015936
+          ],
+          "door_ms_median": 58.1,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "peak_rss_bytes": 306397184,
+          "x_output": 12.25,
+          "peaks_bytes": [
+            306184192,
+            306397184,
+            306511872
+          ],
+          "door_ms_median": 244.6,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "peak_rss_bytes": 966295552,
+          "x_output": 9.38,
+          "peaks_bytes": [
+            945750016,
+            966295552,
+            966377472
+          ],
+          "door_ms_median": 980.1,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "peak_rss_bytes": 2552168448,
+          "x_output": 9.23,
+          "peaks_bytes": [
+            2550235136,
+            2552168448,
+            2553905152
+          ],
+          "door_ms_median": 2543.1,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "B",
+      "variant": "gcstream",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 137084928,
+          "x_output": 28.06,
+          "peaks_bytes": [
+            137052160,
+            137084928,
+            137379840
+          ],
+          "door_ms_median": 228,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "peak_rss_bytes": 292454400,
+          "x_output": 11.69,
+          "peaks_bytes": [
+            292143104,
+            292454400,
+            293044224
+          ],
+          "door_ms_median": 415.7,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "peak_rss_bytes": 923123712,
+          "x_output": 8.96,
+          "peaks_bytes": [
+            922763264,
+            923123712,
+            923189248
+          ],
+          "door_ms_median": 1150.2,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "peak_rss_bytes": 2496102400,
+          "x_output": 9.03,
+          "peaks_bytes": [
+            2496069632,
+            2496102400,
+            2496315392
+          ],
+          "door_ms_median": 2692,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    },
+    {
+      "leg": "A2",
+      "variant": "base",
+      "cells": {
+        "5MB": {
+          "peak_rss_bytes": 148406272,
+          "x_output": 30.37,
+          "peaks_bytes": [
+            148340736,
+            148406272,
+            148520960
+          ],
+          "door_ms_median": 57.5,
+          "out_bytes": 4886115,
+          "out_sha256": "3ec32685b7d1f8e166ca6e1204d559ea3d13f00e097efb3c2ba8bfd5cd96fee2"
+        },
+        "25MB": {
+          "peak_rss_bytes": 341721088,
+          "x_output": 13.66,
+          "peaks_bytes": [
+            341590016,
+            341721088,
+            342081536
+          ],
+          "door_ms_median": 245.9,
+          "out_bytes": 25008253,
+          "out_sha256": "8a568c88730d235514aec4cd390f230e59da98f49492c32275c7028ad605bc97"
+        },
+        "100MB": {
+          "peak_rss_bytes": 1070383104,
+          "x_output": 10.39,
+          "peaks_bytes": [
+            1065811968,
+            1070383104,
+            1074610176
+          ],
+          "door_ms_median": 982.1,
+          "out_bytes": 103020479,
+          "out_sha256": "fcc9c7e2a01d6ff136c3e7889749be91240d385378cef0aa130e459a01b38d76"
+        },
+        "265MB": {
+          "peak_rss_bytes": 3053060096,
+          "x_output": 11.04,
+          "peaks_bytes": [
+            3046948864,
+            3053060096,
+            3055517696
+          ],
+          "door_ms_median": 2555,
+          "out_bytes": 276453655,
+          "out_sha256": "fb17ea8a026ed13a615d19c01dcb1f229df8f494f5a047cdcbf6e80fca113f69"
+        }
+      }
+    }
+  ],
+  "output_byte_identity": {
+    "B-stream/5MB": true,
+    "B-stream/25MB": true,
+    "B-stream/100MB": true,
+    "B-stream/265MB": true,
+    "B-reuse/5MB": true,
+    "B-reuse/25MB": true,
+    "B-reuse/100MB": true,
+    "B-reuse/265MB": true,
+    "B-gcstream/5MB": true,
+    "B-gcstream/25MB": true,
+    "B-gcstream/100MB": true,
+    "B-gcstream/265MB": true,
+    "A2-base/5MB": true,
+    "A2-base/25MB": true,
+    "A2-base/100MB": true,
+    "A2-base/265MB": true
+  }
+}
