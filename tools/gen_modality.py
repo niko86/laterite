@@ -313,6 +313,12 @@ def summary(doc: dict) -> str:
     # purely mechanical (python n node) — a human override never moves it, or it
     # stops measuring anything. What the verdict does is separate "still to do"
     # from "deliberately not doing", so the number can actually reach zero.
+    #
+    # The `by-design` arm is KEPT with no current member — the phase-5 answer to
+    # the question dec-facade-parity left open (2026-09-04). Decision 7 retired
+    # the last two exclusions, but the tri-state is the door a future exclusion
+    # arrives through, and an always-printed "deliberately not adding (0)" is a
+    # statement about the surface, not dead code.
     buckets: dict[str, list[str]] = {"planned": [], "by-design": [], "undecided": []}
     clear = 0
     for cap in doc["capabilities"]:

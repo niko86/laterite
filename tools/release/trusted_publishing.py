@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Create the crates.io Trusted Publishing configs `publish-crates.yml` needs.
 
-Trusted Publishing is configured **per crate**, and this repo publishes eleven.
-Doing that through the crates.io UI is eleven visits to Settings → Trusted
+Trusted Publishing is configured **per crate**, and this repo publishes twelve.
+Doing that through the crates.io UI is twelve visits to Settings → Trusted
 Publishing, each retyping the same four values — the shape that goes wrong on
 the tenth one. crates.io exposes the same thing as an API, so this does it once.
 
@@ -49,7 +49,7 @@ REPOSITORY_NAME = "laterite"
 
 # crates.io pins BOTH of these per config, so they are part of the publish
 # contract rather than incidental. Renaming the workflow or the environment
-# breaks all eleven at once, at publish time, on the append-only registry — the
+# breaks all twelve at once, at publish time, on the append-only registry — the
 # assertion below is what turns that into a local failure instead.
 WORKFLOW_FILENAME = "publish-crates.yml"
 ENVIRONMENT = "crates"

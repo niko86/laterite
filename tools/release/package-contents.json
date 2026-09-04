@@ -54,6 +54,14 @@
     "src/lib.rs",
     "src/writer.rs"
   ],
+  "laterite-ags4-excel": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "README.md",
+    "src/lib.rs"
+  ],
   "laterite-ags4-merge": [
     ".cargo_vcs_info.json",
     "Cargo.lock",

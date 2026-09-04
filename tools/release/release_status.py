@@ -168,8 +168,14 @@ def engine_crates() -> list[str]:
     The snapshot directory is already the census of what has a public API to
     answer for; a crate joining the publish set gains a snapshot in the same PR
     (check_public_api refuses otherwise), so there is no second list to forget.
+
+    One file there is NOT a crate: `laterite.all-features.txt`, the facade's
+    second snapshot (dec-facade-parity decision 4). A crates.io name cannot
+    carry a dot, so a dotted stem is that file and never a crate — filtered
+    here rather than special-cased downstream, or the sweep would ask the
+    registry about a crate that cannot exist.
     """
-    return sorted(f.stem for f in SNAPSHOTS.glob("*.txt"))
+    return sorted(f.stem for f in SNAPSHOTS.glob("*.txt") if "." not in f.stem)
 
 
 def crate_manifest(crate: str) -> Path:

@@ -576,14 +576,22 @@ jobs:
       # `nightly`: rustdoc's JSON output is unstable, and cargo public-api reads
       # it. There is no flag to point it elsewhere; it finds nightly via rustup.
       #
-      # `1.85`: the `rust-version` every crate declares. It is a promise to a
-      # stranger's toolchain, and until this job existed nothing tested it — the
-      # first run found a let chain (stable in 1.88) in laterite-ags4-emit, so
-      # the promise had already been broken for a while.
+      # `1.85`: the `rust-version` all but one crate declares. It is a promise
+      # to a stranger's toolchain, and until this job existed nothing tested it —
+      # the first run found a let chain (stable in 1.88) in laterite-ags4-emit,
+      # so the promise had already been broken for a while.
+      #
+      # `1.88`: laterite-ags4-excel's own floor — its XLSX deps (calamine,
+      # rust_xlsxwriter, zip) all require 1.88, a fact nothing checked until the
+      # crate joined the publish set (dec-facade-parity phase 5). check_msrv.py
+      # groups crates by declared floor and builds each group on its own, and it
+      # dies loudly here if a declared floor has no toolchain — so a third floor
+      # cannot pass silently, only fail asking for its install line.
       - name: Install the nightly + MSRV toolchains
         run: |
           rustup toolchain install nightly --profile minimal
           rustup toolchain install 1.85 --profile minimal
+          rustup toolchain install 1.88 --profile minimal
 
       # No build-accel: that turns on the self-hosted pool's sccache + mold, and
       # this job does not run there. Swatinem is the cache instead — same reason

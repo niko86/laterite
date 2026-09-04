@@ -92,9 +92,10 @@ from check_package_contents import PUBLISH_SET  # noqa: E402
 #: only two entries, held back through the first publish so day one's surface was
 #: as small as possible. That is spent — both went out at 0.9.0 on 2026-08-05,
 #: taking the engine tier to ten published crates. The mechanism
-#: stays because it will be wanted again — the next crate to prepare ahead of its
-#: publish is `laterite-ags4-excel` (see ags-wiki/design/dec-facade-parity.md),
-#: which also has to be renamed before it can go out.
+#: stays because it will be wanted again — though the next prepared crate,
+#: `laterite-ags4-excel` (dec-facade-parity phase 5), never needed it: since
+#: #889 the PR merge is the human gate, so it joined `PUBLISH_SET` and rode the
+#: unattended sweep instead of waiting here.
 DEFERRED: set[str] = set()
 
 #: How long to wait for an uploaded crate to become resolvable from the index.

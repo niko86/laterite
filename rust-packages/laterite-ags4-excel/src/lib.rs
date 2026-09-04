@@ -24,6 +24,15 @@
 //!
 //! Stage 2b of the python-ags4 parity arc.
 
+// The README's example is a doctest, not a second copy of one. `cfg(doctest)`
+// means this module exists only while rustdoc collects doctests: it is absent
+// from a normal build and from the rendered docs.rs page, so the crate's own
+// `//!` docs are untouched and nothing is duplicated. The README is the single
+// source, and `cargo test --workspace` already compiles it.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}
+
 use std::io::Cursor;
 use std::path::Path;
 

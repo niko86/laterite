@@ -1,0 +1,760 @@
+pub mod laterite
+pub mod laterite::ags4
+#[non_exhaustive] pub enum laterite::ags4::Cell
+pub laterite::ags4::Cell::Bool(bool)
+pub laterite::ags4::Cell::Float(f64)
+pub laterite::ags4::Cell::Int(i64)
+pub laterite::ags4::Cell::Null
+pub laterite::ags4::Cell::Text(alloc::string::String)
+impl core::clone::Clone for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::clone(&self) -> laterite::ags4::Cell
+impl core::cmp::PartialEq for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::eq(&self, &laterite::ags4::Cell) -> bool
+impl core::convert::From<&alloc::string::String> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(&alloc::string::String) -> laterite::ags4::Cell
+impl core::convert::From<&str> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(&str) -> laterite::ags4::Cell
+impl core::convert::From<alloc::string::String> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(alloc::string::String) -> laterite::ags4::Cell
+impl core::convert::From<bool> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(bool) -> laterite::ags4::Cell
+impl core::convert::From<f64> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(f64) -> laterite::ags4::Cell
+impl core::convert::From<i32> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(i32) -> laterite::ags4::Cell
+impl core::convert::From<i64> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(i64) -> laterite::ags4::Cell
+impl core::fmt::Debug for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite::ags4::Cell
+impl<T: core::convert::Into<laterite::ags4::Cell>> core::convert::From<core::option::Option<T>> for laterite::ags4::Cell
+pub fn laterite::ags4::Cell::from(core::option::Option<T>) -> laterite::ags4::Cell
+impl core::marker::Freeze for laterite::ags4::Cell
+impl core::marker::Send for laterite::ags4::Cell
+impl core::marker::Sync for laterite::ags4::Cell
+impl core::marker::Unpin for laterite::ags4::Cell
+impl core::marker::UnsafeUnpin for laterite::ags4::Cell
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Cell
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Cell
+#[non_exhaustive] pub enum laterite::ags4::Change
+pub laterite::ags4::Change::Added
+pub laterite::ags4::Change::Changed
+pub laterite::ags4::Change::Removed
+impl core::clone::Clone for laterite::ags4::Change
+pub fn laterite::ags4::Change::clone(&self) -> laterite::ags4::Change
+impl core::cmp::Eq for laterite::ags4::Change
+impl core::cmp::PartialEq for laterite::ags4::Change
+pub fn laterite::ags4::Change::eq(&self, &laterite::ags4::Change) -> bool
+impl core::fmt::Debug for laterite::ags4::Change
+pub fn laterite::ags4::Change::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite::ags4::Change
+impl core::marker::StructuralPartialEq for laterite::ags4::Change
+impl core::marker::Freeze for laterite::ags4::Change
+impl core::marker::Send for laterite::ags4::Change
+impl core::marker::Sync for laterite::ags4::Change
+impl core::marker::Unpin for laterite::ags4::Change
+impl core::marker::UnsafeUnpin for laterite::ags4::Change
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Change
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Change
+#[non_exhaustive] pub enum laterite::ags4::MissingTran
+pub laterite::ags4::MissingTran::Reconcile
+pub laterite::ags4::MissingTran::Refuse
+impl core::clone::Clone for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::clone(&self) -> laterite::ags4::MissingTran
+impl core::cmp::Eq for laterite::ags4::MissingTran
+impl core::cmp::PartialEq for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::eq(&self, &laterite::ags4::MissingTran) -> bool
+impl core::default::Default for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::default() -> laterite::ags4::MissingTran
+impl core::fmt::Debug for laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite::ags4::MissingTran
+impl core::marker::StructuralPartialEq for laterite::ags4::MissingTran
+impl core::marker::Freeze for laterite::ags4::MissingTran
+impl core::marker::Send for laterite::ags4::MissingTran
+impl core::marker::Sync for laterite::ags4::MissingTran
+impl core::marker::Unpin for laterite::ags4::MissingTran
+impl core::marker::UnsafeUnpin for laterite::ags4::MissingTran
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::MissingTran
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::MissingTran
+#[non_exhaustive] pub enum laterite::ags4::Severity
+pub laterite::ags4::Severity::Error
+pub laterite::ags4::Severity::Fyi
+pub laterite::ags4::Severity::Warning
+impl laterite::ags4::Severity
+pub fn laterite::ags4::Severity::as_str(self) -> &'static str
+impl core::clone::Clone for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::clone(&self) -> laterite::ags4::Severity
+impl core::cmp::Eq for laterite::ags4::Severity
+impl core::cmp::Ord for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::cmp(&self, &laterite::ags4::Severity) -> core::cmp::Ordering
+impl core::cmp::PartialEq for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::eq(&self, &laterite::ags4::Severity) -> bool
+impl core::cmp::PartialOrd for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::partial_cmp(&self, &laterite::ags4::Severity) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for laterite::ags4::Severity
+pub fn laterite::ags4::Severity::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for laterite::ags4::Severity
+impl core::marker::StructuralPartialEq for laterite::ags4::Severity
+impl core::marker::Freeze for laterite::ags4::Severity
+impl core::marker::Send for laterite::ags4::Severity
+impl core::marker::Sync for laterite::ags4::Severity
+impl core::marker::Unpin for laterite::ags4::Severity
+impl core::marker::UnsafeUnpin for laterite::ags4::Severity
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Severity
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Severity
+#[non_exhaustive] pub enum laterite::ags4::TypeClash
+pub laterite::ags4::TypeClash::Promote
+pub laterite::ags4::TypeClash::Refuse
+pub laterite::ags4::TypeClash::Widen
+impl core::clone::Clone for laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::clone(&self) -> laterite::ags4::TypeClash
+impl core::cmp::Eq for laterite::ags4::TypeClash
+impl core::cmp::PartialEq for laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::eq(&self, &laterite::ags4::TypeClash) -> bool
+impl core::default::Default for laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::default() -> laterite::ags4::TypeClash
+impl core::fmt::Debug for laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite::ags4::TypeClash
+impl core::marker::StructuralPartialEq for laterite::ags4::TypeClash
+impl core::marker::Freeze for laterite::ags4::TypeClash
+impl core::marker::Send for laterite::ags4::TypeClash
+impl core::marker::Sync for laterite::ags4::TypeClash
+impl core::marker::Unpin for laterite::ags4::TypeClash
+impl core::marker::UnsafeUnpin for laterite::ags4::TypeClash
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::TypeClash
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::TypeClash
+#[non_exhaustive] pub enum laterite::ags4::WriteMode
+pub laterite::ags4::WriteMode::AutoFix
+pub laterite::ags4::WriteMode::Report
+pub laterite::ags4::WriteMode::Strict
+impl core::clone::Clone for laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::clone(&self) -> laterite::ags4::WriteMode
+impl core::cmp::Eq for laterite::ags4::WriteMode
+impl core::cmp::PartialEq for laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::eq(&self, &laterite::ags4::WriteMode) -> bool
+impl core::default::Default for laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::default() -> laterite::ags4::WriteMode
+impl core::fmt::Debug for laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite::ags4::WriteMode
+impl core::marker::StructuralPartialEq for laterite::ags4::WriteMode
+impl core::marker::Freeze for laterite::ags4::WriteMode
+impl core::marker::Send for laterite::ags4::WriteMode
+impl core::marker::Sync for laterite::ags4::WriteMode
+impl core::marker::Unpin for laterite::ags4::WriteMode
+impl core::marker::UnsafeUnpin for laterite::ags4::WriteMode
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::WriteMode
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::WriteMode
+pub struct laterite::ags4::Build
+impl laterite::ags4::Build
+pub fn laterite::ags4::Build::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Build
+pub fn laterite::ags4::Build::mode(self, laterite::ags4::WriteMode) -> laterite::ags4::Build
+pub fn laterite::ags4::Build::run(self) -> core::result::Result<laterite::ags4::Written, laterite::Error>
+pub fn laterite::ags4::Build::synthesise_metadata(self, bool) -> laterite::ags4::Build
+pub fn laterite::ags4::Build::transmission(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Build
+impl core::fmt::Debug for laterite::ags4::Build
+pub fn laterite::ags4::Build::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Build
+impl core::marker::Send for laterite::ags4::Build
+impl core::marker::Sync for laterite::ags4::Build
+impl core::marker::Unpin for laterite::ags4::Build
+impl core::marker::UnsafeUnpin for laterite::ags4::Build
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Build
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Build
+pub struct laterite::ags4::CellChange
+impl laterite::ags4::CellChange
+pub fn laterite::ags4::CellChange::ags_type(&self) -> &str
+pub fn laterite::ags4::CellChange::baseline(&self) -> core::option::Option<&str>
+pub fn laterite::ags4::CellChange::heading(&self) -> &str
+pub fn laterite::ags4::CellChange::revision(&self) -> core::option::Option<&str>
+impl core::clone::Clone for laterite::ags4::CellChange
+pub fn laterite::ags4::CellChange::clone(&self) -> laterite::ags4::CellChange
+impl core::fmt::Debug for laterite::ags4::CellChange
+pub fn laterite::ags4::CellChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::CellChange
+impl core::marker::Send for laterite::ags4::CellChange
+impl core::marker::Sync for laterite::ags4::CellChange
+impl core::marker::Unpin for laterite::ags4::CellChange
+impl core::marker::UnsafeUnpin for laterite::ags4::CellChange
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::CellChange
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::CellChange
+pub struct laterite::ags4::Certify<'a>
+impl laterite::ags4::Certify<'_>
+pub fn laterite::ags4::Certify<'_>::edition(self, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn laterite::ags4::Certify<'_>::to_bytes(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::ags4::Certify<'_>::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+impl core::fmt::Debug for laterite::ags4::Certify<'_>
+pub fn laterite::ags4::Certify<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Send for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Certify<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Certify<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Certify<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Certify<'a>
+pub struct laterite::ags4::Delta
+impl laterite::ags4::Delta
+pub fn laterite::ags4::Delta::added(&self) -> usize
+pub fn laterite::ags4::Delta::changed(&self) -> usize
+pub fn laterite::ags4::Delta::groups(&self) -> &[laterite::ags4::GroupChange]
+pub fn laterite::ags4::Delta::groups_added(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::Delta::groups_removed(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::Delta::is_unchanged(&self) -> bool
+pub fn laterite::ags4::Delta::removed(&self) -> usize
+impl core::clone::Clone for laterite::ags4::Delta
+pub fn laterite::ags4::Delta::clone(&self) -> laterite::ags4::Delta
+impl core::fmt::Debug for laterite::ags4::Delta
+pub fn laterite::ags4::Delta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Delta
+impl core::marker::Send for laterite::ags4::Delta
+impl core::marker::Sync for laterite::ags4::Delta
+impl core::marker::Unpin for laterite::ags4::Delta
+impl core::marker::UnsafeUnpin for laterite::ags4::Delta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Delta
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Delta
+pub struct laterite::ags4::Diff<'a>
+impl<'a> laterite::ags4::Diff<'a>
+pub fn laterite::ags4::Diff<'a>::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Diff<'a>
+pub fn laterite::ags4::Diff<'a>::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Diff<'a>
+pub fn laterite::ags4::Diff<'a>::max_rows_per_group(self, usize) -> laterite::ags4::Diff<'a>
+pub fn laterite::ags4::Diff<'a>::run(self) -> core::result::Result<laterite::ags4::Delta, laterite::Error>
+impl core::fmt::Debug for laterite::ags4::Diff<'_>
+pub fn laterite::ags4::Diff<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite::ags4::Diff<'a>
+impl<'a> core::marker::Send for laterite::ags4::Diff<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Diff<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Diff<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Diff<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Diff<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Diff<'a>
+pub struct laterite::ags4::Document
+impl laterite::ags4::Document
+pub fn laterite::ags4::Document::certify(&self) -> laterite::ags4::Certify<'_>
+impl laterite::ags4::Document
+pub fn laterite::ags4::Document::codes(&self) -> alloc::vec::Vec<&str>
+pub fn laterite::ags4::Document::contains(&self, &str) -> bool
+pub fn laterite::ags4::Document::group(&self, &str) -> core::option::Option<laterite::ags4::Group<'_>>
+pub fn laterite::ags4::Document::groups(&self) -> alloc::vec::Vec<laterite::ags4::Group<'_>>
+pub fn laterite::ags4::Document::is_empty(&self) -> bool
+pub fn laterite::ags4::Document::len(&self) -> usize
+pub fn laterite::ags4::Document::push_row(&mut self, &str, &[(&str, &str)]) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Document::remove_group(&mut self, &str) -> bool
+pub fn laterite::ags4::Document::set_cell(&mut self, &str, usize, &str, impl core::convert::Into<alloc::string::String>) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Document::sliced(&self) -> bool
+impl core::fmt::Debug for laterite::ags4::Document
+pub fn laterite::ags4::Document::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Document
+impl core::marker::Send for laterite::ags4::Document
+impl core::marker::Sync for laterite::ags4::Document
+impl core::marker::Unpin for laterite::ags4::Document
+impl core::marker::UnsafeUnpin for laterite::ags4::Document
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Document
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Document
+pub struct laterite::ags4::Finding
+impl laterite::ags4::Finding
+pub fn laterite::ags4::Finding::description(&self) -> &str
+pub fn laterite::ags4::Finding::group(&self) -> &str
+pub fn laterite::ags4::Finding::line(&self) -> core::option::Option<u32>
+pub fn laterite::ags4::Finding::rule(&self) -> &str
+pub fn laterite::ags4::Finding::severity(&self) -> laterite::ags4::Severity
+impl core::fmt::Debug for laterite::ags4::Finding
+pub fn laterite::ags4::Finding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Finding
+impl core::marker::Send for laterite::ags4::Finding
+impl core::marker::Sync for laterite::ags4::Finding
+impl core::marker::Unpin for laterite::ags4::Finding
+impl core::marker::UnsafeUnpin for laterite::ags4::Finding
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Finding
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Finding
+pub struct laterite::ags4::Fix
+impl laterite::ags4::Fix
+pub fn laterite::ags4::Fix::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Fix
+pub fn laterite::ags4::Fix::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Fix
+pub fn laterite::ags4::Fix::exclude<I, S>(self, I) -> laterite::ags4::Fix where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+pub fn laterite::ags4::Fix::only<I, S>(self, I) -> laterite::ags4::Fix where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+pub fn laterite::ags4::Fix::risky(self, bool) -> laterite::ags4::Fix
+pub fn laterite::ags4::Fix::run(self) -> core::result::Result<laterite::ags4::Fixed, laterite::Error>
+pub fn laterite::ags4::Fix::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::ags4::Fixed, laterite::Error>
+impl core::fmt::Debug for laterite::ags4::Fix
+pub fn laterite::ags4::Fix::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Fix
+impl core::marker::Send for laterite::ags4::Fix
+impl core::marker::Sync for laterite::ags4::Fix
+impl core::marker::Unpin for laterite::ags4::Fix
+impl core::marker::UnsafeUnpin for laterite::ags4::Fix
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Fix
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Fix
+pub struct laterite::ags4::Fixed
+impl laterite::ags4::Fixed
+pub fn laterite::ags4::Fixed::applied(&self) -> &[laterite::ags4::Repair]
+pub fn laterite::ags4::Fixed::bytes(&self) -> &[u8]
+pub fn laterite::ags4::Fixed::edition(&self) -> &str
+pub fn laterite::ags4::Fixed::findings(&self) -> &[laterite::ags4::Finding]
+pub fn laterite::ags4::Fixed::fixes_applied(&self) -> usize
+pub fn laterite::ags4::Fixed::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Fixed::into_text(self) -> alloc::string::String
+pub fn laterite::ags4::Fixed::risky_available(&self) -> usize
+pub fn laterite::ags4::Fixed::save(&self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Fixed::text(&self) -> &str
+impl core::fmt::Debug for laterite::ags4::Fixed
+pub fn laterite::ags4::Fixed::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Fixed
+impl core::marker::Send for laterite::ags4::Fixed
+impl core::marker::Sync for laterite::ags4::Fixed
+impl core::marker::Unpin for laterite::ags4::Fixed
+impl core::marker::UnsafeUnpin for laterite::ags4::Fixed
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Fixed
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Fixed
+pub struct laterite::ags4::Group<'a>
+impl<'a> laterite::ags4::Group<'a>
+pub fn laterite::ags4::Group<'a>::code(&self) -> &'a str
+pub fn laterite::ags4::Group<'a>::headings(&self) -> alloc::vec::Vec<&'a str>
+pub fn laterite::ags4::Group<'a>::is_empty(&self) -> bool
+pub fn laterite::ags4::Group<'a>::len(&self) -> usize
+pub fn laterite::ags4::Group<'a>::row(&self, usize) -> core::option::Option<laterite::ags4::Row<'a>>
+pub fn laterite::ags4::Group<'a>::rows(&self) -> laterite::ags4::Rows<'a>
+pub fn laterite::ags4::Group<'a>::types(&self) -> alloc::vec::Vec<&'a str>
+pub fn laterite::ags4::Group<'a>::units(&self) -> alloc::vec::Vec<&'a str>
+impl core::fmt::Debug for laterite::ags4::Group<'_>
+pub fn laterite::ags4::Group<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::clone::Clone for laterite::ags4::Group<'a>
+pub fn laterite::ags4::Group<'a>::clone(&self) -> laterite::ags4::Group<'a>
+impl<'a> core::marker::Copy for laterite::ags4::Group<'a>
+impl<'a> core::marker::Freeze for laterite::ags4::Group<'a>
+impl<'a> core::marker::Send for laterite::ags4::Group<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Group<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Group<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Group<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Group<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Group<'a>
+pub struct laterite::ags4::GroupChange
+impl laterite::ags4::GroupChange
+pub fn laterite::ags4::GroupChange::added(&self) -> usize
+pub fn laterite::ags4::GroupChange::changed(&self) -> usize
+pub fn laterite::ags4::GroupChange::code(&self) -> &str
+pub fn laterite::ags4::GroupChange::headings_added(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::GroupChange::headings_removed(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::GroupChange::key_headings(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::GroupChange::keyed(&self) -> bool
+pub fn laterite::ags4::GroupChange::removed(&self) -> usize
+pub fn laterite::ags4::GroupChange::rows(&self) -> &[laterite::ags4::RowChange]
+impl core::clone::Clone for laterite::ags4::GroupChange
+pub fn laterite::ags4::GroupChange::clone(&self) -> laterite::ags4::GroupChange
+impl core::fmt::Debug for laterite::ags4::GroupChange
+pub fn laterite::ags4::GroupChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::GroupChange
+impl core::marker::Send for laterite::ags4::GroupChange
+impl core::marker::Sync for laterite::ags4::GroupChange
+impl core::marker::Unpin for laterite::ags4::GroupChange
+impl core::marker::UnsafeUnpin for laterite::ags4::GroupChange
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::GroupChange
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::GroupChange
+pub struct laterite::ags4::GroupData
+impl laterite::ags4::GroupData
+pub fn laterite::ags4::GroupData::code(&self) -> &str
+pub fn laterite::ags4::GroupData::is_empty(&self) -> bool
+pub fn laterite::ags4::GroupData::len(&self) -> usize
+pub fn laterite::ags4::GroupData::new<I, S>(impl core::convert::Into<alloc::string::String>, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+pub fn laterite::ags4::GroupData::row<I, C>(self, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = C>, C: core::convert::Into<laterite::ags4::Cell>
+pub fn laterite::ags4::GroupData::types<I, S>(self, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+pub fn laterite::ags4::GroupData::units<I, S>(self, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+impl core::clone::Clone for laterite::ags4::GroupData
+pub fn laterite::ags4::GroupData::clone(&self) -> laterite::ags4::GroupData
+impl core::fmt::Debug for laterite::ags4::GroupData
+pub fn laterite::ags4::GroupData::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::GroupData
+impl core::marker::Send for laterite::ags4::GroupData
+impl core::marker::Sync for laterite::ags4::GroupData
+impl core::marker::Unpin for laterite::ags4::GroupData
+impl core::marker::UnsafeUnpin for laterite::ags4::GroupData
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::GroupData
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::GroupData
+pub struct laterite::ags4::Merge<'a>
+impl<'a> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::mode(self, laterite::ags4::WriteMode) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::on_missing_tran(self, laterite::ags4::MissingTran) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::on_type_clash(self, laterite::ags4::TypeClash) -> laterite::ags4::Merge<'a>
+pub fn laterite::ags4::Merge<'a>::run(self) -> core::result::Result<laterite::ags4::Merged, laterite::Error>
+pub fn laterite::ags4::Merge<'a>::transmission(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Merge<'a>
+impl core::fmt::Debug for laterite::ags4::Merge<'_>
+pub fn laterite::ags4::Merge<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite::ags4::Merge<'a>
+impl<'a> core::marker::Send for laterite::ags4::Merge<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Merge<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Merge<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Merge<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Merge<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Merge<'a>
+pub struct laterite::ags4::Merged
+impl laterite::ags4::Merged
+pub fn laterite::ags4::Merged::bytes(&self) -> &[u8]
+pub fn laterite::ags4::Merged::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Merged::into_text(self) -> alloc::string::String
+pub fn laterite::ags4::Merged::notes(&self) -> &[laterite::ags4::Note]
+pub fn laterite::ags4::Merged::revisions(&self) -> &[laterite::ags4::Revision]
+pub fn laterite::ags4::Merged::save(&self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+pub fn laterite::ags4::Merged::text(&self) -> &str
+impl core::fmt::Debug for laterite::ags4::Merged
+pub fn laterite::ags4::Merged::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Merged
+impl core::marker::Send for laterite::ags4::Merged
+impl core::marker::Sync for laterite::ags4::Merged
+impl core::marker::Unpin for laterite::ags4::Merged
+impl core::marker::UnsafeUnpin for laterite::ags4::Merged
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Merged
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Merged
+pub struct laterite::ags4::Note
+impl laterite::ags4::Note
+pub fn laterite::ags4::Note::group(&self) -> core::option::Option<&str>
+pub fn laterite::ags4::Note::heading(&self) -> core::option::Option<&str>
+pub fn laterite::ags4::Note::kind(&self) -> &str
+pub fn laterite::ags4::Note::message(&self) -> &str
+impl core::clone::Clone for laterite::ags4::Note
+pub fn laterite::ags4::Note::clone(&self) -> laterite::ags4::Note
+impl core::fmt::Debug for laterite::ags4::Note
+pub fn laterite::ags4::Note::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Note
+impl core::marker::Send for laterite::ags4::Note
+impl core::marker::Sync for laterite::ags4::Note
+impl core::marker::Unpin for laterite::ags4::Note
+impl core::marker::UnsafeUnpin for laterite::ags4::Note
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Note
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Note
+pub struct laterite::ags4::Read
+impl laterite::ags4::Read
+pub fn laterite::ags4::Read::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Read
+pub fn laterite::ags4::Read::index(self, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Read
+pub fn laterite::ags4::Read::index_bytes(self, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Read
+pub fn laterite::ags4::Read::only<I, S>(self, I) -> laterite::ags4::Read where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
+pub fn laterite::ags4::Read::recover_duplicate_headings(self, bool) -> laterite::ags4::Read
+pub fn laterite::ags4::Read::run(self) -> core::result::Result<laterite::ags4::Document, laterite::Error>
+pub fn laterite::ags4::Read::truncate_excess_fields(self, bool) -> laterite::ags4::Read
+impl core::fmt::Debug for laterite::ags4::Read
+pub fn laterite::ags4::Read::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Read
+impl core::marker::Send for laterite::ags4::Read
+impl core::marker::Sync for laterite::ags4::Read
+impl core::marker::Unpin for laterite::ags4::Read
+impl core::marker::UnsafeUnpin for laterite::ags4::Read
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Read
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Read
+pub struct laterite::ags4::Repair
+impl laterite::ags4::Repair
+pub fn laterite::ags4::Repair::is_risky(&self) -> bool
+pub fn laterite::ags4::Repair::kind(&self) -> &str
+pub fn laterite::ags4::Repair::label(&self) -> &str
+pub fn laterite::ags4::Repair::line(&self) -> core::option::Option<u32>
+pub fn laterite::ags4::Repair::rule(&self) -> &str
+impl core::fmt::Debug for laterite::ags4::Repair
+pub fn laterite::ags4::Repair::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Repair
+impl core::marker::Send for laterite::ags4::Repair
+impl core::marker::Sync for laterite::ags4::Repair
+impl core::marker::Unpin for laterite::ags4::Repair
+impl core::marker::UnsafeUnpin for laterite::ags4::Repair
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Repair
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Repair
+pub struct laterite::ags4::Report
+impl laterite::ags4::Report
+pub fn laterite::ags4::Report::certified(&self) -> bool
+pub fn laterite::ags4::Report::count(&self, laterite::ags4::Severity) -> usize
+pub fn laterite::ags4::Report::findings(&self) -> &[laterite::ags4::Finding]
+pub fn laterite::ags4::Report::is_empty(&self) -> bool
+pub fn laterite::ags4::Report::is_valid(&self) -> bool
+pub fn laterite::ags4::Report::revalidate_reason(&self) -> core::option::Option<&str>
+impl core::fmt::Debug for laterite::ags4::Report
+pub fn laterite::ags4::Report::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Report
+impl core::marker::Send for laterite::ags4::Report
+impl core::marker::Sync for laterite::ags4::Report
+impl core::marker::Unpin for laterite::ags4::Report
+impl core::marker::UnsafeUnpin for laterite::ags4::Report
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Report
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Report
+pub struct laterite::ags4::Revision
+impl laterite::ags4::Revision
+pub fn laterite::ags4::Revision::changed(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::Revision::group(&self) -> &str
+pub fn laterite::ags4::Revision::key(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::Revision::winner(&self) -> usize
+impl core::clone::Clone for laterite::ags4::Revision
+pub fn laterite::ags4::Revision::clone(&self) -> laterite::ags4::Revision
+impl core::fmt::Debug for laterite::ags4::Revision
+pub fn laterite::ags4::Revision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Revision
+impl core::marker::Send for laterite::ags4::Revision
+impl core::marker::Sync for laterite::ags4::Revision
+impl core::marker::Unpin for laterite::ags4::Revision
+impl core::marker::UnsafeUnpin for laterite::ags4::Revision
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Revision
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Revision
+pub struct laterite::ags4::Row<'a>
+impl<'a> laterite::ags4::Row<'a>
+pub fn laterite::ags4::Row<'a>::cell(&self, &str) -> core::option::Option<&'a str>
+pub fn laterite::ags4::Row<'a>::is_empty(&self) -> bool
+pub fn laterite::ags4::Row<'a>::len(&self) -> usize
+impl core::fmt::Debug for laterite::ags4::Row<'_>
+pub fn laterite::ags4::Row<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::clone::Clone for laterite::ags4::Row<'a>
+pub fn laterite::ags4::Row<'a>::clone(&self) -> laterite::ags4::Row<'a>
+impl<'a> core::marker::Copy for laterite::ags4::Row<'a>
+impl<'a> core::marker::Freeze for laterite::ags4::Row<'a>
+impl<'a> core::marker::Send for laterite::ags4::Row<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Row<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Row<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Row<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Row<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Row<'a>
+pub struct laterite::ags4::RowChange
+impl laterite::ags4::RowChange
+pub fn laterite::ags4::RowChange::cells(&self) -> &[laterite::ags4::CellChange]
+pub fn laterite::ags4::RowChange::change(&self) -> laterite::ags4::Change
+pub fn laterite::ags4::RowChange::key(&self) -> &[alloc::string::String]
+pub fn laterite::ags4::RowChange::line_baseline(&self) -> core::option::Option<u32>
+pub fn laterite::ags4::RowChange::line_revision(&self) -> core::option::Option<u32>
+impl core::clone::Clone for laterite::ags4::RowChange
+pub fn laterite::ags4::RowChange::clone(&self) -> laterite::ags4::RowChange
+impl core::fmt::Debug for laterite::ags4::RowChange
+pub fn laterite::ags4::RowChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::RowChange
+impl core::marker::Send for laterite::ags4::RowChange
+impl core::marker::Sync for laterite::ags4::RowChange
+impl core::marker::Unpin for laterite::ags4::RowChange
+impl core::marker::UnsafeUnpin for laterite::ags4::RowChange
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::RowChange
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::RowChange
+pub struct laterite::ags4::Rows<'a>
+impl core::fmt::Debug for laterite::ags4::Rows<'_>
+pub fn laterite::ags4::Rows<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::iter::traits::exact_size::ExactSizeIterator for laterite::ags4::Rows<'_>
+impl<'a> core::iter::traits::iterator::Iterator for laterite::ags4::Rows<'a>
+pub type laterite::ags4::Rows<'a>::Item = laterite::ags4::Row<'a>
+pub fn laterite::ags4::Rows<'a>::next(&mut self) -> core::option::Option<laterite::ags4::Row<'a>>
+pub fn laterite::ags4::Rows<'a>::size_hint(&self) -> (usize, core::option::Option<usize>)
+impl<'a> core::marker::Freeze for laterite::ags4::Rows<'a>
+impl<'a> core::marker::Send for laterite::ags4::Rows<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Rows<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Rows<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Rows<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Rows<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Rows<'a>
+pub struct laterite::ags4::Validate
+impl laterite::ags4::Validate
+pub fn laterite::ags4::Validate::check_files(self, bool) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::fyi(self, bool) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::index(self, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::index_bytes(self, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::run(self) -> core::result::Result<laterite::ags4::Report, laterite::Error>
+pub fn laterite::ags4::Validate::warnings(self, bool) -> laterite::ags4::Validate
+impl core::fmt::Debug for laterite::ags4::Validate
+pub fn laterite::ags4::Validate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Validate
+impl core::marker::Send for laterite::ags4::Validate
+impl core::marker::Sync for laterite::ags4::Validate
+impl core::marker::Unpin for laterite::ags4::Validate
+impl core::marker::UnsafeUnpin for laterite::ags4::Validate
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Validate
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Validate
+pub struct laterite::ags4::Write<'a>
+impl<'a> laterite::ags4::Write<'a>
+pub fn laterite::ags4::Write<'a>::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Write<'a>
+pub fn laterite::ags4::Write<'a>::mode(self, laterite::ags4::WriteMode) -> laterite::ags4::Write<'a>
+pub fn laterite::ags4::Write<'a>::synthesise_metadata(self, bool) -> laterite::ags4::Write<'a>
+pub fn laterite::ags4::Write<'a>::to_bytes(self) -> core::result::Result<laterite::ags4::Written, laterite::Error>
+pub fn laterite::ags4::Write<'a>::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::ags4::Written, laterite::Error>
+pub fn laterite::ags4::Write<'a>::transmission(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Write<'a>
+impl core::fmt::Debug for laterite::ags4::Write<'_>
+pub fn laterite::ags4::Write<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite::ags4::Write<'a>
+impl<'a> core::marker::Send for laterite::ags4::Write<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Write<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Write<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Write<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Write<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Write<'a>
+pub struct laterite::ags4::Written
+impl laterite::ags4::Written
+pub fn laterite::ags4::Written::bytes(&self) -> &[u8]
+pub fn laterite::ags4::Written::findings(&self) -> &[laterite::ags4::Finding]
+pub fn laterite::ags4::Written::fixes_applied(&self) -> usize
+pub fn laterite::ags4::Written::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Written::into_text(self) -> alloc::string::String
+pub fn laterite::ags4::Written::text(&self) -> &str
+impl core::fmt::Debug for laterite::ags4::Written
+pub fn laterite::ags4::Written::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::ags4::Written
+impl core::marker::Send for laterite::ags4::Written
+impl core::marker::Sync for laterite::ags4::Written
+impl core::marker::Unpin for laterite::ags4::Written
+impl core::marker::UnsafeUnpin for laterite::ags4::Written
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Written
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Written
+pub fn laterite::ags4::build(alloc::vec::Vec<laterite::ags4::GroupData>) -> laterite::ags4::Build
+pub fn laterite::ags4::build_document(&laterite::ags4::Document) -> laterite::ags4::Build
+pub fn laterite::ags4::diff(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Diff<'static>
+pub fn laterite::ags4::diff_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Diff<'static>
+pub fn laterite::ags4::diff_documents<'a>(&'a laterite::ags4::Document, &'a laterite::ags4::Document) -> laterite::ags4::Diff<'a>
+pub fn laterite::ags4::editions() -> alloc::vec::Vec<&'static str>
+pub fn laterite::ags4::fix(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Fix
+pub fn laterite::ags4::fix_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Fix
+pub fn laterite::ags4::fix_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Fix
+pub fn laterite::ags4::fixable_rules() -> alloc::vec::Vec<&'static str>
+pub fn laterite::ags4::merge<I, P>(I) -> laterite::ags4::Merge<'static> where I: core::iter::traits::collect::IntoIterator<Item = P>, P: core::convert::AsRef<std::path::Path>
+pub fn laterite::ags4::merge_bytes<I, B>(I) -> laterite::ags4::Merge<'static> where I: core::iter::traits::collect::IntoIterator<Item = B>, B: core::convert::Into<alloc::vec::Vec<u8>>
+pub fn laterite::ags4::merge_documents<'a, I>(I) -> laterite::ags4::Merge<'a> where I: core::iter::traits::collect::IntoIterator<Item = &'a laterite::ags4::Document>
+pub fn laterite::ags4::read(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Read
+pub fn laterite::ags4::read_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Read
+pub fn laterite::ags4::read_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Read
+pub fn laterite::ags4::validate(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
+pub fn laterite::ags4::validate_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
+pub fn laterite::ags4::validate_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
+pub fn laterite::ags4::write(&laterite::ags4::Document) -> laterite::ags4::Write<'_>
+pub mod laterite::transport
+pub struct laterite::transport::Lock
+impl laterite::transport::Lock
+pub fn laterite::transport::Lock::level(self, i32) -> laterite::transport::Lock
+pub fn laterite::transport::Lock::run(self) -> core::result::Result<laterite::transport::Packed, laterite::Error>
+pub fn laterite::transport::Lock::work_factor(self, u8) -> laterite::transport::Lock
+impl core::fmt::Debug for laterite::transport::Lock
+pub fn laterite::transport::Lock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Lock
+impl core::marker::Send for laterite::transport::Lock
+impl core::marker::Sync for laterite::transport::Lock
+impl core::marker::Unpin for laterite::transport::Lock
+impl core::marker::UnsafeUnpin for laterite::transport::Lock
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Lock
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Lock
+pub struct laterite::transport::LockBytes
+impl laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::level(self, i32) -> laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::run(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::transport::LockBytes::work_factor(self, u8) -> laterite::transport::LockBytes
+impl core::fmt::Debug for laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::LockBytes
+impl core::marker::Send for laterite::transport::LockBytes
+impl core::marker::Sync for laterite::transport::LockBytes
+impl core::marker::Unpin for laterite::transport::LockBytes
+impl core::marker::UnsafeUnpin for laterite::transport::LockBytes
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::LockBytes
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::LockBytes
+pub struct laterite::transport::Pack
+impl laterite::transport::Pack
+pub fn laterite::transport::Pack::level(self, i32) -> laterite::transport::Pack
+pub fn laterite::transport::Pack::run(self) -> core::result::Result<laterite::transport::Packed, laterite::Error>
+impl core::fmt::Debug for laterite::transport::Pack
+pub fn laterite::transport::Pack::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Pack
+impl core::marker::Send for laterite::transport::Pack
+impl core::marker::Sync for laterite::transport::Pack
+impl core::marker::Unpin for laterite::transport::Pack
+impl core::marker::UnsafeUnpin for laterite::transport::Pack
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Pack
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Pack
+pub struct laterite::transport::PackBytes
+impl laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::level(self, i32) -> laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::run(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+impl core::fmt::Debug for laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::PackBytes
+impl core::marker::Send for laterite::transport::PackBytes
+impl core::marker::Sync for laterite::transport::PackBytes
+impl core::marker::Unpin for laterite::transport::PackBytes
+impl core::marker::UnsafeUnpin for laterite::transport::PackBytes
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::PackBytes
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::PackBytes
+pub struct laterite::transport::Packed
+impl laterite::transport::Packed
+pub fn laterite::transport::Packed::bytes(&self) -> u64
+pub fn laterite::transport::Packed::elapsed_secs(&self) -> f64
+pub fn laterite::transport::Packed::ratio(&self) -> f64
+impl core::fmt::Debug for laterite::transport::Packed
+pub fn laterite::transport::Packed::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Packed
+impl core::marker::Send for laterite::transport::Packed
+impl core::marker::Sync for laterite::transport::Packed
+impl core::marker::Unpin for laterite::transport::Packed
+impl core::marker::UnsafeUnpin for laterite::transport::Packed
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Packed
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Packed
+pub struct laterite::transport::Unpacked
+impl laterite::transport::Unpacked
+pub fn laterite::transport::Unpacked::bytes(&self) -> u64
+pub fn laterite::transport::Unpacked::elapsed_secs(&self) -> f64
+impl core::fmt::Debug for laterite::transport::Unpacked
+pub fn laterite::transport::Unpacked::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Unpacked
+impl core::marker::Send for laterite::transport::Unpacked
+impl core::marker::Sync for laterite::transport::Unpacked
+impl core::marker::Unpin for laterite::transport::Unpacked
+impl core::marker::UnsafeUnpin for laterite::transport::Unpacked
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Unpacked
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Unpacked
+pub const laterite::transport::DEFAULT_LEVEL: i32
+pub const laterite::transport::DEFAULT_WORK_FACTOR: u8
+pub fn laterite::transport::lock(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>, impl core::convert::Into<alloc::string::String>) -> laterite::transport::Lock
+pub fn laterite::transport::lock_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>, impl core::convert::Into<alloc::string::String>) -> laterite::transport::LockBytes
+pub fn laterite::transport::pack(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> laterite::transport::Pack
+pub fn laterite::transport::pack_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::transport::PackBytes
+pub fn laterite::transport::unlock(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<str>) -> core::result::Result<laterite::transport::Unpacked, laterite::Error>
+pub fn laterite::transport::unlock_bytes(impl core::convert::AsRef<[u8]>, impl core::convert::AsRef<str>) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::transport::unpack(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::transport::Unpacked, laterite::Error>
+pub fn laterite::transport::unpack_bytes(impl core::convert::AsRef<[u8]>) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+#[non_exhaustive] pub enum laterite::ErrorKind
+pub laterite::ErrorKind::BadDictionary
+pub laterite::ErrorKind::Emit
+pub laterite::ErrorKind::InvalidArgument
+pub laterite::ErrorKind::Io
+pub laterite::ErrorKind::MissingTran
+pub laterite::ErrorKind::NotAgs4
+pub laterite::ErrorKind::Other
+pub laterite::ErrorKind::TypeConflict
+pub laterite::ErrorKind::UnitConflict
+impl laterite::ErrorKind
+pub fn laterite::ErrorKind::as_str(self) -> &'static str
+pub fn laterite::ErrorKind::exit_code(self) -> i32
+impl core::clone::Clone for laterite::ErrorKind
+pub fn laterite::ErrorKind::clone(&self) -> laterite::ErrorKind
+impl core::cmp::Eq for laterite::ErrorKind
+impl core::cmp::PartialEq for laterite::ErrorKind
+pub fn laterite::ErrorKind::eq(&self, &laterite::ErrorKind) -> bool
+impl core::fmt::Debug for laterite::ErrorKind
+pub fn laterite::ErrorKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for laterite::ErrorKind
+pub fn laterite::ErrorKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for laterite::ErrorKind
+impl core::marker::StructuralPartialEq for laterite::ErrorKind
+impl core::marker::Freeze for laterite::ErrorKind
+impl core::marker::Send for laterite::ErrorKind
+impl core::marker::Sync for laterite::ErrorKind
+impl core::marker::Unpin for laterite::ErrorKind
+impl core::marker::UnsafeUnpin for laterite::ErrorKind
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ErrorKind
+impl core::panic::unwind_safe::UnwindSafe for laterite::ErrorKind
+pub struct laterite::Error
+impl laterite::Error
+pub fn laterite::Error::exit_code(&self) -> i32
+pub fn laterite::Error::kind(&self) -> laterite::ErrorKind
+pub fn laterite::Error::kind_str(&self) -> &'static str
+impl core::error::Error for laterite::Error
+pub fn laterite::Error::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for laterite::Error
+pub fn laterite::Error::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite::Error
+pub fn laterite::Error::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::Error
+impl core::marker::Send for laterite::Error
+impl core::marker::Sync for laterite::Error
+impl core::marker::Unpin for laterite::Error
+impl core::marker::UnsafeUnpin for laterite::Error
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::Error
+impl core::panic::unwind_safe::UnwindSafe for laterite::Error
