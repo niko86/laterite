@@ -78,8 +78,8 @@ MANIFEST = REPO / "tools" / "release" / "package-contents.json"
 #:
 #: * `laterite` — the USER-FACING facade, on its own 0.1.x clock. The only one a
 #:   stranger is expected to depend on directly.
-#: * the ten `laterite-ags4-*` / `laterite-transport` ENGINE crates, lockstep on
-#:   the workspace version, which reshape as the format work demands.
+#: * the `laterite-ags4-*` / `laterite-transport` ENGINE crates, each on its
+#:   own version since #781, which reshape as the format work demands.
 #:
 #: Both tiers are gated identically. The facade exists so the engine can move
 #: without breaking consumers, but the engine is published too, so its surface
@@ -89,6 +89,7 @@ PUBLISH_SET = [
     "laterite-ags4-core",
     "laterite-ags4-diff",
     "laterite-ags4-emit",
+    "laterite-ags4-excel",
     "laterite-ags4-merge",
     "laterite-ags4-parse",
     "laterite-ags4-reference",

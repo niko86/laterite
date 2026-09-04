@@ -580,7 +580,7 @@ def _engine_banner(name: str) -> list[str]:
 
     `laterite` is skipped: it is the door, and what it has to say — its own
     clock, its own churn — is a different claim in kind, hand-written in its
-    README rather than stamped in one shape across eleven crates.
+    README rather than stamped in one shape across the engine crates.
     """
     return [
         f"> **Engine crate, not a door.** `{name}` is machinery inside the laterite",

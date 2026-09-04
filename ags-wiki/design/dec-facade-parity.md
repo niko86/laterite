@@ -298,7 +298,7 @@ Excel, which needs a rename and full prep first.
 | **4b** | facade cert trio: `certify`, cert-input, read-from-cert | 3 | — | 2026-08-05 |
 | **4c** | facade `fix` + `build` | 2 | — | 2026-08-05 |
 | **4d** | facade `diff` + `merge` | 2 | 2 | 2026-08-06 |
-| **5** | Excel publish prep · second facade snapshot | — | 3 | — |
+| **5** | Excel publish prep · second facade snapshot | — | 3 | 2026-09-04 |
 | **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | — |
 | **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | — |
 | **8** | **the jump** — facade onto the product line | — | 0–7 | — |
@@ -333,6 +333,25 @@ match the tree, and the phase-5 PR follows the tree:
   assume) — if it does not, the fallback is one owner dispatch of
   `publish-crates.yml`, and this note gets corrected rather than the
   machinery bent.
+
+  **Verified 2026-09-04 (the phase-5 PR), with one correction and one
+  residue.** The correction: the sweep never reads `PUBLISH_SET` — its
+  census is the `tools/release/public-api/` snapshot directory
+  (`release_status.engine_crates()`), coupled to `PUBLISH_SET` only through
+  `check_public_api.py` refusing a member with no snapshot. A first publish
+  does flow: the registry's full-crate 404 reads as state `new`
+  (`registry_state`), which maps straight to action `publish` (`cut_action`)
+  before the baseline check that would otherwise drop it, `--publish-owed`
+  lists it, and the dispatched `publish-crates.yml` publishes the whole set
+  with already-published versions skipped by `on_registry`, so the new crate
+  goes out in its computed wave. The residue is registry-side and is the
+  owner's one remaining act: a crates.io **Trusted Publishing config** for
+  the new name (`tools/release/trusted_publishing.py --create`) must exist
+  before the dispatched run reaches excel's wave, or that wave fails at the
+  registry — recoverable (the run is idempotent; earlier waves are skips),
+  and if crates.io refuses a config for a never-published crate, the first
+  publish is one owner run of `publish_crates.py --execute` with a token,
+  the phase-2 route, after which the config can be created.
 
 **Phase 0 carries the drift gate.** `repo:tools/gen_modality.py` renders
 `ags-wiki/concepts/modality-register.md` with nothing asserting the two agree —
@@ -434,7 +453,11 @@ leaves it behind.
 `facade_verdict: by-design` has no remaining user. Whether
 `repo:tools/gen_modality.py` keeps the tri-state for a future exclusion or drops
 it is a phase-5 question, not one to answer now — but it should not be left
-sitting there unexercised without a decision either way.
+sitting there unexercised without a decision either way. **Answered at phase 5
+(2026-09-04): kept, with no current member.** The tri-state is the door a
+future exclusion arrives through, and the census's standing "deliberately not
+adding (0)" line is a statement about the surface, not dead code — the
+generator's `summary()` carries the dated rationale.
 
 **What this rules out:** `cargo install laterite-cli` as a supported route, and
 any reading of "0.2" as a facade milestone. If the CLI is ever wanted on

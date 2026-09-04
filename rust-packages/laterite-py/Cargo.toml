@@ -96,7 +96,7 @@ laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
 # carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.
-laterite-ags4-excel = { path = "../laterite-ags4-excel" }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.11.0" }
 # The shared AGS4 emit orchestrator (typed cells -> valid AGS4 + AutoFix).
 # The emit_ags4_from_arrow binding (emit_typed.rs) feeds it Arrow tables
 # DuckDB hands over pyarrow-free — the read boundary reversed. The `arrow`

@@ -34,6 +34,10 @@ public API — a consumer can turn the feature on, and breaking it is still a
 breaking change. Snapshotting the default set would leave `laterite-ags4-types`'
 whole `arrow` surface (`arrow_cols`, `ipc`) unwatched.
 
+The one exception is the facade, which keeps TWO snapshots — its default
+surface and its all-features one — so both what `cargo add laterite` gets and
+what a feature unlocks are in the diff. See [`FACADE_ALL_FEATURES_SNAPSHOT`].
+
 `--omit blanket-impls` drops the blanket impls our dependencies project onto our
 types (`zerocopy::pointer::invariant::CastableFrom` and friends). Those are
 neither ours nor stable across a `cargo update`, and they were two thirds of the
@@ -86,7 +90,21 @@ def snapshot_path(crate: str) -> Path:
     return SNAPSHOTS / f"{crate}.txt"
 
 
-def render(crate: str) -> list[str]:
+#: The facade's SECOND snapshot (dec-facade-parity decision 4). `cargo
+#: public-api` sees only the features it is run with, so once the facade gains a
+#: default-off feature (phase 7's `excel`), a single default-features snapshot
+#: would leave that surface unguarded — and outside the modality reflector that
+#: reads the union of the two files. Landed while the facade has no
+#: feature-gated API, so the two files are byte-identical and the gate is
+#: provably inert: phase 7's diff then shows nothing but the Excel surface.
+#:
+#: The dotted stem is deliberate — a crates.io name cannot carry a dot, so this
+#: file can never shadow a real crate's snapshot. `release_status.engine_crates()`
+#: excludes exactly this name from its snapshot census.
+FACADE_ALL_FEATURES_SNAPSHOT = "laterite.all-features.txt"
+
+
+def render(crate: str, *, all_features: bool) -> list[str]:
     """The public API of `crate` as `cargo public-api` renders it.
 
     Run per-crate with `--manifest-path` rather than `-p` from the workspace
@@ -102,7 +120,7 @@ def render(crate: str) -> list[str]:
             "public-api",
             "--manifest-path",
             str(CRATES / crate / "Cargo.toml"),
-            "--all-features",
+            *(["--all-features"] if all_features else []),
             "--omit",
             "blanket-impls",
         ],
@@ -262,34 +280,46 @@ def main() -> int:
     problems: list[str] = []
     total = 0
 
+    written = 0
     for crate in PUBLISH_SET:
-        lines = render(crate)
-        total += len(lines)
-        path = snapshot_path(crate)
+        # The facade renders twice (see FACADE_ALL_FEATURES_SNAPSHOT); the
+        # engine crates keep their single all-features superset render.
+        variants = [(snapshot_path(crate), True)]
+        if crate == FACADE:
+            variants = [
+                (snapshot_path(crate), False),
+                (SNAPSHOTS / FACADE_ALL_FEATURES_SNAPSHOT, True),
+            ]
+        for path, all_features in variants:
+            lines = render(crate, all_features=all_features)
+            total += len(lines)
 
-        if args.write:
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        elif not path.exists():
-            die(f"{path.relative_to(REPO)} is missing — run with --write to create it")
-        else:
-            want = path.read_text(encoding="utf-8").splitlines()
-            if want != lines:
-                diff = difflib.unified_diff(
-                    want,
-                    lines,
-                    fromfile=f"{crate} (snapshot)",
-                    tofile=f"{crate} (now)",
-                    lineterm="",
+            if args.write:
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                written += 1
+            elif not path.exists():
+                die(
+                    f"{path.relative_to(REPO)} is missing — run with --write to create it"
                 )
-                problems.append("\n".join(diff))
+            else:
+                want = path.read_text(encoding="utf-8").splitlines()
+                if want != lines:
+                    diff = difflib.unified_diff(
+                        want,
+                        lines,
+                        fromfile=f"{path.stem} (snapshot)",
+                        tofile=f"{path.stem} (now)",
+                        lineterm="",
+                    )
+                    problems.append("\n".join(diff))
 
-        problems += check_auto_traits(crate, lines)
-        problems += check_impl_trait_is_asserted(crate, lines)
-        problems += check_no_third_party(crate, lines)
+            problems += check_auto_traits(crate, lines)
+            problems += check_impl_trait_is_asserted(crate, lines)
+            problems += check_no_third_party(crate, lines)
 
     if args.write and not problems:
         print(
-            f"wrote {len(PUBLISH_SET)} snapshots to {SNAPSHOTS.relative_to(REPO)} — {total} lines"
+            f"wrote {written} snapshots to {SNAPSHOTS.relative_to(REPO)} — {total} lines"
         )
         return 0
 

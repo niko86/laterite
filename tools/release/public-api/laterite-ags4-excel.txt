@@ -1,0 +1,22 @@
+pub mod laterite_ags4_excel
+pub struct laterite_ags4_excel::ExcelStats
+pub laterite_ags4_excel::ExcelStats::rows_written: usize
+pub laterite_ags4_excel::ExcelStats::sheets_written: usize
+pub laterite_ags4_excel::ExcelStats::warnings: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_excel::ExcelStats
+pub fn laterite_ags4_excel::ExcelStats::clone(&self) -> laterite_ags4_excel::ExcelStats
+impl core::fmt::Debug for laterite_ags4_excel::ExcelStats
+pub fn laterite_ags4_excel::ExcelStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_excel::ExcelStats
+impl core::marker::Send for laterite_ags4_excel::ExcelStats
+impl core::marker::Sync for laterite_ags4_excel::ExcelStats
+impl core::marker::Unpin for laterite_ags4_excel::ExcelStats
+impl core::marker::UnsafeUnpin for laterite_ags4_excel::ExcelStats
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_excel::ExcelStats
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_excel::ExcelStats
+pub fn laterite_ags4_excel::ags4_bytes_to_xlsx(&[u8], core::option::Option<alloc::vec::Vec<alloc::string::String>>) -> core::result::Result<(alloc::vec::Vec<u8>, laterite_ags4_excel::ExcelStats), laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_excel::ags4_bytes_to_xlsx_with(&[u8], core::option::Option<alloc::vec::Vec<alloc::string::String>>, laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<(alloc::vec::Vec<u8>, laterite_ags4_excel::ExcelStats), laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_excel::ags4_to_excel(&std::path::Path, &std::path::Path, core::option::Option<alloc::vec::Vec<alloc::string::String>>) -> core::result::Result<laterite_ags4_excel::ExcelStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_excel::ags4_to_excel_with(&std::path::Path, &std::path::Path, core::option::Option<alloc::vec::Vec<alloc::string::String>>, laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_excel::ExcelStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_excel::excel_to_ags4(&std::path::Path, &std::path::Path, bool) -> core::result::Result<laterite_ags4_excel::ExcelStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_excel::xlsx_bytes_to_ags4(&[u8], bool) -> core::result::Result<(alloc::vec::Vec<u8>, laterite_ags4_excel::ExcelStats), laterite_ags4_core::error::CliError>
