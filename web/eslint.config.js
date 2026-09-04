@@ -8,6 +8,19 @@
 // override could otherwise hide. Drop the override the day upstream ships a
 // release that declares ^10.
 //
+// The plugin is additionally HELD at exactly 0.16.0: 0.16.1 introduced a
+// `staleCapture` heuristic in solid/reactivity whose escape analysis cannot
+// tell a synchronously-invoked callback from an escaping closure — a capture
+// read by a plain `.filter((s) => ...)` inside a `createMemo` body flags
+// identically to a memo that returns the closure. Verified against a minimal
+// two-case repro (idiomatic sync callback vs genuine returned closure: both
+// flag, on 0.16.1 and 0.17.0 alike), and against the plugin's own dist source
+// (`isCapturedInReturnedFunction` treats reaching the tracked arrow's block
+// body, or any ReturnStatement in the expression chain, as an escape). It
+// flagged 20 sites in this app, at least 18 of them idiomatic tracked-scope
+// code. Lift the pin when an upstream release distinguishes the two cases —
+// re-check with exactly that repro shape, not by eyeballing the messages.
+//
 // The point of this config is the *type-aware* typescript-eslint ruleset
 // (no-floating-promises, no-misused-promises, no-unnecessary-condition, …):
 // `projectService` wires every file to web/tsconfig.json so those rules can see
