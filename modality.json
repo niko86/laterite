@@ -2829,8 +2829,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. The facade reads to string-row AgsGroups; a typed-Arrow group accessor rides the same open question as its read_typed cell — no scheduled waypoint holds it.",
-          "facade_verdict": "planned"
+          "note": "**by-design (owner verdict 2026-09-04; admitted by decision 7's revision on dec-facade-parity).** #871 settled that each boundary's Arrow shape is its own answer, and for an in-process Rust caller the honest shape is the engine's own Arrow types — which the facade's no-third-party-type rule (its highest-leverage rule) cannot name. Every buildable facade door is wrong-shaped: a feature-gated arrow-rs surface would let that crate's frequent majors force facade majors, and an IPC-bytes door would make an in-process caller pay an encode/decode across a boundary that does not exist. The door is the engine, and it is REAL (contrast the retired Excel exclusion, whose named door was publish=false): `laterite-ags4-types` is published, and its `arrow` feature is the typed column builder (`arrow_cols` — build_record_batch*/build_column) every surface's table output is built from. A facade `read_typed`/typed-graph accessor remains an open question on its own cell, independent of this verdict.",
+          "facade_verdict": "by-design"
         },
         {
           "surface": "duckdb",

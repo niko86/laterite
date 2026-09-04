@@ -263,7 +263,14 @@ library consumers.
 `lat` continues to reach people as it does today: per-target binaries from the
 release workflow, and the `lat` console script that rides in the wheel.
 
-### 7 — "Parity" means `0 below`, with no by-design exclusions
+### 7 — "Parity" means every floor row is settled: a door built, or a verdict recorded
+
+> **REVISED 2026-09-04 (owner-ratified).** As decided, this section was titled
+> *"Parity" means `0 below`, with no by-design exclusions* and its predicate was
+> the bare census number. The revision below narrows the predicate to
+> `to add == 0 and UNDECIDED == 0` — every below-floor row carries a recorded
+> `by-design` verdict — because a by-design exclusion came back, and this time
+> its premise is true. The original reasoning stands and is kept in full.
 
 This decision was first drafted the other way round. Because `to_excel` and
 `from_excel` were permanent exclusions, the facade would sit *always* two below
@@ -279,6 +286,33 @@ statement: **the facade is level with the intersection of Python and Node.**
 That is worth the extra crate on its own terms. A gate with an exemption is a
 gate that has to be explained every time it is read, and an exemption sized to
 today's exclusions is one that quietly stops matching when the exclusions change.
+
+**Why the revision, when the original refused exactly this carve-out.** The
+Excel exclusion fell because its premise was false: the "engine door" it pointed
+callers at was `publish = false` and had never been on a registry. The row that
+reopened the question — `read-output-arrow`, which joined the register after
+this page was decided — differs on both counts:
+
+- laterite#871 settled that **each boundary's Arrow shape is its own answer**
+  (Python the capsule, Node the decoded `arrow-js` Table, the browser IPC
+  bytes). For an in-process Rust caller the honest shape is the engine's own
+  Arrow types — and the facade's highest-leverage rule is that no third-party
+  type reaches a public signature. Every buildable facade door is wrong-shaped:
+  a feature-gated `arrow-rs` surface lets that crate's frequent majors force
+  facade majors, and an IPC-bytes door makes an in-process caller pay an
+  encode/decode across a boundary that does not exist.
+- The engine door is **real now**: `laterite-ags4-types` is on crates.io, and
+  its `arrow` feature is the typed column builder (`arrow_cols`) every
+  surface's table output is built from. Pointing a Rust caller at it is not the
+  false sentence the Excel note carried — it is where the capability genuinely
+  lives for that boundary.
+
+So the exemption the original refused to size to two arbitrary cells is instead
+sized to a **principle** already decided elsewhere: a row may sit below the
+floor only with a recorded `facade_verdict: by-design` whose note names a true,
+published door. The census prints the three buckets on every run, so an
+exclusion is never silent; parity — and the phase-8 gate — is
+`to add == 0 and UNDECIDED == 0`, read from `gen_modality.py --summary`.
 
 ## Phasing
 
@@ -407,16 +441,18 @@ notes.
 register gained capabilities after this page was decided — `read-output-arrow`,
 and the `build` / `build-unchecked` file doors, the latter two UNDECIDED for
 the facade — so clearing Excel did not clear the floor. Phase 8's precondition
-stays what decision 7 says: **`0 below`, read from `gen_modality.py
---summary`**, never "Excel done". The remaining rows need their own doors or
-verdicts before the jump.
+stays what decision 7 says (as revised the same day): **`to add == 0 and
+UNDECIDED == 0`, read from `gen_modality.py --summary`**, never "Excel done".
+The remaining rows need their own doors or verdicts before the jump — and got
+them: the build doors were built and `read-output-arrow` carries the by-design
+verdict decision 7's revision exists to admit.
 
 **Phase 8 is a one-way door** and stays its own reviewed PR: the facade version
 moves to the product number, `repo:tests/test_version_faithful.py` converts its
 `startswith("0.1.")` exemption into a parity assertion, `bump-version.sh product`
 gains the facade as a stamped surface, and the floor gate starts asserting
-`0 below`. None of that should ride in on the back of the last capability
-landing.
+decision 7's revised predicate (`to add == 0 and UNDECIDED == 0`). None of that
+should ride in on the back of the last capability landing.
 
 **Phase 8 also retires four documents**, added 2026-08-14 with the versioning
 revision on [[dec-rust-api-crates-io]]. That revision says the facade has its own
