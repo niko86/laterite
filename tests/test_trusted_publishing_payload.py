@@ -21,6 +21,7 @@ at publish time, on the registry that cannot be un-published.
 
 from __future__ import annotations
 
+import email.message
 import importlib.util
 import sys
 import urllib.error
@@ -88,7 +89,11 @@ def test_a_crate_the_registry_does_not_know_is_partitioned_not_fatal(
 
     def fake_call(method, url, token, body=None):
         if url.endswith("crate=laterite-ags4-excel"):
-            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+            # The stub types `hdrs` as a bare Message — an empty one is the
+            # honest stand-in for headers nothing reads.
+            raise urllib.error.HTTPError(
+                url, 404, "Not Found", email.message.Message(), None
+            )
         return {"github_configs": []}
 
     monkeypatch.setattr(tp, "call", fake_call)
@@ -104,7 +109,9 @@ def test_other_http_errors_still_abort(monkeypatch) -> None:
     would print a wall of NO CRATE rows over a bad token."""
 
     def fake_call(method, url, token, body=None):
-        raise urllib.error.HTTPError(url, 403, "Forbidden", None, None)
+        raise urllib.error.HTTPError(
+            url, 403, "Forbidden", email.message.Message(), None
+        )
 
     monkeypatch.setattr(tp, "call", fake_call)
     with pytest.raises(urllib.error.HTTPError):
