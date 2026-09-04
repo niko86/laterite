@@ -107,6 +107,72 @@ fn to_path_writes_what_it_returns() {
 }
 
 #[test]
+fn the_owning_accessors_agree_with_the_borrowing_ones() {
+    // `into_bytes`/`into_text` are the same value as `bytes`/`text`, not a
+    // second computation — each pair asserted against a copy taken first,
+    // since the owning call consumes.
+    let workbook = ags4::to_excel_bytes(DELIVERY).run().unwrap();
+    let wb_bytes = workbook.bytes().to_vec();
+    assert!(!wb_bytes.is_empty());
+    assert_eq!(workbook.into_bytes(), wb_bytes);
+
+    let make = || {
+        let wb = ags4::to_excel_bytes(DELIVERY).run().unwrap();
+        ags4::from_excel_bytes(wb.bytes()).run().unwrap()
+    };
+    let converted = make();
+    let text = converted.text().to_string();
+    assert_eq!(converted.into_text(), text);
+    let converted = make();
+    let bytes = converted.bytes().to_vec();
+    assert!(converted.warnings().is_empty());
+    assert_eq!(converted.into_bytes(), bytes);
+}
+
+#[test]
+fn errors_name_their_input_by_shape() {
+    // The subject line carries the input's SHAPE (byte count, path), which is
+    // what lets a caller with several conversions in flight tell whose error
+    // this is. Contents never appear — same contract as Debug.
+    let err = ags4::to_excel_bytes("no AGS4 here").run().unwrap_err();
+    assert!(err.to_string().contains("12 bytes"), "{err}");
+
+    let dir = scratch("named");
+    let err = ags4::to_excel(dir.join("absent.ags")).run().unwrap_err();
+    assert!(err.to_string().contains("absent.ags"), "{err}");
+}
+
+#[test]
+fn debug_renders_shape_and_settings_never_contents() {
+    // The same privacy contract as the other builders (see document.rs): a
+    // Debug rendering that leaked cell values would put delivery data in logs.
+    let to_excel = ags4::to_excel_bytes(DELIVERY).encoding("windows-1252");
+    let rendered = format!("{to_excel:?}");
+    assert!(rendered.contains("ToExcel"), "{rendered}");
+    assert!(rendered.contains("windows-1252"), "{rendered}");
+    assert!(!rendered.contains("BH01"), "contents leaked: {rendered}");
+
+    let workbook = ags4::to_excel_bytes(DELIVERY).run().unwrap();
+    let rendered = format!("{workbook:?}");
+    assert!(rendered.contains("Workbook"), "{rendered}");
+    assert!(rendered.contains("sheets: 2"), "{rendered}");
+
+    let from_excel = ags4::from_excel_bytes(workbook.bytes()).format_numeric_columns(false);
+    let rendered = format!("{from_excel:?}");
+    assert!(rendered.contains("FromExcel"), "{rendered}");
+    assert!(
+        rendered.contains("format_numeric_columns: false"),
+        "{rendered}"
+    );
+
+    let converted = ags4::from_excel_bytes(workbook.bytes()).run().unwrap();
+    let rendered = format!("{converted:?}");
+    assert!(rendered.contains("Converted"), "{rendered}");
+    assert!(rendered.contains("rows: 3"), "{rendered}");
+    assert!(!rendered.contains("BH01"), "contents leaked: {rendered}");
+}
+
+#[test]
 fn a_doubled_heading_is_refused_unless_recovery_is_asked_for() {
     let err = ags4::to_excel_bytes(DOUBLED_HEADING).run().unwrap_err();
     assert_eq!(err.kind(), ErrorKind::NotAgs4);
