@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
+use laterite_ags4_core::ags4_codec::ReadOptions;
 use laterite_ags4_excel::{ExcelStats, ags4_bytes_to_xlsx_with, xlsx_bytes_to_ags4};
 
 use super::bad_encoding;
@@ -123,18 +123,8 @@ impl ToExcel {
                 enc.decode(&raw).0.into_owned().into_bytes()
             }
         };
-        let opts = ReadOptions {
-            duplicate_headings: if self.recover_duplicate_headings {
-                DuplicateHeadings::Recover
-            } else {
-                DuplicateHeadings::Error
-            },
-            excess_fields: if self.truncate_excess_fields {
-                ExcessFields::Truncate
-            } else {
-                ExcessFields::Error
-            },
-        };
+        let opts =
+            ReadOptions::from_flags(self.recover_duplicate_headings, self.truncate_excess_fields);
         // `None` sheet order: the workbook keeps the AGS4 source order, which
         // is what every sibling surface's default does.
         let (xlsx, stats) = ags4_bytes_to_xlsx_with(&bytes, None, opts).map_err(|e| {

@@ -2338,7 +2338,8 @@ def build_ags4(
             ``.columns`` it can read; capsule-only inputs skip it.
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
-            Defaults to ``"4.1.1"`` when ``None``.
+            ``None`` (default) uses the engine's bundled fallback edition —
+            the same one every surface's build door falls back to.
         mode: How findings are handled. ``"autofix"`` (default) builds, then applies
             the *safe* mechanical fixes to what you wrote (pad decimals, normalise,
             …); anything left unfixable stays in ``BuildResult.findings``.
@@ -2426,8 +2427,9 @@ def build_ags4(
             error-severity rule ("strict mode rejected …"); also for an unknown
             ``dict_version`` or ``mode``.
     """
-    if dict_version is None:
-        dict_version = "4.1.1"
+    # `dict_version=None` passes through: the native side resolves it to the
+    # dictionary's own generated fallback (`hostopts`, #923). A literal here
+    # would pin this surface to an edition the engine has moved past.
     import json
 
     # `_bridge` (the DuckDB fallback connection, usually None) must outlive

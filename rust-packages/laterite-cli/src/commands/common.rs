@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
-use laterite_ags4_validator::{CheckOptions, DictVersion, overlay};
+use laterite_ags4_validator::CheckOptions;
 
 use crate::cli::DictArgs;
 
@@ -23,22 +23,13 @@ pub fn resolve_encoding(label: &str) -> Option<&'static encoding_rs::Encoding> {
 /// `CheckOptions`, exiting 5 with the pre-rework message on a bad value.
 pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
     if let Some(v) = d.dict_version.as_deref() {
-        opts.dict_version = match v {
-            "auto" => None,
-            // Ask the GENERATED `from_edition`, not a hand-written match. The error
-            // message below was already generated (`editions_joined`) while the arms
-            // above it were not — so a new edition in ags_dictionary.json would have
-            // produced a CLI that rejects `4.3` with a message advertising `4.3`.
-            other => {
-                if let Some(dv) = DictVersion::from_edition(other) {
-                    Some(dv)
-                } else {
-                    eprintln!(
-                        "error: --dict-version expects auto|{}, got {other:?}",
-                        laterite_ags4_validator::editions_joined("|")
-                    );
-                    exit(5);
-                }
+        // The parse (and the generated set + message) is `hostopts` (#923) —
+        // one copy per workspace, not per surface.
+        opts.dict_version = match laterite_ags4_emit::hostopts::edition(Some(v)) {
+            Ok(dv) => dv,
+            Err(e) => {
+                eprintln!("error: --dict-version: {e}");
+                exit(5);
             }
         };
     }
@@ -59,49 +50,27 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
         }
     }
     if let Some(p) = d.dict.as_ref() {
-        // A forced base and "no base" cannot both hold.
-        if d.dict_replace && opts.dict_version.is_some() {
-            eprintln!(
-                "error: --dict-replace cannot be combined with --dict-version \
-                 (a forced base contradicts a full replacement)"
-            );
-            exit(5);
-        }
-        let bytes = match std::fs::read(p) {
-            Ok(b) => b,
-            Err(e) => {
-                eprintln!("error: cannot read --dict {}: {e}", p.display());
-                exit(5);
-            }
-        };
-        // With `--dict`, `--dict-version` (already folded into `opts.dict_version`
-        // above) selects the OVERLAY BASE rather than a bundled edition;
-        // `--dict-replace` drops the base entirely; otherwise the base is detected
-        // structurally from the dictionary itself (laterite-dev#568 §2).
-        let base = if d.dict_replace {
-            overlay::BaseSpec::Replace
-        } else if let Some(v) = opts.dict_version {
-            overlay::BaseSpec::Force(v)
-        } else {
-            overlay::BaseSpec::Auto
-        };
-        // Advisory label for the cert — the basename, never the path (laterite-dev#568 §4).
-        let name = p
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("custom-dict")
-            .to_string();
-        match overlay::parse_dict(
-            &bytes,
-            overlay::DictFormat::Auto,
+        // The ladder — source arms, replace/force/auto base selection, the
+        // contradiction refusal, the advisory-basename rule (laterite-dev#568
+        // §2/§4) — is `hostopts` (#923). With `--dict`, `--dict-version`
+        // (already folded into `opts.dict_version` above) selects the OVERLAY
+        // BASE rather than a bundled edition.
+        match laterite_ags4_emit::hostopts::custom_dict(
+            Some(p),
+            None,
+            d.dict_replace,
+            opts.dict_version,
             opts.encoding,
-            base,
-            &name,
+            laterite_ags4_emit::hostopts::DictFlags {
+                source: "--dict",
+                replace: "--dict-replace",
+                version: "--dict-version",
+            },
         ) {
-            Ok(cd) => opts.custom_dict = Some(cd),
+            Ok(cd) => opts.custom_dict = cd,
             Err(e) => {
-                eprintln!("error: bad --dict {name}: {e}");
-                exit(5);
+                eprintln!("error: {e}");
+                exit(e.code);
             }
         }
     }
@@ -130,6 +99,7 @@ pub fn sibling_fixed_path(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use laterite_ags4_validator::DictVersion;
 
     /// Every edition the DICTIONARY defines must be accepted by `--dict-version`.
     ///

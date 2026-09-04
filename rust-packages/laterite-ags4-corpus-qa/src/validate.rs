@@ -83,19 +83,12 @@ fn common_source_prefix(sources: &[String]) -> String {
 /// `--dict-version` string → forced edition, shared by `validate` and
 /// `baseline` so the two passes resolve editions identically. `Ok(None)`
 /// = `auto` (per-file from `TRAN_AGS`); `Ok(Some(v))` = a forced edition;
-/// `Err(bad)` carries the offending value for a uniform error message.
+/// `Err(message)` is caller-ready text.
 pub(crate) fn parse_dict_version(s: &str) -> Result<Option<DictVersion>, String> {
-    // `from_edition` is GENERATED from ags_dictionary.json alongside `DictVersion`
-    // itself, so a new edition is accepted here the moment it enters the dictionary.
-    // This used to be a hand-written match — one of several copies of a set that was
-    // already single-sourced, which meant adding an edition silently left the
-    // hand-copies rejecting it.
-    match s {
-        "auto" => Ok(None),
-        other => DictVersion::from_edition(other)
-            .map(Some)
-            .ok_or_else(|| other.to_string()),
-    }
+    // The parse (and the generated set + message) is `hostopts` (#923) — this
+    // used to be a local parse whose CALLERS each hand-wrote the accepted set
+    // into their error text, the exact drift the shared copy retires.
+    laterite_ags4_emit::hostopts::edition(Some(s)).map_err(|e| e.message)
 }
 
 /// One file's verdict. `outcome` is the summarised bucket `validate`
@@ -198,11 +191,8 @@ pub fn run(args: &ValidateArgs, ctx: Ctx, corpus_dir: &Path) -> Result<i32> {
     // file from its TRAN_AGS — what makes batch dogfood "just work".
     let dict_version: Option<DictVersion> = match parse_dict_version(&args.dict_version) {
         Ok(v) => v,
-        Err(bad) => {
-            eprintln!(
-                "error: --dict-version expects auto|4.0.3|4.0.4|4.1|4.1.1|4.2, \
-                 got {bad:?}"
-            );
+        Err(e) => {
+            eprintln!("error: --dict-version: {e}");
             return Ok(5);
         }
     };

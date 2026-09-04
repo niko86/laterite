@@ -11,6 +11,7 @@
 mod arrow_in;
 mod emit;
 mod error;
+pub mod hostopts;
 mod writer;
 
 #[cfg(feature = "arrow")]

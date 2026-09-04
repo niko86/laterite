@@ -52,6 +52,7 @@
     "src/arrow_in.rs",
     "src/emit.rs",
     "src/error.rs",
+    "src/hostopts.rs",
     "src/lib.rs",
     "src/writer.rs"
   ],

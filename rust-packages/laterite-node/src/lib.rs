@@ -453,42 +453,22 @@ fn build_custom_dict(
     over: Option<DictVersion>,
     enc: &'static encoding_rs::Encoding,
 ) -> std::result::Result<Option<overlay::CustomDict>, (i32, &'static str, String)> {
-    // Where the bytes come from, and the advisory name the cert records (basename for a
-    // path, a neutral label for in-memory bytes — never a filesystem path, laterite-dev#568 §4).
-    let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
-        let b = std::fs::read(Path::new(p))
-            .map_err(|e| (5, "bad_dict", format!("cannot read dict {p}: {e}")))?;
-        let name = Path::new(p)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("custom-dict")
-            .to_string();
-        (b, name)
-    } else if let Some(b) = dict_bytes {
-        (b.to_vec(), "custom-dict".to_string())
-    } else {
-        return Ok(None);
-    };
-    // A forced base and "no base" cannot both hold — same contradiction the CLI exits 5 on.
-    if dict_replace && over.is_some() {
-        return Err((
-            5,
-            "bad_dict",
-            "dictReplace cannot be combined with dictVersion \
-             (a forced base contradicts a full replacement)"
-                .to_string(),
-        ));
-    }
-    let base = if dict_replace {
-        overlay::BaseSpec::Replace
-    } else if let Some(v) = over {
-        overlay::BaseSpec::Force(v)
-    } else {
-        overlay::BaseSpec::Auto
-    };
-    overlay::parse_dict(&bytes, overlay::DictFormat::Auto, enc, base, &name)
-        .map(Some)
-        .map_err(|e| (5, "bad_dict", format!("bad dict {name}: {e}")))
+    // The ladder is `hostopts` (#923) — one copy per workspace. What stays
+    // here is this surface's spelling of the knobs, so an error names what a
+    // JS caller actually typed.
+    laterite_ags4_emit::hostopts::custom_dict(
+        dict_path.map(Path::new),
+        dict_bytes,
+        dict_replace,
+        over,
+        enc,
+        laterite_ags4_emit::hostopts::DictFlags {
+            source: "dict",
+            replace: "dictReplace",
+            version: "dictVersion",
+        },
+    )
+    .map_err(|e| (e.code, e.kind, e.message))
 }
 
 /// Run the validator from a `path`, in-memory `text`, or raw `data` — mirrors
@@ -1444,9 +1424,11 @@ pub fn emit_ags4_from_ipc(
     let opts = laterite_ags4_emit::EmitOpts {
         tran: tran.map(TranInput::fold).transpose()?.flatten(),
         mode: resolve_mode(mode.as_deref())?,
-        edition: resolve_edition(edition.as_deref())
-            .map_err(Error::from_reason)?
-            .unwrap_or(DictVersion::V4_1_1),
+        // The emit door has no per-file TRAN_AGS to defer to, so `auto`
+        // collapses to the dictionary's generated fallback — never a version
+        // literal (this line is one of the two the 2026-07-14 sweep missed).
+        edition: laterite_ags4_emit::hostopts::edition_or_fallback(edition.as_deref())
+            .map_err(|e| Error::from_reason(e.message))?,
         synthesise_metadata: synthesise_metadata.unwrap_or(false),
     };
     // The streaming Arrow door (#790): each cell formats straight off its
@@ -1481,9 +1463,8 @@ pub fn emit_ags4_from_ipc_unchecked(
     units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
     types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 ) -> Result<Buffer> {
-    let edition = resolve_edition(edition.as_deref())
-        .map_err(Error::from_reason)?
-        .unwrap_or(DictVersion::V4_1_1);
+    let edition = laterite_ags4_emit::hostopts::edition_or_fallback(edition.as_deref())
+        .map_err(|e| Error::from_reason(e.message))?;
     let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
     let bytes = laterite_ags4_emit::emit_ags4_from_arrow_unchecked(inputs, edition)
         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -1560,27 +1541,13 @@ fn bad_encoding(msg: &str) -> Error {
 
 /// Plain-`String` error (not napi) so `run_check` can surface a bad edition as
 /// a `{ok:false}` failure report while `emit_ags4_from_ipc` throws it.
+/// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, String> {
-    match s.map(str::trim) {
-        None | Some("" | "auto") => Ok(None),
-        Some(o) => DictVersion::from_edition(o).map(Some).ok_or_else(|| {
-            format!(
-                "unknown dict_version {o:?}; expected auto|{}",
-                laterite_ags4_validator::editions_joined("|")
-            )
-        }),
-    }
+    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
 }
 
 fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
-    match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
-        None | Some("" | "autofix") => Ok(laterite_ags4_emit::EmitMode::AutoFix),
-        Some("report") => Ok(laterite_ags4_emit::EmitMode::Report),
-        Some("strict") => Ok(laterite_ags4_emit::EmitMode::Strict),
-        Some(o) => Err(Error::from_reason(format!(
-            "unknown mode {o:?}; expected autofix|report|strict"
-        ))),
-    }
+    laterite_ags4_emit::hostopts::write_mode(s).map_err(|e| Error::from_reason(e.message))
 }
 
 // --- Excel ↔ AGS4 (laterite-ags4-excel) --------------------------------------
@@ -1832,22 +1799,14 @@ pub fn registry_inherited_key_names(code: String) -> Result<Vec<String>> {
 
 /// Map the surface-level booleans onto core's read policy. Both leniencies are
 /// off by default on every read surface — a file the reader cannot represent
-/// faithfully is refused; a caller opts in.
+/// faithfully is refused; a caller opts in. The mapping is the type's own
+/// (`ReadOptions::from_flags`, #923), not this surface's.
 fn read_opts_from(
     recover: Option<bool>,
     truncate: Option<bool>,
 ) -> laterite_ags4_core::ags4_codec::ReadOptions {
-    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
-    ReadOptions {
-        duplicate_headings: if recover.unwrap_or(false) {
-            DuplicateHeadings::Recover
-        } else {
-            DuplicateHeadings::Error
-        },
-        excess_fields: if truncate.unwrap_or(false) {
-            ExcessFields::Truncate
-        } else {
-            ExcessFields::Error
-        },
-    }
+    laterite_ags4_core::ags4_codec::ReadOptions::from_flags(
+        recover.unwrap_or(false),
+        truncate.unwrap_or(false),
+    )
 }

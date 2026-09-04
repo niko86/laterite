@@ -71,16 +71,9 @@ pub(crate) fn map_cli_err(e: &CliError) -> PyErr {
 
 /// Map a `--dict-version` string to the optional override. `None` /
 /// `"auto"` ⇒ no override (`TRAN_AGS` auto-pick). Unknown ⇒ `Err`.
+/// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
-    match s {
-        None | Some("auto" | "") => Ok(None),
-        Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
-            format!(
-                "unknown --dict-version {other:?} (expected auto|{})",
-                laterite_ags4_validator::editions_joined("|")
-            )
-        }),
-    }
+    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
 }
 
 /// Parse the `--dict` custom-dictionary override for a Python call, mirroring the CLI's
@@ -100,39 +93,22 @@ fn build_custom_dict(
     over: Option<DictVersion>,
     enc: &'static encoding_rs::Encoding,
 ) -> Result<Option<overlay::CustomDict>, (i32, String, String)> {
-    let bad = |m: String| (5, "bad_dict".to_string(), m);
-    // Where the bytes come from, and the advisory name the cert records (basename for a
-    // path, a neutral label for in-memory bytes — never a filesystem path, laterite-dev#568 §4).
-    let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
-        let b =
-            std::fs::read(Path::new(p)).map_err(|e| bad(format!("cannot read --dict {p}: {e}")))?;
-        let name = Path::new(p)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("custom-dict")
-            .to_string();
-        (b, name)
-    } else if let Some(b) = dict_bytes {
-        (b.to_vec(), "custom-dict".to_string())
-    } else {
-        return Ok(None);
-    };
-    // A forced base and "no base" cannot both hold — same contradiction the CLI exits 5 on.
-    if dict_replace && over.is_some() {
-        return Err(bad("dict_replace cannot be combined with dict_version \
-             (a forced base contradicts a full replacement)"
-            .to_string()));
-    }
-    let base = if dict_replace {
-        overlay::BaseSpec::Replace
-    } else if let Some(v) = over {
-        overlay::BaseSpec::Force(v)
-    } else {
-        overlay::BaseSpec::Auto
-    };
-    overlay::parse_dict(&bytes, overlay::DictFormat::Auto, enc, base, &name)
-        .map(Some)
-        .map_err(|e| bad(format!("bad --dict {name}: {e}")))
+    // The ladder is `hostopts` (#923) — one copy per workspace. What stays
+    // here is this surface's spelling of the knobs, so an error names what a
+    // Python caller actually typed.
+    laterite_ags4_emit::hostopts::custom_dict(
+        dict_path.map(Path::new),
+        dict_bytes,
+        dict_replace,
+        over,
+        enc,
+        laterite_ags4_emit::hostopts::DictFlags {
+            source: "--dict",
+            replace: "dict_replace",
+            version: "dict_version",
+        },
+    )
+    .map_err(|e| (e.code, e.kind.to_string(), e.message))
 }
 
 /// (`exit_code`, `error_kind`, message) for a validator error — exit codes
@@ -1598,18 +1574,10 @@ fn read_groups_raw(
     recover_duplicate_headings: bool,
     truncate_excess_fields: bool,
 ) -> PyResult<Bound<'_, PyDict>> {
-    let read_opts = laterite_ags4_core::ags4_codec::ReadOptions {
-        duplicate_headings: if recover_duplicate_headings {
-            laterite_ags4_core::ags4_codec::DuplicateHeadings::Recover
-        } else {
-            laterite_ags4_core::ags4_codec::DuplicateHeadings::Error
-        },
-        excess_fields: if truncate_excess_fields {
-            laterite_ags4_core::ags4_codec::ExcessFields::Truncate
-        } else {
-            laterite_ags4_core::ags4_codec::ExcessFields::Error
-        },
-    };
+    let read_opts = laterite_ags4_core::ags4_codec::ReadOptions::from_flags(
+        recover_duplicate_headings,
+        truncate_excess_fields,
+    );
     let parsed =
         laterite_ags4_core::ags4_codec::read_ags4_with(std::path::Path::new(&path), read_opts)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;

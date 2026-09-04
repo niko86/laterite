@@ -46,16 +46,9 @@ pub(crate) fn resolve_encoding(
 /// returns `Err(message)` (the caller turns it into a `bad_args`
 /// report); we return the short message rather than the whole report so
 /// the `Err` variant stays small (clippy `result_large_err`).
+/// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 pub(crate) fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String> {
-    match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(None),
-        Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
-            format!(
-                "unknown dict_version {other:?}; expected auto|{}",
-                laterite_ags4_validator::editions_joined("|")
-            )
-        }),
-    }
+    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
 }
 
 /// Build the runtime custom-dictionary overlay (laterite-dev#568) from browser-supplied bytes.
@@ -75,26 +68,22 @@ pub(crate) fn build_custom_dict(
     over: Option<DictVersion>,
     enc: &'static encoding_rs::Encoding,
 ) -> std::result::Result<Option<overlay::CustomDict>, String> {
-    let Some(bytes) = dict_bytes else {
-        return Ok(None);
-    };
-    if dict_replace && over.is_some() {
-        return Err("dict_replace cannot be combined with dict_version \
-             (a forced base contradicts a full replacement)"
-            .to_string());
-    }
-    let base = if dict_replace {
-        overlay::BaseSpec::Replace
-    } else if let Some(v) = over {
-        overlay::BaseSpec::Force(v)
-    } else {
-        overlay::BaseSpec::Auto
-    };
-    // The advisory name the cert records is a neutral label — never a filesystem path
-    // (the browser has none anyway), matching the in-memory-bytes arm on every surface.
-    overlay::parse_dict(bytes, overlay::DictFormat::Auto, enc, base, "custom-dict")
-        .map(Some)
-        .map_err(|e| format!("bad dict: {e}"))
+    // The ladder is `hostopts` (#923); this surface has no path arm (the wasm
+    // sandbox has no filesystem), so `dict_path` is structurally `None` and a
+    // custom dict always arrives as bytes under the neutral advisory label.
+    laterite_ags4_emit::hostopts::custom_dict(
+        None,
+        dict_bytes,
+        dict_replace,
+        over,
+        enc,
+        laterite_ags4_emit::hostopts::DictFlags {
+            source: "dict",
+            replace: "dict_replace",
+            version: "dict_version",
+        },
+    )
+    .map_err(|e| e.message)
 }
 
 #[cfg(test)]
