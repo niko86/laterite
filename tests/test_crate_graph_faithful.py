@@ -214,16 +214,23 @@ def test_the_anti_promise_names_the_door() -> None:
 def test_the_facade_makes_its_own_promise_by_hand() -> None:
     """`laterite` is the door, so it must NOT be stamped with the anti-promise.
 
-    Its README's caveat is hand-written and says something different in kind —
-    the facade has its own clock and its own churn statement, which one generated
-    line cannot carry in the same shape as the ten engine crates.
+    Its README's stability statement is hand-written and says something
+    different in kind from the engine crates' generated line. Until phase 8 of
+    dec-facade-parity (2026-09-04) that statement was the "not yet at parity"
+    caveat; the jump retired it, and what stands in its place is the parity
+    claim itself — the crate on the product version, in beta with every other
+    surface. This holds the README to carrying it.
     """
     facade = gcg.RUST / gcg.FACADE / "README.md"
     text = facade.read_text(encoding="utf-8")
     assert "**Engine crate, not a door.**" not in text
-    assert "not yet at parity" in text, (
-        "the facade README has lost the hand-written caveat this gate assumes"
+    assert "not yet at parity" not in text, (
+        "the pre-parity caveat is back in the facade README — phase 8 retired "
+        "it, and the version gate now asserts the parity it hedged against"
     )
+    assert "carries the **product\nversion**" in text or (
+        "carries the **product version**" in text
+    ), "the facade README has lost the hand-written parity/product-line promise"
 
 
 def test_the_card_and_the_readme_cannot_disagree() -> None:

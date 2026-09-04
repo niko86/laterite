@@ -4,14 +4,6 @@ Read, validate and write **AGS4** — the data transfer format the UK
 geotechnical and geoenvironmental industry uses to exchange ground
 investigation data.
 
-> **This crate is not yet at parity with laterite's other surfaces.** The Python,
-> Node, browser, DuckDB and CLI surfaces are in beta; this one is still being
-> built out, and its API will change. The engine underneath is the same one they
-> all run. Use it if that suits you — just don't expect the surface to hold still
-> yet. Cargo will not carry you across a `0.x` minor on the caret requirement
-> `cargo add` writes, so the upgrade is yours to take; don't force one.
-> [What beta means here](https://docs.laterite.dev/reference/support/).
-
 ```rust,no_run
 use laterite::ags4;
 
@@ -132,13 +124,15 @@ bytes in memory. The optional `excel` feature adds XLSX conversion in both
 directions (`ags4::to_excel` / `ags4::from_excel`), kept behind a feature so the
 XLSX machinery stays out of every build that never touches Excel.
 
-The crate is completing to **parity** with the Python and Node surfaces: per
-capability, at least what the weaker of those two offers. When it reaches parity
-it joins the product version line.
+The crate is at **parity** with the Python and Node surfaces — per capability,
+at least what the weaker of those two offers — and carries the **product
+version**: `cargo add laterite` and `pip install laterite` name the same
+release, in beta together with every other surface.
+[What beta means here](https://docs.laterite.dev/reference/support/).
 
-There is no 0.2 — that milestone was retired in favour of going to parity once,
-rather than stopping at a waypoint on a crate whose whole purpose is to be
-stable.
+Parity was reached once, then the crate left `0.1.x` for the product line in a
+single jump. There was never a 0.2 — deliberately, rather than stopping at a
+waypoint on a crate whose whole purpose is to be stable.
 
 ## Other surfaces
 

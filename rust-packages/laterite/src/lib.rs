@@ -42,9 +42,7 @@
 //! It is a **facade**. The work happens in a tier of `laterite-ags4-*` engine
 //! crates, which move on their own version and reshape as the format work
 //! demands. This crate exists so that *their* reshaping does not reach you —
-//! a promise about the engine, and not the same thing as a promise that this
-//! crate's own surface holds still. Both clauses below; neither is worth much
-//! printed alone.
+//! a promise about the engine, kept by the rules below.
 //!
 //! Concretely, and these are the rules the API is built to:
 //!
@@ -63,12 +61,13 @@
 //! - **One [`Error`]** with a coarse, `#[non_exhaustive]` [`ErrorKind`] and a
 //!   stable [`Error::kind_str`] shared with the Python, Node and `lat` surfaces.
 //!
-//! **Those four rules absorb the engine. Nothing absorbs this crate.** It is
-//! pre-1.0, on its own version line, and still being completed to parity with
-//! the Python and Node surfaces — its API will change, and a minor release may
-//! break you. Cargo will not carry you across a `0.x` minor on a caret
-//! requirement, which is what `cargo add` writes, so the upgrade is yours to
-//! take rather than something that happens to you. Don't force it.
+//! The crate is at **parity** with the Python and Node surfaces — per
+//! capability, at least what the weaker of those two offers — and carries the
+//! **product version**: `cargo add laterite` and `pip install laterite` name
+//! the same release. While the product line is pre-1.0 a breaking change takes
+//! the minor, and Cargo will not carry you across a `0.x` minor on the caret
+//! requirement `cargo add` writes, so an upgrade is yours to take rather than
+//! something that happens to you.
 //!
 //! What that means for every surface is stated once, at
 //! <https://docs.laterite.dev/reference/support/>.
@@ -84,15 +83,10 @@
 //! (compress / encrypt any file), and — behind the optional `excel` feature —
 //! XLSX conversion in both directions.
 //!
-//! The crate is completing to **parity** with the Python and Node surfaces —
-//! offering, per capability, at least what the weaker of those two offers — and
-//! joins the product version line when it gets there. Excel arrived additively,
-//! exactly as promised: nothing else changed to admit it.
-//!
-//! There is no 0.2. This paragraph used to promise one; the milestone was
-//! retired in favour of going to parity once, because a 0.2 would have been a
-//! waypoint that existed for as long as the remaining work took, on a crate
-//! whose purpose is to be a stable surface *over a moving engine*.
+//! Parity was reached once, then the crate left `0.1.x` for the product line
+//! in a single jump — there was never a 0.2, deliberately: a waypoint version
+//! would have existed for as long as the remaining work took, on a crate whose
+//! purpose is to be a stable surface *over a moving engine*.
 
 #![forbid(unsafe_code)]
 
