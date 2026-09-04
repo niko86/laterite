@@ -84,8 +84,11 @@ finds all of them and Markdown renders none of them.
 
 Exemptions borrow the wiki lint's A11 (`repo:ags-wiki/.bootstrap/lint.py`) word,
 its line-scoping, and its generic/specific shape — but **not** its spelling:
-A11's specific form is `<!-- retired: TERM -->` naming a retired term, and it has
-no form that names a word to exempt. Here:
+A11's specific form is a `retired:` HTML comment naming a retired term (the
+literal shape is quoted in A11's own header), and it has no form that names a
+word to exempt. (The shape is deliberately not written out here: A11 scans raw
+page text with no code-span exclusion, so a backticked example of the marker
+reads as a malformed exemption attempt on every lint run — #863's first entry.) Here:
 
 - `cadence: historical` — every cadence word on that line;
 - `cadence: historical=monthly` — only the one named, which must be a real
