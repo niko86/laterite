@@ -299,12 +299,40 @@ Excel, which needs a rename and full prep first.
 | **4c** | facade `fix` + `build` | 2 | — | 2026-08-05 |
 | **4d** | facade `diff` + `merge` | 2 | 2 | 2026-08-06 |
 | **5** | Excel publish prep · second facade snapshot | — | 3 | — |
-| **6** | **publish `laterite-ags4-excel`** at 0.9.0 — owner | — | 5 | — |
+| **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | — |
 | **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | — |
 | **8** | **the jump** — facade onto the product line | — | 0–7 | — |
 
 Phases 1 and 3 are independent of each other and of everything in 4; 4a–4c are
 independent of both publish tracks.
+
+### Phase 5/6 reconciled against the release machinery (2026-09-04, owner-ratified)
+
+Rows 5 and 6 were written before per-crate versioning (#781/#849), the
+PR-mode nightly cut (#891) and the retired crates-environment approval
+(#889) — the decisions stand, but three of the rows' mechanics no longer
+match the tree, and the phase-5 PR follows the tree:
+
+- **Excel takes its own version stanza at 0.11.0** (owner call, 2026-09-04
+  — its current effective workspace-inherited version, freezing what is;
+  the row's old `0.9.0` was the August lockstep number). The crate's
+  `version.workspace = true` predates per-crate versioning and goes with
+  it.
+- **Dep sites take explicit `version = "X.Y.Z"` pins beside `path`**, the
+  idiom the #809 coherence gate polices — not the plan's original
+  `{ workspace = true }`, which was the lockstep idiom. This applies to
+  excel's own `[dependencies]` (core / emit / types, currently pin-free,
+  which crates.io refuses) pinned at the registry's current versions.
+- **Phase 6 stops being a separate owner act** (owner call, 2026-09-04):
+  since #889 the PR merge is the human gate and publishes run unattended —
+  once excel is `publish = true` and in `PUBLISH_SET`, the nightly's
+  stamped-but-absent sweep dispatches its first publish after the phase-5
+  merge. The phase-5 PR must VERIFY that the sweep's enumeration actually
+  picks up a never-published crate (it asks the registry about
+  `PUBLISH_SET` members; a first publish is the case to prove, not
+  assume) — if it does not, the fallback is one owner dispatch of
+  `publish-crates.yml`, and this note gets corrected rather than the
+  machinery bent.
 
 **Phase 0 carries the drift gate.** `repo:tools/gen_modality.py` renders
 `ags-wiki/concepts/modality-register.md` with nothing asserting the two agree —
