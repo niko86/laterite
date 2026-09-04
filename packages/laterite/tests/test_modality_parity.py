@@ -873,6 +873,26 @@ _RUST_MERGE_IN_DOORS = {
 _RUST_MERGE_OUT_DOORS = {
     "value": "Merge::run",
 }
+# The `excel` feature's doors (dec-facade-parity phase 7). They render only in
+# the ALL-FEATURES snapshot, which is why this reflector reads the union of the
+# two facade files — reading `laterite.txt` alone would report every one of
+# these absent while the crate exports them.
+_RUST_TO_EXCEL_IN_DOORS = {
+    "path": "to_excel",
+    "bytes": "to_excel_bytes",
+}
+_RUST_TO_EXCEL_OUT_DOORS = {
+    "file": "ToExcel::to_path",
+    "bytes": "Workbook::bytes",
+}
+_RUST_FROM_EXCEL_IN_DOORS = {
+    "path": "from_excel",
+    "bytes": "from_excel_bytes",
+}
+_RUST_FROM_EXCEL_OUT_DOORS = {
+    "file": "FromExcel::to_path",
+    "bytes": "Converted::bytes",
+}
 
 
 def _rust_api() -> set[str]:
@@ -923,6 +943,10 @@ def test_rust_facade_reflects_the_register():
         ("diff", _RUST_DIFF_OUT_DOORS, "out"),
         ("merge", _RUST_MERGE_IN_DOORS, "in"),
         ("merge", _RUST_MERGE_OUT_DOORS, "out"),
+        ("to_excel", _RUST_TO_EXCEL_IN_DOORS, "in"),
+        ("to_excel", _RUST_TO_EXCEL_OUT_DOORS, "out"),
+        ("from_excel", _RUST_FROM_EXCEL_IN_DOORS, "in"),
+        ("from_excel", _RUST_FROM_EXCEL_OUT_DOORS, "out"),
     ):
         present, absent = _reflect_rust(doors, api)
         _assert_reflection(_cell(doc, capability, "rust"), direction, present, absent)
@@ -940,7 +964,9 @@ def test_rust_source_doors_are_all_mapped():
     discovered = {
         item
         for item in api
-        if re.fullmatch(r"(read|validate|fix|build|diff|merge)(_\w+)?", item)
+        if re.fullmatch(
+            r"(read|validate|fix|build|diff|merge|to_excel|from_excel)(_\w+)?", item
+        )
         and "::" not in item
     }
     mapped = (
@@ -950,6 +976,8 @@ def test_rust_source_doors_are_all_mapped():
         | set(_RUST_BUILD_IN_DOORS.values())
         | set(_RUST_DIFF_IN_DOORS.values())
         | set(_RUST_MERGE_IN_DOORS.values())
+        | set(_RUST_TO_EXCEL_IN_DOORS.values())
+        | set(_RUST_FROM_EXCEL_IN_DOORS.values())
     )
     unmapped = discovered - mapped
     assert not unmapped, (

@@ -125,12 +125,13 @@ is something you wrote down in your own `Cargo.toml`.
 
 Read, validate, fix, build, write, certify, diff, merge, and `transport` —
 compress (`pack`) or compress-and-encrypt (`lock`) any file, from a path or from
-bytes in memory.
+bytes in memory. The optional `excel` feature adds XLSX conversion in both
+directions (`ags4::to_excel` / `ags4::from_excel`), kept behind a feature so the
+XLSX machinery stays out of every build that never touches Excel.
 
 The crate is completing to **parity** with the Python and Node surfaces: per
-capability, at least what the weaker of those two offers. Only Excel is still to
-arrive, behind an optional feature; it is additive, so nothing here has to change
-to admit it. When it reaches parity it joins the product version line.
+capability, at least what the weaker of those two offers. When it reaches parity
+it joins the product version line.
 
 There is no 0.2 — that milestone was retired in favour of going to parity once,
 rather than stopping at a waypoint on a crate whose whole purpose is to be

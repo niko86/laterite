@@ -115,7 +115,7 @@ jobs:
             --exclude laterite-ags4-corpus-qa \
             --exclude laterite-ags4-perf \
             --exclude laterite-ags4-compliance \
-            --features laterite-ags4-emit/arrow,laterite-ags4-types/arrow
+            --features laterite-ags4-emit/arrow,laterite-ags4-types/arrow,laterite/excel
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages

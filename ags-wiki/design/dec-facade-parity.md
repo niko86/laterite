@@ -300,7 +300,7 @@ Excel, which needs a rename and full prep first.
 | **4d** | facade `diff` + `merge` | 2 | 2 | 2026-08-06 |
 | **5** | Excel publish prep · second facade snapshot | — | 3 | 2026-09-04 |
 | **6** | **publish `laterite-ags4-excel`** at 0.11.0 — the phase-5 merge (see the reconciliation below) | — | 5 | 2026-09-04 |
-| **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | — |
+| **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | 2026-09-04 |
 | **8** | **the jump** — facade onto the product line | — | 0–7 | — |
 
 Phases 1 and 3 are independent of each other and of everything in 4; 4a–4c are
@@ -402,6 +402,14 @@ provenance typestate reaches the facade.
 publish. `CHANGELOG.md` records `laterite-ags4-excel` as *"never considered for the
 registry"*; that becomes false here and the correction belongs in this release's
 notes.
+
+**The floor moved while the phases ran (noted at phase 7, 2026-09-04).** The
+register gained capabilities after this page was decided — `read-output-arrow`,
+and the `build` / `build-unchecked` file doors, the latter two UNDECIDED for
+the facade — so clearing Excel did not clear the floor. Phase 8's precondition
+stays what decision 7 says: **`0 below`, read from `gen_modality.py
+--summary`**, never "Excel done". The remaining rows need their own doors or
+verdicts before the jump.
 
 **Phase 8 is a one-way door** and stays its own reviewed PR: the facade version
 moves to the product number, `repo:tests/test_version_faithful.py` converts its

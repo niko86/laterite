@@ -1,4 +1,5 @@
-//! The AGS4 surface: read, validate, fix, build, write, diff, merge.
+//! The AGS4 surface: read, validate, fix, build, write, diff, merge — and,
+//! behind the `excel` feature, XLSX conversion in both directions.
 //!
 //! Everything format-specific lives under this module and not at the crate
 //! root, so a future format is a sibling rather than a rename.
@@ -7,6 +8,11 @@ mod build;
 mod cert;
 mod diff;
 mod document;
+// Feature-gated at the MODULE, not inside it, so a default build never
+// compiles the XLSX machinery — the weight the crate split keeps off
+// consumers who never touch Excel (dec-facade-parity decision 4).
+#[cfg(feature = "excel")]
+mod excel;
 mod fix;
 mod merge;
 mod report;
@@ -27,6 +33,10 @@ pub use diff::{
     CellChange, Change, Delta, Diff, GroupChange, RowChange, diff, diff_bytes, diff_documents,
 };
 pub use document::{Document, Group, Row, Rows};
+#[cfg(feature = "excel")]
+pub use excel::{
+    Converted, FromExcel, ToExcel, Workbook, from_excel, from_excel_bytes, to_excel, to_excel_bytes,
+};
 pub use fix::{Fix, Fixed, Repair, fix, fix_bytes, fix_str, fixable_rules};
 pub use merge::{
     Merge, Merged, MissingTran, Note, Revision, TypeClash, merge, merge_bytes, merge_documents,

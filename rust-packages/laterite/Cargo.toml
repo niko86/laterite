@@ -29,6 +29,10 @@ include = [
 laterite-ags4-core = { workspace = true, features = ["transport"] }
 laterite-ags4-diff = { workspace = true }
 laterite-ags4-emit = { workspace = true }
+# Behind the `excel` feature (dec-facade-parity decision 4): a consumer who
+# does not enable it never downloads, compiles or locks calamine and
+# rust_xlsxwriter — the weight the crate split exists to keep off them.
+laterite-ags4-excel = { workspace = true, optional = true }
 laterite-ags4-merge = { workspace = true }
 laterite-ags4-parse = { workspace = true }
 laterite-ags4-reference = { workspace = true }
@@ -45,6 +49,11 @@ serde_json = "1"
 
 [features]
 default = []
+# AGS4 ↔ XLSX conversion (`ags4::to_excel` / `ags4::from_excel`). Default-off so
+# the XLSX machinery stays out of every build that never touches Excel; both
+# facade snapshots exist so the gated surface stays in the API diff either way
+# (check_public_api.py, dec-facade-parity decision 4).
+excel = ["dep:laterite-ags4-excel"]
 # The only escape hatch to the engine crates, and deliberately a FEATURE rather
 # than `#[doc(hidden)]`: a feature appears in the consumer's own Cargo.toml, so
 # reaching past the facade is a thing they wrote down and can be asked about.
