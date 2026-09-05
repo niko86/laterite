@@ -63,14 +63,14 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
 laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `merge()` — reconcile N deliveries of one project into one file (KEY-aware,
 # argument-order recency, widen-to-X). The same leaf PyO3 + the CLI reuse.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.14.0" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.15.0" }
 laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.12.0", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.
 laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.17.0", features = ["arrow"] }
 # AGS4 ↔ XLSX converter (#358) — the same crate laterite-py binds for
 # to_excel/from_excel. Pure Rust (calamine + rust_xlsxwriter), DuckDB-free.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.11.0" }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.12.0" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `table_ipc` prepends the `_id`/`_parent_id` columns from the ONE shared id
 # maths every surface uses (byte-identical to the DuckDB extension). Pure +
@@ -81,7 +81,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.11.0" }
 laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
 # Transport (pack/unpack/lock/unlock) — zstd + age passphrase, the shared

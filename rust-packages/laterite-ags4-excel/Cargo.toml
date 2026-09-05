@@ -12,7 +12,7 @@
 
 [package]
 name = "laterite-ags4-excel"
-version = "0.11.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 # 1.88, not the workspace's usual 1.85: calamine, rust_xlsxwriter and zip all
 # require 1.88, so a lower promise here would send a 1.85 consumer a crate that

@@ -71,7 +71,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
 laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `lat merge` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Reuses the same parse/emit/reference leaves.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.14.0" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.15.0" }
 # `--emit-index` (#294 F#10): mint an `.ags.idx` validity certificate after a
 # clean check (`Sidecar::assemble`). `default-features = false` drops core's
 # `transport` feature, so the CLI does NOT pull age/zstd — only the index +
@@ -80,7 +80,7 @@ laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0", defau
 # The trust model: `check` (validate, with or without a certificate) and `mint`. The
 # binary no longer owns a `try_certified_skip` of its own — that conjunction was one of
 # five across the surfaces, and no two agreed.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
 # `hostopts` (#923): the shared option-normalisation seam — edition labels,
 # the custom-dict ladder — so `--dict-version` / `--dict` mean the same thing
 # here as on every other surface. Already in the tree via merge/excel; this
@@ -111,7 +111,7 @@ clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 rpassword = { version = "7", optional = true }
 # The `excel` verb — AGS4 ↔ XLSX. Kept behind the `excel` feature so the
 # calamine / rust_xlsxwriter deps don't ride into a lean build.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.11.0", optional = true }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.12.0", optional = true }
 # Optional, behind the `tui` feature — the interactive findings browser
 # (`lat --tui`). crossterm arrives via ratatui::crossterm so the
 # backend/event types are version-matched to the linked ratatui.
