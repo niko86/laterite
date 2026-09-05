@@ -16,6 +16,7 @@
     "src/ags4/report.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/pending_adoptions.rs",
     "src/transport.rs"
   ],
   "laterite-ags4-core": [
