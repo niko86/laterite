@@ -1198,18 +1198,17 @@ pub struct AppliedFix {
 
 /// Map the engine's `Fix` records to the napi `AppliedFix` shape — shared by
 /// `fix()`'s `FixReport.applied` and `buildAgs4`'s `EmitResult.applied` so both
-/// present an identical ledger (#294 F#7). `kind`/`risk` are serde-serialised so
-/// they match Python / CLI byte-for-byte.
+/// present an identical ledger (#294 F#7). `kind`/`risk` come from the engine's
+/// own `as_str` (#937), the same spelling every surface gets.
 fn to_applied_fixes(fixes: &[Fix]) -> Vec<AppliedFix> {
-    let s = |v: serde_json::Value| v.as_str().map(String::from).unwrap_or_default();
     fixes
         .iter()
         .map(|f| AppliedFix {
-            kind: serde_json::to_value(f.kind).map(s).unwrap_or_default(),
+            kind: f.kind.as_str().to_string(),
             label: f.label.clone(),
             rule: f.rule.clone(),
             line: f.line,
-            risk: serde_json::to_value(f.risk).map(s).unwrap_or_default(),
+            risk: f.risk.as_str().to_string(),
         })
         .collect()
 }

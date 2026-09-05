@@ -39,7 +39,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_core::index::{Sidecar as CoreSidecar, TierCoverage};
 use laterite_ags4_validator::findings::{Severity, Target};
-use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, WorldScope,
     fix_document_selective, overlay,
@@ -448,21 +447,14 @@ pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<B
     let list = PyList::empty(py);
     for f in fixes {
         let o = PyDict::new(py);
-        let kind = serde_json::to_value(f.kind)
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_string))
-            .unwrap_or_default();
-        o.set_item("kind", kind)?;
+        // The engine's own spellings (#937) — this function used to derive
+        // `kind` by serde round-trip and `risk` by hand-matched literals,
+        // one drift-prone mechanism each.
+        o.set_item("kind", f.kind.as_str())?;
         o.set_item("label", &f.label)?;
         o.set_item("rule", &f.rule)?;
         o.set_item("line", f.line)?;
-        o.set_item(
-            "risk",
-            match f.risk {
-                FixRisk::Safe => "safe",
-                FixRisk::Risky => "risky",
-            },
-        )?;
+        o.set_item("risk", f.risk.as_str())?;
         list.append(o)?;
     }
     Ok(list)

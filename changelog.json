@@ -132,6 +132,9 @@
       },
       {
         "text": "**Forge edit apply: one pad-and-write seam under the six ops that hand-rolled it (#936).** Below #928's OpKind dispatch, six op implementations each hand-rolled the same strip — resolve heading, pad the line's fields to the group's arity, mutate one column, write back into the plan — with the heading-resolution expression textually identical six times. `Shape::resolve_heading` now owns the refusal, a shared `pad_and_write` owns the strip (its pad-not-refuse rationale moved onto `padded_fields`), and `column_lines` owns the twice-duplicated every-line-a-group-owns collector. Behaviour is byte-identical — the whole forge suite passes unchanged — and the recorded +250–380-line cost of a new edit op shrinks by exactly the boilerplate share."
+      },
+      {
+        "text": "**The fix ledger spells itself once: `FixKind::as_str` / `FixRisk::as_str` on the engine (#937).** Both build doors return an `applied` fix ledger, and each host binding re-derived the enum→string mapping its own way — node round-tripped both enums through serde, Python round-tripped `kind` but hand-matched `risk` to literals — one serde rename away from two surfaces spelling the same fix differently. The spelling now lives on the enums themselves; py/node became thin adapters, and a unit test pins each `as_str` value equal to the serde wire spelling (shown red on a mutated arm first), so the method and the wire format cannot diverge either. Purely additive on the published validator crate — no semver break."
       }
     ],
     "deprecated": [],
