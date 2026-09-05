@@ -98,6 +98,40 @@ pub enum FixRisk {
     Risky,
 }
 
+impl FixKind {
+    /// The wire spelling — the serde `snake_case` rename, and held equal to
+    /// it by test. Host bindings building the `applied` ledger call this
+    /// instead of a JSON round-trip or their own literals: before it existed
+    /// the py/node pair had drifted into one mechanism each, which is one
+    /// serde rename away from two surfaces spelling the same fix differently
+    /// (#937).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NormalizeCrlf => "normalize_crlf",
+            Self::StripBom => "strip_bom",
+            Self::StripEmbeddedCr => "strip_embedded_cr",
+            Self::RenameDuplicateHeading => "rename_duplicate_heading",
+            Self::InsertTranDlim => "insert_tran_dlim",
+            Self::InsertTranRcon => "insert_tran_rcon",
+            Self::ReformatNumeric => "reformat_numeric",
+            Self::CanonicalizeDatetime => "canonicalize_datetime",
+            Self::NormalizeTypography => "normalize_typography",
+            Self::PadShortRow => "pad_short_row",
+            Self::QuoteUnquotedRow => "quote_unquoted_row",
+        }
+    }
+}
+
+impl FixRisk {
+    /// See [`FixKind::as_str`] — same contract, same agreement test.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Safe => "safe",
+            Self::Risky => "risky",
+        }
+    }
+}
+
 /// One proposed fix. `edits` is empty for the two byte-level kinds
 /// (`NormalizeCrlf`/`StripBom` operate on the whole document, not a span).
 /// `rule` is the exact rule-label const (`"AGS Format Rule 8"`, …) so the
@@ -1164,6 +1198,36 @@ mod tests {
         let mut found = Findings::new();
         rules::run_all(&parsed, &dict, &opts, &mut found);
         (parsed, found)
+    }
+
+    /// `as_str` and the serde spelling must be ONE spelling: the wasm surface
+    /// serialises the enum, py/node call the method, and this is what makes
+    /// a rename impossible to half-do. The arrays must list every variant —
+    /// a variant added to the enum already fails `as_str`'s exhaustive match,
+    /// which lands the author in the same file as this list.
+    #[test]
+    fn as_str_agrees_with_the_serde_spelling() {
+        use FixKind::*;
+        for k in [
+            NormalizeCrlf,
+            StripBom,
+            StripEmbeddedCr,
+            RenameDuplicateHeading,
+            InsertTranDlim,
+            InsertTranRcon,
+            ReformatNumeric,
+            CanonicalizeDatetime,
+            NormalizeTypography,
+            PadShortRow,
+            QuoteUnquotedRow,
+        ] {
+            let wire = serde_json::to_value(k).expect("serialises");
+            assert_eq!(wire.as_str(), Some(k.as_str()), "{k:?}");
+        }
+        for r in [FixRisk::Safe, FixRisk::Risky] {
+            let wire = serde_json::to_value(r).expect("serialises");
+            assert_eq!(wire.as_str(), Some(r.as_str()), "{r:?}");
+        }
     }
 
     fn kinds(fixes: &Fixes) -> Vec<FixKind> {
