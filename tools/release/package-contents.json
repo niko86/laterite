@@ -50,6 +50,7 @@
     "Cargo.toml.orig",
     "README.md",
     "src/arrow_in.rs",
+    "src/catalog.rs",
     "src/emit.rs",
     "src/error.rs",
     "src/hostopts.rs",

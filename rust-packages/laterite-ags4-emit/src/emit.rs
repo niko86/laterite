@@ -821,46 +821,33 @@ impl SynthAccumulator {
     }
 }
 
-/// Distinct non-empty units used (Rule 15): every group's UNIT-row value plus
-/// every distinct value in a `PU`-typed data column. Blanks and the literal
-/// `"UNIT"` are excluded.
-fn collect_units<'a>(groups: impl Iterator<Item = &'a OwnedGroup>) -> BTreeSet<String> {
-    let mut units = BTreeSet::new();
-    for g in groups {
-        for u in &g.units {
-            let u = u.trim();
-            if !u.is_empty() && u != "UNIT" {
-                units.insert(u.to_string());
-            }
-        }
-        for (ci, ty) in g.types.iter().enumerate() {
-            if ty.trim() == "PU" {
-                for row in &g.rows {
-                    if let Some(v) = row.get(ci).map(|s| s.trim()) {
-                        if !v.is_empty() {
-                            units.insert(v.to_string());
-                        }
-                    }
-                }
-            }
-        }
+// The collection rule itself — trim, the header-literal exclusions, the
+// PU harvest — is `crate::catalog` (#924), shared with forge's
+// whole-file minting so the dogfood corpus can manufacture every case this
+// emitter handles. This adapter is emit's half of the seam.
+impl crate::catalog::GroupView for OwnedGroup {
+    fn units(&self) -> &[String] {
+        &self.units
     }
-    units
+    fn types(&self) -> &[String] {
+        &self.types
+    }
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+    fn cell(&self, row: usize, col: usize) -> Option<&str> {
+        self.rows.get(row)?.get(col).map(String::as_str)
+    }
 }
 
-/// Distinct non-empty type codes used (Rule 17): every group's TYPE-row value.
-/// Blanks and the literal `"TYPE"` are excluded.
+/// Distinct non-empty units used (Rule 15) — see `catalog::units_used`.
+fn collect_units<'a>(groups: impl Iterator<Item = &'a OwnedGroup>) -> BTreeSet<String> {
+    crate::catalog::units_used(groups)
+}
+
+/// Distinct non-empty type codes used (Rule 17) — see `catalog::types_used`.
 fn collect_types<'a>(groups: impl Iterator<Item = &'a OwnedGroup>) -> BTreeSet<String> {
-    let mut types = BTreeSet::new();
-    for g in groups {
-        for t in &g.types {
-            let t = t.trim();
-            if !t.is_empty() && t != "TYPE" {
-                types.insert(t.to_string());
-            }
-        }
-    }
-    types
+    crate::catalog::types_used(groups)
 }
 
 /// A two-column catalog group (UNIT or TYPE): the KEY symbol + a DESC that
@@ -1999,8 +1986,11 @@ mod tests {
 
     #[test]
     fn collect_units_gathers_unit_rows_and_pu_columns_only() {
-        // 379: only PU-typed columns contribute data-cell units (`== "PU"`).
-        // 382: blank PU cells are skipped (`!v.is_empty()`).
+        // The rule is shared (`catalog::units_used`, #924); this pins it
+        // THROUGH the OwnedGroup adapter — forge pins the same expected set
+        // over the same logical input through its own Group adapter, which
+        // is what "converged" means here. Only PU-typed columns contribute
+        // data-cell units; blank PU cells are skipped.
         let g = OwnedGroup {
             code: "X".into(),
             headings: vec!["A".into(), "B".into()],
@@ -2030,8 +2020,9 @@ mod tests {
 
     #[test]
     fn collect_types_excludes_blanks_and_the_literal_type() {
-        // 400: `!t.is_empty() && t != "TYPE"` — a blank or the literal "TYPE"
-        // is dropped; flipping `&&` to `||` would admit them.
+        // `!t.is_empty() && t != "TYPE"` — a blank or the literal "TYPE"
+        // is dropped; flipping `&&` to `||` would admit them. Pinned through
+        // the OwnedGroup adapter (the rule is `catalog::types_used`, #924).
         let g = OwnedGroup {
             code: "X".into(),
             headings: vec!["A".into(), "B".into(), "C".into()],

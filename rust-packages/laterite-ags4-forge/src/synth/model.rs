@@ -22,6 +22,7 @@
 
 use std::collections::BTreeSet;
 
+use laterite_ags4_emit::catalog;
 use laterite_ags4_parity::Rng;
 use laterite_ags4_validator::{DictVersion, Dictionary};
 
@@ -280,18 +281,33 @@ fn collect_abbr(groups: &[Group], dict: &Dictionary<'static>) -> Group {
     )
 }
 
-/// Build the `UNIT` group covering every non-empty unit any group declares
-/// (Rule 15). Description falls back to the unit symbol itself.
-fn collect_unit(groups: &[Group]) -> Group {
-    let mut units: BTreeSet<String> = BTreeSet::new();
-    for g in groups {
-        for u in &g.units {
-            if !u.is_empty() {
-                units.insert(u.clone());
-            }
-        }
+// The collection rule — trim, the header-literal exclusions, the PU
+// harvest — is `laterite_ags4_emit::catalog` (#924), shared with the
+// shipped emitter's catalog synthesis. Reliquary row 14 kept the two
+// collectors separate "until they drift"; they drifted (forge kept padded
+// units the emitter trimmed, and never learned the PU harvest, so the
+// dogfood corpus could not manufacture the picklist-of-units case the
+// emitter handles). This adapter is forge's half of the seam.
+impl catalog::GroupView for Group {
+    fn units(&self) -> &[String] {
+        &self.units
     }
-    let rows = units
+    fn types(&self) -> &[String] {
+        &self.types
+    }
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+    fn cell(&self, row: usize, col: usize) -> Option<&str> {
+        self.rows.get(row)?.values.get(col).map(String::as_str)
+    }
+}
+
+/// Build the `UNIT` group covering every unit any group uses (Rule 15,
+/// via `catalog::units_used` — UNIT-row values plus PU-column cells).
+/// Description falls back to the unit symbol itself.
+fn collect_unit(groups: &[Group]) -> Group {
+    let rows = catalog::units_used(groups)
         .iter()
         .map(|u| Row::owned(vec![u.clone(), u.clone()]))
         .collect();
@@ -305,17 +321,10 @@ fn collect_unit(groups: &[Group]) -> Group {
 }
 
 /// Build the `TYPE` group covering every type code any group declares
-/// (Rule 17). Description falls back to the code itself.
+/// (Rule 17, via `catalog::types_used`). Description falls back to the
+/// code itself.
 fn collect_type(groups: &[Group]) -> Group {
-    let mut types: BTreeSet<String> = BTreeSet::new();
-    for g in groups {
-        for t in &g.types {
-            if !t.is_empty() {
-                types.insert(t.clone());
-            }
-        }
-    }
-    let rows = types
+    let rows = catalog::types_used(groups)
         .iter()
         .map(|t| Row::owned(vec![t.clone(), t.clone()]))
         .collect();
@@ -543,6 +552,33 @@ mod tests {
 
     fn group<'a>(m: &'a ProjectModel, code: &str) -> &'a Group {
         m.groups.iter().find(|g| g.code == code).unwrap()
+    }
+
+    /// The convergence pin (#924): the SAME logical input as emit's
+    /// `collect_units_gathers_unit_rows_and_pu_columns_only` — a padded
+    /// unit, a header-literal, a PU column with a blank cell — asserted to
+    /// the same expected sets, through forge's own `Group` adapter. Before
+    /// the shared rule this input produced a DIFFERENT catalog here: the
+    /// padded `" m "` survived untrimmed, `"UNIT"`/`"TYPE"` were admitted,
+    /// and `kPa` (the PU cell) was never harvested at all.
+    #[test]
+    fn catalog_collection_matches_the_emitters_semantics() {
+        let g = Group::new(
+            "XXXX",
+            ["A", "B"],
+            [" m ", "UNIT"],
+            ["PU", "TYPE"],
+            vec![
+                Row::owned(vec!["kPa".into(), "notpu".into()]),
+                Row::owned(vec!["  ".into(), "blankpu".into()]),
+            ],
+        );
+        let unit = collect_unit(std::slice::from_ref(&g));
+        let units: Vec<&str> = unit.rows.iter().map(|r| r.values[0].as_str()).collect();
+        assert_eq!(units, vec!["kPa", "m"]);
+        let ty = collect_type(std::slice::from_ref(&g));
+        let types: Vec<&str> = ty.rows.iter().map(|r| r.values[0].as_str()).collect();
+        assert_eq!(types, vec!["PU"]);
     }
 
     /// GEOL strata are coherent and clean-by-construction: every row's

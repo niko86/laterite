@@ -33,6 +33,10 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # The canonical field quoter (`quote_field`) — `edit` must write fields the
 # way everything else in the repo writes them, not by a local copy.
 laterite-ags4-types = { path = "../laterite-ags4-types" }
+# The shared Rule 15/17 catalog-collection rule (`catalog`, #924), so the
+# dogfood corpus mints UNIT/TYPE by the same semantics the shipped emitter
+# synthesizes them — trim, header-literal exclusion, the PU harvest.
+laterite-ags4-emit = { path = "../laterite-ags4-emit" }
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 serde = { version = "1", features = ["derive"] }
