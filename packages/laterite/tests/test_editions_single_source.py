@@ -15,6 +15,7 @@ bundles another edition: anything that reintroduces a hand-list goes red the mom
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import laterite
@@ -98,6 +99,45 @@ def test_an_unbundled_edition_is_still_rejected(
     assert "9.9" not in _native.registry_editions()
     assert _cli.main(["validate", str(f), "--dict-version", "9.9"]) == 5
     capsys.readouterr()
+
+
+def test_the_public_edition_type_lists_exactly_the_bundled_editions() -> None:
+    """`laterite.Edition` is a `Literal`, so it is necessarily a hand-list — a
+    Literal built from a runtime call loses its static value to every type
+    checker, which is the type's whole job. It was also the last unreached row
+    of the single-source sweep (#927): `_cli.py` derives, `web/editions.ts` is
+    generated, and this public type was left with nothing proving it. This is
+    the gate that makes the hand-list safe: it goes red the moment the
+    dictionary bundles an edition the Literal does not carry, or the Literal
+    carries one the dictionary dropped.
+    """
+    from typing import get_args
+
+    assert list(get_args(laterite.Edition)) == list(_native.registry_editions())
+
+
+def test_every_edition_enumeration_in_the_module_is_the_full_set() -> None:
+    """The prose twin: any line of `__init__.py` that ENUMERATES editions (the
+    `Edition` literal, a docstring's `one of …` list) must enumerate exactly
+    the bundled set — a docstring advertising four of five editions is the
+    same stale hand-list one channel over. Lines merely MENTIONING an edition
+    (an example, a default) are not enumerations and are not judged here.
+    """
+    editions = list(_native.registry_editions())
+    version = r'"(\d+\.\d+(?:\.\d+)?)"'
+    src = Path(laterite.__file__).read_text(encoding="utf-8")
+    enumerating = [
+        (n, line)
+        for n, line in enumerate(src.splitlines(), 1)
+        if len(re.findall(version, line)) >= 3
+    ]
+    assert enumerating, "the Edition literal alone should have matched"
+    for n, line in enumerating:
+        found = re.findall(version, line)
+        assert found == editions, (
+            f"__init__.py:{n} enumerates {found}, the dictionary bundles "
+            f"{editions} — a stale hand-list"
+        )
 
 
 def test_the_emit_path_accepts_every_bundled_edition() -> None:

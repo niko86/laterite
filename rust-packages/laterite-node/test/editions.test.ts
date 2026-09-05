@@ -50,4 +50,44 @@ describe("edition value domain", () => {
       expect(msg, `message must name ${ed}`).toContain(ed);
     }
   });
+
+  it("every TSDoc edition list in ts/ matches the dictionary (#927)", () => {
+    // TSDoc prose cannot derive from a runtime call, so the full-list
+    // spellings (`"4.0.3" | "4.0.4" | …`) are necessarily hand-written — the
+    // last unreached row of the editions single-source sweep. This makes the
+    // hand-list safe: bundling a new edition reddens every stale doc line, by
+    // file and count, instead of shipping TSDoc advertising the old set.
+    const expected = EDITIONS.map((e) => `"${e}"`).join(" | ");
+    for (const file of ["index.ts", "registry.ts"]) {
+      const src = readFileSync(
+        new URL(`../ts/${file}`, import.meta.url),
+        "utf8",
+      );
+      const lists = src.match(/"4\.\d[^`\n]*?"(?:\s*\|\s*"[\d.]+")+/g) ?? [];
+      expect(
+        lists.length,
+        `${file}: the full-list TSDoc spellings should still exist`,
+      ).toBeGreaterThan(0);
+      for (const found of lists) {
+        expect(found, `${file}: stale TSDoc edition list`).toBe(expected);
+      }
+      // The abbreviated ranges (`` `"4.0.3"`…`"4.2"` ``) pin only their
+      // endpoints; the ellipsis may wrap across a comment line.
+      const first = EDITIONS[0];
+      const last = EDITIONS[EDITIONS.length - 1];
+      const range = /`"([\d.]+)"`…\s*(?:\n\s*\*\s*)?`"([\d.]+)"`/g;
+      for (const [, lo, hi] of src.matchAll(range)) {
+        expect(lo, `${file}: range start`).toBe(first);
+        expect(hi, `${file}: range end`).toBe(last);
+      }
+      // And a documented numeric default is the dictionary's own fallback —
+      // the doc twin of the hard-coded `unwrap_or(V4_1_1)` class #923 retired
+      // from the code.
+      for (const [, dflt] of src.matchAll(/\(default `"([\d.]+)"`\)/g)) {
+        expect(dflt, `${file}: stale documented default`).toBe(
+          DICT.fallback_edition,
+        );
+      }
+    }
+  });
 });

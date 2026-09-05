@@ -75,6 +75,21 @@ needed the closed set of valid `--dict-version` strings.
 > a typed `Option<Edition>`), so it was never in this class. See
 > [[data-single-source-audit]] row 2 for the full register entry.
 
+> [!done] **The last hand-lists, resolved by GATE rather than derivation
+> (#927).** Two statements of the set cannot derive from a runtime call by
+> construction: Python's public `Edition = Literal[…]` (a `Literal` built at
+> runtime loses its static value to every type checker — the type's whole
+> job) and the Node TSDoc prose (`"4.0.3" | … | "4.2"`, plus the documented
+> `(default "4.1.1")`). Their fix is a gate, not generation:
+> `test_editions_single_source.py` pins `get_args(Edition)` — and every
+> edition-enumerating line of `__init__.py`, docstrings included — to
+> `registry_editions()`, and `editions.test.ts` pins every full-list TSDoc
+> spelling, the abbreviated `…` ranges' endpoints, and each documented
+> numeric default (to `fallback_edition`) against `ags_dictionary.json`
+> itself. Both gates were shown red on a mutated literal before being
+> trusted. Every statement of the set is now either derived, generated, or
+> gated — none is bare.
+
 [[surface-census]] is what makes the convergence checkable *across
 launchers* rather than just within one crate: it gained a second table
 (`editions` + `fallback_edition`) diffing the native binary, `uvx`, and

@@ -902,21 +902,22 @@ class Ags4File:
             path, txt, data = self._src
         else:
             path, txt, data = None, self.text, None
-        dict_path, dict_bytes = _split_dict(dictionary)
-        r = _native.run_check(
-            path=path,
-            text=txt,
-            data=data,
+        r = _run_check(
+            path,
+            txt,
+            data,
             dict_version=dict_version,
-            include_warnings=warnings,
-            include_fyi=fyi,
+            warnings=warnings,
+            fyi=fyi,
             warnings_as_errors=warnings_as_errors,
             check_files=check_files,
             encoding=encoding if encoding is not None else self._encoding,
-            dict_path=dict_path,
-            dict_bytes=dict_bytes,
+            dictionary=dictionary,
             dict_replace=dict_replace,
             cert=self._cert,
+            # Never strict here — see the module-level door's comment: a cert
+            # this handle inherited from `read(index=)` was asserted THERE.
+            strict_cert=False,
         )
         self._report = Report(raise_for(r))
         return self
@@ -1471,6 +1472,51 @@ class AgsQuery:
         return f"<AgsQuery {' '.join(bits) or 'empty'}>"
 
 
+def _run_check(
+    path: str | None,
+    txt: str | None,
+    data: builtins.bytes | bytearray | memoryview | None,
+    *,
+    dict_version: Edition | None,
+    warnings: bool,
+    fyi: bool,
+    warnings_as_errors: bool,
+    check_files: bool,
+    encoding: str | None,
+    dictionary: str | Path | builtins.bytes | None,
+    dict_replace: bool,
+    cert: Any,
+    strict_cert: bool,
+) -> dict:
+    """The one piece of plumbing under BOTH validate doors (#927).
+
+    Module-level `validate` and `Ags4File.validate` present the same 8-knob
+    caller surface and used to restate this native call separately — a knob
+    addition cost four edits inside one package (both doors, the `.pyi`,
+    `_cli.py`). The knob→engine mapping is now declared once; what stays
+    per-door is genuinely per-door (how the source and certificate were
+    obtained, and `strict_cert`). Deleting this makes the 14-argument call
+    reappear twice, which is the test it was extracted against.
+    """
+    dict_path, dict_bytes = _split_dict(dictionary)
+    return _native.run_check(
+        path=path,
+        text=txt,
+        data=data,
+        dict_version=dict_version,
+        include_warnings=warnings,
+        include_fyi=fyi,
+        warnings_as_errors=warnings_as_errors,
+        check_files=check_files,
+        encoding=encoding,
+        dict_path=dict_path,
+        dict_bytes=dict_bytes,
+        dict_replace=dict_replace,
+        cert=cert,
+        strict_cert=strict_cert,
+    )
+
+
 def validate(
     source: Any = None,
     *,
@@ -1585,7 +1631,6 @@ def validate(
             afterwards would cost exactly what the caller was trying to save.
     """
     path, txt, data = _resolve_source(source, text=text)
-    dict_path, dict_bytes = _split_dict(dictionary)
     # Loaded here, checked in the engine. The freshness comparison needs the
     # source BYTES, and the native layer is about to read them anyway — doing it
     # here would read a 25 MB delivery twice to save parsing it once, which is
@@ -1595,22 +1640,21 @@ def validate(
         if index is not None
         else None
     )
-    r = _native.run_check(
-        path=path,
-        text=txt,
-        data=data,
+    r = _run_check(
+        path,
+        txt,
+        data,
         dict_version=dict_version,
-        include_warnings=warnings,
-        include_fyi=fyi,
+        warnings=warnings,
+        fyi=fyi,
         warnings_as_errors=warnings_as_errors,
         check_files=check_files,
         encoding=encoding,
-        dict_path=dict_path,
-        dict_bytes=dict_bytes,
+        dictionary=dictionary,
         dict_replace=dict_replace,
         cert=cert,
         # This door NAMED the cert, so a stale one is an error. `Ags4File.validate`
-        # passes no such flag: a cert it inherited from `read(index=)` was asserted
+        # passes False: a cert it inherited from `read(index=)` was asserted
         # there, not here, and quietly re-validating is the right answer if the
         # file has since moved under it.
         strict_cert=cert is not None,
