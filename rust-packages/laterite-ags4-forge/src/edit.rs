@@ -954,18 +954,85 @@ value = "21.5"
     }
 }
 
+/// The enum, the spelling table and `as_str` are all emitted from the one
+/// list in the invocation below, so a spelling cannot exist without its
+/// variant or a variant without its spelling — and `parse_flag`'s match and
+/// `cmd.rs`'s spelling→clap-field match are both exhaustive over the enum,
+/// so a new row refuses to COMPILE until each has its arm. Adding an edit op
+/// used to be a three-file ritual coupled by a bare string, where a typo in
+/// `cmd.rs`'s tuple table fell through `parse_flag`'s catch-all at runtime;
+/// now the places a new operation must touch fail the build, not a review.
+macro_rules! op_kinds {
+    ($(($spelling:literal, $variant:ident)),+ $(,)?) => {
+        /// One command-line spelling of one edit operation. `Blank` and
+        /// `SetTypeRaw` are distinct HERE even though each is a second
+        /// spelling of another variant's patch `kind` — one kind in a patch
+        /// file, two intentions at the command line (see `parse_flag`).
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum OpKind { $($variant),+ }
+
+        impl OpKind {
+            /// Every spelling, in the fixed order the flags apply (`cmd.rs`
+            /// iterates this table, so this order IS the application order).
+            pub const SPELLINGS: &'static [(&'static str, OpKind)] =
+                &[$(($spelling, OpKind::$variant)),+];
+
+            pub const fn as_str(self) -> &'static str {
+                match self { $(OpKind::$variant => $spelling),+ }
+            }
+        }
+    };
+}
+
+op_kinds![
+    ("set", Set),
+    ("blank", Blank),
+    ("add-column", AddColumn),
+    ("set-unit", SetUnit),
+    ("set-type", SetType),
+    ("set-type-raw", SetTypeRaw),
+    ("add-row", AddRow),
+    ("insert-row", InsertRow),
+    ("delete-row", DeleteRow),
+    ("delete-column", DeleteColumn),
+    ("delete-group", DeleteGroup),
+];
+
+/// `--{kind}` in the flag error messages — the spelling, verbatim.
+impl std::fmt::Display for OpKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// The string door, for callers that arrive with a spelling rather than a
+/// flag. Patch files never come through here (serde dispatches on the `kind`
+/// tag itself); this owns the "unknown operation" vocabulary that used to be
+/// `parse_flag`'s catch-all — now the only place an unknown spelling can
+/// still be said, since the flag path starts from the table.
+impl std::str::FromStr for OpKind {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::SPELLINGS
+            .iter()
+            .find(|&&(spelling, _)| spelling == s)
+            .map(|&(_, kind)| kind)
+            .ok_or_else(|| anyhow::anyhow!("unknown operation {s:?}"))
+    }
+}
+
 /// Parse one `--set GROUP:ROW:HEADING=VALUE` (and its siblings). Split from
 /// the right on `=` so a value may contain one; split from the left on `:`
 /// so it may contain those too.
-pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
+pub fn parse_flag(kind: OpKind, spec: &str) -> anyhow::Result<Op> {
     let bad = |want: &str| anyhow::anyhow!("--{kind} {spec:?} is not `{want}`");
     let row = |s: &str| -> anyhow::Result<usize> {
         s.parse::<usize>()
             .map_err(|_| anyhow::anyhow!("--{kind} {spec:?}: {s:?} is not a row number"))
     };
     match kind {
-        "set" | "blank" => {
-            let (locator, value) = if kind == "set" {
+        OpKind::Set | OpKind::Blank => {
+            let (locator, value) = if matches!(kind, OpKind::Set) {
                 spec.split_once('=')
                     .ok_or_else(|| bad("GROUP:ROW:HEADING=VALUE"))?
             } else {
@@ -974,7 +1041,7 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
             let mut parts = locator.splitn(3, ':');
             let (g, r, h) = (parts.next(), parts.next(), parts.next());
             let (Some(g), Some(r), Some(h)) = (g, r, h) else {
-                return Err(bad(if kind == "set" {
+                return Err(bad(if matches!(kind, OpKind::Set) {
                     "GROUP:ROW:HEADING=VALUE"
                 } else {
                     "GROUP:ROW:HEADING"
@@ -987,14 +1054,14 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 value: value.to_string(),
             })
         }
-        "add-column" => {
+        OpKind::AddColumn => {
             let (g, h) = spec.split_once(':').ok_or_else(|| bad("GROUP:HEADING"))?;
             Ok(Op::AddColumn {
                 group: g.to_string(),
                 heading: h.to_string(),
             })
         }
-        "set-unit" => {
+        OpKind::SetUnit => {
             // The locator is split, never the whole spec: AGS unit strings
             // routinely carry colons (`yyyy-mm-ddThh:mm`), and a four-part
             // colon form would be ambiguous for exactly the type this
@@ -1012,7 +1079,7 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 unit: unit.to_string(),
             })
         }
-        "set-type" | "set-type-raw" => {
+        OpKind::SetType | OpKind::SetTypeRaw => {
             let (locator, ags_type) = spec
                 .split_once('=')
                 .ok_or_else(|| bad("GROUP:HEADING=TYPE"))?;
@@ -1026,10 +1093,10 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 // `--set-type-raw` is a SPELLING of this operation, the way
                 // `--blank` is a spelling of `set`: one kind in a patch file,
                 // two intentions at the command line.
-                reformat: kind == "set-type",
+                reformat: matches!(kind, OpKind::SetType),
             })
         }
-        "insert-row" => {
+        OpKind::InsertRow => {
             let (g, at) = spec.split_once(':').ok_or_else(|| bad("GROUP:POSITION"))?;
             Ok(Op::InsertRow {
                 group: g.to_string(),
@@ -1037,28 +1104,27 @@ pub fn parse_flag(kind: &str, spec: &str) -> anyhow::Result<Op> {
                 cells: BTreeMap::new(),
             })
         }
-        "delete-row" => {
+        OpKind::DeleteRow => {
             let (g, r) = spec.split_once(':').ok_or_else(|| bad("GROUP:ROW"))?;
             Ok(Op::DeleteRow {
                 group: g.to_string(),
                 row: row(r)?,
             })
         }
-        "delete-column" => {
+        OpKind::DeleteColumn => {
             let (g, h) = spec.split_once(':').ok_or_else(|| bad("GROUP:HEADING"))?;
             Ok(Op::DeleteColumn {
                 group: g.to_string(),
                 heading: h.to_string(),
             })
         }
-        "delete-group" => Ok(Op::DeleteGroup {
+        OpKind::DeleteGroup => Ok(Op::DeleteGroup {
             group: spec.to_string(),
         }),
-        "add-row" => Ok(Op::AddRow {
+        OpKind::AddRow => Ok(Op::AddRow {
             group: spec.to_string(),
             cells: BTreeMap::new(),
         }),
-        other => Err(anyhow::anyhow!("unknown operation {other:?}")),
     }
 }
 
@@ -1425,49 +1491,64 @@ mod tests {
     }
 
     /// The flag grammar and the patch `kind` names are the same vocabulary —
-    /// two spellings of one operation would be a documentation trap.
+    /// two spellings of one operation would be a documentation trap. The
+    /// sweep runs over the whole spelling table, so it also covers the two
+    /// deliberate second spellings the old hand-list had to footnote away.
     #[test]
     fn the_flag_names_and_the_patch_kinds_agree() {
-        for kind in [
-            "set",
-            "add-column",
-            "set-unit",
-            // `--set-type-raw` is absent for the same reason `--blank` is:
-            // it is a second spelling of a kind already listed, not a kind.
-            "set-type",
-            "add-row",
-            "insert-row",
-            "delete-row",
-            "delete-column",
-            "delete-group",
-        ] {
+        for &(spelling, kind) in OpKind::SPELLINGS {
             let spec = match kind {
-                "set" => "LOCA:1:LOCA_ID=x",
-                "add-column" => "LOCA:LOCA_NEW",
-                "set-unit" => "LOCA:LOCA_ID=m",
-                "set-type" => "LOCA:LOCA_ID=X",
-                "insert-row" | "delete-row" => "LOCA:1",
-                "delete-column" => "LOCA:LOCA_ID",
-                _ => "LOCA",
+                OpKind::Set => "LOCA:1:LOCA_ID=x",
+                OpKind::Blank => "LOCA:1:LOCA_ID",
+                OpKind::AddColumn => "LOCA:LOCA_NEW",
+                OpKind::SetUnit => "LOCA:LOCA_ID=m",
+                OpKind::SetType | OpKind::SetTypeRaw => "LOCA:LOCA_ID=X",
+                OpKind::InsertRow | OpKind::DeleteRow => "LOCA:1",
+                OpKind::DeleteColumn => "LOCA:LOCA_ID",
+                OpKind::AddRow | OpKind::DeleteGroup => "LOCA",
             };
             let op = parse_flag(kind, spec).unwrap();
             let json = serde_json::to_value(&op).unwrap();
-            assert_eq!(json["kind"], kind, "flag --{kind} must serialise as {kind}");
+            // `--blank` / `--set-type-raw` are second spellings of `set` /
+            // `set-type`: one kind in a patch file, two flag intentions.
+            let patch_kind = match kind {
+                OpKind::Blank => "set",
+                OpKind::SetTypeRaw => "set-type",
+                _ => spelling,
+            };
+            assert_eq!(
+                json["kind"], patch_kind,
+                "flag --{kind} must serialise as {patch_kind}"
+            );
         }
+    }
+
+    /// The table and `as_str` come from one macro list, so a mismatch cannot
+    /// be written; what this pins is the `FromStr` wiring over that table
+    /// (a swapped tuple index would still compile) and the one message left
+    /// for an unknown spelling now that the flag path starts from the table.
+    #[test]
+    fn every_spelling_round_trips_and_an_unknown_one_is_refused() {
+        for &(spelling, kind) in OpKind::SPELLINGS {
+            assert_eq!(spelling.parse::<OpKind>().unwrap(), kind);
+            assert_eq!(kind.as_str(), spelling);
+        }
+        let e = "frobnicate".parse::<OpKind>().unwrap_err().to_string();
+        assert_eq!(e, "unknown operation \"frobnicate\"");
     }
 
     /// A value may contain `=` and `:`; the locator may not. Splitting from
     /// the wrong end is how a remark like `depth: 3=4m` loses its tail.
     #[test]
     fn a_set_value_may_contain_the_delimiters() {
-        let op = parse_flag("set", "LOCA:1:LOCA_REM=depth: 3=4m").unwrap();
+        let op = parse_flag(OpKind::Set, "LOCA:1:LOCA_REM=depth: 3=4m").unwrap();
         assert_eq!(op, set("LOCA", 1, "LOCA_REM", "depth: 3=4m"));
     }
 
     #[test]
     fn blank_is_set_to_nothing() {
         assert_eq!(
-            parse_flag("blank", "LOCA:2:LOCA_REM").unwrap(),
+            parse_flag(OpKind::Blank, "LOCA:2:LOCA_REM").unwrap(),
             set("LOCA", 2, "LOCA_REM", "")
         );
     }
@@ -1475,15 +1556,15 @@ mod tests {
     #[test]
     fn a_malformed_flag_says_what_the_shape_should_be() {
         for (kind, spec, want) in [
-            ("set", "LOCA:1:LOCA_ID", "GROUP:ROW:HEADING=VALUE"),
-            ("set", "LOCA=x", "GROUP:ROW:HEADING=VALUE"),
-            ("delete-row", "LOCA", "GROUP:ROW"),
-            ("delete-column", "LOCA", "GROUP:HEADING"),
+            (OpKind::Set, "LOCA:1:LOCA_ID", "GROUP:ROW:HEADING=VALUE"),
+            (OpKind::Set, "LOCA=x", "GROUP:ROW:HEADING=VALUE"),
+            (OpKind::DeleteRow, "LOCA", "GROUP:ROW"),
+            (OpKind::DeleteColumn, "LOCA", "GROUP:HEADING"),
         ] {
             let e = parse_flag(kind, spec).unwrap_err().to_string();
             assert!(e.contains(want), "--{kind} {spec:?} said: {e}");
         }
-        let e = parse_flag("delete-row", "LOCA:one")
+        let e = parse_flag(OpKind::DeleteRow, "LOCA:one")
             .unwrap_err()
             .to_string();
         assert!(e.contains("not a row number"), "{e}");
@@ -1904,20 +1985,20 @@ mod tests {
     #[test]
     fn the_set_unit_flag_splits_the_locator_and_not_the_value() {
         assert_eq!(
-            parse_flag("set-unit", "LOCA:LOCA_DATE=yyyy-mm-ddThh:mm:ss").unwrap(),
+            parse_flag(OpKind::SetUnit, "LOCA:LOCA_DATE=yyyy-mm-ddThh:mm:ss").unwrap(),
             set_unit("LOCA", "LOCA_DATE", "yyyy-mm-ddThh:mm:ss")
         );
         // Legal, and the whole reason the operation exists.
         assert_eq!(
-            parse_flag("set-unit", "LOCA:LOCA_NATE=").unwrap(),
+            parse_flag(OpKind::SetUnit, "LOCA:LOCA_NATE=").unwrap(),
             set_unit("LOCA", "LOCA_NATE", "")
         );
         assert!(
-            parse_flag("set-unit", "LOCA:LOCA_NATE").is_err(),
+            parse_flag(OpKind::SetUnit, "LOCA:LOCA_NATE").is_err(),
             "a spec with no `=` names no unit"
         );
         assert!(
-            parse_flag("set-unit", "LOCA=mm").is_err(),
+            parse_flag(OpKind::SetUnit, "LOCA=mm").is_err(),
             "a spec with no `:` names no heading"
         );
     }
@@ -2105,15 +2186,15 @@ mod tests {
     #[test]
     fn the_two_set_type_spellings_differ_only_in_reformatting() {
         assert_eq!(
-            parse_flag("set-type", "LOCA:LOCA_NATE=3DP").unwrap(),
+            parse_flag(OpKind::SetType, "LOCA:LOCA_NATE=3DP").unwrap(),
             set_type("LOCA", "LOCA_NATE", "3DP")
         );
         assert_eq!(
-            parse_flag("set-type-raw", "LOCA:LOCA_NATE=3DP").unwrap(),
+            parse_flag(OpKind::SetTypeRaw, "LOCA:LOCA_NATE=3DP").unwrap(),
             set_type_raw("LOCA", "LOCA_NATE", "3DP")
         );
-        assert!(parse_flag("set-type", "LOCA:LOCA_NATE").is_err());
-        assert!(parse_flag("set-type", "LOCA=3DP").is_err());
+        assert!(parse_flag(OpKind::SetType, "LOCA:LOCA_NATE").is_err());
+        assert!(parse_flag(OpKind::SetType, "LOCA=3DP").is_err());
     }
 
     /// A patch file that omits `reformat` means re-format: the safe half.
@@ -2314,10 +2395,10 @@ type = "0DP"
     #[test]
     fn the_add_column_flag_takes_a_group_and_a_heading() {
         assert_eq!(
-            parse_flag("add-column", "LOCA:LOCA_GL").unwrap(),
+            parse_flag(OpKind::AddColumn, "LOCA:LOCA_GL").unwrap(),
             add_column("LOCA", "LOCA_GL")
         );
-        assert!(parse_flag("add-column", "LOCA").is_err());
+        assert!(parse_flag(OpKind::AddColumn, "LOCA").is_err());
     }
 
     fn insert_row(group: &str, at: usize, cells: &[(&str, &str)]) -> Op {
@@ -2513,11 +2594,11 @@ type = "0DP"
     #[test]
     fn the_insert_row_flag_takes_a_group_and_a_position() {
         assert_eq!(
-            parse_flag("insert-row", "LOCA:2").unwrap(),
+            parse_flag(OpKind::InsertRow, "LOCA:2").unwrap(),
             insert_row("LOCA", 2, &[])
         );
-        assert!(parse_flag("insert-row", "LOCA").is_err());
-        assert!(parse_flag("insert-row", "LOCA:x").is_err());
+        assert!(parse_flag(OpKind::InsertRow, "LOCA").is_err());
+        assert!(parse_flag(OpKind::InsertRow, "LOCA:x").is_err());
     }
 
     /// The whole projection, listed four ways. Canonical order — not listing
