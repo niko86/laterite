@@ -936,6 +936,15 @@ pub fn minimize(args: &MinimizeArgs, ctx: Ctx) -> Result<i32> {
     Ok(0)
 }
 
+/// Hand prose, not a derivation from `OpKind::SPELLINGS`, because its flag
+/// order predates the table and the bytes are part of the CLI surface — but
+/// gated below (`the_no_operations_message_names_every_spelling`), so a new
+/// spelling cannot ship without being advertised here.
+const NO_OPERATIONS: &str = "no operations — pass --set/--blank/--set-unit/--set-type/\
+     --set-type-raw/--add-column/--add-row/--insert-row/\
+     --delete-row/--delete-column/--delete-group or --patch \
+     (--patch-template shows one)";
+
 /// `forge edit` — structured edits to a real AGS4 file (#655).
 ///
 /// Nothing is written without `--out` or `--in-place`: the default run is the
@@ -975,19 +984,26 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
         },
         None => Vec::new(),
     };
-    for (kind, specs) in [
-        ("set", &args.set),
-        ("blank", &args.blank),
-        ("add-column", &args.add_column),
-        ("set-unit", &args.set_unit),
-        ("set-type", &args.set_type),
-        ("set-type-raw", &args.set_type_raw),
-        ("add-row", &args.add_row),
-        ("insert-row", &args.insert_row),
-        ("delete-row", &args.delete_row),
-        ("delete-column", &args.delete_column),
-        ("delete-group", &args.delete_group),
-    ] {
+    for &(_, kind) in crate::edit::OpKind::SPELLINGS {
+        use crate::edit::OpKind;
+        // The spelling table is the one list (its order is the application
+        // order above), and this match is exhaustive over `OpKind`: a new
+        // operation cannot reach a build without naming its clap field here,
+        // where the old `(string, field)` tuple table waited for a reviewer
+        // to notice the typo that fell through `parse_flag`'s catch-all.
+        let specs = match kind {
+            OpKind::Set => &args.set,
+            OpKind::Blank => &args.blank,
+            OpKind::AddColumn => &args.add_column,
+            OpKind::SetUnit => &args.set_unit,
+            OpKind::SetType => &args.set_type,
+            OpKind::SetTypeRaw => &args.set_type_raw,
+            OpKind::AddRow => &args.add_row,
+            OpKind::InsertRow => &args.insert_row,
+            OpKind::DeleteRow => &args.delete_row,
+            OpKind::DeleteColumn => &args.delete_column,
+            OpKind::DeleteGroup => &args.delete_group,
+        };
         for spec in specs {
             match crate::edit::parse_flag(kind, spec) {
                 Ok(op) => ops.push(op),
@@ -999,12 +1015,7 @@ pub fn edit(args: &EditArgs, ctx: Ctx) -> Result<i32> {
         }
     }
     if ops.is_empty() {
-        eprintln!(
-            "error: no operations — pass --set/--blank/--set-unit/--set-type/\
-             --set-type-raw/--add-column/--add-row/--insert-row/\
-             --delete-row/--delete-column/--delete-group or --patch \
-             (--patch-template shows one)"
-        );
+        eprintln!("error: {NO_OPERATIONS}");
         return Ok(5);
     }
 
@@ -1399,6 +1410,24 @@ mod scale_inject_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The one hand-written statement of the flag vocabulary left after
+    /// #928 — kept prose for its bytes, held to the spelling table here.
+    /// Whole tokens, not `contains`: `--set` is a prefix of `--set-unit`,
+    /// so a substring check would keep passing after dropping it.
+    #[test]
+    fn the_no_operations_message_names_every_spelling() {
+        let advertised: Vec<&str> = NO_OPERATIONS
+            .split(|c: char| c == '/' || c.is_whitespace())
+            .filter(|t| t.starts_with("--"))
+            .collect();
+        for &(spelling, _) in crate::edit::OpKind::SPELLINGS {
+            assert!(
+                advertised.contains(&format!("--{spelling}").as_str()),
+                "the no-operations message must advertise --{spelling}"
+            );
+        }
+    }
 
     #[test]
     fn a_directory_yields_its_ags_files_and_counts_what_it_walked_past() {
