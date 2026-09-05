@@ -29,7 +29,7 @@ but each is a distinct, single-purpose unit (a deployable, a data set, a tool gr
 | `packages/` | the **Python package**: `laterite` (the AGS4 base wheel) | thin Python over the Rust wheel; the AGS5 packages were decoupled out of this tree |
 | `web/` | the **web validator app** (browser SQL-over-AGS via the wasm build) | its own front-end project |
 | `ags-wiki/` | the **knowledge base** (this vault) — rules, groups, the O-N divergence catalogue, design decisions, concepts | LLM-maintained; see `AGS-WIKI.md` |
-| `docs/` | engineering docs (parity map, merge semantics, design reviews, release runbooks) and **`docs/history/`** — the dated-report / retired-pipeline archive (perf matrices, benchmarks) | `docs/history/` is the *chronological record*, not a relic graveyard |
+| `docs/` | `docs/agents/` — the agent-skill configuration docs (issue tracker, triage labels, domain layout) — plus the parity coverage map | small on purpose; the knowledge base itself is `ags-wiki/`, and the dated-report archive this row once promised (`docs/history/`) never existed in this repo |
 | `tools/` | dev/build/release/perf scripts; **`tools/release/`** is the publish machinery — version bumping, the wasm artifact gates, the package-contents manifest, trusted publishing, the public-API snapshots | every script is CI-wired or a documented utility |
 | `examples/` | runnable example scripts | the AGS5 examples (`create_ags5db`, `create_agsx`, `benchmark_scale`, …) went with the decouple, out of this tree |
 | `assets/` | brand icons (the curated/derived set the README + release pipeline use) | raw art exports are *not* kept here |
@@ -55,9 +55,10 @@ allowlist, CI, and wiki `repo_refs` for a purely cosmetic gain.
 
 ## Why not reorganise the sparse dirs?
 
-Each terse directory (`reports/`, `experiments/`, `tests/`, `demo/`) is a distinct,
-justified unit, and the paths are **encoded across the repo** — the public
-allowlist (`tools/release/public-allowlist.txt`), CI workflows, and wiki `repo_refs`. A top-level move would touch many files (the root `tests/`
+Each terse directory (`tests/`, `examples/`, `assets/`) is a distinct,
+justified unit, and the paths are **encoded across the repo** — CI workflows,
+wiki `repo_refs`, and the release manifests under `tools/release/`. A top-level
+move would touch many files (the root `tests/`
 alone is referenced in ~47) to break references for a cosmetic gain. The fix for
 "feels busy" is this map — *legibility over relocation*. If a specific consolidation
 is ever worth it, do it surgically with its blast radius on the table (and steer

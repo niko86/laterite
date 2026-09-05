@@ -122,8 +122,10 @@ the crate can reach it directly any more. The on-disk half of Rule 20 (the
 one rule that reads state outside the bytes) moved out of
 `rules/references.rs` into a new `src/world.rs` (`WorldScope`, `world::run`),
 reached only through `check_parsed`. A new build-time `ENGINE_FINGERPRINT`
-(`env!("LATERITE_ENGINE_FINGERPRINT")`, computed by a new `build.rs`,
-`sha2` build-dependency only) identifies the *engine that produces verdicts*
+(`env!("LATERITE_ENGINE_FINGERPRINT")`, computed by a new `build.rs`;
+build-only deps — `sha2`, joined later by `toml` so the manifest's own
+`[dependencies]` table names the in-workspace crates the hash covers,
+laterite-dev#550) identifies the *engine that produces verdicts*
 for an `.ags.idx` certificate, rather than the hand-bumped `VERSION`
 (`CARGO_PKG_VERSION`), which does not change when a rule's logic does. As
 shipped in PR 2 the hash covered only this crate's own rule sources plus the
@@ -150,9 +152,12 @@ catalogue lives at
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-validator` — near the root of the
-dependency graph, but not a zero-dep leaf itself: it depends on two lean,
+dependency graph, but not a zero-dep leaf itself: it depends on three lean,
 wasm-safe leaves — [[laterite-ags4-reference]] (the compiled dictionary +
-rules catalogue, laterite-dev#475) and `laterite-ags4-parse` (the shared tokenizer, #168)
+rules catalogue, laterite-dev#475), `laterite-ags4-parse` (the shared tokenizer, #168)
+and `laterite-ags4-types` (the AGS type-system leaf: Rule 8 and the fixes
+engine take their numeric expected-forms from it, so the formatter that
+judges a typed value is the one that writes it — laterite-dev#528)
 — plus `thiserror` + `chrono` + `encoding_rs` + `deunicode`, and **no other
 workspace crate**. That still-lean dep graph (leaf + leaf + small external
 crates) is what keeps it embeddable in a CLI, a PyO3 cdylib, and a wasm

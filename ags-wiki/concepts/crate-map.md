@@ -209,10 +209,11 @@ as stable):
 - [[laterite-ags4-excel]] — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
   `laterite-ags4-core` (2026-06-18) so those Excel deps stop riding into every core consumer that never
   touches XLSX (the duckdb extension, `laterite-ags5-db`, `laterite-ags4-perf`). Path fns (`ags4_to_excel` /
-  `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, #359) the
-  path fns wrap. Three consumers now: `laterite-py` (`laterite.compat.AGS4_to_excel` / `excel_to_AGS4`),
-  `laterite-node` (`toExcel` / `fromExcel`, #358), and `laterite-ags4-wasm` (`ags4_to_xlsx` /
-  `xlsx_to_ags4`, the browser Excel surface, #359). It takes `laterite-ags4-core` with
+  `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, laterite-dev#359) the
+  path fns wrap. Its consumers: `laterite-py` (`laterite.compat.AGS4_to_excel` / `excel_to_AGS4`),
+  `laterite-node` (`toExcel` / `fromExcel`, laterite-dev#358), `laterite-ags4-wasm` (`ags4_to_xlsx` /
+  `xlsx_to_ags4`, the browser Excel surface, laterite-dev#359), and — each behind an off-by-default
+  `excel` feature — the `lat` binary and the [[laterite]] facade. It takes `laterite-ags4-core` with
   `default-features = false` (Excel never needs `transport`; pulling `age`→getrandom blocked wasm32),
   and exposes a `wasm` feature (→ `rust_xlsxwriter/wasm`) so the browser build takes its clock from
   `js_sys::Date::now()` — the default `SystemTime::now()` traps on wasm32 stamping the workbook date.

@@ -155,7 +155,7 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.16.0", opt
 # precomputed content hash (file_id), so this wrapper hashes the bytes itself
 # (sha2 + hex — both already in the wasm dep graph via the keychain).
 laterite-ags4-censor = { path = "../laterite-ags4-censor", optional = true }
-# AGS4 ↔ XLSX conversion (#359). Its FS-free `ags4_bytes_to_xlsx` /
+# AGS4 ↔ XLSX conversion (laterite-dev#359). Its FS-free `ags4_bytes_to_xlsx` /
 # `xlsx_bytes_to_ags4` cores back the browser Excel surface. calamine +
 # rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-ags4-excel takes
 # core with `default-features = false`, so `age` / getrandom never enters this

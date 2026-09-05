@@ -1,4 +1,4 @@
-//! AGS4 ↔ XLSX (#359).
+//! AGS4 ↔ XLSX (laterite-dev#359).
 //!
 //! The FS-free `laterite-ags4-excel` cores (`ags4_bytes_to_xlsx` /
 //! `xlsx_bytes_to_ags4`) drive the browser Excel surface: the Tools pane hands

@@ -280,8 +280,7 @@ a real, plausible, unrelated page with nothing failing anywhere (#458).
 `tools/check_issue_refs.py` holds the numbers already known to be foreign; it
 cannot judge a new one, and says so on every run.
 
-`output/` is gitignored working space. `experiments/` holds dictionary
-scaffolders — not production code.
+`output/` is gitignored working space.
 
 ### Working in this environment (tool-call hygiene)
 

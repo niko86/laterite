@@ -5,7 +5,7 @@ status: drafted
 tags: [concept]
 ags_editions: []
 repo_refs:
-  matrix: "ags-wiki/.bootstrap/probes/parity-matrix.md"
+  matrix: "ags-wiki/strategies/strat-parity-matrix.md"
   parity: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"
 related: [parity-model, parity-confidence-model, laterite-ags4-forge, parity-triage-sampling-bias, parity-cascade-unreconcilable, strat-parity-matrix]
 sources: []
@@ -16,8 +16,8 @@ sources: []
 > [!quote] The method [[laterite-ags4-forge]] implements: instead of *waiting*
 > for a crawl to surface a Rust↔python divergence, **manufacture and
 > prove** it. A candidate's *signature* is
-> `(parity_tag, rust_rules, python_rules, target_rule)`; **fitness =
-> signature novelty** — `RustOnly/PythonOnly/ValidityDisagree`
+> `(parity_tag, rust_rules, python_rules, injection, scaffold)`; **fitness =
+> signature novelty** — `RustOnlyRules/PythonOnlyRules/ValidityDisagree`
 > (`Parity::is_action`) is TOP and frozen as breeding stock,
 > first-seen `KnownDivergence{O-N}` is MED, a seen signature ≈ 0.
 > High-fitness specimens breed (re-apply / deepen / crossover) under a

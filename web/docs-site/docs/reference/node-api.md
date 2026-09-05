@@ -14,9 +14,11 @@ a `read()` returns. This is the full surface; for the guided tour, see the
 | `buildAgs4Unchecked` | `buildAgs4Unchecked(groups, opts?)`              | `Buffer` (or the `out` path) |
 | `fix`       | `fix(source?, opts?)`                                     | `FixResult`     |
 | `diff`      | `diff(a, b, opts?)`                                       | `RevisionDelta` |
+| `merge`     | `merge(sources, opts?)`                                   | `MergeResult` (two or more sources) |
 | `listRules` | `listRules()`                                             | `RuleMeta[]`    |
 | `toExcel`   | `toExcel(agsPath, xlsxPath, { groups? })`                 | `ExcelStats`    |
 | `fromExcel` | `fromExcel(xlsxPath, agsPath, { formatNumericColumns? })` | `ExcelStats`    |
+| `toDuckdb`  | `toDuckdb(source, output, { groups? })`                   | `Promise<DuckdbStats>` (needs the `@duckdb/node-api` peer) |
 
 `source` is a path (`string`) or `Uint8Array`; `read`/`validate` also take
 `{ text }` in `opts` to read from an in-memory string. `validate`/`fix` accept
@@ -60,6 +62,9 @@ chained verbs return something you keep working on.
 | `save(path)`             | `string`                  | write to disk                                         |
 | `sql(query, { arrow? })` | `Promise<Row[] \| Table>` | SQL across groups (loads the `@duckdb/node-api` peer) |
 | `at(group, values)`      | `AgsSubset`               | a group filtered to KEY values                        |
+| `toExcel(xlsxPath?, { groups? })` | `ExcelStats \| Buffer`   | one worksheet per group; omit the path for the `.xlsx` bytes |
+| `toDuckdb(path, { groups? })` | `Promise<DuckdbStats>`  | one born-typed, keyed table per group (the peer again) |
+| `close()`                | `void`                    | drop caches + close the DuckDB engine; `using f = read(…)` runs it automatically |
 
 ### Verbs (chained)
 
@@ -69,6 +74,7 @@ chained verbs return something you keep working on.
 | `fix(opts?)`         | `Ags4File`               | a **new** repaired file; log on `.fixReport`               |
 | `diff(other, opts?)` | `RevisionDelta`          | cell/row/group changes vs another file                     |
 | `certify(path?)`     | `string`                 | mint the `.ags.idx` certificate (after a clean `validate`) |
+| `certifyBytes(opts?)` | `Buffer`                | the certificate's bytes in memory — `certify`'s filesystem-free twin |
 | `report`             | `Report \| undefined`    | the last `validate()` verdict                              |
 | `fixReport`          | `FixResult \| undefined` | the last `fix()` log                                       |
 
@@ -80,4 +86,4 @@ if (!file.report.isValid) file.fix().save("clean.ags");
 !!! note "Python-only"
     The `python-ags4` compat shim is the one Python-only surface. See the
     [capability matrix](../surfaces/index.md#what-each-door-can-do). Excel I/O
-    (`toExcel` / `fromExcel`) landed on Node in #358.
+    (`toExcel` / `fromExcel`) landed on Node in laterite-dev#358.

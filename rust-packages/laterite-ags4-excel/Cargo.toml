@@ -47,7 +47,7 @@ path = "src/lib.rs"
 # sits ABOVE core in the layering: it consumes the parser, never the reverse.
 # `default-features = false` drops core's default-on `transport` module (age +
 # zstd) — Excel never touches it, and pulling it in dragged `age` → `getrandom`
-# into the tree, which blocks the wasm32 build (the browser Excel surface, #359).
+# into the tree, which blocks the wasm32 build (the browser Excel surface, laterite-dev#359).
 # Consumers that DO want transport (laterite-py) enable it on their own core dep;
 # cargo feature-unifies it back on for those builds.
 laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0", default-features = false }
@@ -59,7 +59,7 @@ rust_xlsxwriter = "0.99"
 calamine = "0.36"
 
 [features]
-# The browser Excel surface (#359) enables this so rust_xlsxwriter takes its
+# The browser Excel surface (laterite-dev#359) enables this so rust_xlsxwriter takes its
 # clock from `js_sys::Date::now()` instead of `SystemTime::now()`, which traps
 # ("unreachable") on wasm32-unknown-unknown when it stamps the workbook's
 # creation time. rust_xlsxwriter target-gates the swap (`target_arch = "wasm32"`),

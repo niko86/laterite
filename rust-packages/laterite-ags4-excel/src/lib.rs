@@ -84,7 +84,7 @@ pub fn ags4_to_excel_with(
     Ok(stats)
 }
 
-/// AGS4 bytes → XLSX bytes — the **FS-free core** the wasm surface (#359) and
+/// AGS4 bytes → XLSX bytes — the **FS-free core** the wasm surface (laterite-dev#359) and
 /// the path wrapper above both call. Each group becomes a worksheet in
 /// python-ags4's layout.
 ///
@@ -293,7 +293,7 @@ pub fn excel_to_ags4(
     Ok(stats)
 }
 
-/// XLSX bytes → AGS4 bytes — the **FS-free core** the wasm surface (#359) and
+/// XLSX bytes → AGS4 bytes — the **FS-free core** the wasm surface (laterite-dev#359) and
 /// the path wrapper above both call. Each worksheet with a `HEADING` column
 /// becomes one AGS4 group; columns not matching Rule 19's
 /// `[A-Z0-9]{4}_[A-Z0-9]{1,4}` are dropped (with a warning); rows whose HEADING
@@ -1018,7 +1018,7 @@ mod tests {
 
     #[test]
     fn bytes_round_trips_with_no_filesystem() {
-        // The FS-free path the wasm surface (#359) drives: bytes in, bytes out,
+        // The FS-free path the wasm surface (laterite-dev#359) drives: bytes in, bytes out,
         // no temp files. Must match the path round-trip exactly.
         let (xlsx, w) = ags4_bytes_to_xlsx(SAMPLE_AGS4.as_bytes(), None).unwrap();
         assert_eq!(w.sheets_written, 2);

@@ -1559,7 +1559,7 @@ fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
 
 // --- Excel ↔ AGS4 (laterite-ags4-excel) --------------------------------------
 // Binds the same AGS4↔XLSX converter Python exposes as to_excel/from_excel
-// (#358 — closes the node-Excel capability gap). Path-based, like the Python
+// (laterite-dev#358 — closes the node-Excel capability gap). Path-based, like the Python
 // binding: Node has a filesystem, so no in-memory round-trip is needed.
 
 /// The outcome of an Excel conversion (mirrors `laterite_ags4_excel::ExcelStats`).

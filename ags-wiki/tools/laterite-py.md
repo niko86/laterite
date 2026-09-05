@@ -64,7 +64,13 @@ Excel is the sibling `laterite-ags4-excel` named below), plus the wasm-safe leav
 / `laterite-ags4-merge` (the Python `diff()` / `build_ags4()` / `merge()`
 surfaces — `merge_files` in `src/lib.rs` is the new 2026-07-12 addition, see
 [[dec-ags4-merge-semantics]]) and [[laterite-ags4-reference]] directly (its
-`build.rs`'s typed-graph codegen, below). Built **only via maturin** (`maturin develop` /
+`build.rs`'s typed-graph codegen, below). Four more direct edges round out
+the picture: `laterite-ags4-parse` (the binding parses through the leaf
+since #168 Phase 3), [[laterite-ags4-trust]] (the one shared certificate
+decision), `laterite-ags4-hostopts` (the shared option normalisation,
+#923/#947), and `laterite-ags4-types` (the typed-Arrow column builder behind
+the read path's `arrow` feature) — the machine-derived full set lives in
+[[crate-dependency-graph]], which cannot drift. Built **only via maturin** (`maturin develop` /
 `maturin build`), never a bare `cargo build`; the cdylib loads in Python
 as `laterite._laterite_native`. Its `build.rs` also emits the typed-graph
 `#[pyclass]` codegen — since laterite-dev#475's follow-up (laterite-dev#493) it does so via
