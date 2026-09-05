@@ -16,5 +16,8 @@
 //!
 //! | waiting on (registry) | the local copy | replaced by |
 //! |---|---|---|
-//! | `laterite-ags4-hostopts` on the registry at all (#947 extracted it; its FIRST publish is a token run) | `ags4/build.rs::staged_write` + `staging_dir` | `laterite_ags4_hostopts::staged_write` (#930) |
-//! | `laterite-ags4-core` newer than 0.14.0 | the body of `ags4/mod.rs::read_options` | `ags4_codec::ReadOptions::from_flags` (#930) |
+//! | *(none — #930 worked both rows on 2026-09-05: the staged-write body is `laterite_ags4_hostopts::staged_write_io`, the read-options body is `ags4_codec::ReadOptions::from_flags`)* | | |
+//!
+//! An empty table is still a ledger: the CONSTRAINT above is permanent, so
+//! the next time this crate wants engine API the registry does not carry
+//! yet, the copy gets a row here first.

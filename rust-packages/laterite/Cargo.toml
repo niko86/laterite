@@ -32,6 +32,10 @@ include = [
 laterite-ags4-core = { workspace = true, features = ["transport"] }
 laterite-ags4-diff = { workspace = true }
 laterite-ags4-emit = { workspace = true }
+# The shared host-option normalisation (#923/#947): the staged atomic `out=`
+# write the build doors use. Adopted by #930, retiring the facade's last
+# wait-state copies.
+laterite-ags4-hostopts = { workspace = true }
 # Behind the `excel` feature (dec-facade-parity decision 4): a consumer who
 # does not enable it never downloads, compiles or locks calamine and
 # rust_xlsxwriter — the weight the crate split exists to keep off them.

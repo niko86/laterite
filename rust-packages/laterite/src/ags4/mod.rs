@@ -19,9 +19,7 @@ mod report;
 
 use std::path::{Path, PathBuf};
 
-use laterite_ags4_core::ags4_codec::{
-    DuplicateHeadings, ExcessFields, ReadOptions, read_ags4_bytes_with,
-};
+use laterite_ags4_core::ags4_codec::{ReadOptions, read_ags4_bytes_with};
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, TranStamp, emit_ags4};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
@@ -862,27 +860,15 @@ pub(crate) fn emit_mode(mode: WriteMode) -> EmitMode {
 }
 
 /// The read-tolerance pair → the engine's [`ReadOptions`], ONE copy (#939).
-/// Also a wait-state single point: the engine grew
-/// `ags4_codec::ReadOptions::from_flags` for exactly this translation, and
-/// this body becomes a call to it once the registry carries it — see
-/// [`crate::pending_adoptions`] (#930). Until then, one body to delete
-/// instead of a copy per door.
+/// Since #930 the translation itself is the engine's
+/// (`ags4_codec::ReadOptions::from_flags` — core 0.15.0); what stays here is
+/// only the seam the doors share, so a third tolerance knob still reaches
+/// every door through one line.
 pub(crate) fn read_options(
     recover_duplicate_headings: bool,
     truncate_excess_fields: bool,
 ) -> ReadOptions {
-    ReadOptions {
-        duplicate_headings: if recover_duplicate_headings {
-            DuplicateHeadings::Recover
-        } else {
-            DuplicateHeadings::Error
-        },
-        excess_fields: if truncate_excess_fields {
-            ExcessFields::Truncate
-        } else {
-            ExcessFields::Error
-        },
-    }
+    ReadOptions::from_flags(recover_duplicate_headings, truncate_excess_fields)
 }
 
 /// The edition knob → a concrete [`DictVersion`]: a label resolves (or
