@@ -367,6 +367,47 @@ impl Shape {
     fn arity(&self, g: &laterite_ags4_parse::ParsedGroup) -> usize {
         g.headings.len() + self.added.get(&g.code).map_or(0, Vec::len)
     }
+
+    /// `col`, with the miss already named. Every arm refuses an unknown
+    /// heading with the same `NoSuchHeading`, so the refusal is built here
+    /// once instead of at each resolution site (#936).
+    fn resolve_heading(
+        &self,
+        g: &laterite_ags4_parse::ParsedGroup,
+        group: &str,
+        heading: &str,
+    ) -> Result<usize, EditError> {
+        self.col(g, heading)
+            .ok_or_else(|| EditError::NoSuchHeading {
+                group: group.to_string(),
+                heading: heading.to_string(),
+            })
+    }
+}
+
+/// A line's fields, padded to `want`. A short row is padded rather than
+/// refused: the edit the caller asked for is unambiguous, and leaving the row
+/// ragged would be the worse answer. Padding reaches the group's FULL arity,
+/// not just the target column — stopping at the column is what "leaving it
+/// ragged" means. `resize` truncates when it shrinks, so an over-long row is
+/// left alone (`want` is always `arity + 1` here, the larger bound).
+fn padded_fields(text: &str, want: usize) -> Vec<String> {
+    let mut fields = split_ags_line(text);
+    if fields.len() < want {
+        fields.resize(want, String::new());
+    }
+    fields
+}
+
+/// Every line the group owns — descriptor rows then data rows — the sweep
+/// both whole-column operations (add, delete) walk so the arity stays
+/// consistent across the group.
+fn column_lines(g: &laterite_ags4_parse::ParsedGroup) -> Vec<u32> {
+    [g.heading_line, g.unit_line, g.type_line]
+        .into_iter()
+        .flatten()
+        .chain(g.rows.iter().map(|r| r.line))
+        .collect()
 }
 
 /// The last line the group's DESCRIPTOR rows occupy — where a row inserted at
@@ -471,6 +512,16 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
             _ => line_text(n),
         }
     };
+    // Pad line `n` to `want`, set field `at`, plan the rewrite — the strip
+    // every write arm otherwise hand-rolls (#936). `want` stays the caller's:
+    // the arms compute it at different points relative to `shape` mutation
+    // (`AddColumn` after registering its column), and that timing is theirs.
+    let pad_and_write =
+        |plan: &mut BTreeMap<u32, Line>, n: u32, want: usize, at: usize, value: &str| {
+            let mut fields = padded_fields(&current(plan, n), want);
+            fields[at] = value.to_string();
+            plan.insert(n, Line::Replace(rebuild(&fields)));
+        };
 
     // Every heading lookup and every arity calculation below goes through
     // this, never straight to the parse — see `Shape`.
@@ -492,12 +543,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 value,
                 group,
             } => {
-                let col = shape
-                    .col(g, heading)
-                    .ok_or_else(|| EditError::NoSuchHeading {
-                        group: group.clone(),
-                        heading: heading.clone(),
-                    })?;
+                let col = shape.resolve_heading(g, group, heading)?;
                 let data = g
                     .rows
                     .get(row.wrapping_sub(1))
@@ -506,23 +552,11 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                         row: *row,
                         rows: g.rows.len(),
                     })?;
-                let mut fields = split_ags_line(&current(&plan, data.line));
-                // +1 for the leading "DATA" tag. A short row is padded rather
-                // than refused: the edit the caller asked for is unambiguous,
-                // and leaving the row ragged would be the worse answer. Padding
-                // reaches the group's FULL arity, not just the target column —
-                // stopping at the column is what "leaving it ragged" means.
-                let at = col + 1;
-                // `col` is an index INTO `headings`, so the group's arity is
-                // always the larger bound — there is no separate "at least the
-                // target column" case to defend against. `resize` truncates
-                // when it shrinks, so an over-long row is left alone.
-                let want = shape.arity(g) + 1;
-                if fields.len() < want {
-                    fields.resize(want, String::new());
-                }
-                fields[at].clone_from(value);
-                plan.insert(data.line, Line::Replace(rebuild(&fields)));
+                // +1 for the leading "DATA" tag; `col` is an index INTO
+                // `headings`, so `arity + 1` is always the larger bound —
+                // there is no separate "at least the target column" case to
+                // defend against (the pad rationale lives on `padded_fields`).
+                pad_and_write(&mut plan, data.line, shape.arity(g) + 1, col + 1, value);
             }
             Op::AddColumn { group, heading } => {
                 if shape.col(g, heading).is_some() {
@@ -553,30 +587,16 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 let want = shape.arity(g) + 1;
                 let at = col + 1;
 
-                // Every line the group owns, descriptor rows included, so the
-                // arity stays consistent. Pad, then WRITE the cell — a row
-                // that was already over-long has a value sitting where the new
-                // column goes, and leaving it there would make a column that
-                // was asked to start empty start with somebody else's data.
-                let lines: Vec<u32> = [g.heading_line, g.unit_line, g.type_line]
-                    .into_iter()
-                    .flatten()
-                    .chain(g.rows.iter().map(|r| r.line))
-                    .collect();
-                for n in lines {
+                // Every line the group owns, descriptor rows included. Pad,
+                // then WRITE the cell — a row that was already over-long has a
+                // value sitting where the new column goes, and leaving it
+                // there would make a column that was asked to start empty
+                // start with somebody else's data.
+                for n in column_lines(g) {
                     if matches!(plan.get(&n), Some(Line::Drop)) {
                         continue; // already gone; a removal outranks a write
                     }
-                    let mut fields = split_ags_line(&current(&plan, n));
-                    if fields.len() < want {
-                        fields.resize(want, String::new());
-                    }
-                    fields[at] = if n == hl {
-                        heading.clone()
-                    } else {
-                        String::new()
-                    };
-                    plan.insert(n, Line::Replace(rebuild(&fields)));
+                    pad_and_write(&mut plan, n, want, at, if n == hl { heading } else { "" });
                 }
                 // Rows this patch appends are built to `shape.arity`, which
                 // now includes this column, so they need nothing here — and
@@ -587,28 +607,17 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 heading,
                 unit,
             } => {
-                let col = shape
-                    .col(g, heading)
-                    .ok_or_else(|| EditError::NoSuchHeading {
-                        group: group.clone(),
-                        heading: heading.clone(),
-                    })?;
+                let col = shape.resolve_heading(g, group, heading)?;
                 let line = g.unit_line.ok_or_else(|| EditError::MissingDescriptor {
                     group: group.clone(),
                     row: "UNIT",
                 })?;
-                let mut fields = split_ags_line(&current(&plan, line));
                 // The parser does NOT pad the UNIT row — it carries the raw
                 // fields the file had, which may be fewer than the headings.
                 // Padding to the group's arity is what stops a write to a late
-                // column running off the end, and it is the answer `SetCell`
-                // already gives for a short DATA row.
-                let want = shape.arity(g) + 1;
-                if fields.len() < want {
-                    fields.resize(want, String::new());
-                }
-                fields[col + 1].clone_from(unit);
-                plan.insert(line, Line::Replace(rebuild(&fields)));
+                // column running off the end, the same answer a short DATA row
+                // gets.
+                pad_and_write(&mut plan, line, shape.arity(g) + 1, col + 1, unit);
             }
             Op::SetType {
                 group,
@@ -626,23 +635,13 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                         ags_type: ags_type.clone(),
                     });
                 }
-                let col = shape
-                    .col(g, heading)
-                    .ok_or_else(|| EditError::NoSuchHeading {
-                        group: group.clone(),
-                        heading: heading.clone(),
-                    })?;
+                let col = shape.resolve_heading(g, group, heading)?;
                 let line = g.type_line.ok_or_else(|| EditError::MissingDescriptor {
                     group: group.clone(),
                     row: "TYPE",
                 })?;
                 let want = shape.arity(g) + 1;
-                let mut fields = split_ags_line(&current(&plan, line));
-                if fields.len() < want {
-                    fields.resize(want, String::new());
-                }
-                fields[col + 1].clone_from(ags_type);
-                plan.insert(line, Line::Replace(rebuild(&fields)));
+                pad_and_write(&mut plan, line, want, col + 1, ags_type);
 
                 if *reformat {
                     // The unit as THIS PATCH has left it, not as the file
@@ -660,10 +659,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                         })
                         .unwrap_or_default();
                     for (i, data) in g.rows.iter().enumerate() {
-                        let mut fields = split_ags_line(&current(&plan, data.line));
-                        if fields.len() < want {
-                            fields.resize(want, String::new());
-                        }
+                        let mut fields = padded_fields(&current(&plan, data.line), want);
                         let before = fields[col + 1].clone();
                         let after =
                             crate::project::project(&before, ags_type, &unit).ok_or_else(|| {
@@ -683,12 +679,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
             Op::AddRow { cells, group } => {
                 let mut values = vec![String::new(); shape.arity(g)];
                 for (heading, value) in cells {
-                    let col = shape
-                        .col(g, heading)
-                        .ok_or_else(|| EditError::NoSuchHeading {
-                            group: group.clone(),
-                            heading: heading.clone(),
-                        })?;
+                    let col = shape.resolve_heading(g, group, heading)?;
                     values[col].clone_from(value);
                 }
                 let mut fields = vec!["DATA".to_string()];
@@ -726,12 +717,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 };
                 let mut values = vec![String::new(); shape.arity(g)];
                 for (heading, value) in cells {
-                    let col = shape
-                        .col(g, heading)
-                        .ok_or_else(|| EditError::NoSuchHeading {
-                            group: group.clone(),
-                            heading: heading.clone(),
-                        })?;
+                    let col = shape.resolve_heading(g, group, heading)?;
                     values[col].clone_from(value);
                 }
                 let mut fields = vec!["DATA".to_string()];
@@ -777,12 +763,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 // wrong field or ran off the end and reported the row as too
                 // short. Collecting them and removing right-to-left is what
                 // makes the pair mean the same thing in either order.
-                let col = shape
-                    .col(g, heading)
-                    .ok_or_else(|| EditError::NoSuchHeading {
-                        group: group.clone(),
-                        heading: heading.clone(),
-                    })?;
+                let col = shape.resolve_heading(g, group, heading)?;
                 columns.entry(group.clone()).or_default().insert(col);
             }
         }
@@ -791,11 +772,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
     // Right-to-left, so an earlier removal cannot move a later one's index.
     for (code, cols) in &columns {
         let g = &parsed.groups[code];
-        let lines: Vec<u32> = [g.heading_line, g.unit_line, g.type_line]
-            .into_iter()
-            .flatten()
-            .chain(g.rows.iter().map(|r| r.line))
-            .collect();
+        let lines = column_lines(g);
         for col in cols.iter().rev() {
             let at = col + 1;
             for n in &lines {
