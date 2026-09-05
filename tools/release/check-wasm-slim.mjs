@@ -21,27 +21,33 @@
 //   Exit 0 = the artifact is the slim one; 1 = it is not, and why.
 ///////////////////////////////////////////////////////////////////////////////
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { checkWasmArtifact, pkgDirArg } from "./wasm-artifact-gate.mjs";
 
-// The slim surface, in full. Every name here is ungated in `lib.rs`; anything
-// behind `excel` / `arrow` / `certify` / `diff` / `merge` / `censor` is absent
-// on purpose. Adding a genuinely new ungated export means adding it here — that
-// edit is the point, since it forces the question "should this ship to every
-// consumer?" to be answered once, deliberately, rather than by whoever's build
-// happened to include it.
-const EXPECTED_FUNCTIONS = [
-  "apply_fixes",
-  "build_ags4",
-  "build_ags4_unchecked",
-  "compute_fixes",
-  "dictionary",
-  "engine_fingerprint",
-  "engine_version",
-  "list_rules",
-  "read",
-  "validate",
-  "version",
-];
+// The slim surface: every export the facts table (modality.json
+// `wasm_exports`, #926) says is UNGATED. Anything behind `excel` / `arrow` /
+// `certify` / `diff` / `merge` / `censor` is absent on purpose. The question
+// this list used to force — "should this ship to every consumer?" — is still
+// answered once, deliberately: it is now the `features_required: []` cell on
+// the export's table row, where registering the export happens anyway, instead
+// of a second copy here that #883 showed drifts one hand-edit at a time.
+const FACTS = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../../modality.json", import.meta.url)),
+    "utf-8",
+  ),
+).wasm_exports.exports;
+const EXPECTED_FUNCTIONS = FACTS.filter(
+  (row) => row.features_required.length === 0,
+).map((row) => row.name);
+if (EXPECTED_FUNCTIONS.length === 0) {
+  // A gate fed an empty expectation would "pass" any artifact at all.
+  console.error(
+    "check-wasm-slim: the export-facts table yielded no ungated exports",
+  );
+  process.exit(1);
+}
 
 // `ParsedDataset` is the only handle class the slim build hands out (the gated
 // builds add `ExcelResult` and `MergeResult`), and its MEMBERS are listed for

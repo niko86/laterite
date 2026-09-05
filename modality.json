@@ -93,6 +93,115 @@
       "reason": "This register's grid asks whether a capability is OFFERED in a form; it is silent on whether two present forms agree on the ANSWER for identical bytes. That gap is exactly where an edition-resolution bug lived — the O-42 `guard_4_0_4` content guard ran on a path read (`check_file_with_dict`) but was skipped by laterite-py/laterite-node/wasm's hand-assembled bytes/text branches, so the same file resolved to a different dictionary edition by modality — until closed 2026-07-14 by a same-bytes-same-verdict gate: `repo:packages/laterite/tests/test_modality_output_parity.py` / `repo:rust-packages/laterite-node/test/modality-output-parity.test.ts`. See [[cert-trust-v2]] for the fix and the general 'surfaces reach past the door' pattern it closes a second instance of."
     }
   ],
+  "wasm_exports": {
+    "note": "The wasm export-facts table (#926): one row per top-level #[wasm_bindgen] pub fn in laterite-ags4-wasm — its capability in this register (null = build/catalogue metadata with no I/O modality to register) and the cargo features that must be ON for the export to exist (empty = ungated, ships in every build). This fact used to be stated five times (here as cells, two hand lists in test_modality_parity.py, two EXPECTED_FUNCTIONS arrays in the wasm release gates); the projections now derive from these rows: check-wasm-slim.mjs takes the rows with no features_required, check-wasm-tier1.mjs the rows within its tier's feature set, and test_modality_parity.py projects its verb→capability map and meta allowlist — its orphan guard proves this table complete against lib.rs in BOTH directions, and the two artifact gates verify features_required empirically against real builds. Registering a new export = one row here + its register cell.",
+    "exports": [
+      {
+        "name": "read",
+        "capability": "read",
+        "features_required": []
+      },
+      {
+        "name": "validate",
+        "capability": "validate",
+        "features_required": []
+      },
+      {
+        "name": "certify",
+        "capability": "certify",
+        "features_required": [
+          "certify"
+        ]
+      },
+      {
+        "name": "compute_fixes",
+        "capability": "fix",
+        "features_required": []
+      },
+      {
+        "name": "apply_fixes",
+        "capability": "fix",
+        "features_required": []
+      },
+      {
+        "name": "build_ags4",
+        "capability": "build",
+        "features_required": []
+      },
+      {
+        "name": "build_ags4_ipc",
+        "capability": "build",
+        "features_required": [
+          "arrow"
+        ]
+      },
+      {
+        "name": "build_ags4_unchecked",
+        "capability": "build-unchecked",
+        "features_required": []
+      },
+      {
+        "name": "diff",
+        "capability": "diff",
+        "features_required": [
+          "diff"
+        ]
+      },
+      {
+        "name": "merge",
+        "capability": "merge",
+        "features_required": [
+          "merge"
+        ]
+      },
+      {
+        "name": "censor",
+        "capability": "censor",
+        "features_required": [
+          "censor"
+        ]
+      },
+      {
+        "name": "ags4_to_xlsx",
+        "capability": "to_excel",
+        "features_required": [
+          "excel"
+        ]
+      },
+      {
+        "name": "xlsx_to_ags4",
+        "capability": "from_excel",
+        "features_required": [
+          "excel"
+        ]
+      },
+      {
+        "name": "list_rules",
+        "capability": null,
+        "features_required": []
+      },
+      {
+        "name": "dictionary",
+        "capability": null,
+        "features_required": []
+      },
+      {
+        "name": "version",
+        "capability": null,
+        "features_required": []
+      },
+      {
+        "name": "engine_version",
+        "capability": null,
+        "features_required": []
+      },
+      {
+        "name": "engine_fingerprint",
+        "capability": null,
+        "features_required": []
+      }
+    ]
+  },
   "capabilities": [
     {
       "capability": "read",

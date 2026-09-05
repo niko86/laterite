@@ -68,29 +68,38 @@
 //   since #355 the first of those is what the app itself runs on.
 ///////////////////////////////////////////////////////////////////////////////
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { checkWasmArtifact, pkgDirArg } from "./wasm-artifact-gate.mjs";
 
-// The tier-1 surface, in full: the slim ten plus the four cheap gates. What is
-// absent is what defines the tier — `build_ags4_ipc` (arrow), `ags4_to_xlsx` /
-// `xlsx_to_ags4` (excel) — and it is absent by cost, not by taste. Adding a
-// name here means deciding that every first-time visitor should download it.
-const EXPECTED_FUNCTIONS = [
-  "apply_fixes",
-  "build_ags4",
-  "build_ags4_unchecked",
-  "censor",
-  "certify",
-  "compute_fixes",
-  "dictionary",
-  "diff",
-  "engine_fingerprint",
-  "engine_version",
-  "list_rules",
-  "merge",
-  "read",
-  "validate",
-  "version",
-];
+// dec-engine-tiering's boundary, encoded ONCE: tier 1 is the engine minus
+// `arrow` and `excel`, so its surface is every export-facts row (modality.json
+// `wasm_exports`, #926) whose features fit inside this set. What is absent is
+// what defines the tier — `build_ags4_ipc` (arrow), `ags4_to_xlsx` /
+// `xlsx_to_ags4` (excel) — and it is absent by cost, not by taste. Growing
+// this SET means deciding that every first-time visitor should download that
+// feature; the per-export decision lives on the table row.
+const TIER_FEATURES = new Set(["censor", "certify", "diff", "merge"]);
+const FACTS = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../../modality.json", import.meta.url)),
+    "utf-8",
+  ),
+).wasm_exports.exports;
+const EXPECTED_FUNCTIONS = FACTS.filter((row) =>
+  row.features_required.every((f) => TIER_FEATURES.has(f)),
+).map((row) => row.name);
+// The subset relation the two hand lists never expressed: tier 1 must be a
+// strict superset of slim (an ungated row satisfies `every` vacuously), and a
+// derivation that yields nothing gated would mean the tier set no longer
+// matches the table's feature vocabulary.
+if (!EXPECTED_FUNCTIONS.some((n) => n === "certify")) {
+  console.error(
+    "check-wasm-tier1: the export-facts table yielded no tier-gated exports — " +
+      "TIER_FEATURES no longer matches the table's features_required vocabulary",
+  );
+  process.exit(1);
+}
 
 // Two handle classes: `ParsedDataset` (ungated) and `MergeResult` (from
 // `merge`). `excel`'s `ExcelResult` is the third, and its absence is half of
