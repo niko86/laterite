@@ -267,8 +267,9 @@ tripping over it rather than by the gate that was meant to catch it. So report
 what was filtered out **on every run, pass or fail** — a count is enough, and
 `tools/check_package_contents.py` and `tools/check_released_crate_readmes.py`
 already do it. A filter nobody can see is a blind spot with a green tick on it.
-(#295 found three of these in one day; #460 is the one gate still owing the
-report.)
+(#295 found three of these in one day; #460 — `check_doc_refs.py` itself, the
+last gate owing its report — was discharged, and that gate now prints its
+skipped-token count with a `--skipped` flag to list them.)
 
 **A bare `#N` means an issue or PR in THIS repo.** That is what a reader
 assumes and what GitHub autolinks, so a number that means somewhere else carries
