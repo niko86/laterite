@@ -129,6 +129,9 @@
       },
       {
         "text": "**Forge edit ops dispatch on an `OpKind` enum, not bare strings (#928).** Adding a forge edit op was a three-file ritual coupled by a string: a clap field, a `(string, field)` tuple in `cmd.rs`, and a `&str` match arm in `parse_flag` — where a typo in the tuple fell through the catch-all at runtime. One macro list now emits the enum, the spelling table and `as_str` together, so a spelling cannot exist without its variant, and both dispatch sites match exhaustively on `OpKind`: a new operation refuses to COMPILE until `parse_flag` and the clap-field map each have their arm (demonstrated by mutation — a dummy row reddens three sites). `--blank` and `--set-type-raw` stay spellings of `set`/`set-type`; the CLI surface (flags, help, error text) is byte-identical, and the one hand-written flag list left — the no-operations message — is now gate-held to the table."
+      },
+      {
+        "text": "**Forge edit apply: one pad-and-write seam under the six ops that hand-rolled it (#936).** Below #928's OpKind dispatch, six op implementations each hand-rolled the same strip — resolve heading, pad the line's fields to the group's arity, mutate one column, write back into the plan — with the heading-resolution expression textually identical six times. `Shape::resolve_heading` now owns the refusal, a shared `pad_and_write` owns the strip (its pad-not-refuse rationale moved onto `padded_fields`), and `column_lines` owns the twice-duplicated every-line-a-group-owns collector. Behaviour is byte-identical — the whole forge suite passes unchanged — and the recorded +250–380-line cost of a new edit op shrinks by exactly the boilerplate share."
       }
     ],
     "deprecated": [],
