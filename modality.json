@@ -202,6 +202,129 @@
       }
     ]
   },
+  "xcheck_coverage": {
+    "note": "Which capabilities the cross-surface OUTPUT-VALUE gate (laterite-ags4-xcheck) holds, as an authored decision per row (#940). status: 'covered' rows name the case ops (cases/*.json is the case-list SSOT); 'excluded' rows carry the decided reason there is no byte agreement to compare; 'wanted' rows are uncovered with NO structural blocker recorded — honest backlog, not decisions. meta_ops holds the case ops that pin METADATA verbs (list_rules via rules_json) — the same class as wasm_exports' capability:null rows, outside the capability axis by construction. test_modality_parity.py reflects this table against the case manifest in both directions, so a verb cannot ship uncovered silently again (build_ags4_unchecked did, #882-#883 to #940).",
+    "meta_ops": [
+      "rules_json"
+    ],
+    "rows": [
+      {
+        "capability": "read",
+        "status": "covered",
+        "ops": [
+          "read_csv",
+          "read_json"
+        ]
+      },
+      {
+        "capability": "validate",
+        "status": "covered",
+        "ops": [
+          "validate_json",
+          "validate_ndjson"
+        ]
+      },
+      {
+        "capability": "fix",
+        "status": "covered",
+        "ops": [
+          "fix_dest",
+          "fix_json"
+        ]
+      },
+      {
+        "capability": "build",
+        "status": "covered",
+        "ops": [
+          "build_typed"
+        ]
+      },
+      {
+        "capability": "build-unchecked",
+        "status": "covered",
+        "ops": [
+          "build_unchecked_typed"
+        ]
+      },
+      {
+        "capability": "diff",
+        "status": "covered",
+        "ops": [
+          "diff_json"
+        ]
+      },
+      {
+        "capability": "merge",
+        "status": "covered",
+        "ops": [
+          "merge_json",
+          "merge_out"
+        ]
+      },
+      {
+        "capability": "censor",
+        "status": "wanted"
+      },
+      {
+        "capability": "certify",
+        "status": "wanted"
+      },
+      {
+        "capability": "cert-input",
+        "status": "wanted"
+      },
+      {
+        "capability": "emit",
+        "status": "covered",
+        "ops": [
+          "emit_typed_verbatim",
+          "reemit_canonical"
+        ]
+      },
+      {
+        "capability": "to_excel",
+        "status": "covered",
+        "ops": [
+          "excel_roundtrip"
+        ]
+      },
+      {
+        "capability": "from_excel",
+        "status": "covered",
+        "ops": [
+          "excel_roundtrip"
+        ]
+      },
+      {
+        "capability": "transport-pack",
+        "status": "covered",
+        "ops": [
+          "pack_out",
+          "unpack_roundtrip"
+        ]
+      },
+      {
+        "capability": "transport-lock",
+        "status": "excluded",
+        "why": "an age passphrase ciphertext is nondeterministic by design (fresh salt/nonce per run), so there is no cross-leg byte agreement to compare; the plaintext round-trip equality it would add is the pack ops' comparison again"
+      },
+      {
+        "capability": "read_typed",
+        "status": "excluded",
+        "why": "its values are read's values — the typed-graph layer adds host-native object shape with no shared wire form, and agreement is held at the read layer beneath it"
+      },
+      {
+        "capability": "read-output-view",
+        "status": "excluded",
+        "why": "each surface's tabular/Arrow output shape is deliberately its own answer (#885 settled the boundary; the node IPC pass-through was spiked and rejected on #871), so there is no one wire form the legs owe each other"
+      },
+      {
+        "capability": "read-output-arrow",
+        "status": "excluded",
+        "why": "same decision as read-output-view (#885/#871): the Arrow shape is per-surface by design, so byte agreement is not a contract these doors make"
+      }
+    ]
+  },
   "capabilities": [
     {
       "capability": "read",
