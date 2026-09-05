@@ -52,6 +52,7 @@ pub fn laterite_ags4_emit::hostopts::custom_dict(core::option::Option<&std::path
 pub fn laterite_ags4_emit::hostopts::edition(core::option::Option<&str>) -> core::result::Result<core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>, laterite_ags4_emit::hostopts::OptError>
 pub fn laterite_ags4_emit::hostopts::edition_or_fallback(core::option::Option<&str>) -> core::result::Result<laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_emit::hostopts::OptError>
 pub fn laterite_ags4_emit::hostopts::staged_write(&std::path::Path, &[u8]) -> core::result::Result<(), laterite_ags4_emit::hostopts::OptError>
+pub fn laterite_ags4_emit::hostopts::staged_write_io(&std::path::Path, &[u8]) -> core::io::error::Result<()>
 pub fn laterite_ags4_emit::hostopts::write_mode(core::option::Option<&str>) -> core::result::Result<laterite_ags4_emit::EmitMode, laterite_ags4_emit::hostopts::OptError>
 pub enum laterite_ags4_emit::EmitError
 pub laterite_ags4_emit::EmitError::EmbeddedNewline

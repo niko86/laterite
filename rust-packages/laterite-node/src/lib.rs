@@ -1213,6 +1213,14 @@ fn to_applied_fixes(fixes: &[Fix]) -> Vec<AppliedFix> {
         .collect()
 }
 
+// #938 deliberately does NOT route the TS `stagedWrite` through a napi door
+// here: `p2.test.ts` pins node's `out=` failure contract to real fs error
+// shapes (`/ENOENT/`), and an `OptError` squashed through `from_reason`
+// cannot reproduce them without a hand-mapped errno table — worse fidelity
+// than the fs-native TS implementation it would replace. The py door adopts
+// (`hostopts::staged_write_io` + PyO3's io::Error mapping keeps the exact
+// OSError subclasses); node's host-side dance stays the host's.
+
 /// The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
 /// false only for un-fixable input (the TS layer raises then). `fixed` is the
 /// repaired bytes (the original verbatim when nothing applied); `residual` is

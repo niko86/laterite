@@ -184,11 +184,18 @@ pub fn custom_dict(
 /// `create_new` makes a name collision an error rather than a silent
 /// overwrite of whatever was squatting on it).
 pub fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), OptError> {
-    let io_err = |e: std::io::Error| OptError {
+    staged_write_io(dest, bytes).map_err(|e| OptError {
         code: 3,
         kind: "io",
         message: format!("cannot write {}: {e}", dest.display()),
-    };
+    })
+}
+
+/// [`staged_write`]'s dance with the raw [`std::io::Error`] kept: a host
+/// binding whose error contract carries the OS shape (Python's `OSError`
+/// subclasses via PyO3's `io::Error` mapping, #938) needs the kind, which
+/// the `OptError` squash above throws away.
+pub fn staged_write_io(dest: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let dir = staging_dir(dest);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -203,11 +210,10 @@ pub fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), OptError> {
         .open(&tmp)
         .and_then(|mut f| std::io::Write::write_all(&mut f, bytes))
         .and_then(|()| std::fs::rename(&tmp, dest))
-        .map_err(|e| {
+        .inspect_err(|_| {
             // Best-effort cleanup: the temp file is ours alone (create_new),
             // and leaving it behind litters the caller's output directory.
             let _ = std::fs::remove_file(&tmp);
-            io_err(e)
         })
 }
 
