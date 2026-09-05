@@ -14,7 +14,6 @@ mod arrow_in;
 pub mod catalog;
 mod emit;
 mod error;
-pub mod hostopts;
 mod writer;
 
 #[cfg(feature = "arrow")]

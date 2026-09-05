@@ -48,7 +48,7 @@ pub(crate) fn resolve_encoding(
 /// the `Err` variant stays small (clippy `result_large_err`).
 /// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 pub(crate) fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String> {
-    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
+    laterite_ags4_hostopts::edition(s).map_err(|e| e.message)
 }
 
 /// Build the runtime custom-dictionary overlay (laterite-dev#568) from browser-supplied bytes.
@@ -71,13 +71,13 @@ pub(crate) fn build_custom_dict(
     // The ladder is `hostopts` (#923); this surface has no path arm (the wasm
     // sandbox has no filesystem), so `dict_path` is structurally `None` and a
     // custom dict always arrives as bytes under the neutral advisory label.
-    laterite_ags4_emit::hostopts::custom_dict(
+    laterite_ags4_hostopts::custom_dict(
         None,
         dict_bytes,
         dict_replace,
         over,
         enc,
-        laterite_ags4_emit::hostopts::DictFlags {
+        laterite_ags4_hostopts::DictFlags {
             source: "dict",
             replace: "dict_replace",
             version: "dict_version",

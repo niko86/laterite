@@ -15,7 +15,7 @@ sources: []
 ## Definition
 
 The Rust side of the **shipped AGS4 toolkit** is **one Cargo workspace of
-twenty-five crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
+twenty-six crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
 published Python wheel** — the base [[laterite]] — plus a **loadable DuckDB
 extension** that ships outside the wheel entirely (the
 [[dec-duckdb-extension|laterite-duckdb]], via DuckDB Community Extensions).
@@ -48,7 +48,7 @@ CLI, a PyO3 cdylib, and a wasm bundle alike — see
 ## Why it matters
 
 Five questions a cold session re-derives from source unless this map
-exists: **why twenty-five crates** (the engine/CLI/QA/bindings/leaf split);
+exists: **why twenty-six crates** (the engine/CLI/QA/bindings/leaf split);
 **why AGS5 is decoupled** (the shipped product is AGS4-only; `.ags5db`/`.agsx`
 sit dormant outside this repo); **the wasm path**
 ([[tech-stack-wasm]]); **the PyO3 boundary** ([[pyo3-boundary]]); and **why the
@@ -230,7 +230,16 @@ as stable):
   `core → emit` layering inversion (`core` depended on `emit` solely for `From<EmitError> for CliError`) was
   **cut** in #441: that conversion moved to its sole consumer `laterite-ags4-excel`, so `core` no longer depends on
   `emit` — see [[core-emit-layering-inversion]].
-- `laterite-ags4-diff` — the wasm-safe **revision-diff leaf** (#204): the KEY-aware, type-aware
+- [[laterite-ags4-hostopts]] — the **shared host-option normalisation** (#923; its own crate since
+  #947): edition labels (`auto` deferrable vs collapsed-to-fallback), write modes, the
+  custom-dictionary ladder, the staged atomic `out=` write — the one copy behind every surface
+  binding's caller-facing knobs, with only the per-surface flag *spellings* (`--dict-replace` /
+  `dictReplace` / `dict_replace`) left at each boundary as data. Born as a module inside
+  `laterite-ags4-emit` — parked there because the published facade can only adopt from a published
+  crate — and extracted once the tenancy taxed emit's release train (nothing in emit called it).
+  Deps: `laterite-ags4-emit` (`EmitMode`) + `laterite-ags4-validator` (the dictionary + the
+  custom-dict overlay); sits above both, below the five callers (py, node, wasm, the CLI, and —
+  post-#930 — the facade). the KEY-aware, type-aware
   comparison of two parsed AGS4 files (`diff_parsed(a, b, dict, cap) -> RevisionDelta`; rows matched
   by the group's dictionary KEY headings, cells compared through `parse_value` so a formatting-only
   change — `"1.0"` → `"1.00"` — is suppressed). Extracted out of `laterite-ags4-wasm` so PyO3, the CLI
@@ -407,6 +416,13 @@ flowchart LR
   trust --> latpy
   trust --> latnode
   trust --> wasm
+  emit --> hostopts[laterite-ags4-hostopts]
+  validator --> hostopts
+  hostopts --> check
+  hostopts --> latpy
+  hostopts --> latnode
+  hostopts --> wasm
+  hostopts --> corpusqa
   parse --> diff[laterite-ags4-diff]
   reference --> diff
   diff --> check

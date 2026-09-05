@@ -9,51 +9,6 @@ pub fn laterite_ags4_emit::catalog::GroupView::types(&self) -> &[alloc::string::
 pub fn laterite_ags4_emit::catalog::GroupView::units(&self) -> &[alloc::string::String]
 pub fn laterite_ags4_emit::catalog::types_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
 pub fn laterite_ags4_emit::catalog::units_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
-pub mod laterite_ags4_emit::hostopts
-pub struct laterite_ags4_emit::hostopts::DictFlags
-pub laterite_ags4_emit::hostopts::DictFlags::replace: &'static str
-pub laterite_ags4_emit::hostopts::DictFlags::source: &'static str
-pub laterite_ags4_emit::hostopts::DictFlags::version: &'static str
-impl core::clone::Clone for laterite_ags4_emit::hostopts::DictFlags
-pub fn laterite_ags4_emit::hostopts::DictFlags::clone(&self) -> laterite_ags4_emit::hostopts::DictFlags
-impl core::fmt::Debug for laterite_ags4_emit::hostopts::DictFlags
-pub fn laterite_ags4_emit::hostopts::DictFlags::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for laterite_ags4_emit::hostopts::DictFlags
-impl core::marker::Freeze for laterite_ags4_emit::hostopts::DictFlags
-impl core::marker::Send for laterite_ags4_emit::hostopts::DictFlags
-impl core::marker::Sync for laterite_ags4_emit::hostopts::DictFlags
-impl core::marker::Unpin for laterite_ags4_emit::hostopts::DictFlags
-impl core::marker::UnsafeUnpin for laterite_ags4_emit::hostopts::DictFlags
-impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::hostopts::DictFlags
-impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::hostopts::DictFlags
-pub struct laterite_ags4_emit::hostopts::OptError
-pub laterite_ags4_emit::hostopts::OptError::code: i32
-pub laterite_ags4_emit::hostopts::OptError::kind: &'static str
-pub laterite_ags4_emit::hostopts::OptError::message: alloc::string::String
-impl core::clone::Clone for laterite_ags4_emit::hostopts::OptError
-pub fn laterite_ags4_emit::hostopts::OptError::clone(&self) -> laterite_ags4_emit::hostopts::OptError
-impl core::cmp::Eq for laterite_ags4_emit::hostopts::OptError
-impl core::cmp::PartialEq for laterite_ags4_emit::hostopts::OptError
-pub fn laterite_ags4_emit::hostopts::OptError::eq(&self, &laterite_ags4_emit::hostopts::OptError) -> bool
-impl core::error::Error for laterite_ags4_emit::hostopts::OptError
-impl core::fmt::Debug for laterite_ags4_emit::hostopts::OptError
-pub fn laterite_ags4_emit::hostopts::OptError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::fmt::Display for laterite_ags4_emit::hostopts::OptError
-pub fn laterite_ags4_emit::hostopts::OptError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::StructuralPartialEq for laterite_ags4_emit::hostopts::OptError
-impl core::marker::Freeze for laterite_ags4_emit::hostopts::OptError
-impl core::marker::Send for laterite_ags4_emit::hostopts::OptError
-impl core::marker::Sync for laterite_ags4_emit::hostopts::OptError
-impl core::marker::Unpin for laterite_ags4_emit::hostopts::OptError
-impl core::marker::UnsafeUnpin for laterite_ags4_emit::hostopts::OptError
-impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::hostopts::OptError
-impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::hostopts::OptError
-pub fn laterite_ags4_emit::hostopts::custom_dict(core::option::Option<&std::path::Path>, core::option::Option<&[u8]>, bool, core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>, &'static encoding_rs::Encoding, laterite_ags4_emit::hostopts::DictFlags) -> core::result::Result<core::option::Option<laterite_ags4_reference::overlay::CustomDict>, laterite_ags4_emit::hostopts::OptError>
-pub fn laterite_ags4_emit::hostopts::edition(core::option::Option<&str>) -> core::result::Result<core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>, laterite_ags4_emit::hostopts::OptError>
-pub fn laterite_ags4_emit::hostopts::edition_or_fallback(core::option::Option<&str>) -> core::result::Result<laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_emit::hostopts::OptError>
-pub fn laterite_ags4_emit::hostopts::staged_write(&std::path::Path, &[u8]) -> core::result::Result<(), laterite_ags4_emit::hostopts::OptError>
-pub fn laterite_ags4_emit::hostopts::staged_write_io(&std::path::Path, &[u8]) -> core::io::error::Result<()>
-pub fn laterite_ags4_emit::hostopts::write_mode(core::option::Option<&str>) -> core::result::Result<laterite_ags4_emit::EmitMode, laterite_ags4_emit::hostopts::OptError>
 pub enum laterite_ags4_emit::EmitError
 pub laterite_ags4_emit::EmitError::EmbeddedNewline
 pub laterite_ags4_emit::EmitError::EmbeddedNewline::field: usize

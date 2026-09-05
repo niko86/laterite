@@ -72,7 +72,7 @@ pub(crate) fn map_cli_err(e: &CliError) -> PyErr {
 /// `"auto"` ⇒ no override (`TRAN_AGS` auto-pick). Unknown ⇒ `Err`.
 /// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
-    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
+    laterite_ags4_hostopts::edition(s).map_err(|e| e.message)
 }
 
 /// Parse the `--dict` custom-dictionary override for a Python call, mirroring the CLI's
@@ -95,13 +95,13 @@ fn build_custom_dict(
     // The ladder is `hostopts` (#923) — one copy per workspace. What stays
     // here is this surface's spelling of the knobs, so an error names what a
     // Python caller actually typed.
-    laterite_ags4_emit::hostopts::custom_dict(
+    laterite_ags4_hostopts::custom_dict(
         dict_path.map(Path::new),
         dict_bytes,
         dict_replace,
         over,
         enc,
-        laterite_ags4_emit::hostopts::DictFlags {
+        laterite_ags4_hostopts::DictFlags {
             source: "--dict",
             replace: "dict_replace",
             version: "dict_version",
@@ -469,7 +469,7 @@ pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<B
 /// a flattened base `OSError` with the shape lost in a message.
 #[pyfunction]
 fn staged_write(path: &str, data: &[u8]) -> PyResult<()> {
-    laterite_ags4_emit::hostopts::staged_write_io(Path::new(path), data).map_err(PyErr::from)
+    laterite_ags4_hostopts::staged_write_io(Path::new(path), data).map_err(PyErr::from)
 }
 
 /// Headless one-shot mechanical repair of a delivered AGS4 file (the same engine

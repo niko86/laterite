@@ -90,6 +90,7 @@ PUBLISH_SET = [
     "laterite-ags4-diff",
     "laterite-ags4-emit",
     "laterite-ags4-excel",
+    "laterite-ags4-hostopts",
     "laterite-ags4-merge",
     "laterite-ags4-parse",
     "laterite-ags4-reference",

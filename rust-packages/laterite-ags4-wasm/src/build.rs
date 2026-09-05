@@ -134,15 +134,15 @@ extern "C" {
     pub type BuildReportJs;
 }
 
-// Both parsers are `laterite_ags4_emit::hostopts` (#923) — the one copy of the
+// Both parsers are `laterite_ags4_hostopts` (#923) — the one copy of the
 // option normalisation every surface shares — narrowed to this boundary's
 // message-only error shape.
 fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
-    laterite_ags4_emit::hostopts::edition_or_fallback(s).map_err(|e| e.message)
+    laterite_ags4_hostopts::edition_or_fallback(s).map_err(|e| e.message)
 }
 
 fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
-    laterite_ags4_emit::hostopts::write_mode(s).map_err(|e| e.message)
+    laterite_ags4_hostopts::write_mode(s).map_err(|e| e.message)
 }
 
 /// `build_ags4` / `build_ags4_ipc`'s named options.

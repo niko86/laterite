@@ -27,17 +27,16 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3_arrow::PyTable;
 
-// Both parsers are `laterite_ags4_emit::hostopts` (#923) — the one copy of the
+// Both parsers are `laterite_ags4_hostopts` (#923) — the one copy of the
 // option normalisation every surface shares — narrowed to this boundary's error
 // type. The edition set, the fallback and the rejection message are generated
 // from ags_dictionary.json inside the shared module.
 fn parse_edition(s: Option<&str>) -> PyResult<DictVersion> {
-    laterite_ags4_emit::hostopts::edition_or_fallback(s)
-        .map_err(|e| PyRuntimeError::new_err(e.message))
+    laterite_ags4_hostopts::edition_or_fallback(s).map_err(|e| PyRuntimeError::new_err(e.message))
 }
 
 fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
-    laterite_ags4_emit::hostopts::write_mode(s).map_err(|e| PyRuntimeError::new_err(e.message))
+    laterite_ags4_hostopts::write_mode(s).map_err(|e| PyRuntimeError::new_err(e.message))
 }
 
 /// Build valid AGS4 from per-group Arrow tables.

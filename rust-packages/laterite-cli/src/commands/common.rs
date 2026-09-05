@@ -25,7 +25,7 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
     if let Some(v) = d.dict_version.as_deref() {
         // The parse (and the generated set + message) is `hostopts` (#923) —
         // one copy per workspace, not per surface.
-        opts.dict_version = match laterite_ags4_emit::hostopts::edition(Some(v)) {
+        opts.dict_version = match laterite_ags4_hostopts::edition(Some(v)) {
             Ok(dv) => dv,
             Err(e) => {
                 eprintln!("error: --dict-version: {e}");
@@ -55,13 +55,13 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
         // §2/§4) — is `hostopts` (#923). With `--dict`, `--dict-version`
         // (already folded into `opts.dict_version` above) selects the OVERLAY
         // BASE rather than a bundled edition.
-        match laterite_ags4_emit::hostopts::custom_dict(
+        match laterite_ags4_hostopts::custom_dict(
             Some(p),
             None,
             d.dict_replace,
             opts.dict_version,
             opts.encoding,
-            laterite_ags4_emit::hostopts::DictFlags {
+            laterite_ags4_hostopts::DictFlags {
                 source: "--dict",
                 replace: "--dict-replace",
                 version: "--dict-version",

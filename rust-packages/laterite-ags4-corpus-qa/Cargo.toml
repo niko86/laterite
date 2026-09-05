@@ -34,9 +34,10 @@ tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
-# `hostopts` (#923): the shared `--dict-version` parse, so this tool's edition
-# labels (and rejection text) match the product surfaces by construction.
-laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+# `hostopts` (#923, its own crate since #947): the shared `--dict-version`
+# parse, so this tool's edition labels (and rejection text) match the product
+# surfaces by construction. It was this crate's only direct emit use.
+laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts" }
 # Stage 7b: CheckOptions now carries an `encoding: &'static
 # encoding_rs::Encoding` field. corpus-qa uses UTF-8 by harvesting
 # convention; the dep is already transitive via laterite-ags4-validator so

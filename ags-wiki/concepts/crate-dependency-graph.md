@@ -40,10 +40,11 @@ flowchart TD
     laterite_node[laterite-node]
     laterite_py[laterite-py]
   end
-  subgraph L3["L3 · trust model + tools"]
+  subgraph L3["L3 · trust model + host options + tools"]
     laterite_ags4_compliance[laterite-ags4-compliance]
     laterite_ags4_corpus_qa[laterite-ags4-corpus-qa]
     laterite_ags4_forge[laterite-ags4-forge]
+    laterite_ags4_hostopts[laterite-ags4-hostopts]
     laterite_ags4_parity[laterite-ags4-parity]
     laterite_ags4_perf[laterite-ags4-perf]
     laterite_ags4_trust[laterite-ags4-trust]
@@ -88,7 +89,7 @@ flowchart TD
   laterite_ags4_core --> laterite_ags4_types
   laterite_ags4_core --> laterite_transport
   laterite_ags4_corpus_qa --> laterite_ags4_censor
-  laterite_ags4_corpus_qa --> laterite_ags4_emit
+  laterite_ags4_corpus_qa --> laterite_ags4_hostopts
   laterite_ags4_corpus_qa --> laterite_ags4_parity
   laterite_ags4_corpus_qa --> laterite_ags4_validator
   laterite_ags4_corpus_qa --> laterite_cliutil
@@ -106,6 +107,8 @@ flowchart TD
   laterite_ags4_forge --> laterite_ags4_types
   laterite_ags4_forge --> laterite_ags4_validator
   laterite_ags4_forge --> laterite_cliutil
+  laterite_ags4_hostopts --> laterite_ags4_emit
+  laterite_ags4_hostopts --> laterite_ags4_validator
   laterite_ags4_merge --> laterite_ags4_emit
   laterite_ags4_merge --> laterite_ags4_parse
   laterite_ags4_merge --> laterite_ags4_reference
@@ -130,6 +133,7 @@ flowchart TD
   laterite_ags4_wasm --> laterite_ags4_diff
   laterite_ags4_wasm --> laterite_ags4_emit
   laterite_ags4_wasm --> laterite_ags4_excel
+  laterite_ags4_wasm --> laterite_ags4_hostopts
   laterite_ags4_wasm --> laterite_ags4_merge
   laterite_ags4_wasm --> laterite_ags4_parse
   laterite_ags4_wasm --> laterite_ags4_trust
@@ -141,8 +145,8 @@ flowchart TD
   laterite_ags4_xcheck --> laterite_ags4_validator
   laterite_cli --> laterite_ags4_core
   laterite_cli --> laterite_ags4_diff
-  laterite_cli --> laterite_ags4_emit
   laterite_cli --> laterite_ags4_excel
+  laterite_cli --> laterite_ags4_hostopts
   laterite_cli --> laterite_ags4_merge
   laterite_cli --> laterite_ags4_parse
   laterite_cli --> laterite_ags4_trust
@@ -152,6 +156,7 @@ flowchart TD
   laterite_node --> laterite_ags4_diff
   laterite_node --> laterite_ags4_emit
   laterite_node --> laterite_ags4_excel
+  laterite_node --> laterite_ags4_hostopts
   laterite_node --> laterite_ags4_merge
   laterite_node --> laterite_ags4_parse
   laterite_node --> laterite_ags4_trust
@@ -162,6 +167,7 @@ flowchart TD
   laterite_py --> laterite_ags4_diff
   laterite_py --> laterite_ags4_emit
   laterite_py --> laterite_ags4_excel
+  laterite_py --> laterite_ags4_hostopts
   laterite_py --> laterite_ags4_merge
   laterite_py --> laterite_ags4_parse
   laterite_py --> laterite_ags4_reference
@@ -183,24 +189,25 @@ flowchart TD
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
-| `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
-| `laterite-ags4-emit` | L2 | 3 | 11 | 4 |
+| `laterite-ags4-validator` | L2 | 3 | 14 | 3 |
+| `laterite-ags4-emit` | L2 | 3 | 10 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-excel` | L2 | 2 | 5 | 7 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
+| `laterite-ags4-hostopts` | L3 | 2 | 5 | 5 |
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
 | `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
-| `laterite-ags4-corpus-qa` | L3 | 5 | 0 | 8 |
+| `laterite-ags4-corpus-qa` | L3 | 5 | 0 | 9 |
 | `laterite-ags4-forge` | L3 | 6 | 0 | 7 |
 | `laterite-ags4-perf` | L3 | 4 | 0 | 5 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
-| `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
-| `laterite-cli` | L4 | 9 | 0 | 12 |
-| `laterite-node` | L4 | 10 | 0 | 11 |
-| `laterite-py` | L4 | 10 | 0 | 11 |
+| `laterite-ags4-wasm` | L4 | 11 | 0 | 13 |
+| `laterite-cli` | L4 | 9 | 0 | 13 |
+| `laterite-node` | L4 | 11 | 0 | 12 |
+| `laterite-py` | L4 | 11 | 0 | 12 |
 | `laterite` | L? | 9 | 0 | 11 |
 
 ## Structural findings (computed from the manifests)
@@ -209,9 +216,9 @@ flowchart TD
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
   - `laterite-ags4-parse` (in-degree 17)
+  - `laterite-ags4-validator` (in-degree 14)
   - `laterite-ags4-types` (in-degree 13)
-  - `laterite-ags4-validator` (in-degree 13)
-  - `laterite-ags4-emit` (in-degree 11)
+  - `laterite-ags4-emit` (in-degree 10)
   - `laterite-ags4-core` (in-degree 9)
   - `laterite-ags4-reference` (in-degree 7)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**

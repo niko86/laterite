@@ -70,6 +70,10 @@ LAYER = {
     # into ONE certificate decision. It sits above both and below every surface, which
     # is the same slot the tools occupy — it is not itself a tool.
     "laterite-ags4-trust": 3,
+    # The shared host-option normalisation (#923, extracted by #947): returns
+    # emit's EmitMode and builds the validator's CustomDict, so it sits above
+    # both — and below the five surfaces that call it.
+    "laterite-ags4-hostopts": 3,
     "laterite-ags4-parity": 3,
     "laterite-ags4-forge": 3,
     "laterite-ags4-corpus-qa": 3,
@@ -92,7 +96,7 @@ LAYER_NAME = {
     0: "L0 · foundations (depend on nothing above L0)",
     1: "L1 · core (data foundation)",
     2: "L2 · writer / validator / excel / diff",
-    3: "L3 · trust model + tools",
+    3: "L3 · trust model + host options + tools",
     4: "L4 · surfaces + CLI",
 }
 

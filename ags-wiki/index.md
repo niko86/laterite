@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-09-03
-counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
+generated: 2026-09-05
+counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
 ---
 # AGS Wiki — Content Catalog
 
@@ -15,7 +15,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | Groups | 177 |
 | Types | 17 |
 | Observations | 56 |
-| Tools | 30 |
+| Tools | 31 |
 | Concepts | 31 |
 | Editions | 5 |
 | Comparisons | 1 |
@@ -23,10 +23,10 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 41 |
-| **Total (live)** | **428** |
+| **Total (live)** | **429** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 40 · `confirmed` 18 · `drafted` 339 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 40 · `confirmed` 18 · `drafted` 340 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -339,6 +339,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 30, concept
 | [[laterite-ags4-emit]] | drafted | crate |
 | [[laterite-ags4-excel]] | drafted | crate |
 | [[laterite-ags4-forge]] | drafted | cli |
+| [[laterite-ags4-hostopts]] | drafted | crate |
 | [[laterite-ags4-merge]] | drafted | crate |
 | [[laterite-ags4-parity]] | drafted | crate |
 | [[laterite-ags4-parse]] | drafted | crate |
