@@ -460,6 +460,18 @@ pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<B
     Ok(list)
 }
 
+/// The shared staged atomic write (`hostopts::staged_write_io`, #938) behind
+/// a Python door: a temp file in the destination's own directory + rename,
+/// so `out` never holds a partial write. The `_io` variant + PyO3's
+/// `io::Error` conversion is what keeps this door's error contract exactly
+/// what the old in-Python dance raised — the right `OSError` SUBCLASS
+/// (`FileNotFoundError` for a missing directory, `PermissionError`, …), not
+/// a flattened base `OSError` with the shape lost in a message.
+#[pyfunction]
+fn staged_write(path: &str, data: &[u8]) -> PyResult<()> {
+    laterite_ags4_emit::hostopts::staged_write_io(Path::new(path), data).map_err(PyErr::from)
+}
+
 /// Headless one-shot mechanical repair of a delivered AGS4 file (the same engine
 /// the browser fix UI uses, applied without a UI). Reads from path/text/data,
 /// computes fixes against the file's own findings, applies the *safe* set (plus
@@ -1641,6 +1653,7 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
+    m.add_function(wrap_pyfunction!(staged_write, m)?)?;
     m.add_function(wrap_pyfunction!(list_rules, m)?)?;
     m.add_function(wrap_pyfunction!(diff_files, m)?)?;
     m.add_function(wrap_pyfunction!(merge_files, m)?)?;
