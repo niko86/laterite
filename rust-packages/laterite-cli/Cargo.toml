@@ -81,6 +81,11 @@ laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.14.0", defau
 # binary no longer owns a `try_certified_skip` of its own — that conjunction was one of
 # five across the surfaces, and no two agreed.
 laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.15.0" }
+# `hostopts` (#923): the shared option-normalisation seam — edition labels,
+# the custom-dict ladder — so `--dict-version` / `--dict` mean the same thing
+# here as on every other surface. Already in the tree via merge/excel; this
+# names the direct use.
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.16.0" }
 # Timestamp the certificate (`ValidationStamp.checked_at`, RFC-3339). Already in
 # the tree via the validator; declared here to stamp the mint directly.
 chrono = "0.4"

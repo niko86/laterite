@@ -68,22 +68,11 @@ fn ags4_to_xlsx_core(
     recover_duplicate_headings: bool,
     truncate_excess_fields: bool,
 ) -> Result<ExcelResult, String> {
-    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ExcessFields, ReadOptions};
+    use laterite_ags4_core::ags4_codec::ReadOptions;
     // Both leniencies are off by default here as on every read surface; the
     // browser caller opts into the suffixed recovery read, or into discarding
     // fields that bind to no heading.
-    let opts = ReadOptions {
-        duplicate_headings: if recover_duplicate_headings {
-            DuplicateHeadings::Recover
-        } else {
-            DuplicateHeadings::Error
-        },
-        excess_fields: if truncate_excess_fields {
-            ExcessFields::Truncate
-        } else {
-            ExcessFields::Error
-        },
-    };
+    let opts = ReadOptions::from_flags(recover_duplicate_headings, truncate_excess_fields);
     let (bytes, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(data, None, opts)
         .map_err(|e| e.to_string())?;
     Ok(ExcelResult {

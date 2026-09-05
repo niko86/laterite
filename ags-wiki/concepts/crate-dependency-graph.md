@@ -88,6 +88,7 @@ flowchart TD
   laterite_ags4_core --> laterite_ags4_types
   laterite_ags4_core --> laterite_transport
   laterite_ags4_corpus_qa --> laterite_ags4_censor
+  laterite_ags4_corpus_qa --> laterite_ags4_emit
   laterite_ags4_corpus_qa --> laterite_ags4_parity
   laterite_ags4_corpus_qa --> laterite_ags4_validator
   laterite_ags4_corpus_qa --> laterite_cliutil
@@ -139,6 +140,7 @@ flowchart TD
   laterite_ags4_xcheck --> laterite_ags4_validator
   laterite_cli --> laterite_ags4_core
   laterite_cli --> laterite_ags4_diff
+  laterite_cli --> laterite_ags4_emit
   laterite_cli --> laterite_ags4_excel
   laterite_cli --> laterite_ags4_merge
   laterite_cli --> laterite_ags4_parse
@@ -181,7 +183,7 @@ flowchart TD
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
-| `laterite-ags4-emit` | L2 | 3 | 8 | 4 |
+| `laterite-ags4-emit` | L2 | 3 | 10 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-excel` | L2 | 2 | 5 | 7 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
@@ -189,13 +191,13 @@ flowchart TD
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
 | `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
-| `laterite-ags4-corpus-qa` | L3 | 4 | 0 | 7 |
+| `laterite-ags4-corpus-qa` | L3 | 5 | 0 | 8 |
 | `laterite-ags4-forge` | L3 | 5 | 0 | 6 |
 | `laterite-ags4-perf` | L3 | 4 | 0 | 5 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
 | `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
-| `laterite-cli` | L4 | 8 | 0 | 12 |
+| `laterite-cli` | L4 | 9 | 0 | 12 |
 | `laterite-node` | L4 | 10 | 0 | 11 |
 | `laterite-py` | L4 | 10 | 0 | 11 |
 | `laterite` | L? | 9 | 0 | 11 |
@@ -208,8 +210,8 @@ flowchart TD
   - `laterite-ags4-parse` (in-degree 17)
   - `laterite-ags4-types` (in-degree 13)
   - `laterite-ags4-validator` (in-degree 13)
+  - `laterite-ags4-emit` (in-degree 10)
   - `laterite-ags4-core` (in-degree 9)
-  - `laterite-ags4-emit` (in-degree 8)
   - `laterite-ags4-reference` (in-degree 7)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**
   - `laterite`

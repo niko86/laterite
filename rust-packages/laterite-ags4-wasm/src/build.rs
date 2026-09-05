@@ -7,7 +7,7 @@
 use crate::boundary::{TranInput, WasmOptions, decode_opts, to_js};
 #[cfg(feature = "arrow")]
 use laterite_ags4_validator::Dictionary;
-use laterite_ags4_validator::{DictVersion, dict::FALLBACK, findings, fixes};
+use laterite_ags4_validator::{DictVersion, findings, fixes};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -134,27 +134,15 @@ extern "C" {
     pub type BuildReportJs;
 }
 
+// Both parsers are `laterite_ags4_emit::hostopts` (#923) — the one copy of the
+// option normalisation every surface shares — narrowed to this boundary's
+// message-only error shape.
 fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
-    match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(FALLBACK),
-        Some(other) => DictVersion::from_edition(other).ok_or_else(|| {
-            format!(
-                "unknown edition {other:?}; expected {}",
-                laterite_ags4_validator::editions_joined("|")
-            )
-        }),
-    }
+    laterite_ags4_emit::hostopts::edition_or_fallback(s).map_err(|e| e.message)
 }
 
 fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
-    match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
-        None | Some("") | Some("autofix") => Ok(laterite_ags4_emit::EmitMode::AutoFix),
-        Some("report") => Ok(laterite_ags4_emit::EmitMode::Report),
-        Some("strict") => Ok(laterite_ags4_emit::EmitMode::Strict),
-        Some(other) => Err(format!(
-            "unknown mode {other:?}; expected autofix|report|strict"
-        )),
-    }
+    laterite_ags4_emit::hostopts::write_mode(s).map_err(|e| e.message)
 }
 
 /// `build_ags4` / `build_ags4_ipc`'s named options.
@@ -630,6 +618,7 @@ mod tests {
     use super::*;
     use crate::testdata::err;
     use laterite_ags4_parse::parse_bytes;
+    use laterite_ags4_validator::dict::FALLBACK;
 
     #[test]
     fn emits_valid_and_canonicalises_typed() {

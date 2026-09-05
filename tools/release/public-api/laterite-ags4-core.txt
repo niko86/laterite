@@ -93,6 +93,8 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::Pa
 pub struct laterite_ags4_core::ags4_codec::ReadOptions
 pub laterite_ags4_core::ags4_codec::ReadOptions::duplicate_headings: laterite_ags4_core::ags4_codec::DuplicateHeadings
 pub laterite_ags4_core::ags4_codec::ReadOptions::excess_fields: laterite_ags4_core::ags4_codec::ExcessFields
+impl laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::from_flags(bool, bool) -> Self
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ReadOptions
 pub fn laterite_ags4_core::ags4_codec::ReadOptions::clone(&self) -> laterite_ags4_core::ags4_codec::ReadOptions
 impl core::default::Default for laterite_ags4_core::ags4_codec::ReadOptions

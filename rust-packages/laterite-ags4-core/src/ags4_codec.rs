@@ -378,6 +378,29 @@ pub struct ReadOptions {
     pub excess_fields: ExcessFields,
 }
 
+impl ReadOptions {
+    /// The host bindings' two caller-facing booleans, mapped once. Every
+    /// surface exposes exactly `recover_duplicate_headings` /
+    /// `truncate_excess_fields` and each used to restate this bool→enum
+    /// mapping locally (#923) — the mapping belongs to the type, not to the
+    /// callers.
+    #[must_use]
+    pub fn from_flags(recover_duplicate_headings: bool, truncate_excess_fields: bool) -> Self {
+        ReadOptions {
+            duplicate_headings: if recover_duplicate_headings {
+                DuplicateHeadings::Recover
+            } else {
+                DuplicateHeadings::Error
+            },
+            excess_fields: if truncate_excess_fields {
+                ExcessFields::Truncate
+            } else {
+                ExcessFields::Error
+            },
+        }
+    }
+}
+
 /// Read an AGS4 file from a path — slurps the bytes and delegates to
 /// [`read_ags4_bytes`] (the shared leaf walks the whole buffer at once).
 pub fn read_ags4(path: &Path) -> Result<ParsedAgs4, CliError> {

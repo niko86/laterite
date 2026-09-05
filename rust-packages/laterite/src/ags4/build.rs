@@ -447,6 +447,13 @@ impl BuildSaved {
 /// REACH this write is the doors' difference, not the write's. (The same
 /// contract as the Python surface's `_staged_write`; `std::fs::rename`
 /// replaces an existing file on Unix and Windows alike.)
+///
+/// A DELIBERATE copy of `laterite_ags4_emit::hostopts::staged_write` (#923),
+/// not an oversight: this crate is published, and `cargo package --verify`
+/// builds its tarball against the emit version on crates.io — which will not
+/// carry `hostopts` until the next engine cut publishes it. Adopt (delete
+/// this fn, call the shared one, bump the emit req) only once that version
+/// is live; doing it earlier fails the package-contents gate's verify build.
 fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
     let io_err = |e: std::io::Error| {
         Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)

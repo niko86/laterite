@@ -86,7 +86,7 @@ def test_dictionary_per_edition() -> None:
 
 
 def test_dictionary_rejects_unknown_edition() -> None:
-    with pytest.raises(ValueError, match="unknown --dict-version"):
+    with pytest.raises(ValueError, match="unknown edition"):
         latreg.dictionary("9.9")
 
 

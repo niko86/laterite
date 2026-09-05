@@ -58,6 +58,23 @@ needed the closed set of valid `--dict-version` strings.
 > dictionary bundles another edition — they pass trivially today, but go red
 > the moment anyone reintroduces a hand-list.
 
+> [!done] **Extended (#923, 2026-09-05).** The sweep above converged the
+> *parsers* but not every *fallback site*, so this page over-claimed the
+> close: two `laterite-node` emit doors kept `.unwrap_or(DictVersion::V4_1_1)`
+> (in a file that used `dict::FALLBACK` correctly at five other sites), and
+> Python's `build_ags4` hand-coded `dict_version = "4.1.1"` while the sibling
+> unchecked door passed `None` through. Both were symptoms of the same fork:
+> "auto" had grown **two semantics** — the check doors defer it (resolve from
+> `TRAN_AGS`), the emit doors collapse it to the fallback — and no shared
+> parser could serve both once it had already decided. The fix is the pair in
+> `laterite_ags4_emit::hostopts`: `edition()` keeps `auto` deferrable,
+> `edition_or_fallback()` collapses to the generated `dict::FALLBACK`; every
+> string-taking surface (py, node, wasm, the CLI — and corpus-qa's
+> `--dict-version`, whose *error text* was the last hand-written list) now
+> calls one of those two. The facade parses no edition strings (its knob is
+> a typed `Option<Edition>`), so it was never in this class. See
+> [[data-single-source-audit]] row 2 for the full register entry.
+
 [[surface-census]] is what makes the convergence checkable *across
 launchers* rather than just within one crate: it gained a second table
 (`editions` + `fallback_edition`) diffing the native binary, `uvx`, and

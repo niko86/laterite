@@ -448,10 +448,14 @@ function marshalGroups(
 function stagedWrite(bytes: Buffer, out: string): void {
   const tmp = join(
     dirname(out),
-    `.laterite-build-${process.pid}-${Date.now()}.tmp`,
+    `.laterite-build-${process.pid}-${process.hrtime.bigint()}.tmp`,
   );
   try {
-    writeFileSync(tmp, bytes);
+    // `wx` = exclusive create, matching the native twins' `create_new`: a name
+    // collision is an error, never a silent overwrite of whatever was
+    // squatting on it. hrtime (not Date.now) so two writes in the same
+    // millisecond cannot even share a name.
+    writeFileSync(tmp, bytes, { flag: "wx" });
     renameSync(tmp, out);
   } catch (err) {
     try {

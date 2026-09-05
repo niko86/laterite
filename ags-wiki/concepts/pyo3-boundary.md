@@ -127,6 +127,14 @@ why the workspace Rust build excludes it — `--exclude laterite-py`, as
 `.github/workflows/ci.yml` does — and `uv sync` builds it through maturin
 instead.
 
+That exclusion is also why the boundary should hold no *decisions*: logic in
+this crate is testable only through a built wheel, never by `cargo test`.
+Since #923 the option normalisation the cdylib used to own — edition labels,
+write modes, the custom-dict ladder, the staged `out=` write — lives in
+`laterite_ags4_emit::hostopts` (a crate the workspace test run *does* reach),
+and `laterite-py`'s parsers shrink to marshal → call → map `OptError` into
+Python exceptions. See [[data-single-source-audit]] row 2.
+
 The boundary is also **directional**: *Rust drives Python, never the
 reverse* — the shipped artefact is the Rust binary, and this wheel is
 the scoped exception where a Python library imports the Rust engine, not

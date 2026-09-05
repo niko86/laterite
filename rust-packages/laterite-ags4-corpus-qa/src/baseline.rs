@@ -143,9 +143,7 @@ impl Baseline {
 fn capture(args: &BaselineArgs, ctx: Ctx, corpus_dir: &Path) -> Result<Baseline> {
     let dict_version = match parse_dict_version(&args.dict_version) {
         Ok(v) => v,
-        Err(bad) => {
-            anyhow::bail!("--dict-version expects auto|4.0.3|4.0.4|4.1|4.1.1|4.2, got {bad:?}")
-        }
+        Err(e) => anyhow::bail!("--dict-version: {e}"),
     };
 
     // Default artifact resolution mirrors `validate`: explicit
