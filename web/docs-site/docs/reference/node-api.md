@@ -74,7 +74,7 @@ chained verbs return something you keep working on.
 | `fix(opts?)`         | `Ags4File`               | a **new** repaired file; log on `.fixReport`               |
 | `diff(other, opts?)` | `RevisionDelta`          | cell/row/group changes vs another file                     |
 | `certify(path?)`     | `string`                 | mint the `.ags.idx` certificate (after a clean `validate`) |
-| `certifyBytes(opts?)` | `Buffer`                | the certificate's bytes in memory — `certify`'s filesystem-free twin |
+| `certifyBytes(opts?)` | `Buffer`                | the certificate's bytes in memory: `certify`'s filesystem-free twin |
 | `report`             | `Report \| undefined`    | the last `validate()` verdict                              |
 | `fixReport`          | `FixResult \| undefined` | the last `fix()` log                                       |
 

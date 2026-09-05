@@ -1,8 +1,8 @@
 # Explore the registry & KEY chain
 
 **Available in:** Python (`laterite.registry`) and Node
-(`import { registry } from "laterite"` — the same graph, generated from the
-same dictionary, with the same functions in camelCase: `registry.childGroups`,
+(`import { registry } from "laterite"`): the same graph, generated from the
+same dictionary, with the same functions in camelCase (`registry.childGroups`,
 `registry.inheritedKeyNames`, …); see the
 [capability matrix](../surfaces/index.md#what-each-door-can-do). The worked
 example below is Python.
