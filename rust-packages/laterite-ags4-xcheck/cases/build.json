@@ -260,6 +260,75 @@
         "wasm-engine"
       ],
       "spec_ref": "The SYNTHESIS path of the build door, which every earlier build case leaves off. Synthesis mints whole GROUPS the caller never wrote (UNIT/TYPE from the data, ABBR for PA codes) and stamps the caller's TRAN, so a surface that diverges here produces a file with different groups, not merely different bytes - and nothing else compares that across surfaces. It also pins the five TRAN values landing in their own headings on all four legs at once: they are same-typed and adjacent in every surface's internal call, so a transposition is invisible to every compiler involved."
+    },
+    {
+      "id": "emit.unchecked.proj",
+      "op": "build_unchecked_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID",
+              "PROJ_NAME"
+            ],
+            "rows": [
+              [
+                "P1",
+                "Test Project"
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "The judge-free build door (#858/#882/#883) on its clean path: `build_ags4_unchecked` / `buildAgs4Unchecked` must produce the byte-identical file the judged Report build produces \u2014 same dictionary UNIT/TYPE fills, same canonical cell formatting, same section order \u2014 on every surface. The verdict is what is absent, not the assembly."
+    },
+    {
+      "id": "emit.unchecked.verbatim_dirty_cell",
+      "op": "build_unchecked_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID",
+              "PROJ_NAME"
+            ],
+            "rows": [
+              [
+                "P1",
+                "Test Project"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_GL"
+            ],
+            "rows": [
+              [
+                "BH01",
+                "1.0"
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "The door's defining value question: a STRING `\"1.0\"` under the 2DP heading LOCA_GL is data the judged AutoFix door rewrites to `\"1.00\"` \u2014 unchecked must keep it VERBATIM, identically on every surface. A surface that quietly judged (or quietly reformatted) diverges here and nowhere on the clean case."
     }
   ]
 }
