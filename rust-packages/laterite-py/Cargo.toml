@@ -96,20 +96,23 @@ laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
 # carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.12.0" }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.0" }
 # The shared AGS4 emit orchestrator (typed cells -> valid AGS4 + AutoFix).
 # The emit_ags4_from_arrow binding (emit_typed.rs) feeds it Arrow tables
 # DuckDB hands over pyarrow-free — the read boundary reversed. The `arrow`
 # feature pulls the shared Arrow→Value transpose (group_from_arrow) so the
 # native + wasm hosts share one conversion.
-laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.17.0", features = ["arrow"] }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.0", features = ["arrow"] }
+# `hostopts` (#923, its own crate since #947): the shared option-normalisation
+# seam — edition labels, write modes, the custom-dict ladder, the staged write.
+laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.0" }
 # The KEY-aware/type-aware revision-diff leaf (#204): `diff_parsed` over two
 # parsed files + a Dictionary — the same diff wasm + the CLI use.
 laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
 # `merge()` — reconcile N deliveries of one project into a single file, KEY-aware
 # with argument-order recency and widen-to-X. The same leaf `lat merge` uses;
 # it pulls parse + emit (emit re-validates its output) but stays wasm-safe.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.15.0" }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.16.0" }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.

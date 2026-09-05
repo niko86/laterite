@@ -448,9 +448,10 @@ impl BuildSaved {
 /// contract as the Python surface's `_staged_write`; `std::fs::rename`
 /// replaces an existing file on Unix and Windows alike.)
 ///
-/// A DELIBERATE copy of `laterite_ags4_emit::hostopts::staged_write` (#923),
-/// not an oversight — a wait-state copy, inventoried with the why in
-/// [`crate::pending_adoptions`] (#930). Adopt only per that ledger's rule.
+/// A DELIBERATE copy of `laterite_ags4_hostopts::staged_write` (#923, extracted
+/// to its own crate by #947), not an oversight — a wait-state copy, inventoried
+/// with the why in [`crate::pending_adoptions`] (#930). Adopt only per that
+/// ledger's rule.
 fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
     let io_err = |e: std::io::Error| {
         Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)

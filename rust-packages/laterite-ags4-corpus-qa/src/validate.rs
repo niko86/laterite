@@ -88,7 +88,7 @@ pub(crate) fn parse_dict_version(s: &str) -> Result<Option<DictVersion>, String>
     // The parse (and the generated set + message) is `hostopts` (#923) — this
     // used to be a local parse whose CALLERS each hand-wrote the accepted set
     // into their error text, the exact drift the shared copy retires.
-    laterite_ags4_emit::hostopts::edition(Some(s)).map_err(|e| e.message)
+    laterite_ags4_hostopts::edition(Some(s)).map_err(|e| e.message)
 }
 
 /// One file's verdict. `outcome` is the summarised bucket `validate`

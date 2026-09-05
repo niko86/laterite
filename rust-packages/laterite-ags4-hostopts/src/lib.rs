@@ -10,18 +10,22 @@
 //! `cargo test --workspace`, so the logic was untestable exactly where it was
 //! duplicated.
 //!
-//! This module is the one copy, in a crate the workspace test run reaches.
+//! This crate is the one copy, in a place the workspace test run reaches.
 //! A binding shrinks to marshal → call → map [`OptError`] into its own error
 //! type. What stays per-surface is *data*, not logic: the flag spellings a
 //! surface's user actually typed ([`DictFlags`]), so an error still names the
 //! knob as that surface spells it.
+//!
+//! Born as `laterite_ags4_emit::hostopts` — parked there because a module the
+//! published facade adopts from had to live in a published crate — and
+//! extracted to its own crate once that tenancy started taxing emit's release
+//! train (#947).
 
 use std::path::Path;
 
+use laterite_ags4_emit::EmitMode;
 use laterite_ags4_validator::overlay::{self, BaseSpec, CustomDict, DictFormat};
 use laterite_ags4_validator::{DictVersion, dict, editions_joined};
-
-use crate::emit::EmitMode;
 
 /// A refused option, host-agnostically.
 ///
@@ -233,6 +237,14 @@ fn staging_dir(dest: &Path) -> &Path {
     }
 }
 
+// The README's example is a doctest, not a second copy of one. `cfg(doctest)`
+// means this module exists only while rustdoc collects doctests: it is absent
+// from a normal build and from the rendered docs.rs page. The README is the
+// single source, and `cargo test --workspace` already compiles it.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,7 +271,7 @@ mod tests {
         assert!(err.message.contains("4.1.1"), "{}", err.message);
     }
 
-    /// The defect class this module exists for: the fallback is the
+    /// The defect class this crate exists for: the fallback is the
     /// dictionary's, by construction — there is no version literal here to
     /// go stale when the fallback moves.
     #[test]

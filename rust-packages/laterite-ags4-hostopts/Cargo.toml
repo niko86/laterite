@@ -1,0 +1,52 @@
+# laterite-ags4-hostopts — the host bindings' shared option normalisation.
+#
+# Extracted out of laterite-ags4-emit (#947, 2026-09-05) because the tenancy
+# there was a publishing accident, not a design: a module the published facade
+# can adopt from must itself be published, and emit was the crate that already
+# was. Nothing inside emit ever called it, so every hostopts change rode emit's
+# release train for no reason — emit 0.17.0 was forced partly by a hostopts
+# addition (#938), and that bump is what triggered the #944 pin cascade.
+#
+# Sits ABOVE emit and the validator (it returns emit's `EmitMode` and builds
+# the validator's `CustomDict`), BELOW the five surfaces that call it (PyO3,
+# napi, wasm, the CLI, the facade). See the crate docs in src/lib.rs for what
+# the module itself is for (#923).
+
+[package]
+name = "laterite-ags4-hostopts"
+version = "0.1.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+edition = "2024"
+rust-version = "1.85"
+description = "Shared caller-facing option normalisation for the laterite AGS4 surfaces — edition labels, write modes, custom dictionaries, staged writes"
+license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical"]
+categories = ["science::geo", "encoding"]
+publish = true
+
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+    "/README.md",
+]
+
+[dependencies]
+# `EmitMode` — the write-mode vocabulary the emit doors consume. The one emit
+# type in this crate's interface; everything else it touches is the validator's.
+laterite-ags4-emit = { workspace = true }
+# The per-edition dictionary (`DictVersion`, `dict::FALLBACK`, `editions_joined`)
+# and the custom-dictionary overlay (`overlay::parse_dict` + `CustomDict`).
+laterite-ags4-validator = { workspace = true }
+# `custom_dict` takes the caller's already-resolved source encoding — the same
+# `&'static Encoding` it hands `CheckOptions`.
+encoding_rs = "0.8"
+
+[lints]
+workspace = true
+
+# Which release train cuts this crate (#806): the nightly engine cut derives
+# bumps for `engine` crates only; `product` crates ride the product trains.
+[package.metadata.laterite]
+release_tier = "engine"

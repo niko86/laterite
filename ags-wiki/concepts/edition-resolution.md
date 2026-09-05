@@ -67,7 +67,8 @@ needed the closed set of valid `--dict-version` strings.
 > "auto" had grown **two semantics** — the check doors defer it (resolve from
 > `TRAN_AGS`), the emit doors collapse it to the fallback — and no shared
 > parser could serve both once it had already decided. The fix is the pair in
-> `laterite_ags4_emit::hostopts`: `edition()` keeps `auto` deferrable,
+> `laterite_ags4_hostopts` (born `laterite_ags4_emit::hostopts`, extracted by
+> #947): `edition()` keeps `auto` deferrable,
 > `edition_or_fallback()` collapses to the generated `dict::FALLBACK`; every
 > string-taking surface (py, node, wasm, the CLI — and corpus-qa's
 > `--dict-version`, whose *error text* was the last hand-written list) now

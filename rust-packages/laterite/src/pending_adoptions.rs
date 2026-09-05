@@ -16,5 +16,5 @@
 //!
 //! | waiting on (registry) | the local copy | replaced by |
 //! |---|---|---|
-//! | `laterite-ags4-emit` newer than 0.16.0 | `ags4/build.rs::staged_write` + `staging_dir` | `hostopts::staged_write` (#930 — which also settles hostopts' permanent home) |
+//! | `laterite-ags4-hostopts` on the registry at all (#947 extracted it; its FIRST publish is a token run) | `ags4/build.rs::staged_write` + `staging_dir` | `laterite_ags4_hostopts::staged_write` (#930) |
 //! | `laterite-ags4-core` newer than 0.14.0 | the body of `ags4/mod.rs::read_options` | `ags4_codec::ReadOptions::from_flags` (#930) |

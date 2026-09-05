@@ -2162,7 +2162,7 @@ dependencies = [
  "encoding_rs",
  "hex",
  "laterite-ags4-censor",
- "laterite-ags4-emit",
+ "laterite-ags4-hostopts",
  "laterite-ags4-parity",
  "laterite-ags4-validator",
  "laterite-cliutil",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "arrow",
  "criterion",
@@ -2203,7 +2203,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-excel"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
@@ -2235,8 +2235,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-hostopts"
+version = "0.1.0"
+dependencies = [
+ "encoding_rs",
+ "laterite-ags4-emit",
+ "laterite-ags4-validator",
+]
+
+[[package]]
 name = "laterite-ags4-merge"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
@@ -2369,6 +2378,7 @@ dependencies = [
  "laterite-ags4-diff",
  "laterite-ags4-emit",
  "laterite-ags4-excel",
+ "laterite-ags4-hostopts",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
@@ -2404,8 +2414,8 @@ dependencies = [
  "encoding_rs",
  "laterite-ags4-core",
  "laterite-ags4-diff",
- "laterite-ags4-emit",
  "laterite-ags4-excel",
+ "laterite-ags4-hostopts",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
@@ -2439,6 +2449,7 @@ dependencies = [
  "laterite-ags4-diff",
  "laterite-ags4-emit",
  "laterite-ags4-excel",
+ "laterite-ags4-hostopts",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
@@ -2463,6 +2474,7 @@ dependencies = [
  "laterite-ags4-diff",
  "laterite-ags4-emit",
  "laterite-ags4-excel",
+ "laterite-ags4-hostopts",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-reference",

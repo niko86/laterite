@@ -456,13 +456,13 @@ fn build_custom_dict(
     // The ladder is `hostopts` (#923) — one copy per workspace. What stays
     // here is this surface's spelling of the knobs, so an error names what a
     // JS caller actually typed.
-    laterite_ags4_emit::hostopts::custom_dict(
+    laterite_ags4_hostopts::custom_dict(
         dict_path.map(Path::new),
         dict_bytes,
         dict_replace,
         over,
         enc,
-        laterite_ags4_emit::hostopts::DictFlags {
+        laterite_ags4_hostopts::DictFlags {
             source: "dict",
             replace: "dictReplace",
             version: "dictVersion",
@@ -1434,7 +1434,7 @@ pub fn emit_ags4_from_ipc(
         // The emit door has no per-file TRAN_AGS to defer to, so `auto`
         // collapses to the dictionary's generated fallback — never a version
         // literal (this line is one of the two the 2026-07-14 sweep missed).
-        edition: laterite_ags4_emit::hostopts::edition_or_fallback(edition.as_deref())
+        edition: laterite_ags4_hostopts::edition_or_fallback(edition.as_deref())
             .map_err(|e| Error::from_reason(e.message))?,
         synthesise_metadata: synthesise_metadata.unwrap_or(false),
     };
@@ -1470,7 +1470,7 @@ pub fn emit_ags4_from_ipc_unchecked(
     units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
     types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 ) -> Result<Buffer> {
-    let edition = laterite_ags4_emit::hostopts::edition_or_fallback(edition.as_deref())
+    let edition = laterite_ags4_hostopts::edition_or_fallback(edition.as_deref())
         .map_err(|e| Error::from_reason(e.message))?;
     let inputs = inputs_from_ipc(groups, units.as_ref(), types.as_ref())?;
     let bytes = laterite_ags4_emit::emit_ags4_from_arrow_unchecked(inputs, edition)
@@ -1550,11 +1550,11 @@ fn bad_encoding(msg: &str) -> Error {
 /// a `{ok:false}` failure report while `emit_ags4_from_ipc` throws it.
 /// The parse is `hostopts` (#923) — one copy per workspace, not per surface.
 fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, String> {
-    laterite_ags4_emit::hostopts::edition(s).map_err(|e| e.message)
+    laterite_ags4_hostopts::edition(s).map_err(|e| e.message)
 }
 
 fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
-    laterite_ags4_emit::hostopts::write_mode(s).map_err(|e| Error::from_reason(e.message))
+    laterite_ags4_hostopts::write_mode(s).map_err(|e| Error::from_reason(e.message))
 }
 
 // --- Excel ↔ AGS4 (laterite-ags4-excel) --------------------------------------
