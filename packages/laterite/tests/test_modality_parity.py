@@ -550,26 +550,23 @@ def test_node_excel_bytes_forms():
 # Browser (wasm crate + web/src/lib) — orphan-guard
 # --------------------------------------------------------------------------- #
 
-# The wasm-verb → capability map, coupled to discovered reality (the
-# test_fixable_contract idiom). A new top-level `#[wasm_bindgen] pub fn` with no
-# entry here fails until it is mapped AND given a register browser cell.
+# The wasm export FACTS live on the register itself (`wasm_exports` in
+# modality.json, #926) — one row per export carrying its capability and the
+# features that gate it. This fact used to be stated five times (two hand maps
+# here, two EXPECTED_FUNCTIONS arrays in the release gates, plus the cells);
+# #883 registered ONE export with six hand-edits. These two names are now
+# PROJECTIONS of the table, and the orphan guard below is its reflector: a new
+# top-level `#[wasm_bindgen] pub fn` with no table row fails until it gets one
+# (and a register browser cell); a row naming no real export fails as stale.
+_WASM_EXPORT_FACTS = {row["name"]: row for row in _doc()["wasm_exports"]["exports"]}
 _WASM_VERB_CAP = {
-    "read": "read",
-    "validate": "validate",
-    "certify": "certify",
-    "compute_fixes": "fix",
-    "apply_fixes": "fix",
-    "build_ags4": "build",
-    "build_ags4_ipc": "build",
-    "build_ags4_unchecked": "build-unchecked",
-    "diff": "diff",
-    "merge": "merge",
-    "censor": "censor",
-    "ags4_to_xlsx": "to_excel",
-    "xlsx_to_ags4": "from_excel",
+    name: row["capability"]
+    for name, row in _WASM_EXPORT_FACTS.items()
+    if row["capability"] is not None
 }
-# Verbs with no file-I/O modality (catalogue/dictionary lookups, build metadata) —
-# the by-design allowlist, hygiene-checked below so it can't mask a removed verb.
+# Rows with `capability: null` — verbs with no file-I/O modality to register
+# (catalogue/dictionary lookups, build metadata), hygiene-checked below so the
+# allowlist can't mask a removed verb.
 # `version` reports CARGO_PKG_VERSION, mirroring Node's `version()`; it takes no
 # input and touches no file, so it has no I/O modality to register. Added in laterite-dev#556,
 # where `ags4-compliance`'s wasm runner had HARD-CODED `version: "0.5.1"` because
@@ -584,11 +581,7 @@ _WASM_VERB_CAP = {
 # inputs, so surfaces reporting the same one are running the same rules — which
 # is what laterite-dev#556's report thought it was asserting.
 _WASM_META_ALLOW = {
-    "list_rules",
-    "dictionary",
-    "version",
-    "engine_version",
-    "engine_fingerprint",
+    name for name, row in _WASM_EXPORT_FACTS.items() if row["capability"] is None
 }
 
 _WEB_VERB_CAP = {"lock": "transport-lock", "unlock": "transport-lock"}
@@ -734,18 +727,25 @@ def test_arity_gate_can_see_the_exports():
 
 
 def test_wasm_orphan_guard():
+    """The export-facts table's reflector: complete in BOTH directions.
+
+    This is what lets the release gates and the projections above trust the
+    table — a new export with no row fails here, and a row whose export was
+    renamed or removed fails as stale, so neither .mjs gate can be handed a
+    list that quietly stopped describing lib.rs.
+    """
     discovered = _wasm_verbs()
-    mapped = set(_WASM_VERB_CAP) | _WASM_META_ALLOW
+    mapped = set(_WASM_EXPORT_FACTS)
     unregistered = discovered - mapped
     assert not unregistered, (
-        f"wasm verb(s) {sorted(unregistered)} exported but unmapped — map each to a "
-        f"capability in _WASM_VERB_CAP (+ a browser cell in modality.json) or to "
-        f"_WASM_META_ALLOW with a reason"
+        f"wasm verb(s) {sorted(unregistered)} exported but not in the export-facts "
+        f"table — add a row to modality.json `wasm_exports` (capability + "
+        f"features_required, plus a register browser cell for a capability verb)"
     )
     stale = mapped - discovered
     assert not stale, (
-        f"wasm verb map has {sorted(stale)} not found in lib.rs — the export was "
-        f"renamed/removed; update _WASM_VERB_CAP / _WASM_META_ALLOW"
+        f"export-facts rows {sorted(stale)} name no export in lib.rs — the export "
+        f"was renamed/removed; update modality.json `wasm_exports`"
     )
 
 
@@ -753,6 +753,27 @@ def test_wasm_capabilities_have_browser_cells():
     doc = _doc()
     for cap in set(_WASM_VERB_CAP.values()):
         _cell(doc, cap, "browser")  # raises if the browser cell is missing
+
+
+def test_export_facts_features_are_real_cargo_features():
+    """Every `features_required` value must be a feature the wasm crate
+    declares — a typo'd feature name would silently drop the export from BOTH
+    release gates' expected lists, and an artifact check against a wrong
+    expectation reports the artifact, not the table. (Whether each cell is the
+    RIGHT feature is held empirically: the slim and tier-1 artifact gates build
+    real feature sets and compare exports by name, so a cell wrong at either
+    tier boundary fails those.)"""
+    import tomllib
+
+    manifest = tomllib.loads(
+        (WASM_SRC.parent / "Cargo.toml").read_text(encoding="utf-8")
+    )
+    declared = set(manifest.get("features", {}))
+    used = {f for row in _WASM_EXPORT_FACTS.values() for f in row["features_required"]}
+    assert used <= declared, (
+        f"export-facts rows name features the wasm crate does not declare: "
+        f"{sorted(used - declared)}"
+    )
 
 
 def test_web_transport_orphan_guard():
@@ -938,32 +959,40 @@ def _reflect_rust(doors: dict[str, str], api: set[str]) -> tuple[set[str], set[s
     return present, absent
 
 
+# The one registry of the judgement tables above — the reflector iterates it,
+# and the completeness guard derives its mapped set from it, so adding a door
+# table is ONE row here rather than an edit in each test (the old second copy
+# was a hand-restated union of nine `.values()` calls that had to be kept in
+# step with this tuple by eye).
+_RUST_DOOR_TABLES = (
+    ("read", _RUST_READ_DOORS, "in"),
+    ("validate", _RUST_VALIDATE_DOORS, "in"),
+    ("emit", _RUST_EMIT_DOORS, "out"),
+    ("certify", _RUST_CERTIFY_DOORS, "out"),
+    ("cert-input", _RUST_CERT_INPUT_DOORS, "in"),
+    ("fix", _RUST_FIX_IN_DOORS, "in"),
+    ("fix", _RUST_FIX_OUT_DOORS, "out"),
+    ("build", _RUST_BUILD_IN_DOORS, "in"),
+    ("build", _RUST_BUILD_OUT_DOORS, "out"),
+    ("build-unchecked", _RUST_BUILD_UNCHECKED_IN_DOORS, "in"),
+    ("build-unchecked", _RUST_BUILD_UNCHECKED_OUT_DOORS, "out"),
+    ("diff", _RUST_DIFF_IN_DOORS, "in"),
+    ("diff", _RUST_DIFF_OUT_DOORS, "out"),
+    ("merge", _RUST_MERGE_IN_DOORS, "in"),
+    ("merge", _RUST_MERGE_OUT_DOORS, "out"),
+    ("to_excel", _RUST_TO_EXCEL_IN_DOORS, "in"),
+    ("to_excel", _RUST_TO_EXCEL_OUT_DOORS, "out"),
+    ("from_excel", _RUST_FROM_EXCEL_IN_DOORS, "in"),
+    ("from_excel", _RUST_FROM_EXCEL_OUT_DOORS, "out"),
+)
+
+
 def test_rust_facade_reflects_the_register():
     """Every I/O form the register claims for the Rust facade must be a door the
     published API actually has — and every door it has must be credited."""
     doc = _doc()
     api = _rust_api()
-    for capability, doors, direction in (
-        ("read", _RUST_READ_DOORS, "in"),
-        ("validate", _RUST_VALIDATE_DOORS, "in"),
-        ("emit", _RUST_EMIT_DOORS, "out"),
-        ("certify", _RUST_CERTIFY_DOORS, "out"),
-        ("cert-input", _RUST_CERT_INPUT_DOORS, "in"),
-        ("fix", _RUST_FIX_IN_DOORS, "in"),
-        ("fix", _RUST_FIX_OUT_DOORS, "out"),
-        ("build", _RUST_BUILD_IN_DOORS, "in"),
-        ("build", _RUST_BUILD_OUT_DOORS, "out"),
-        ("build-unchecked", _RUST_BUILD_UNCHECKED_IN_DOORS, "in"),
-        ("build-unchecked", _RUST_BUILD_UNCHECKED_OUT_DOORS, "out"),
-        ("diff", _RUST_DIFF_IN_DOORS, "in"),
-        ("diff", _RUST_DIFF_OUT_DOORS, "out"),
-        ("merge", _RUST_MERGE_IN_DOORS, "in"),
-        ("merge", _RUST_MERGE_OUT_DOORS, "out"),
-        ("to_excel", _RUST_TO_EXCEL_IN_DOORS, "in"),
-        ("to_excel", _RUST_TO_EXCEL_OUT_DOORS, "out"),
-        ("from_excel", _RUST_FROM_EXCEL_IN_DOORS, "in"),
-        ("from_excel", _RUST_FROM_EXCEL_OUT_DOORS, "out"),
-    ):
+    for capability, doors, direction in _RUST_DOOR_TABLES:
         present, absent = _reflect_rust(doors, api)
         _assert_reflection(_cell(doc, capability, "rust"), direction, present, absent)
 
@@ -985,17 +1014,17 @@ def test_rust_source_doors_are_all_mapped():
         )
         and "::" not in item
     }
-    mapped = (
-        set(_RUST_READ_DOORS.values())
-        | set(_RUST_VALIDATE_DOORS.values())
-        | set(_RUST_FIX_IN_DOORS.values())
-        | set(_RUST_BUILD_IN_DOORS.values())
-        | set(_RUST_BUILD_UNCHECKED_IN_DOORS.values())
-        | set(_RUST_DIFF_IN_DOORS.values())
-        | set(_RUST_MERGE_IN_DOORS.values())
-        | set(_RUST_TO_EXCEL_IN_DOORS.values())
-        | set(_RUST_FROM_EXCEL_IN_DOORS.values())
-    )
+    # Derived from the same registry the reflector iterates, not restated: the
+    # "in" tables are the ones whose doors the discovered sweep can see. A
+    # method door (`Validate::index`, cert-input's only entry) carries `::`
+    # and the sweep excludes those, so including every "in" table is exactly
+    # the nine-way union this replaced.
+    mapped = {
+        door
+        for _, doors, direction in _RUST_DOOR_TABLES
+        if direction == "in"
+        for door in doors.values()
+    }
     unmapped = discovered - mapped
     assert not unmapped, (
         f"the facade offers {sorted(unmapped)} but no form is mapped to it — add "
