@@ -92,6 +92,7 @@
 
 pub mod ags4;
 mod error;
+pub(crate) mod pending_adoptions;
 pub mod transport;
 
 pub use error::{Error, ErrorKind};
