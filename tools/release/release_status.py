@@ -95,6 +95,7 @@ import tarfile
 import tomllib
 import urllib.error
 import urllib.request
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -148,6 +149,64 @@ SECTION_BUMP = {
 #: The section whose entries cannot be classified from their section alone.
 AMBIGUOUS = "changed"
 ORDER = ["major", "minor", "patch", "none"]
+
+# --- the report's shape ------------------------------------------------------
+#
+# One typed record per crate instead of a 17-string-key dict: the renderers,
+# the nightly's `engine_cut` accessors and two hand-mirrored test fixtures all
+# read the same keys by string, so a typo was a silent wrong answer at a
+# distance and #802's three new keys had to be threaded through both fixtures
+# by hand. Frozen dataclasses make the typo an AttributeError at the line that
+# made it, and the fixtures collapse to `dataclasses.replace(DEFAULT, **kw)`.
+#
+# The field ORDER is the `--json` wire order (`dataclasses.asdict` preserves
+# it, and nightly.yml's later steps read that file) — append, don't reorder.
+
+
+@dataclass(frozen=True)
+class CrateStatus:
+    """One engine crate's row, exactly as `--json` serialises it."""
+
+    crate: str
+    version: str
+    last_stamp: str
+    registry_state: str
+    registry_latest: str
+    api_added: int
+    api_removed: int
+    api_removed_names: list[str]
+    verdict: str
+    tier: str
+    published_live: str
+    delta_baseline: str
+    code_changed: bool
+    deps_behind: list[str]
+    part_required: str
+    cut_action: str
+    cut_why: str
+
+
+@dataclass(frozen=True)
+class ProductStatus:
+    version: str
+    last_stamp: str
+    verdict: str
+
+
+@dataclass(frozen=True)
+class Report:
+    engine_crates: list[CrateStatus]
+    product: ProductStatus
+    changelog_unreleased: dict[str, int]
+
+    @classmethod
+    def from_json(cls, data: dict) -> Report:
+        """Rehydrate a `--json` file — how `engine_cut` reads the snapshot back."""
+        return cls(
+            engine_crates=[CrateStatus(**c) for c in data["engine_crates"]],
+            product=ProductStatus(**data["product"]),
+            changelog_unreleased=data["changelog_unreleased"],
+        )
 
 
 def sh(*args: str) -> str:
@@ -591,14 +650,14 @@ def cut_action(
     return "bump", ""
 
 
-def registry_scope(status: dict) -> str:
+def registry_scope(status: Report) -> str:
     """What the registry read did not cover — printed on every run.
 
     The house rule is that a gate dropping input says what it dropped, and an
     unreachable crate is dropped input. This line is the only thing standing
     between "we could not ask" and a silent green.
     """
-    states = [c["registry_state"] for c in status["engine_crates"]]
+    states = [c.registry_state for c in status.engine_crates]
     total = len(states)
     skipped = sum(1 for st in states if st == "skipped")
     unknown = sum(1 for st in states if st == "unknown")
@@ -630,7 +689,7 @@ def verdict_from_api(added: int, removed: int) -> str:
     return "none"
 
 
-def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> dict:
+def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> Report:
     """The whole report. `fetch=None` asks the registry nothing."""
     _, product_stamp = last_stamp(PRODUCT_MANIFEST, "/^version/,+1")
     sections = changelog_sections()
@@ -684,84 +743,82 @@ def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> d
                 reasons.append("code changed with no API movement")
             why = "; ".join(reasons)
         crates.append(
-            {
-                "crate": crate,
-                "version": version,
-                "last_stamp": stamp,
-                "registry_state": state,
-                "registry_latest": published,
-                "api_added": added,
-                "api_removed": removed,
-                "api_removed_names": removed_names[:20],
-                "verdict": verdict_from_api(added, removed),
-                "tier": tier,
-                "published_live": live,
-                "delta_baseline": delta_baseline,
-                "code_changed": code,
-                "deps_behind": stale,
-                "part_required": part,
-                "cut_action": action,
-                "cut_why": why,
-            }
+            CrateStatus(
+                crate=crate,
+                version=version,
+                last_stamp=stamp,
+                registry_state=state,
+                registry_latest=published,
+                api_added=added,
+                api_removed=removed,
+                api_removed_names=removed_names[:20],
+                verdict=verdict_from_api(added, removed),
+                tier=tier,
+                published_live=live,
+                delta_baseline=delta_baseline,
+                code_changed=code,
+                deps_behind=stale,
+                part_required=part,
+                cut_action=action,
+                cut_why=why,
+            )
         )
-    return {
-        "engine_crates": crates,
-        "product": {
-            "version": version_of(PRODUCT_MANIFEST, r'^version\s*=\s*"([^"]+)"'),
-            "last_stamp": product_stamp,
-            "verdict": verdict_from_sections(sections),
-        },
-        "changelog_unreleased": sections,
-    }
+    return Report(
+        engine_crates=crates,
+        product=ProductStatus(
+            version=version_of(PRODUCT_MANIFEST, r'^version\s*=\s*"([^"]+)"'),
+            last_stamp=product_stamp,
+            verdict=verdict_from_sections(sections),
+        ),
+        changelog_unreleased=sections,
+    )
 
 
-def render(s: dict) -> str:
-    p = s["product"]
+def render(s: Report) -> str:
+    p = s.product
     lines = [
         "engine crates (per-crate since #781; verdict = API delta since the last"
         " PUBLISHED version, or the last stamp when the registry has no answer):"
     ]
-    for c in s["engine_crates"]:
-        verdicts = [] if c["verdict"] == "none" else [c["verdict"].upper()]
-        shout = REGISTRY_FLAG.get(c["registry_state"])
+    for c in s.engine_crates:
+        verdicts = [] if c.verdict == "none" else [c.verdict.upper()]
+        shout = REGISTRY_FLAG.get(c.registry_state)
         if shout:
             verdicts.append(shout)
-        if c["cut_action"] == "bump":
-            verdicts.append(f"BUMP {c['part_required'].upper()} OWED")
-        elif c["cut_action"] == "human":
+        if c.cut_action == "bump":
+            verdicts.append(f"BUMP {c.part_required.upper()} OWED")
+        elif c.cut_action == "human":
             verdicts.append("NEEDS A HUMAN")
-        if c["deps_behind"] and c["cut_action"] != "bump":
+        if c.deps_behind and c.cut_action != "bump":
             # A crate the cut does not act on (the facade, an unlabelled crate)
             # can still be pinning versions the floors have left — a fact, not
             # an action, so it is said without being shouted as owed.
             verdicts.append("PINS BEHIND FLOORS")
         flag = f"   ->  {', '.join(verdicts)}" if verdicts else ""
-        reg = f"crates.io {c['registry_latest']}"
+        reg = f"crates.io {c.registry_latest}"
         lines.append(
             (
-                f"  {c['crate']:<26} {c['version']:<8} "
-                f"+{c['api_added']} -{c['api_removed']}  {reg:<18}{flag}"
+                f"  {c.crate:<26} {c.version:<8} "
+                f"+{c.api_added} -{c.api_removed}  {reg:<18}{flag}"
             ).rstrip()
         )
     lines += [
-        f"product  {p['version']:<10} last stamped {p['last_stamp']}",
+        f"product  {p.version:<10} last stamped {p.last_stamp}",
         "         changelog [unreleased]: "
         + (
-            ", ".join(f"{k} {v}" for k, v in sorted(s["changelog_unreleased"].items()))
+            ", ".join(f"{k} {v}" for k, v in sorted(s.changelog_unreleased.items()))
             or "empty"
         )
-        + f"   ->  {p['verdict'].upper()}",
+        + f"   ->  {p.verdict.upper()}",
     ]
-    removed = [
-        (c["crate"], n) for c in s["engine_crates"] for n in c["api_removed_names"]
-    ]
+    removed = [(c.crate, n) for c in s.engine_crates for n in c.api_removed_names]
     if removed:
         lines.append("")
         lines.append(
             "  public API REMOVED since a crate's baseline — a consumer has to follow:"
         )
         lines += [f"    {crate}: {n}" for crate, n in removed]
-    n_changed = s["changelog_unreleased"].get(AMBIGUOUS, 0)
+    n_changed = s.changelog_unreleased.get(AMBIGUOUS, 0)
     if n_changed:
         lines.append("")
         plural = "y" if n_changed == 1 else "ies"
@@ -782,7 +839,7 @@ def render(s: dict) -> str:
     lines.append(
         "  snapshot exists for the Python/Node surface — so treat that one as a suggestion."
     )
-    if all(c["registry_state"] == "skipped" for c in s["engine_crates"]):
+    if all(c.registry_state == "skipped" for c in s.engine_crates):
         lines.append(
             "  The crates.io column is EMPTY this run — nothing was asked, so no crate here"
         )
@@ -802,29 +859,26 @@ def render(s: dict) -> str:
     return "\n".join(lines)
 
 
-def render_nag(s: dict) -> str:
-    p = s["product"]
-    owed_crates = [c for c in s["engine_crates"] if c["cut_action"] == "bump"]
-    humans = [c for c in s["engine_crates"] if c["cut_action"] == "human"]
-    unpublished = [
-        c for c in s["engine_crates"] if c["registry_state"] in ("owed", "new")
-    ]
-    unknown = sum(1 for c in s["engine_crates"] if c["registry_state"] == "unknown")
+def render_nag(s: Report) -> str:
+    p = s.product
+    owed_crates = [c for c in s.engine_crates if c.cut_action == "bump"]
+    humans = [c for c in s.engine_crates if c.cut_action == "human"]
+    unpublished = [c for c in s.engine_crates if c.registry_state in ("owed", "new")]
+    unknown = sum(1 for c in s.engine_crates if c.registry_state == "unknown")
     parts = []
     if owed_crates:
         parts.append(
             "crate bumps owed: "
-            + ", ".join(f"{c['crate']} ({c['part_required']})" for c in owed_crates)
+            + ", ".join(f"{c.crate} ({c.part_required})" for c in owed_crates)
         )
     if humans:
-        parts.append("needs a human: " + ", ".join(c["crate"] for c in humans))
+        parts.append("needs a human: " + ", ".join(c.crate for c in humans))
     if unpublished:
         parts.append(
-            "stamped but not on crates.io: "
-            + ", ".join(c["crate"] for c in unpublished)
+            "stamped but not on crates.io: " + ", ".join(c.crate for c in unpublished)
         )
-    if p["verdict"] != "none":
-        parts.append(f"product {p['version']} release owed ({p['verdict']})")
+    if p.verdict != "none":
+        parts.append(f"product {p.version} release owed ({p.verdict})")
     # Said out loud even when nothing else is owed: a bare "nothing owed" would
     # be claiming knowledge a failed registry read does not have.
     caveat = f" ({unknown} crate(s) unreachable on crates.io)" if unknown else ""
@@ -836,23 +890,21 @@ def render_nag(s: dict) -> str:
     return "release-status: " + " · ".join(parts) + caveat
 
 
-def render_cut(s: dict) -> str:
+def render_cut(s: Report) -> str:
     """The actionable view (#806): what the nightly cut would DO, one line per act."""
     by = {
-        a: [c for c in s["engine_crates"] if c["cut_action"] == a]
+        a: [c for c in s.engine_crates if c.cut_action == a]
         for a in ("bump", "publish", "human", "unconcluded")
     }
     lines = ["engine cut (#806) — baseline: the last PUBLISHED version of each crate:"]
     lines.extend(
-        f"  bump    {c['crate']} {c['part_required']}   ({c['cut_why']})"
-        for c in by["bump"]
+        f"  bump    {c.crate} {c.part_required}   ({c.cut_why})" for c in by["bump"]
     )
     lines.extend(
-        f"  publish {c['crate']} {c['version']}   ({c['cut_why']})"
-        for c in by["publish"]
+        f"  publish {c.crate} {c.version}   ({c.cut_why})" for c in by["publish"]
     )
-    lines.extend(f"  HUMAN   {c['crate']}: {c['cut_why']}" for c in by["human"])
-    lines.extend(f"  ?       {c['crate']}: {c['cut_why']}" for c in by["unconcluded"])
+    lines.extend(f"  HUMAN   {c.crate}: {c.cut_why}" for c in by["human"])
+    lines.extend(f"  ?       {c.crate}: {c.cut_why}" for c in by["unconcluded"])
     if not (by["bump"] or by["publish"] or by["human"]):
         lines.append(
             "  nothing owed"
@@ -868,7 +920,7 @@ def render_cut(s: dict) -> str:
         lines.append("commands (what the nightly's PR mode runs):")
         lines.extend(
             "  uv run --no-project python tools/release/bump_crate.py "
-            f"{c['crate']} {c['part_required']}"
+            f"{c.crate} {c.part_required}"
             for c in by["bump"]
         )
     lines.append("")
@@ -992,7 +1044,7 @@ def main() -> int:
 
     s = collect(fetch=None if args.no_registry else fetch_index)
     if args.json:
-        print(json.dumps(s, indent=2))
+        print(json.dumps(asdict(s), indent=2))
     elif args.nag:
         print(render_nag(s))
     elif args.cut:

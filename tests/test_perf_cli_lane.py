@@ -23,11 +23,14 @@ pinned here is the contract:
 
 from __future__ import annotations
 
-import importlib.util
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+from _tools import load_tool
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # The suite split is file-granular (the conftest collection hook ignores
 # whole modules): one test here spawns a child interpreter to prove the
@@ -36,21 +39,7 @@ import pytest
 # contract they pin can only drift when code changes, which runs that job.
 pytestmark = pytest.mark.needs_env
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load(stem: str):
-    """Import a hyphen-named tools/ script as a module."""
-    name = stem.replace("-", "_")
-    spec = importlib.util.spec_from_file_location(name, REPO / "tools" / f"{stem}.py")
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-cli = _load("perf-cli")
+cli = load_tool("perf_cli")
 
 
 # --- the artifact ----------------------------------------------------------

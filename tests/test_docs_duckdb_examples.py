@@ -52,10 +52,10 @@ import functools
 import os
 import re
 import shutil
-import sys
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 _REPO = Path(__file__).resolve().parents[1]
 _SQL_DIR = _REPO / "web" / "docs-site" / "examples" / "duckdb"
@@ -153,7 +153,6 @@ def test_docs_duckdb_example_runs(
 # runs in a buildless lane — importing `duckdb` there would break both. This file
 # already owns the connection, the extension-mode reporting and the env gating.
 
-_GEN = _REPO / "tools" / "gen_doc_outputs.py"
 _DOCS = _REPO / "web" / "docs-site" / "docs"
 
 
@@ -161,19 +160,13 @@ _DOCS = _REPO / "web" / "docs-site" / "docs"
 def _gen_doc_outputs():
     """Load the builder without importing `tools` as a package.
 
-    Registered in `sys.modules` before execution because the module defines a
-    dataclass, and `dataclasses` resolves the defining module by name — an
-    unregistered one gives `AttributeError: 'NoneType' object has no attribute
-    '__dict__'` at import time rather than anything about dataclasses.
+    `load_tool` registers the module in `sys.modules` before execution, which
+    matters here because the module defines a dataclass, and `dataclasses`
+    resolves the defining module by name — an unregistered one gives
+    `AttributeError: 'NoneType' object has no attribute '__dict__'` at import
+    time rather than anything about dataclasses.
     """
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("gen_doc_outputs", _GEN)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["gen_doc_outputs"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return load_tool("gen_doc_outputs")
 
 
 def _page_program(md: str, lang: str) -> tuple[str, int]:

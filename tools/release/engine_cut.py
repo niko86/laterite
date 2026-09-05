@@ -4,8 +4,8 @@
 The nightly job runs `release_status.py --json` ONCE and every later step reads
 that file through this — so the tracker, the publish dispatch and the cut PR
 all act on the same registry sweep rather than three sweeps that can disagree
-mid-run. Every function here is pure over the status dict; `main()` is the only
-line that touches the world.
+mid-run. Every function here is pure over the typed report (`rs.Report`, #925);
+`main()` is the only line that touches the world.
 
 The modes map one-to-one onto the job's steps:
 
@@ -35,36 +35,33 @@ import release_status as rs
 EXIT_UNCONCLUDED = 3
 
 
-def tokens(status: dict) -> list[str]:
+def tokens(status: rs.Report) -> list[str]:
     """One space-free token per owed act, stable across nights until acted on."""
     out = []
-    for c in status["engine_crates"]:
-        action = c["cut_action"]
-        if action == "bump":
-            out.append(f"{c['crate']}:bump-{c['part_required']}")
-        elif action == "publish":
-            out.append(f"{c['crate']}:publish-{c['version']}")
-        elif action == "human":
-            out.append(f"{c['crate']}:human")
+    for c in status.engine_crates:
+        if c.cut_action == "bump":
+            out.append(f"{c.crate}:bump-{c.part_required}")
+        elif c.cut_action == "publish":
+            out.append(f"{c.crate}:publish-{c.version}")
+        elif c.cut_action == "human":
+            out.append(f"{c.crate}:human")
     return out
 
 
-def bumps(status: dict) -> list[tuple[str, str]]:
+def bumps(status: rs.Report) -> list[tuple[str, str]]:
     return [
-        (c["crate"], c["part_required"])
-        for c in status["engine_crates"]
-        if c["cut_action"] == "bump"
+        (c.crate, c.part_required)
+        for c in status.engine_crates
+        if c.cut_action == "bump"
     ]
 
 
-def publish_owed(status: dict) -> list[str]:
-    return [c["crate"] for c in status["engine_crates"] if c["cut_action"] == "publish"]
+def publish_owed(status: rs.Report) -> list[str]:
+    return [c.crate for c in status.engine_crates if c.cut_action == "publish"]
 
 
-def unconcluded(status: dict) -> list[str]:
-    return [
-        c["crate"] for c in status["engine_crates"] if c["cut_action"] == "unconcluded"
-    ]
+def unconcluded(status: rs.Report) -> list[str]:
+    return [c.crate for c in status.engine_crates if c.cut_action == "unconcluded"]
 
 
 def main() -> int:
@@ -80,7 +77,11 @@ def main() -> int:
         )
         return 2
     mode, path = sys.argv[1], Path(sys.argv[2])
-    status = json.loads(path.read_text())
+    # Rehydrate into the typed report the accessors and renderers take — the
+    # wire file stays plain JSON (nightly.yml wrote it with `--json`), and a
+    # key it does not carry fails HERE, loudly, not as a wrong empty answer
+    # three steps later.
+    status = rs.Report.from_json(json.loads(path.read_text()))
 
     if mode == "--render":
         print(rs.render(status))

@@ -21,26 +21,16 @@ release. The card says so because this refused to let it say otherwise.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
-import sys
 import tomllib
 from pathlib import Path
 
+from _tools import load_tool
+
 REPO = Path(__file__).resolve().parents[1]
 
-
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gic = _load("gen_install_channels", REPO / "tools" / "gen_install_channels.py")
+gic = load_tool("gen_install_channels")
 
 
 def _sources() -> dict[str, str]:

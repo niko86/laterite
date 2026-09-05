@@ -14,23 +14,9 @@ asserting the current tree happens to agree.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
+from _tools import load_tool
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gwc = _load("gen_wiki_cli", REPO / "tools" / "gen_wiki_cli.py")
+gwc = load_tool("gen_wiki_cli")
 
 README = gwc._README.read_text(encoding="utf-8")
 CLI_RS = gwc._CLI_RS.read_text(encoding="utf-8")

@@ -22,29 +22,9 @@ the run's own business, and it fails loudly there.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
+from _tools import load_tool
 
-_TOOLS = Path(__file__).resolve().parents[1] / "tools"
-
-
-def _load():
-    # The house pattern for testing a tools/ script (test_check_doc_types.py):
-    # load by path, not by import name. The `sys.path` insert is still needed —
-    # the gate imports its sibling `check_package_contents` for the publish set.
-    sys.path.insert(0, str(_TOOLS))
-    spec = importlib.util.spec_from_file_location(
-        "check_semver", _TOOLS / "check_semver.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_semver"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_GATE = _load()
+_GATE = load_tool("check_semver")
 classify = _GATE.classify
 tree_version = _GATE.tree_version
 version_in = _GATE.version_in

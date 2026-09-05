@@ -23,65 +23,24 @@ seam, and everything above it takes the fetcher as a parameter.
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 import urllib.error
+from dataclasses import asdict, fields, replace
 from email.message import Message
-from pathlib import Path
 
 import pytest
+from _tools import default_crate, load_tool, report_of
 
-REPO = Path(__file__).resolve().parents[1]
+rs = load_tool("release_status")
 
-
-def _load():
-    """Import `tools/release/release_status.py` — `tools/release/` is not a package."""
-    spec = importlib.util.spec_from_file_location(
-        "release_status", REPO / "tools" / "release" / "release_status.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["release_status"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+#: The one all-quiet row (tests/_tools.py, shared with test_engine_cut.py) —
+#: the two files used to hand-mirror this shape as 17-key dicts.
+DEFAULT = default_crate(rs)
 
 
-rs = _load()
-
-
-def _status(*crates: dict) -> dict:
-    """A report dict shaped like `collect()`'s, without running git or the network."""
-    return {
-        "engine_crates": [
-            {
-                "crate": c.get("crate", "laterite-ags4-core"),
-                "version": c.get("version", "0.12.0"),
-                "last_stamp": "abc1234 2026-08-29 release: x",
-                "registry_state": c["registry_state"],
-                "registry_latest": c.get("registry_latest", "0.11.0"),
-                "api_added": c.get("api_added", 0),
-                "api_removed": 0,
-                "api_removed_names": [],
-                "verdict": c.get("verdict", "none"),
-                "tier": c.get("tier", "engine"),
-                "published_live": c.get("published_live", "0.11.0"),
-                "delta_baseline": c.get("delta_baseline", "publish 0.11.0"),
-                "code_changed": c.get("code_changed", False),
-                "deps_behind": c.get("deps_behind", []),
-                "part_required": c.get("part_required", "none"),
-                "cut_action": c.get("cut_action", "none"),
-                "cut_why": c.get("cut_why", ""),
-            }
-            for c in crates
-        ],
-        "product": {
-            "version": "0.12.0",
-            "last_stamp": "abc 2026-08-29 x",
-            "verdict": "none",
-        },
-        "changelog_unreleased": {},
-    }
+def _status(*crates: dict):
+    """A `collect()`-shaped report, without running git or the network."""
+    return report_of(rs, *(replace(DEFAULT, **c) for c in crates))
 
 
 # --- the index path: a wrong path 404s, and a 404 reads as "never published" ---
@@ -225,8 +184,32 @@ def test_skipping_the_registry_says_so_and_claims_nothing():
 def test_collect_with_no_fetcher_asks_nothing_and_marks_every_crate_skipped():
     """`--no-registry` is the same code path with nothing behind it."""
     status = rs.collect(fetch=None)
-    assert status["engine_crates"], "the snapshot census should not be empty"
-    assert {c["registry_state"] for c in status["engine_crates"]} == {"skipped"}
+    assert status.engine_crates, "the snapshot census should not be empty"
+    assert {c.registry_state for c in status.engine_crates} == {"skipped"}
+
+
+# --- the wire shape: nightly.yml reads the --json file back ---
+
+
+def test_json_wire_is_the_dict_shape_the_nightly_already_reads():
+    """`--json` moved from a literal dict to `dataclasses.asdict` (#925); the
+    key set and ORDER are the wire contract nightly.yml's later steps parse,
+    so they are pinned here rather than trusted to field order by accident."""
+    wire = asdict(_status({"registry_state": "ok"}))
+    assert list(wire) == ["engine_crates", "product", "changelog_unreleased"]
+    assert list(wire["product"]) == ["version", "last_stamp", "verdict"]
+    assert list(wire["engine_crates"][0]) == [f.name for f in fields(rs.CrateStatus)]
+    assert list(wire["engine_crates"][0])[:5] == [
+        "crate",
+        "version",
+        "last_stamp",
+        "registry_state",
+        "registry_latest",
+    ]
+    # And the round-trip engine_cut performs on the file it reads back.
+    assert rs.Report.from_json(json.loads(json.dumps(wire))) == _status(
+        {"registry_state": "ok"}
+    )
 
 
 # --- the network seam ---

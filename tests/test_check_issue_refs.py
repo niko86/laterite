@@ -22,32 +22,19 @@ gate itself, so it must not shell out to a second interpreter.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
-import sys
 from pathlib import Path
 
 import pytest
 import yaml
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 DATA = REPO / "foreign-issue-refs.json"
 
 
-def _load():
-    """Import `tools/check_issue_refs.py` — `tools/` is not a package."""
-    spec = importlib.util.spec_from_file_location(
-        "check_issue_refs", REPO / "tools" / "check_issue_refs.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_issue_refs"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gate = _load()
+gate = load_tool("check_issue_refs")
 
 
 def test_the_tree_is_clean(capsys: pytest.CaptureFixture[str]) -> None:

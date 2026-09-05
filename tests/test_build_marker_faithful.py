@@ -52,7 +52,8 @@ CI = REPO / ".github/workflows/ci.yml"
 BUILT_PACKAGES = {"laterite", "laterite_native", "_laterite_native"}
 
 #: Repo-local names an import walk will see but which pip never installs.
-LOCAL_MODULES = {"tests", "tools", "conftest"}
+#: `_tools` is this suite's shared script loader (tests/_tools.py, #925).
+LOCAL_MODULES = {"tests", "tools", "conftest", "_tools"}
 
 #: Text that betrays a module running project code OUT OF PROCESS, where an
 #: import walk cannot follow. `native` is this suite's fixture for the resolved

@@ -19,26 +19,15 @@ leg's job (`docs-vs-released-crates` in `.github/workflows/nightly.yml`).
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 import tomllib
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-REPO = Path(__file__).resolve().parents[1]
+from _tools import load_tool
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-crr = _load(
-    "check_released_crate_readmes", REPO / "tools" / "check_released_crate_readmes.py"
-)
+crr = load_tool("check_released_crate_readmes")
 
 
 def test_discovery_finds_the_publishable_readme_examples() -> None:
@@ -307,7 +296,7 @@ def test_tree_versions_agree_with_the_publisher() -> None:
     crate versioning is a stated goal, so the layout WILL move. This is what
     fails when only one of them is updated.
     """
-    pc = _load("publish_crates", REPO / "tools" / "publish_crates.py")
+    pc = load_tool("publish_crates")
     for s in crr.subjects():
         assert s.tree_version == pc.crate_version(s.crate), (
             f"{s.crate}: this tool says {s.tree_version}, publish_crates says "

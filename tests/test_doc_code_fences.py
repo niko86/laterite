@@ -12,21 +12,14 @@ that behaviour so it cannot quietly stop happening.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 
-_spec = importlib.util.spec_from_file_location(
-    "gen_doc_outputs", ROOT / "tools" / "gen_doc_outputs.py"
-)
-assert _spec and _spec.loader
-gen_doc_outputs = importlib.util.module_from_spec(_spec)
-sys.modules["gen_doc_outputs"] = gen_doc_outputs
-_spec.loader.exec_module(gen_doc_outputs)
+gen_doc_outputs = load_tool("gen_doc_outputs")
 
 census = gen_doc_outputs.census_code_fences
 markers = gen_doc_outputs.census_doc_markers

@@ -18,29 +18,10 @@ channel is actually wired to it.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
-
 import pytest
+from _tools import load_tool
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load_tracker():
-    """Import `tools/issue_tracker.py` as a module — `tools/` is not a package.
-    Same shape as test_changelog_advisor's loader, so there is one way to do this."""
-    spec = importlib.util.spec_from_file_location(
-        "issue_tracker", REPO / "tools" / "issue_tracker.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["issue_tracker"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-nt = _load_tracker()
+nt = load_tool("issue_tracker")
 TITLE = nt.TITLE
 failing_jobs, plan, plan_items, read_state, render_body = (
     nt.failing_jobs,

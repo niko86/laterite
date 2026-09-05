@@ -31,13 +31,13 @@ count of what was scanned is printed on every run, pass or fail.
 
 from __future__ import annotations
 
-import importlib.util
 import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 NIGHTLY = REPO / ".github" / "workflows" / "nightly.yml"
@@ -46,18 +46,6 @@ NIGHTLY = REPO / ".github" / "workflows" / "nightly.yml"
 @pytest.fixture(scope="module")
 def workflow() -> dict[str, Any]:
     return yaml.safe_load(NIGHTLY.read_text(encoding="utf-8"))
-
-
-def _load_issue_tracker():
-    """Import `tools/issue_tracker.py` — `tools/` is not a package. Same shape as
-    tests/test_issue_tracker.py's loader, so there is one way to do this."""
-    spec = importlib.util.spec_from_file_location(
-        "issue_tracker", REPO / "tools" / "issue_tracker.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
@@ -395,7 +383,7 @@ def test_a_docs_leg_failing_alone_opens_an_issue_that_names_it(
     built from the workflow, exactly as GitHub builds it. Drop the leg from
     `notify`'s `needs` and this goes red because the failure never appears in the
     context at all — a green tracker over a red run."""
-    tracker = _load_issue_tracker()
+    tracker = load_tool("issue_tracker")
     leg = "docs-vs-released-duckdb"
     # What the `NEEDS` env carries: one entry per dependency, and nothing else.
     context = {

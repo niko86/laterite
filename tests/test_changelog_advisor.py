@@ -27,28 +27,15 @@ implements, so the two cannot drift apart silently.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 
 
-def _load_gen_changelog():
-    """Import `tools/gen_changelog.py` as a module — `tools/` is not a package."""
-    spec = importlib.util.spec_from_file_location(
-        "gen_changelog", REPO / "tools" / "gen_changelog.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["gen_changelog"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gc = _load_gen_changelog()
+gc = load_tool("gen_changelog")
 
 
 def _data(current: str, **block) -> dict:

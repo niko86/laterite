@@ -57,6 +57,7 @@ import tomllib
 from pathlib import Path
 
 import yaml
+from _tools import load_tool
 
 _REPO = Path(__file__).resolve().parents[1]
 
@@ -587,14 +588,7 @@ def test_the_facade_floor_holds() -> None:
     predicate — a second copy is how the gate and the report drift into
     disagreeing about which rows are below.
     """
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location(
-        "gen_modality", _REPO / "tools" / "gen_modality.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    mod = load_tool("gen_modality")
 
     register = json.loads((_REPO / "modality.json").read_text(encoding="utf-8"))
     unsettled = []

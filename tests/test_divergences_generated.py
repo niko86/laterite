@@ -14,20 +14,12 @@ section cannot be derived — are hard failures rather than warnings.
 from __future__ import annotations
 
 import copy
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
-ROOT = Path(__file__).resolve().parent.parent
-
-_spec = importlib.util.spec_from_file_location(
-    "gen_observations", ROOT / "tools" / "gen_observations.py"
-)
-assert _spec and _spec.loader
-gen = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(gen)
+gen = load_tool("gen_observations")
 
 
 @pytest.fixture
