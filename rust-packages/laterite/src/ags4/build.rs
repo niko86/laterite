@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use laterite_ags4_emit::GroupInput;
 
-use super::{Document, Finding, WriteMode, Written, emit_groups, resolve_edition};
+use super::{Document, Finding, WriteMode, Written, emit_groups};
 use crate::{Error, ErrorKind};
 
 /// One cell's value, before AGS4 formatting.
@@ -449,11 +449,8 @@ impl BuildSaved {
 /// replaces an existing file on Unix and Windows alike.)
 ///
 /// A DELIBERATE copy of `laterite_ags4_emit::hostopts::staged_write` (#923),
-/// not an oversight: this crate is published, and `cargo package --verify`
-/// builds its tarball against the emit version on crates.io — which will not
-/// carry `hostopts` until the next engine cut publishes it. Adopt (delete
-/// this fn, call the shared one, bump the emit req) only once that version
-/// is live; doing it earlier fails the package-contents gate's verify build.
+/// not an oversight — a wait-state copy, inventoried with the why in
+/// [`crate::pending_adoptions`] (#930). Adopt only per that ledger's rule.
 fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
     let io_err = |e: std::io::Error| {
         Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)
@@ -555,10 +552,7 @@ impl BuildUnchecked {
 
     /// Do it. The AGS4 bytes, with no verdict attached.
     pub fn run(self) -> Result<Vec<u8>, Error> {
-        let edition = match self.edition.as_deref() {
-            Some(label) => resolve_edition(label)?,
-            None => laterite_ags4_reference::dict::FALLBACK,
-        };
+        let edition = super::edition_or_fallback(self.edition.as_deref())?;
         let groups = self
             .groups
             .into_iter()

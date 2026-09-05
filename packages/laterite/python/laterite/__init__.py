@@ -2598,27 +2598,15 @@ def _frames_to_tables(
 
 
 def _staged_write(data: bytes, out: str | os.PathLike[str]) -> Path:
-    """Write ``data`` to ``out`` via a temp file in the destination's own
-    directory + ``os.replace`` — atomic on one filesystem, so ``out`` never
-    holds a partial write. Shared by the two build doors' ``out=`` riders;
-    what each door lets REACH this write is the doors' difference, not the
-    write's."""
-    import contextlib
-    import tempfile
-
+    """Write ``data`` to ``out`` via the engine's shared staged write
+    (``hostopts::staged_write``, #938) — a temp file in the destination's own
+    directory + rename, atomic on one filesystem, so ``out`` never holds a
+    partial write. The dance itself has one implementation for every surface;
+    a failed write raises ``OSError``, as this door always has. Shared by the
+    two build doors' ``out=`` riders; what each door lets REACH this write is
+    the doors' difference, not the write's."""
     out_path = Path(out)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=".laterite-build-", suffix=".tmp", dir=out_path.parent
-    )
-    tmp = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        tmp.replace(out_path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            tmp.unlink()
-        raise
+    _native.staged_write(os.fspath(out_path), data)
     return out_path
 
 

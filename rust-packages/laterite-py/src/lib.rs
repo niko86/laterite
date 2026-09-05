@@ -39,7 +39,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_core::index::{Sidecar as CoreSidecar, TierCoverage};
 use laterite_ags4_validator::findings::{Severity, Target};
-use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, WorldScope,
     fix_document_selective, overlay,
@@ -448,24 +447,29 @@ pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<B
     let list = PyList::empty(py);
     for f in fixes {
         let o = PyDict::new(py);
-        let kind = serde_json::to_value(f.kind)
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_string))
-            .unwrap_or_default();
-        o.set_item("kind", kind)?;
+        // The engine's own spellings (#937) — this function used to derive
+        // `kind` by serde round-trip and `risk` by hand-matched literals,
+        // one drift-prone mechanism each.
+        o.set_item("kind", f.kind.as_str())?;
         o.set_item("label", &f.label)?;
         o.set_item("rule", &f.rule)?;
         o.set_item("line", f.line)?;
-        o.set_item(
-            "risk",
-            match f.risk {
-                FixRisk::Safe => "safe",
-                FixRisk::Risky => "risky",
-            },
-        )?;
+        o.set_item("risk", f.risk.as_str())?;
         list.append(o)?;
     }
     Ok(list)
+}
+
+/// The shared staged atomic write (`hostopts::staged_write_io`, #938) behind
+/// a Python door: a temp file in the destination's own directory + rename,
+/// so `out` never holds a partial write. The `_io` variant + PyO3's
+/// `io::Error` conversion is what keeps this door's error contract exactly
+/// what the old in-Python dance raised — the right `OSError` SUBCLASS
+/// (`FileNotFoundError` for a missing directory, `PermissionError`, …), not
+/// a flattened base `OSError` with the shape lost in a message.
+#[pyfunction]
+fn staged_write(path: &str, data: &[u8]) -> PyResult<()> {
+    laterite_ags4_emit::hostopts::staged_write_io(Path::new(path), data).map_err(PyErr::from)
 }
 
 /// Headless one-shot mechanical repair of a delivered AGS4 file (the same engine
@@ -1649,6 +1653,7 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
+    m.add_function(wrap_pyfunction!(staged_write, m)?)?;
     m.add_function(wrap_pyfunction!(list_rules, m)?)?;
     m.add_function(wrap_pyfunction!(diff_files, m)?)?;
     m.add_function(wrap_pyfunction!(merge_files, m)?)?;

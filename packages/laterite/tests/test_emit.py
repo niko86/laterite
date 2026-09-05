@@ -596,6 +596,18 @@ def test_unchecked_out_stages_the_write(tmp_path):
     assert not leftovers, f"staging must clean up: {leftovers}"
 
 
+def test_out_failure_keeps_its_oserror_subclass(tmp_path):
+    # The staged write's error contract (#938): a missing destination
+    # directory raises FileNotFoundError — the subclass, not a flattened
+    # base OSError — exactly what the old in-Python dance raised before the
+    # shared native door took over. The node twin of this pin is
+    # p2.test.ts's /ENOENT/ match.
+    frames = {"PROJ": _proj()}
+    with pytest.raises(FileNotFoundError):
+        laterite.build_ags4_unchecked(frames, out=tmp_path / "missing" / "x.ags")
+    assert not list(tmp_path.iterdir()), "a failed write must not litter"
+
+
 def test_unchecked_out_writes_even_a_dirty_file(tmp_path):
     # THE difference from build_ags4(out=): nothing judges, so a file
     # build_ags4(mode="strict") refuses still lands — the caller chose

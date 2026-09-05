@@ -162,6 +162,8 @@ pub laterite_ags4_validator::fixes::FixKind::ReformatNumeric
 pub laterite_ags4_validator::fixes::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::fixes::FixKind::StripBom
 pub laterite_ags4_validator::fixes::FixKind::StripEmbeddedCr
+impl laterite_ags4_validator::fixes::FixKind
+pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind
 pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> laterite_ags4_validator::fixes::FixKind
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixKind
@@ -185,6 +187,8 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::Fi
 pub enum laterite_ags4_validator::fixes::FixRisk
 pub laterite_ags4_validator::fixes::FixRisk::Risky
 pub laterite_ags4_validator::fixes::FixRisk::Safe
+impl laterite_ags4_validator::fixes::FixRisk
+pub const fn laterite_ags4_validator::fixes::FixRisk::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixRisk
 pub fn laterite_ags4_validator::fixes::FixRisk::clone(&self) -> laterite_ags4_validator::fixes::FixRisk
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixRisk
@@ -366,6 +370,8 @@ pub laterite_ags4_validator::FixKind::ReformatNumeric
 pub laterite_ags4_validator::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::FixKind::StripBom
 pub laterite_ags4_validator::FixKind::StripEmbeddedCr
+impl laterite_ags4_validator::fixes::FixKind
+pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind
 pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> laterite_ags4_validator::fixes::FixKind
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixKind

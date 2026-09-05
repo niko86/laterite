@@ -1031,3 +1031,83 @@ def test_rust_source_doors_are_all_mapped():
         "it to the _RUST_*_DOORS tables and credit the form in modality.json, or "
         "the register will under-report the surface"
     )
+
+
+# --------------------------------------------------------------------------- #
+# the xcheck coverage table (#940) — authored decisions, reflected both ways
+# --------------------------------------------------------------------------- #
+
+XCHECK_CASES = REPO / "rust-packages" / "laterite-ags4-xcheck" / "cases"
+
+
+def _xcheck_rows() -> list[dict]:
+    return _doc()["xcheck_coverage"]["rows"]
+
+
+def _manifest_ops() -> set[str]:
+    """Every `op` the case-list SSOT actually exercises — read straight from
+    `cases/*.json`, no build, so this reflector runs wherever pytest does."""
+    ops: set[str] = set()
+    for path in sorted(XCHECK_CASES.glob("*.json")):
+        for case in json.loads(path.read_text(encoding="utf-8"))["cases"]:
+            ops.add(case["op"])
+    return ops
+
+
+def test_xcheck_rows_are_the_capability_axis_exactly():
+    # One row per register capability, in the register's own order — the table
+    # borrows its axis rather than minting a second verb inventory. A new
+    # capability lands red HERE until someone decides its xcheck story, which
+    # is the whole point: build-unchecked shipped on every surface (#882/#883)
+    # with zero legs and nothing to say so.
+    caps = [c["capability"] for c in _doc()["capabilities"]]
+    rows = [r["capability"] for r in _xcheck_rows()]
+    assert rows == caps, (
+        "xcheck_coverage rows must list exactly the register's capabilities, "
+        f"in order — rows {rows} vs capabilities {caps}"
+    )
+
+
+def test_xcheck_rows_carry_their_status_shape():
+    # covered → names its ops and no excuse; excluded → a decided reason and
+    # no ops; wanted → neither, deliberately: an uncovered row with no
+    # structural blocker is honest backlog, and dressing it as a decision
+    # would silence the gap this table exists to show.
+    for row in _xcheck_rows():
+        cap, status = row["capability"], row["status"]
+        assert status in ("covered", "wanted", "excluded"), f"{cap}: {status!r}"
+        if status == "covered":
+            assert row.get("ops"), f"{cap}: covered but names no case ops"
+            assert "why" not in row, f"{cap}: covered rows carry no excuse"
+        elif status == "excluded":
+            assert row.get("why"), f"{cap}: excluded without a decided reason"
+            assert "ops" not in row, f"{cap}: excluded rows name no ops"
+        else:
+            assert "ops" not in row and "why" not in row, (
+                f"{cap}: wanted means uncovered with nothing recorded — give it "
+                "a case (covered) or a decided reason (excluded) instead"
+            )
+
+
+def test_xcheck_covered_ops_and_the_case_manifest_agree_both_ways():
+    table = _doc()["xcheck_coverage"]
+    named = {
+        op for row in _xcheck_rows() if row["status"] == "covered" for op in row["ops"]
+    }
+    # `meta_ops` are the case ops pinning METADATA verbs (list_rules) — no
+    # capability row exists for those by construction, the same class as
+    # wasm_exports' capability:null rows. This reflector found the first one
+    # itself: rules_json was an orphan on the table's very first run.
+    named |= set(table.get("meta_ops", []))
+    manifest = _manifest_ops()
+    phantom = named - manifest
+    assert not phantom, (
+        f"xcheck_coverage cites op(s) {sorted(phantom)} that no case in "
+        "cases/*.json exercises — a stale claim of coverage"
+    )
+    orphans = manifest - named
+    assert not orphans, (
+        f"case op(s) {sorted(orphans)} exist in cases/*.json but no covered row "
+        "owns them — a verb gained a case without the table learning it, the "
+        "same silence in the other direction"
+    )

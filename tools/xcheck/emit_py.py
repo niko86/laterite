@@ -86,6 +86,14 @@ def observe_python(case: dict, repo_root: Path) -> dict | None:
             return build_typed(build, case["input"].get("build_opts"))
         except Exception as e:
             return {"err": type(e).__name__}
+    if op == "build_unchecked_typed":
+        build = case["input"].get("build")
+        if build is None:
+            return None
+        try:
+            return build_unchecked_typed(build)
+        except Exception as e:
+            return {"err": type(e).__name__}
     return None
 
 
@@ -115,6 +123,21 @@ def build_typed(groups: list[dict], opts: dict | None = None) -> dict:
             tran=laterite.TranStamp(**tran) if tran else None,
         ).text
     }
+
+
+def build_unchecked_typed(groups: list[dict]) -> dict:
+    """`laterite.build_ags4_unchecked` — the judge-free build door (#882).
+    Same frames path as `build_typed`, no judge-era knobs (the door refuses
+    them); the bytes must equal every other surface's, INCLUDING from data
+    the judged AutoFix door would have rewritten — that verbatim-keeping is
+    the door's whole contract, and what a cross-surface case pins (#940)."""
+    import polars as pl
+
+    tables = {
+        g["code"]: pl.DataFrame(g["rows"], schema=g["headings"], orient="row")
+        for g in groups
+    }
+    return {"ok": laterite.build_ags4_unchecked(tables).decode("utf-8")}
 
 
 # --- the `python-compat` leg (the python-ags4 shim) ------------------

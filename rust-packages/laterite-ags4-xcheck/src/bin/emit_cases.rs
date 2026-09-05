@@ -137,6 +137,37 @@ fn build_typed(groups: &[BuildGroup], build_opts: Option<&BuildOpts>) -> Observa
     }
 }
 
+/// The judge-free build door (#858/#882): `emit_ags4_unchecked` — the same
+/// dictionary fills and cell formatting as `build_typed`'s orchestrator,
+/// MINUS the verdict. The cross-surface value question is the door's whole
+/// contract (#940): every surface must emit the same bytes it does,
+/// including from data the judged `AutoFix` door would have rewritten — a
+/// string `"1.0"` under a 2DP heading stays `"1.0"` here, on every surface.
+/// No `build_opts`: the unchecked doors refuse the judge-era knobs.
+fn build_unchecked_typed(groups: &[BuildGroup]) -> Observation {
+    let inputs: Vec<laterite_ags4_emit::GroupInput> = groups
+        .iter()
+        .map(|g| laterite_ags4_emit::GroupInput {
+            code: g.code.clone(),
+            headings: g.headings.clone(),
+            units: g.units.clone(),
+            types: g.types.clone(),
+            rows: g.rows.clone(),
+        })
+        .collect();
+    // The same resolved default edition the judged leg uses — read off
+    // `EmitOpts::default()` rather than restated, so the two legs cannot
+    // disagree about what "no edition named" means.
+    let edition = laterite_ags4_emit::EmitOpts::default().edition;
+    match laterite_ags4_emit::emit_ags4_unchecked(inputs, edition) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(text) => Observation::Ok(serde_json::Value::String(text)),
+            Err(e) => Observation::Err(format!("NotUtf8: {e}")),
+        },
+        Err(e) => Observation::Err(format!("{e:?}")),
+    }
+}
+
 fn observe(case: &Case, repo_root: &std::path::Path) -> Option<Observation> {
     match case.op.as_str() {
         "reemit_canonical" => {
@@ -150,6 +181,10 @@ fn observe(case: &Case, repo_root: &std::path::Path) -> Option<Observation> {
         "build_typed" => {
             let groups = case.input.build.as_ref()?;
             Some(build_typed(groups, case.input.build_opts.as_ref()))
+        }
+        "build_unchecked_typed" => {
+            let groups = case.input.build.as_ref()?;
+            Some(build_unchecked_typed(groups))
         }
         // Unknown op: the leg records nothing; `xcheck --require-legs all` turns
         // a case the authority silently skipped into a hard failure, so a new op

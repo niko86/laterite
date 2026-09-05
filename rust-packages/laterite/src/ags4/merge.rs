@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use laterite_ags4_merge::{MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
 
-use super::{Document, WriteMode, resolve_edition, validator_kind};
+use super::{Document, WriteMode, validator_kind};
 use crate::{Error, ErrorKind};
 
 /// How to settle a heading two files typed differently.
@@ -418,15 +418,8 @@ impl<'a> Merge<'a> {
         let opts = MergeOpts {
             on_type_clash: self.on_type_clash.to_engine(),
             on_missing_tran: self.on_missing_tran.to_engine(),
-            edition: match &self.edition {
-                Some(label) => resolve_edition(label)?,
-                None => laterite_ags4_reference::dict::FALLBACK,
-            },
-            emit_mode: match self.mode {
-                WriteMode::AutoFix => laterite_ags4_emit::EmitMode::AutoFix,
-                WriteMode::Report => laterite_ags4_emit::EmitMode::Report,
-                WriteMode::Strict => laterite_ags4_emit::EmitMode::Strict,
-            },
+            edition: super::edition_or_fallback(self.edition.as_deref())?,
+            emit_mode: super::emit_mode(self.mode),
             tran: self.tran,
         };
 

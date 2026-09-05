@@ -58,6 +58,17 @@ async function runNode(cases, repoRoot) {
         return { err: (e?.name ?? "Error").replace(/Error$/, "") };
       }
     }
+    if (op === "build_unchecked_typed") {
+      const build = aCase.input?.build;
+      if (build == null) return null;
+      try {
+        // The judge-free door (#883) hands back raw bytes, not a BuildResult —
+        // decode without translation so the CRLF survives verbatim (#940).
+        return { ok: mod.buildAgs4Unchecked(toNodeGroups(build)).toString("utf8") };
+      } catch (e) {
+        return { err: (e?.name ?? "Error").replace(/Error$/, "") };
+      }
+    }
     return null;
   };
   return collect("node", mod.engineFingerprint(), cases, observe);
@@ -91,6 +102,20 @@ async function runWasm(cases, repoRoot) {
         // {code, headings, units?, types?, rows} shape the manifest carries —
         // then ONE named options object.
         return { ok: glue.build_ags4(JSON.stringify(build), buildOpts(aCase)).text };
+      } catch (e) {
+        return { err: (e?.message ?? "Error").split("\n")[0] };
+      }
+    }
+    if (aCase.op === "build_unchecked_typed") {
+      const build = aCase.input?.build;
+      if (build == null) return null;
+      try {
+        // The judge-free door (#883): same groups_json, raw Uint8Array back —
+        // bytes as the universal output form is what lets it exist in a
+        // browser at all. Decode without translation (#940).
+        return {
+          ok: Buffer.from(glue.build_ags4_unchecked(JSON.stringify(build))).toString("utf8"),
+        };
       } catch (e) {
         return { err: (e?.message ?? "Error").split("\n")[0] };
       }

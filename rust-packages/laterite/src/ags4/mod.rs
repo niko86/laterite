@@ -325,18 +325,7 @@ impl Read {
             }
         };
 
-        let opts = ReadOptions {
-            duplicate_headings: if self.recover_duplicate_headings {
-                DuplicateHeadings::Recover
-            } else {
-                DuplicateHeadings::Error
-            },
-            excess_fields: if self.truncate_excess_fields {
-                ExcessFields::Truncate
-            } else {
-                ExcessFields::Error
-            },
-        };
+        let opts = read_options(self.recover_duplicate_headings, self.truncate_excess_fields);
         // The sliced path, when a certificate can vouch for the byte index AND
         // the caller asked for specific groups. Every guard below is a reason to
         // fall back rather than to fail: the whole-file parse is always correct,
@@ -858,6 +847,57 @@ impl<'a> Write<'a> {
     }
 }
 
+/// [`WriteMode`] → the engine's [`EmitMode`], one arm per public mode. ONE
+/// copy on purpose (#939): each door owning its own three-arm match is how a
+/// fourth mode reaches one door and not another. Private on purpose too —
+/// the Angle C rule keeps the engine type off the public surface, so every
+/// door owes this translation, and owing it is fine as long as it is owed
+/// to one function.
+pub(crate) fn emit_mode(mode: WriteMode) -> EmitMode {
+    match mode {
+        WriteMode::AutoFix => EmitMode::AutoFix,
+        WriteMode::Report => EmitMode::Report,
+        WriteMode::Strict => EmitMode::Strict,
+    }
+}
+
+/// The read-tolerance pair → the engine's [`ReadOptions`], ONE copy (#939).
+/// Also a wait-state single point: the engine grew
+/// `ags4_codec::ReadOptions::from_flags` for exactly this translation, and
+/// this body becomes a call to it once the registry carries it — see
+/// [`crate::pending_adoptions`] (#930). Until then, one body to delete
+/// instead of a copy per door.
+pub(crate) fn read_options(
+    recover_duplicate_headings: bool,
+    truncate_excess_fields: bool,
+) -> ReadOptions {
+    ReadOptions {
+        duplicate_headings: if recover_duplicate_headings {
+            DuplicateHeadings::Recover
+        } else {
+            DuplicateHeadings::Error
+        },
+        excess_fields: if truncate_excess_fields {
+            ExcessFields::Truncate
+        } else {
+            ExcessFields::Error
+        },
+    }
+}
+
+/// The edition knob → a concrete [`DictVersion`]: a label resolves (or
+/// refuses, naming the accepted set), absence means the dictionary's
+/// generated fallback. ONE copy (#939) — a hand-written fallback literal in
+/// a door is the exact class the editions sweep retired.
+pub(crate) fn edition_or_fallback(
+    edition: Option<&str>,
+) -> Result<laterite_ags4_reference::dict::DictVersion, Error> {
+    match edition {
+        Some(label) => resolve_edition(label),
+        None => Ok(laterite_ags4_reference::dict::FALLBACK),
+    }
+}
+
 /// The one call into the emit engine, shared by [`write`] and
 /// [`build`](build::build).
 ///
@@ -872,17 +912,9 @@ fn emit_groups(
     synthesise_metadata: bool,
     tran: Option<TranStamp>,
 ) -> Result<Written, Error> {
-    let edition = match edition {
-        Some(label) => resolve_edition(label)?,
-        None => laterite_ags4_reference::dict::FALLBACK,
-    };
     let opts = EmitOpts {
-        mode: match mode {
-            WriteMode::AutoFix => EmitMode::AutoFix,
-            WriteMode::Report => EmitMode::Report,
-            WriteMode::Strict => EmitMode::Strict,
-        },
-        edition,
+        mode: emit_mode(mode),
+        edition: edition_or_fallback(edition)?,
         tran,
         synthesise_metadata,
     };
