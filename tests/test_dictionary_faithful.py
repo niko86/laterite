@@ -11,28 +11,20 @@ committed artifact to it.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
 
+from _tools import load_tool
+
 _REPO = Path(__file__).resolve().parents[1]
-_GEN = _REPO / "tools" / "gen_dictionary.py"
 _COMMITTED = (
     _REPO / "rust-packages" / "laterite-ags4-reference" / "data" / "ags_dictionary.json"
 )
 
 
-def _gen():
-    spec = importlib.util.spec_from_file_location("_gen_dictionary", _GEN)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def test_committed_matches_generator():
     """regenerate == committed (catches both stale commits and source-dict edits)."""
-    mod = _gen()
+    mod = load_tool("gen_dictionary")
     regenerated = mod.build()
     committed = json.loads(_COMMITTED.read_text())
     assert regenerated == committed, (
@@ -42,7 +34,7 @@ def test_committed_matches_generator():
 
 def test_every_edition_reconstructs_exactly():
     """The heading-local doc losslessly reproduces all five editions (incl. order)."""
-    mod = _gen()
+    mod = load_tool("gen_dictionary")
     doc = json.loads(_COMMITTED.read_text())
     for ed in doc["editions"]:
         # reconstruct must not raise; build() already self-verified, this re-checks
@@ -86,7 +78,7 @@ def test_abbr_picklist_and_tran_ags_faithful():
     (Rule 14) — the two things beyond the group/heading schema the validator
     needs. Each must reconstruct from the committed file exactly per edition,
     re-parsed straight from the official .ags."""
-    mod = _gen()
+    mod = load_tool("gen_dictionary")
     doc = json.loads(_COMMITTED.read_text())
     assert isinstance(doc["abbreviations"], list) and len(doc["abbreviations"]) > 3000
     for ed in doc["editions"]:

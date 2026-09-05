@@ -21,60 +21,30 @@ rows; no test touches the network or git history it does not own.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from _tools import default_crate, load_tool, report_of
 
 REPO = Path(__file__).resolve().parents[1]
 
+# Order matters: `engine_cut` imports `release_status` by bare name, and the
+# registration `load_tool` does is what binds it to THIS file's instance.
+rs = load_tool("release_status")
+ec = load_tool("engine_cut")
 
-def _load(name: str):
-    spec = importlib.util.spec_from_file_location(
-        name, REPO / "tools" / "release" / f"{name}.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+#: The one all-quiet row (tests/_tools.py) — a `CrateStatus`, so a typo'd
+#: field below is an error at the call, not a silently ignored dict key.
+DEFAULT = default_crate(rs)
 
 
-rs = _load("release_status")
-ec = _load("engine_cut")
+def _crate(**kw):
+    return replace(DEFAULT, **kw)
 
 
-def _crate(**kw) -> dict:
-    row = {
-        "crate": "laterite-ags4-core",
-        "version": "0.12.0",
-        "last_stamp": "abc1234 2026-08-29 release: x",
-        "registry_state": "ok",
-        "registry_latest": "0.12.0",
-        "api_added": 0,
-        "api_removed": 0,
-        "api_removed_names": [],
-        "verdict": "none",
-        "tier": "engine",
-        "published_live": "0.12.0",
-        "delta_baseline": "publish 0.12.0",
-        "code_changed": False,
-        "deps_behind": [],
-        "part_required": "none",
-        "cut_action": "none",
-        "cut_why": "",
-    }
-    row.update(kw)
-    return row
-
-
-def _status(*crates: dict) -> dict:
-    return {
-        "engine_crates": list(crates),
-        "product": {"version": "0.12.0", "last_stamp": "x", "verdict": "none"},
-        "changelog_unreleased": {},
-    }
+def _status(*crates):
+    return report_of(rs, *crates)
 
 
 # --- caret admission: the 0.x rule the whole fault class hangs on ---

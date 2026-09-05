@@ -17,27 +17,10 @@ The gate's own history is the argument for testing it: it exists because
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
-
 import pytest
+from _tools import load_tool
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load():
-    spec = importlib.util.spec_from_file_location(
-        "check_changelog", REPO / "tools" / "check_changelog.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_changelog"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-cc = _load()
+cc = load_tool("check_changelog")
 
 
 # --- routing ------------------------------------------------------------------

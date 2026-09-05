@@ -20,32 +20,18 @@ Stdlib only, so it runs in the buildless subset beside the other tools tests.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
-
 import pytest
-
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load(rel: str, name: str):
-    spec = importlib.util.spec_from_file_location(name, REPO / rel)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+from _tools import load_tool
 
 
 @pytest.fixture(scope="module")
 def gate():
-    return _load("tools/check_docs_em_dash.py", "check_docs_em_dash")
+    return load_tool("check_docs_em_dash")
 
 
 @pytest.fixture(scope="module")
 def hook():
-    return _load("web/docs-site/hooks/version_stamp.py", "version_stamp")
+    return load_tool("version_stamp")
 
 
 def test_prose_is_reported(gate):

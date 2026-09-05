@@ -20,28 +20,15 @@ pinned here:
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from pathlib import Path
+
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 
 
-def _load():
-    """Import `tools/bench-vs-python-ags4.py` as a module — the hyphenated
-    name is not importable, and `tools/` is not a package."""
-    spec = importlib.util.spec_from_file_location(
-        "bench_vs_python_ags4", REPO / "tools" / "bench-vs-python-ags4.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["bench_vs_python_ags4"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-bench = _load()
+bench = load_tool("bench_vs_python_ags4")
 
 
 # --- ru_maxrss units -------------------------------------------------------

@@ -9,23 +9,9 @@ memory tables name the same APIs) and the memory claim pattern.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
+from _tools import load_tool
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load():
-    spec = importlib.util.spec_from_file_location(
-        "check_speed_claims", REPO / "tools" / "check_speed_claims.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gate = _load()
+gate = load_tool("check_speed_claims")
 
 _TABLES = """\
 **Validation**

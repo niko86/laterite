@@ -8,28 +8,9 @@ silently empties is the failure mode the tool's own zero-check exists for —
 these tests make sure that check has something to stand on.
 """
 
-import importlib.util
-import sys
-from pathlib import Path
+from _tools import load_tool
 
-_TOOLS = Path(__file__).resolve().parents[1] / "tools"
-
-
-def _load():
-    # The house pattern for testing a tools/ script (test_check_changelog.py):
-    # load by path, not by import name.
-    sys.path.insert(0, str(_TOOLS))
-    spec = importlib.util.spec_from_file_location(
-        "check_doc_types", _TOOLS / "check_doc_types.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_doc_types"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-cdt = _load()
+cdt = load_tool("check_doc_types")
 
 
 def test_discovery_finds_both_corpora():

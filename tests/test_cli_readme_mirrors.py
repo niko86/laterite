@@ -20,33 +20,16 @@ authority is true of every launcher rather than of one file.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 
-
-def _tool():
-    """Import `tools/gen_cli_readme.py` — `tools/` is not a package.
-
-    Same shape as tests/test_issue_tracker.py's loader, so there is one way to do
-    this, and the mirror list is READ from the tool rather than restated here: a
-    second copy of the list is the defect this module exists to catch, one level
-    up.
-    """
-    path = REPO / "tools" / "gen_cli_readme.py"
-    spec = importlib.util.spec_from_file_location("gen_cli_readme", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["gen_cli_readme"] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-TOOL = _tool()
+# The mirror list is READ from the tool rather than restated here: a second copy
+# of the list is the defect this module exists to catch, one level up.
+TOOL = load_tool("gen_cli_readme")
 
 
 def test_there_are_mirrors_to_check() -> None:

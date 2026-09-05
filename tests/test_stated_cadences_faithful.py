@@ -38,43 +38,23 @@ A hand-typed "monthly" in the mirror would just be the same drift one file over.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
-
-if TYPE_CHECKING:
-    from types import ModuleType
+from _tools import load_tool
 
 _REPO = Path(__file__).resolve().parent.parent
 _MIRROR = _REPO / "external-authorities.json"
 
-
-def _load_checker() -> ModuleType:
-    """The far-side reconciler, for its workflow parser.
-
-    Imported rather than reimplemented: this test reads `on:` blocks in THIS
-    tree and that script reads them in the satellite's, and two parsers
-    disagreeing about what a workflow says is the exact failure both exist to
-    prevent. Loaded by path, the idiom `test_check_changelog.py` established.
-    """
-    spec = importlib.util.spec_from_file_location(
-        "check_external_authorities", _REPO / "tools" / "check_external_authorities.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_external_authorities"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_cx = _load_checker()
+# The far-side reconciler, for its workflow parser. Imported rather than
+# reimplemented: this test reads `on:` blocks in THIS tree and that script reads
+# them in the satellite's, and two parsers disagreeing about what a workflow
+# says is the exact failure both exist to prevent.
+_cx = load_tool("check_external_authorities")
 
 
 @dataclass(frozen=True)

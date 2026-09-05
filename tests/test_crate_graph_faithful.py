@@ -16,44 +16,28 @@ manifest changes and the page does not.
 
 from __future__ import annotations
 
-import importlib.util
 import re
 import sys
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
 
+gcg = load_tool("gen_crate_graph")
 
-def _load(name: str, path: Path, *, tolerate_exit: bool = False):
-    """Import a non-package script by path — same shape as the other loaders here.
-
-    `tolerate_exit` is for `lint.py`, whose ~1450-line body is all top level and
-    ends in `sys.exit()`; it has no `__main__` guard, so importing it RUNS the
-    lint and then exits. Catching that leaves the module's top-level names bound,
-    which is all this file needs. It is a wart, not a design: the fix is to wrap
-    lint.py's body in a `main()`, which is a whole-file reindent and belongs in
-    its own change.
-    """
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    try:
-        spec.loader.exec_module(mod)
-    except SystemExit:
-        if not tolerate_exit:
-            raise
-    return mod
-
-
-# `lint.py` may import a sibling by bare name, so the bootstrap directory has to
-# be on the path before it loads — true whether or not the citation grammar has
-# been split out into `refs.py` yet.
-sys.path.insert(0, str(REPO / "ags-wiki" / ".bootstrap"))
-gcg = _load("gen_crate_graph", REPO / "tools" / "gen_crate_graph.py")
-lint = _load("lint", REPO / "ags-wiki" / ".bootstrap" / "lint.py", tolerate_exit=True)
+# `lint.py`'s ~1450-line body is all top level and ends in `sys.exit()`; it has
+# no `__main__` guard, so importing it RUNS the lint and then exits. Catching
+# that leaves the module's top-level names bound, which is all this file needs —
+# `load_tool` registers the module before executing it, so the interrupted
+# module is what `sys.modules` holds. It is a wart, not a design: the fix is to
+# wrap lint.py's body in a `main()`, which is a whole-file reindent and belongs
+# in its own change.
+try:
+    lint = load_tool("lint")
+except SystemExit:
+    lint = sys.modules["lint"]
 
 
 def test_the_two_cargo_readers_agree() -> None:

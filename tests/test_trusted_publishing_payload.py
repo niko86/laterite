@@ -22,27 +22,15 @@ at publish time, on the registry that cannot be un-published.
 from __future__ import annotations
 
 import email.message
-import importlib.util
-import sys
 import urllib.error
 from pathlib import Path
 
 import pytest
+from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
-TOOL = REPO / "tools" / "release" / "trusted_publishing.py"
 
-
-def _load():
-    spec = importlib.util.spec_from_file_location("trusted_publishing", TOOL)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["trusted_publishing"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-tp = _load()
+tp = load_tool("trusted_publishing")
 
 
 def test_the_crate_field_goes_over_the_wire_as_crate() -> None:

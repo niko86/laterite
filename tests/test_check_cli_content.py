@@ -9,29 +9,9 @@ DISAGREE with the binary's, because that disagreement is the defect the gate
 exists to catch.
 """
 
-import importlib.util
-import sys
-from pathlib import Path
+from _tools import load_tool
 
-_XCHECK_TOOLS = Path(__file__).resolve().parents[1] / "tools" / "xcheck"
-
-
-def _load():
-    # The house pattern for testing a tools/ script (test_check_changelog.py):
-    # load by path, not by import name — the buildless repo-gates job installs
-    # nothing, and a bare import would also trip the marker-faithfulness gate.
-    sys.path.insert(0, str(_XCHECK_TOOLS))  # the gate imports its sibling emit_cli
-    spec = importlib.util.spec_from_file_location(
-        "check_cli_content", _XCHECK_TOOLS / "check_cli_content.py"
-    )
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["check_cli_content"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_mod = _load()
+_mod = load_tool("check_cli_content")
 diff_facts_binary = _mod.diff_facts_binary
 diff_facts_npx = _mod.diff_facts_npx
 fix_facts_binary = _mod.fix_facts_binary

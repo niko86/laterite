@@ -15,31 +15,17 @@ observation) and a green tick that did not say so would read as a full check.
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+from _tools import load_tool
+
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
-REPO = Path(__file__).resolve().parents[1]
-
-
-def _load():
-    """Import `tools/check_rule_catalogue_refs.py` — `tools/` is not a package."""
-    spec = importlib.util.spec_from_file_location(
-        "check_rule_catalogue_refs", REPO / "tools" / "check_rule_catalogue_refs.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-gate = _load()
+gate = load_tool("check_rule_catalogue_refs")
 
 
 def _write(
