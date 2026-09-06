@@ -24,9 +24,11 @@ sources: []
 > symmetric diff against documented arms — **O-2** (Rust-only Rule 6,
 > python no-op), **O-3** (Rust 5 ↔ python 4), **O-26** (python triple
 > 19b) — and only returns an O-N if the *entire* diff is consumed.
-> (No O-27 arm: Rule 20's on-disk half is now implemented as opt-in
-> `--check-files`, ON in the dogfood, so the two AGREE directly —
-> [[strat-o27-rule20-ondisk]].) `classify`
+> (The O-27 arm is narrow: Rule 20's on-disk half is opt-in
+> `--check-files`, ON in the dogfood — where the two AGREE directly and
+> the arm is inert — but a harness running with it OFF, like the
+> cross-surface compliance matrix, sees python's always-on check fire
+> alone, and the arm reconciles that — [[strat-o27-rule20-ondisk]].) `classify`
 > HardError maps UnsupportedEdition→O-30, NotAgs4+all-mandatory-absent
 > →O-34. Only a fully-explained diff is KNOWN_DIVERGENCE (out of the
 > ACTION list / exit code).

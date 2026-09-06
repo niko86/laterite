@@ -1,4 +1,4 @@
-// #358 — Node Excel I/O. Binds the SAME `laterite-ags4-excel` converter Python's
+// laterite-dev#358 — Node Excel I/O. Binds the SAME `laterite-ags4-excel` converter Python's
 // to_excel / from_excel use, so AGS4 ↔ XLSX round-trips through Node.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,7 +21,7 @@ const AGS =
     '"DATA","BH02","20.00"',
   ].join("\r\n") + "\r\n";
 
-describe("Excel I/O (#358)", () => {
+describe("Excel I/O (laterite-dev#358)", () => {
   it("round-trips AGS4 → xlsx → AGS4", () => {
     const dir = mkdtempSync(join(tmpdir(), "lat-excel-"));
     const ags = join(dir, "in.ags");

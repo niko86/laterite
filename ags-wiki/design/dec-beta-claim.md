@@ -60,6 +60,12 @@ This is `RELEASING.md`'s existing `product` tier, not a new list.
 quality: it is not yet at parity with the other five ([[dec-facade-parity]] phase 4
 of 9). Its README says so in one line. It joins when it is finished.
 
+> [!note] It finished, and it joined (2026-09-04)
+> [[dec-facade-parity]] completed: the facade reached parity, jumped onto the
+> product version, and its README now says it is *"in beta together with every
+> other surface"*. Six surfaces carry the claim; the exception above is a
+> record of the decision-time state, not the current one.
+
 **The web app is not a surface.** It is a worked example of the browser package,
 built on it and nothing else — a call already recorded in `mkdocs.yml` when thirteen
 near-identical Browser cookbook tabs were deleted for the same reason. `README.md`
@@ -112,8 +118,10 @@ make a wrapper thick — and the census catching it is the system working.
 
 ## Consequences
 
-- The product tier moves to 1.0 together; the Rust crate keeps its own clock and is
-  not carried along by it.
+- The product tier moves to 1.0 together; ~~the Rust crate keeps its own clock and is
+  not carried along by it.~~ **Overtaken 2026-09-04** — the facade completed
+  [[dec-facade-parity]] and moved onto the product version; it is carried with the
+  tier now.
 - **Platform parity becomes a rule**: a platform shipped by one artifact is shipped by
   all. `aarch64-unknown-linux-gnu` therefore belongs in `release.yml`'s **binaries**
   matrix, not only the wheel matrix and `napi.targets`.
