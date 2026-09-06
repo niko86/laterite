@@ -187,22 +187,34 @@ def _crate_deps() -> dict[str, set[str]]:
     return out
 
 
-def _crate_map_edges() -> list[tuple[str, str]]:
-    """(name, name) for each `A --> B` in crate-map.md's graph, resolving node
-    ids through their `id[crate-name]` / `id[crate-name<br/>alias]` labels."""
-    if not CRATE_MAP.exists():
-        return []
-    block = "\n".join(
-        re.findall(r"```mermaid\n(.*?)```", CRATE_MAP.read_text(), re.DOTALL)
-    )
+def _mermaid_crate_edges(block: str) -> list[tuple[str, str]]:
+    """(name, name) for each `A --> B` in one mermaid block, resolving node ids
+    through their `id[crate-name]` / `id["crate-name"]` /
+    `id[crate-name<br/>alias]` labels. Shared by the crate-map edge gate (C5
+    long-term) and the tool-page edge gate (C5 tools, #950) so the two cannot
+    parse the same syntax two ways."""
     id2name = {
         m.group(1): m.group(2)
-        for m in re.finditer(r"(\w+)\[([a-z0-9-]+)(?:<br/>[^\]]*)?\]", block)
+        for m in re.finditer(r'(\w+)\["?([a-z0-9-]+)(?:<br/>[^\]]*)?"?\]', block)
     }
+    # An edge's endpoints may carry their label inline (`a[lab] --> b[lab]`),
+    # so the arrow regex must let an optional bracket group sit between the id
+    # and the arrow — without it, every inline-labelled edge silently parses as
+    # no edge at all (the tool-page gate's first dry run missed 2 of emit's 8
+    # drawn edges exactly this way).
     return [
         (id2name.get(a, a), id2name.get(b, b))
-        for a, b in re.findall(r"(\w+)\s*-->\s*(\w+)", block)
+        for a, b in re.findall(r"(\w+)(?:\[[^\]]*\])?\s*-->\s*(\w+)", block)
     ]
+
+
+def _crate_map_edges() -> list[tuple[str, str]]:
+    """(name, name) for each `A --> B` in crate-map.md's graph."""
+    if not CRATE_MAP.exists():
+        return []
+    return _mermaid_crate_edges(
+        "\n".join(re.findall(r"```mermaid\n(.*?)```", CRATE_MAP.read_text(), re.DOTALL))
+    )
 
 
 # Reliquary self-check (wiki-reliability): the "Machine-checked register" table
@@ -1457,6 +1469,44 @@ if CRATE_DEPS:
                 f"other (phantom edge; a real dependency was dropped?)"
             )
 
+# C5 tools (#950): the same edge rule for the hand-drawn crate diagrams on TOOL
+# pages. The crate-map gate above proved the class — a drawn edge outlives the
+# dependency it drew — and tool pages carry the same diagrams by hand (the
+# week-36 curation found laterite-ags4-emit.md's drawing 6 of 10 dependents).
+# A drawn edge between two workspace crates must reflect a real Cargo coupling
+# in either direction (hard, like crate-map's). Simplification stays legal — a
+# diagram may omit edges for readability — so omission is REPORTED, never
+# failed: for the page's own crate, the count of direct couplings the drawing
+# leaves out. A gate that drops input says what it dropped.
+bad_tool_edges: list[str] = []
+tool_edge_coverage: list[str] = []
+if CRATE_DEPS:
+    _cnames = set(CRATE_DEPS)
+    for _tp in sorted((WIKI / "tools").glob("*.md")):
+        _ttxt = _tp.read_text(encoding="utf-8")
+        _drawn: set[str] = set()
+        for _block in re.findall(r"```mermaid\n(.*?)```", _ttxt, re.DOTALL):
+            for _a, _b in _mermaid_crate_edges(_block):
+                if _a in _cnames and _b in _cnames:
+                    _drawn |= {_a, _b}
+                    if _b not in CRATE_DEPS[_a] and _a not in CRATE_DEPS[_b]:
+                        bad_tool_edges.append(
+                            f"tools/{_tp.name}: edge {_a}-->{_b} — neither "
+                            f"crate depends on the other (phantom edge)"
+                        )
+        _own = _tp.stem
+        if _own in _cnames and _drawn:
+            _actual = (CRATE_DEPS[_own] & _cnames) | {
+                _c for _c, _d in CRATE_DEPS.items() if _own in _d
+            }
+            _shown = len((_drawn - {_own}) & _actual)
+            if _shown < len(_actual):
+                tool_edge_coverage.append(
+                    f"tools/{_tp.name}: diagram draws {_shown} of "
+                    f"{len(_actual)} direct couplings "
+                    f"({len(_actual) - _shown} omitted — legal, counted)"
+                )
+
 print(f"pages scanned: {len(md)}")
 section("broken wikilinks", broken)  # hard
 section("unbalanced mermaid fences", unbalanced)  # hard
@@ -1473,6 +1523,14 @@ section(
 section(
     "crate-map edge names a non-dependency (phantom edge)", bad_crate_edges
 )  # hard (C5 long-term)
+section(
+    "tool-page mermaid edge names a non-dependency (phantom edge)", bad_tool_edges
+)  # hard (C5 tools, #950)
+info_section(
+    "tool-page mermaid draws a subset of its crate's direct couplings "
+    "(informational — omission is legal, the count keeps it visible)",
+    tool_edge_coverage,
+)
 section("erDiagram names an undocumented group code", bad_erd)  # hard (C5)
 section("related: dangling targets (no such page)", related_dangling_hard)  # hard (D2)
 section(
