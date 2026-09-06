@@ -419,6 +419,14 @@ jobs:
       - name: duckdb cells and the pinned function manifest cover each other
         run: uv run --no-project python tools/check_duckdb_manifest.py
 
+      # Also not a drift gate over a render: docs/parity-coverage-map.md
+      # hand-restates the parity contract (headline, non-closure table,
+      # expected-result line), and the O-47 entry moved under it three ways in
+      # one curation round (#950). The JSON is already enforced by identity in
+      # the parity workflow; this holds the PAGE to the JSON.
+      - name: parity coverage map restates parity-known-failures.json
+        run: uv run --no-project python tools/check_parity_coverage_map.py
+
       - name: crate cards match the manifests
         run: uv run --no-project python tools/gen_crate_graph.py --check
 
