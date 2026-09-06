@@ -85,9 +85,9 @@ isn't verified here; the extension crate lives in the external
 `niko86/laterite-duckdb` repo, not this workspace.)* Distribution is via
 DuckDB **Community Extensions**, **not** the PyPI/npm mirror — so this
 never enters the wheel-weight split ([[crate-map]]). The community-side
-0.7.0 wasm release (PR duckdb/community-extensions#2197) is **pending the DuckDB maintainers' merge**
-as of this writing — the migration itself is done and repo-side wasm
-builds green, but the public wasm *publish* is not yet live.
+0.7.0 wasm release (PR duckdb/community-extensions#2197) **merged 2026-07-09**,
+so the public wasm publish has been live since — later extension releases
+have shipped through the same community pipeline.
 
 It reuses the pure-Rust engine wholesale: `laterite-ags4-core`'s AGS4 codec
 (`ags4_codec::read_ags4_bytes`, via
@@ -229,14 +229,15 @@ exclusion at all (the crate isn't a workspace member to exclude); see
 "## Testing" below for how the dedicated repo tests it now. See
 ci-and-runners.
 
-It is also dropped from the **public *wheel* mirror** workspace: the `private`
-set in `tools/release/rewrite-internal-refs.sh` lists `laterite-duckdb`
-alongside the three dev/QA crates, so the public `cargo build --workspace` never
-sees it. That is correct — it does **not** ship through the wheels — but it is
-not the whole story: a community extension is built from a **public repo with a
-root `Cargo.toml` and a stable ref**, and the wheel mirror (a whole-workspace
-tree, force-pushed, with this crate dropped) is none of those. How it *does*
-ship is the **Distribution** section below.
+It is also outside every repo-side publish path: `laterite-duckdb` is not a
+member of `rust-packages/Cargo.toml`'s workspace, so no wheel, npm package or
+crates.io publish here ever carries it. (An earlier version of this paragraph
+described the public *wheel mirror*'s rewriter, `tools/release/rewrite-internal-refs.sh`,
+keeping the crate in its `private` set — the mirror and the script were both
+retired at the repo flip, when this repo became the public home.) It does
+**not** ship through the wheels — but that is not the whole story: a community
+extension is built from a **public repo with a root `Cargo.toml` and a stable
+ref**. How it *does* ship is the **Distribution** section below.
 
 ## Testing
 
@@ -288,13 +289,14 @@ dedicated public repo** — `niko86/laterite-duckdb` — laid out as
 `extension-ci-tools` expects:
 
 - the `laterite_ags4` **glue crate at the root** (the `read_ags`/`ags_*` bindings);
-- the four lib crates (`laterite-ags4-core`/`-types`/`-ags4-validator`/`-ags4-emit`)
-  pulled from the **`laterite` mirror as a git submodule** pinned to a release
-  tag — **not** crates.io (the crates stay `publish = false`) and **not**
-  vendored/copied; community-extensions' *recursive* checkout makes them present,
-  and the root `Cargo.toml` path-deps into the submodule. (Proven: a standalone
-  crate outside the workspace path-depping into the lib crates builds a loadable
-  cdylib; `laterite-ags4-emit` comes transitively via `laterite-ags4-core`.)
+- the lib crates taken from **crates.io** as ordinary per-crate version
+  requirements, since the engine tier's first publish (laterite 0.9.0). The
+  original shape — the **`laterite` mirror as a git submodule** pinned to a
+  release tag, path-dep'd because nothing was on crates.io yet — is gone:
+  the extension repo's `.gitmodules` holds only `extension-ci-tools`, and its
+  root `Cargo.toml`'s own header comment records the retirement and why (a
+  hand-moved submodule pin with nothing to check it against, versus a version
+  requirement cargo resolves). Nothing is vendored/copied.
 - `description.yml` (`build: cargo`, verified against real Rust community
   extensions), `Makefile`, `extension_config.cmake`, `test/sql/*.test`.
 
@@ -351,8 +353,8 @@ single-source stay in the monorepo).
   don't "fix" it back into `--workspace`.
 - It is **out of the wheel-weight split** entirely: it ships through Community
   Extensions from its **own dedicated repo** (`niko86/laterite-duckdb`, which
-  submodules the wheel mirror for its lib deps — see Distribution), so it stays
-  in the `private` set of the wheel-mirror rewriter and never reaches PyPI/npm.
+  takes its lib deps from crates.io — see Distribution), and it never reaches
+  PyPI/npm.
 - The keychain is now a **reusable primitive** — moved into [[laterite-ags4-reference]]
   (re-exported at the historical `laterite-ags4-core::keychain` path); adopting it in
   the *dormant* `.ags5db` writer would make cross-delivery merge stateless — still a
@@ -411,8 +413,8 @@ single-source stay in the monorepo).
   community CI's binaryen rejected; the `duckdb` crate's rustc 1.86 floor
   avoids it), so the extension now builds all three wasm variants
   (`wasm_mvp`/`wasm_eh`/`wasm_threads`). The repo-side migration + wasm
-  builds are done; the **community-side 0.7.0 wasm publish (PR duckdb/community-extensions#2197) is
-  still pending the DuckDB maintainers' merge** as of this writing — the
+  builds are done, and the **community-side 0.7.0 wasm publish
+  (PR duckdb/community-extensions#2197) merged 2026-07-09** — the
   `duckdb/community-extensions#2079`/`v0.4.1` community-PR reference above predates this and likely
   needs its own re-check (not verified in this pass). musl status unverified.
 
