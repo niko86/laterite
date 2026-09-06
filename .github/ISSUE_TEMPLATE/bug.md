@@ -51,7 +51,8 @@ fixture from that. -->
 
 <!-- Fill in whichever line matches your surface; delete the rest. -->
 
-- laterite version: `python -c "import laterite; print(laterite.__version__)"`
+- laterite version: `python -c "import importlib.metadata; print(importlib.metadata.version('laterite'))"`
+- engine fingerprint (for validator bugs): `python -c "import laterite; print(laterite.engine_fingerprint())"`
 - Node package + version:
 - wasm package + version:
 - DuckDB extension version:

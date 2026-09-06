@@ -1,7 +1,7 @@
 ---
 type: insight
 title: "Rule 8 DT/yyyy-mm flags valid month-only dates as invalid"
-status: refuted
+status: confirmed
 tags: [insight, rule-08, dt-validation, resolved]
 gap_kind: validator-bug
 severity: medium

@@ -26,17 +26,21 @@ deterministic, synthetic-fixture suite (`repo:web/e2e/app.spec.ts`).
 Key facts:
 
 - **Runs against the production artifact.** The `webServer` in
-  `repo:web/playwright.config.ts` serves `dist/` at the deploy base
-  `/laterite/`, so the specs exercise the same bundle that ships — a wrong
-  base path (the [[validator-site]] failure mode) would surface here, not in
-  production.
+  `repo:web/playwright.config.ts` serves `dist/` at the same `VITE_BASE` knob
+  the build reads (default `/` — the apex-domain deploy; the old `/laterite/`
+  Pages path survives only as a `workflow_dispatch` override in
+  deploy-validator.yml), so the specs exercise the same bundle that ships — a
+  wrong base path (the [[validator-site]] failure mode) would surface here,
+  not in production.
 - **Requires a prior build.** `vite preview` serves an existing `dist/` but
   does NOT build it; CI's `e2e.yml` runs `wasm-pack build` then `npm run build`
   first. (The npm `e2e` script is just `playwright test`.)
 - **Isolated workflow.** `repo:.github/workflows/e2e.yml` is separate from
   `ci.yml` (rust/python) and `deploy-validator.yml` so an e2e change or flake
-  never blocks a merge or a deploy — see ci-and-runners. Default runner is
-  the self-hosted `ags5-portainer`; a dispatch can pick `github`.
+  never blocks a merge or a deploy — see ci-and-runners. Both its jobs run
+  GitHub-hosted (`ubuntu-latest`; public runs are free minutes, and the warm
+  self-hosted pool is kept for `ci.yml`'s per-PR builds), and its
+  `workflow_dispatch` takes no inputs — there is no runner choice to make.
 - **The sandbox can run it.** `npx playwright install chromium` + headless
   Chromium work on darwin, so the suite is runnable locally before pushing, not
   only in CI.

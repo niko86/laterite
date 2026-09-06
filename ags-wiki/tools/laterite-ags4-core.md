@@ -27,9 +27,10 @@ sources: []
 
 The **DuckDB-free pure-string** core of the AGS toolchain: every module
 that manipulates AGS data as strings without needing a database
-connection. Extracted from laterite-ags5-db so the same logic feeds both the
-light AGS4 wheel ([[laterite-py]], no DuckDB) and the DuckDB-bound AGS5
-wheel (laterite-py-ags5).
+connection. Originally extracted from the AGS5 DuckDB strand (now dormant,
+satellite-resident) precisely so the light AGS4 wheel ([[laterite-py]], no
+DuckDB) could share its logic; today the shipped AGS4 toolchain is its
+consumer.
 
 Modules (`repo:rust-packages/laterite-ags4-core/src/lib.rs`): `registry` (the
 174-group AGS4 union dictionary loaded at build time + group-tree
@@ -40,12 +41,18 @@ consumer), `effective_dict`
 (the Rule 18 standard ∪ file-DICT union — the shared implementation homed in
 [[laterite-ags4-reference]] since #777, re-exported here with an adapter for
 the read codec so a reader can bind a file-declared group's columns; see
-[[effective-dictionary]]), `ddl`
-(pure-string DDL emitter — no DuckDB connection), `ags4_codec` (CRLF /
-double-quoted CSV reader), `ags4_writer` (spec-correct AGS4 emitter),
-`excel` (AGS4 ↔ XLSX via calamine + rust_xlsxwriter), `transport`
-(zstd + age envelope for `pack`/`unpack`/`lock`/`unlock`), and `error`
-(the shared `CliError`).
+[[effective-dictionary]]), `ags4_codec` (the tolerant AGS4 read codec —
+see "The read projection" below), `index` (the `.ags.idx` certificate +
+byte-offset index), `keychain` (deterministic content-addressed row keys,
+SHA-256 → UUIDv8; the implementation moved to [[laterite-ags4-reference]] and
+this module is a path-preserving re-export, mirroring `registry`),
+`read_render` (the ONE `lat read` CSV/JSON renderer every surface shares,
+laterite-dev#530), `transport` (a thin `CliError`-returning face over
+[[laterite-transport]]'s zstd + age envelope, behind the default-on
+`transport` feature), and `error` (the shared `CliError`). What is NOT here
+any more: Excel I/O left for [[laterite-ags4-excel]] (2026-06-18), emission
+lives in [[laterite-ags4-emit]], and no DDL emitter exists in the workspace —
+the `.ags5db` DDL story left with the dormant strand.
 
 ## The read projection (since #900)
 
@@ -71,10 +78,11 @@ slice and holds just that slice's buffer.
 
 ## Inputs / outputs
 
-In: AGS4 byte streams, `.xlsx` workbooks, and pure-string heading values.
-Out: parsed group structures, emitted AGS4 / DDL text, packed/encrypted
-envelopes. No database I/O lives here — that is added on top by
-laterite-ags5-db.
+In: AGS4 byte streams and pure-string heading values. Out: parsed group
+structures, rendered `lat read` output (CSV/JSON), `.ags.idx` certificates,
+and packed/encrypted envelopes (behind `transport`). No Excel I/O
+([[laterite-ags4-excel]]'s job), no emission ([[laterite-ags4-emit]]'s), and
+no database I/O — DuckDB enters only in downstream consumers.
 
 ## Where it lives
 
@@ -82,9 +90,12 @@ laterite-ags5-db.
 [[laterite-ags4-types]], which it **re-exports as `laterite_ags4_core::ags_types`**
 (`pub use laterite_ags4_types as ags_types;` in
 `repo:rust-packages/laterite-ags4-core/src/lib.rs`) so every downstream consumer
-keeps the old `ags_types` path working unchanged. Beyond that leaf it
-carries the wasm-hostile deps (age / zstd / calamine / rpassword / csv)
-that kept them *out* of [[laterite-ags4-types]].
+keeps the old `ags_types` path working unchanged. Beyond that leaf it takes
+the parse and reference leaves plus a small host set (serde / serde_json,
+thiserror, sha2 + uuid on the keychain path) — the wasm-hostile crypto
+(age / zstd) rides one level down in [[laterite-transport]], behind core's
+default-on `transport` feature, so a wasm-safe consumer drops it with
+`default-features = false`.
 
 ## Where it fits
 

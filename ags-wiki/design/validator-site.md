@@ -229,7 +229,8 @@ Work after the 12-PR delivery, from live mobile testing + a multi-agent
   comma overshoot + malformed-quote data-loss masking were hardened in a
   follow-up; see `log.md`.)
 
-In review (open PRs, the "fixes + tests first" sweep before the next features):
+Also merged on master (2026-06-02 — the "fixes + tests first" sweep that ran
+before the next features; this list previously sat under "In review"):
 
 - **#43** — FYI-only files show an **amber** informational banner (not red);
   Tools regrouped by file-dependency (Reference / This file / Compare);
