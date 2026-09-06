@@ -51,7 +51,7 @@ napi-derive = "3"
 # The engine — all DuckDB-free, pure Rust (same crates laterite-py + laterite-ags4-wasm
 # wrap). laterite-ags4-types `arrow` feature pulls the shared typed-Arrow builder
 # (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.14.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.15.0" }
 # The shared parse leaf (#168 Phase 3): text/bytes parse through the leaf
 # directly; its `ParseError` → ValidatorError via the Phase-2 `From` bridge so
 # the `thrown`/`classify` exit-code map is unchanged. Validator dep stays for
@@ -73,7 +73,7 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.0", featu
 laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.0" }
 # AGS4 ↔ XLSX converter (laterite-dev#358) — the same crate laterite-py binds for
 # to_excel/from_excel. Pure Rust (calamine + rust_xlsxwriter), DuckDB-free.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.0" }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `table_ipc` prepends the `_id`/`_parent_id` columns from the ONE shared id
 # maths every surface uses (byte-identical to the DuckDB extension). Pure +

@@ -107,7 +107,7 @@ censor = ["dep:laterite-ags4-censor", "dep:sha2", "dep:hex"]
 
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.14.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.15.0" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
 # ONE shared id maths every surface uses (byte-identical to the extension + wheel
@@ -163,7 +163,7 @@ laterite-ags4-censor = { path = "../laterite-ags4-censor", optional = true }
 # `wasm` feature swaps rust_xlsxwriter's clock to `js_sys::Date::now()` — its
 # default `SystemTime::now()` traps on wasm32 when stamping the workbook's
 # creation time.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.0", features = ["wasm"], optional = true }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1", features = ["wasm"], optional = true }
 # The AGS type system — SAME canonical_type / parse_value / parse_datetime
 # the native DuckDB conversion uses, so the explorer casts identically
 # (parity by construction). NOT optional: `sql_type` shapes every `meta()` call
