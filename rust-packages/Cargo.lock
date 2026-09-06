@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "arrow",
  "criterion",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-excel"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
@@ -2237,7 +2237,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-hostopts"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "encoding_rs",
  "laterite-ags4-emit",
@@ -2319,7 +2319,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "chrono",
  "criterion",

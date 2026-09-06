@@ -64,7 +64,7 @@ mimalloc = { version = "0.1", features = ["v2"] }
 # has zero code-consumer breakage (every call site uses the re-exported
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /
 # check_file / findings).
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.14.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.15.0" }
 # `--diff` (#204): parse both files via the shared parse leaf + the
 # KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
 laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
@@ -80,13 +80,13 @@ laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0", defau
 # The trust model: `check` (validate, with or without a certificate) and `mint`. The
 # binary no longer owns a `try_certified_skip` of its own — that conjunction was one of
 # five across the surfaces, and no two agreed.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.1" }
 # `hostopts` (#923, its own crate since #947): the shared option-normalisation
 # seam — edition labels, the custom-dict ladder — so `--dict-version` / `--dict`
 # mean the same thing here as on every other surface. This replaced the direct
 # emit dep outright: hostopts was the binary's ONLY emit use (the writer reaches
 # it transitively, via merge/excel).
-laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.0" }
+laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.1" }
 # Timestamp the certificate (`ValidationStamp.checked_at`, RFC-3339). Already in
 # the tree via the validator; declared here to stamp the mint directly.
 chrono = "0.4"
@@ -112,7 +112,7 @@ clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 rpassword = { version = "7", optional = true }
 # The `excel` verb — AGS4 ↔ XLSX. Kept behind the `excel` feature so the
 # calamine / rust_xlsxwriter deps don't ride into a lean build.
-laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.0", optional = true }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1", optional = true }
 # Optional, behind the `tui` feature — the interactive findings browser
 # (`lat --tui`). crossterm arrives via ratatui::crossterm so the
 # backend/event types are version-matched to the linked ratatui.
