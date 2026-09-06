@@ -291,7 +291,7 @@ what #463 was filed about.
 
 It carries no token. crates.io Trusted Publishing validates this repo, that
 workflow **filename** and the `crates` environment over OIDC — so renaming or
-moving that file breaks the publish for all eleven crates at once. The
+moving that file breaks the publish for every crate in the publish set at once. The
 per-crate configs live under each crate's Settings → Trusted Publishing on
 crates.io.
 

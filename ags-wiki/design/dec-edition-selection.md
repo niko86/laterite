@@ -68,8 +68,10 @@ a real corpus leave the parity ACTION list instead of swamping it.
 (`forced` / `exact` / `guessed` / `fallback`) lets a batch run distinguish a
 genuine `TRAN_AGS` edition from this fallback — the blind spot that O-31 surfaced
 (fallback files were indistinguishable from genuine 4.1.1). Older 4.0.x
-dictionaries are Latin-1 (cp1252); `build.rs` decodes them byte→char
-(ISO-8859-1) — lossless, dependency-free, the same 0–255 tolerance O-1 documents.
+dictionaries are Latin-1 (cp1252); `tools/gen_dictionary.py` decodes them
+byte→char (ISO-8859-1) ahead of time — lossless, dependency-free, the same
+0–255 tolerance O-1 documents — so the committed `ags_dictionary.json` is
+already UTF-8 by the time any `build.rs` reads it.
 
 See [[rust-vs-python-ags4-parity]] for how these resolutions land in the parity
 baseline, and [[dec-dictionary-single-source]] for where the bundled editions

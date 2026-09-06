@@ -41,7 +41,7 @@ never touches Excel: the DuckDB extension, `ags4-perf`, and the wasm builds.
 The dependency edge is also load-bearing in the other direction. Excel depends on
 core with `default-features = false`, which drops core's default-on `transport`
 module (`age` + `zstd`). Pulling that in dragged `age` → `getrandom` into the
-tree, which **blocks the wasm32 build** (#359). Consumers that genuinely want
+tree, which **blocks the wasm32 build** (laterite-dev#359). Consumers that genuinely want
 transport enable it on their own core dependency instead.
 
 > [!note] Excel sits **above** core in the layering: it consumes the parser,

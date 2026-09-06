@@ -1,7 +1,11 @@
 # Explore the registry & KEY chain
 
-**Available in:** Python (`laterite.registry` is a Python-only module; see the
-[capability matrix](../surfaces/index.md#what-each-door-can-do))
+**Available in:** Python (`laterite.registry`) and Node
+(`import { registry } from "laterite"`): the same graph, generated from the
+same dictionary, with the same functions in camelCase (`registry.childGroups`,
+`registry.inheritedKeyNames`, …); see the
+[capability matrix](../surfaces/index.md#what-each-door-can-do). The worked
+example below is Python.
 
 Ask the AGS dictionary itself which groups hang off a parent, and which KEY
 headings a child inherits, without opening a file. The registry is the

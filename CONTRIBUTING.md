@@ -10,8 +10,8 @@ a PR.
 ## Setup
 
 You need a stable Rust toolchain, [`uv`](https://github.com/astral-sh/uv), and
-Python 3.14 for the workspace. (The published wheel is abi3 and installs on 3.12+;
-the dev floor is higher.)
+Python ≥ 3.12 for the workspace — the same floor the published abi3-py312 wheel
+declares (`requires-python` in the root `pyproject.toml`).
 
 ```bash
 git clone https://github.com/niko86/laterite.git
@@ -74,7 +74,7 @@ uv run ty check
 uv run pytest tests/ packages/laterite/tests -q
 cd rust-packages
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --exclude laterite-ags4-wasm --exclude laterite-ags4-tokenizer-wasm -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 Keep the diff to what the change actually needs. Small, targeted PRs get reviewed
