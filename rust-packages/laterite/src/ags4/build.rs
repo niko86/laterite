@@ -444,54 +444,16 @@ impl BuildSaved {
 /// Write `bytes` to `dest` via a temporary file in the destination's own
 /// directory + rename — atomic on one filesystem, so `dest` never holds a
 /// partial write. Shared by the build doors' file forms; what each door lets
-/// REACH this write is the doors' difference, not the write's. (The same
-/// contract as the Python surface's `_staged_write`; `std::fs::rename`
-/// replaces an existing file on Unix and Windows alike.)
+/// REACH this write is the doors' difference, not the write's.
 ///
-/// A DELIBERATE copy of `laterite_ags4_hostopts::staged_write` (#923, extracted
-/// to its own crate by #947), not an oversight — a wait-state copy, inventoried
-/// with the why in [`crate::pending_adoptions`] (#930). Adopt only per that
-/// ledger's rule.
+/// The staging dance is the shared `laterite_ags4_hostopts::staged_write_io`
+/// (#930 retired the wait-state copy this used to be); what stays here is the
+/// boundary's own error mapping — the `io::Error` kept as the source, the way
+/// every [`Error`] on this surface carries one.
 fn staged_write(dest: &Path, bytes: &[u8]) -> Result<(), Error> {
-    let io_err = |e: std::io::Error| {
+    laterite_ags4_hostopts::staged_write_io(dest, bytes).map_err(|e| {
         Error::with_source(ErrorKind::Io, format!("cannot write {}", dest.display()), e)
-    };
-    let dir = staging_dir(dest);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.subsec_nanos());
-    let tmp = dir.join(format!(
-        ".laterite-build-{}-{nanos}.tmp",
-        std::process::id()
-    ));
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&tmp)
-        .and_then(|mut f| std::io::Write::write_all(&mut f, bytes))
-        .and_then(|()| std::fs::rename(&tmp, dest))
-        .map_err(|e| {
-            // Best-effort cleanup: the temp file is ours alone (create_new),
-            // and leaving it behind litters the caller's output directory.
-            let _ = std::fs::remove_file(&tmp);
-            io_err(e)
-        })
-}
-
-/// The directory the staging file goes in: the DESTINATION's own, never the
-/// system temp dir — rename is only atomic within one filesystem, and that
-/// atomicity is the door's whole promise. A bare filename has no parent (or an
-/// empty one), and both mean the current directory.
-///
-/// Its own function because the property is invisible to the integration
-/// tests: on one filesystem a mis-chosen directory still passes every
-/// end-to-end assertion, so the choice is pinned here, where a unit test can
-/// see it.
-fn staging_dir(dest: &Path) -> &Path {
-    match dest.parent() {
-        Some(p) if !p.as_os_str().is_empty() => p,
-        _ => Path::new("."),
-    }
+    })
 }
 
 // --- build_unchecked ----------------------------------------------------
@@ -621,25 +583,5 @@ impl std::fmt::Debug for BuildSaved {
             .field("findings", &self.findings.len())
             .field("fixes_applied", &self.fixes_applied)
             .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::staging_dir;
-    use std::path::Path;
-
-    /// See `staging_dir` — the same-filesystem property cannot fail an
-    /// integration test on a single-filesystem machine, so the choice itself
-    /// is the thing asserted.
-    #[test]
-    fn the_staging_dir_is_the_destinations_own() {
-        assert_eq!(
-            staging_dir(Path::new("/a/b/out.ags")),
-            Path::new("/a/b"),
-            "staging anywhere else forfeits rename atomicity"
-        );
-        assert_eq!(staging_dir(Path::new("out.ags")), Path::new("."));
-        assert_eq!(staging_dir(Path::new("./out.ags")), Path::new("."));
     }
 }

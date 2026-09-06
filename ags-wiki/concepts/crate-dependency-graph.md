@@ -73,6 +73,7 @@ flowchart TD
   laterite --> laterite_ags4_diff
   laterite --> laterite_ags4_emit
   laterite --> laterite_ags4_excel
+  laterite --> laterite_ags4_hostopts
   laterite --> laterite_ags4_merge
   laterite --> laterite_ags4_parse
   laterite --> laterite_ags4_reference
@@ -195,7 +196,7 @@ flowchart TD
 | `laterite-ags4-excel` | L2 | 2 | 5 | 7 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
-| `laterite-ags4-hostopts` | L3 | 2 | 5 | 5 |
+| `laterite-ags4-hostopts` | L3 | 2 | 6 | 5 |
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
 | `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
@@ -208,7 +209,7 @@ flowchart TD
 | `laterite-cli` | L4 | 9 | 0 | 13 |
 | `laterite-node` | L4 | 11 | 0 | 12 |
 | `laterite-py` | L4 | 11 | 0 | 12 |
-| `laterite` | L? | 9 | 0 | 11 |
+| `laterite` | L? | 10 | 0 | 12 |
 
 ## Structural findings (computed from the manifests)
 
@@ -221,6 +222,7 @@ flowchart TD
   - `laterite-ags4-emit` (in-degree 10)
   - `laterite-ags4-core` (in-degree 9)
   - `laterite-ags4-reference` (in-degree 7)
+  - `laterite-ags4-hostopts` (in-degree 6)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**
   - `laterite`
 
