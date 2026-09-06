@@ -464,6 +464,19 @@ jobs:
       - name: no em dash in docs-site prose (source pre-check)
         run: uv run --no-project python tools/check_docs_em_dash.py
 
+      # The #950 convention ratchet: a NEW spelled-out crate count in tracked
+      # prose fails; existing ones are counted, reported and never judged. On a
+      # PR the base ref is the ratchet's floor; on schedule/dispatch runs
+      # base_ref is empty, the fallback diffs main against itself, and the gate
+      # reports totals with nothing judged — its documented, deliberate pass.
+      # Needs this job's `fetch-depth: 0` for the merge-base diff. One wiring
+      # only: this job is unconditional on every PR (wiki-only ones included),
+      # so a wiki-lint.yml copy would gate nothing the run here does not.
+      - name: no new spelled-out crate count in prose
+        run: >
+          uv run --no-project python tools/check_spelled_counts.py
+          --base "origin/${{ github.base_ref || 'main' }}"
+
       # Sibling of the gate above, and here for the same reason it is: no build,
       # a file walk, and an unconditional job so it cannot stop firing. A bare
       # `#N` is a claim that a number is OURS — #458 is the write-up of what
