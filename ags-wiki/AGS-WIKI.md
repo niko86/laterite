@@ -69,6 +69,20 @@ that rule governs the whole repo and this manual governs `ags-wiki/` only (§0) 
 so this states the wiki half and defers, rather than keeping a second copy that
 would drift from it, which is the very failure both rules are about.
 
+**Corollary — an ENUMERABLE set is not a fact to copy either** (#950). A
+tool page's generated crate-card already lists the crate's dependencies and
+dependents, held to the manifests by `gen_crate_graph.py --check`. Prose
+beside it therefore *tells the story* — why an edge exists, which one is
+load-bearing — and **defers the full set to the card** and to
+[[crate-dependency-graph]], rather than re-listing members the card already
+proves. The week-36 curation found two pages whose hand-prose dep-lists had
+drifted while the generated card beside them stayed correct the whole time;
+a hand-kept copy of an enumerable set is the measured-value failure with a
+list in place of a number. The same goes for the set's SIZE: a spelled-out
+crate count in prose is refused at the PR by `tools/check_spelled_counts.py`
+(new occurrences only; `<!-- historical -->` exempts a series that already
+happened, and crate-map's count is measured outright by lint C6b).
+
 **Citation grammar** (inline code span):
 - repo file/line — `` `repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs:352` ``
 - repo symbol — `` `repo:.../rules/mod.rs::run_all` ``
@@ -191,6 +205,14 @@ structure, not synthesized insight); narrative diagrams stay
 | `editions/*`, `concepts/edition-resolution` | `timeline` 4.0.3→4.2 | generated |
 | `observations/*`, observation cross-ref hub | `graph LR` O-N edges | generated from OBSERVATIONS cross-refs |
 | rule / type / group | `## Variations` mermaid (edition delta + Rust↔python) | **placeholder** (Ingest) |
+
+**Hand-drawn crate diagrams may simplify, never invent** (#950). A tool-page
+or crate-map `flowchart` is a curated view: it may *omit* edges for
+readability, and lint reports the omission count so a thin drawing stays
+visible — but every edge it *draws* between two workspace crates must be a
+real Cargo coupling in either direction. A phantom edge (a stale arrow
+outliving the dependency it drew) fails lint the same way on tool pages as
+on [[crate-map]].
 
 ## 7. Markdown toolkit (use these)
 
