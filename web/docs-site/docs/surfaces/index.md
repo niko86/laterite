@@ -15,9 +15,11 @@ validator.
 | **[CLI](cli.md)** &nbsp;(`lat`)                          | the shipped binary                     | CI gates, shell one-liners, `fix` in place                |
 | **[Browser](../reference/wasm-api.md)** &nbsp;(`@laterite/ags4-wasm`, npm) | `npm i @laterite/ags4-wasm`            | validate / read / fix inside the page (nothing uploaded)  |
 
-Every one of these is **[in beta](../reference/support.md)**. The Rust crate
-(`cargo add laterite`) is the one surface that isn't: it runs the same engine, but
-it is not yet at parity with these five.
+Every one of these is **[in beta](../reference/support.md)**, and so is the
+**Rust crate** (`cargo add laterite`): it reached parity with the Python and
+Node surfaces and joined the product line at 0.12.0. It is a library for Rust
+programs rather than a door you pick from this table, so the tour below sticks
+to the five above.
 
 The **[web app](browser.md)** is built on the browser package and nothing else, so
 it is a worked example of that door rather than a sixth one. Go and use it, but you
@@ -39,16 +41,20 @@ browser package runs the engine in the page. This grid is the honest map:
 | **diff** revisions          |   ✅   |  ✅  |   –    | ✅  |   ✅    |
 | **certify** (`.ags.idx`)    |   ✅   |  ✅  |   –    | ✅  |   ✅    |
 | **Excel** ↔ AGS4            |   ✅   |  ✅  |   –    | ✅  |   ✅    |
-| **transport** (pack / lock) |   ✅   |  ✅  |   –    | ✅  |   ✅    |
+| **transport** (pack / lock) |   ✅   |  ✅  |   –    | ✅  |    –    |
 | **python-ags4 compat**      |   ✅   |  –   |   –    |  –  |    –    |
 
 **✅ supported&nbsp;&nbsp;·&nbsp;&nbsp;○ planned&nbsp;&nbsp;·&nbsp;&nbsp;– by design**
 
 Every capability is now either supported (`✅`) or a deliberate by-design blank
-(`–`). The browser reaches **everything except the `python-ags4` drop-in**: the
-former Excel, `certify` and `transport` gaps are all closed (transport encrypts
-in a Web Worker with the same `zstd + age` envelope the CLI reads). _By design
-(`–`):_ the CLI is a validator + inspect/repair tool (no query/build); DuckDB is
+(`–`). The browser package reaches **everything except transport and the
+`python-ags4` drop-in**: the former Excel and `certify` gaps are closed. _By
+design (`–`):_ transport stays out of the browser package because the age
+envelope needs `getrandom`, which does not build for wasm (the
+[web app](browser.md) packs and unpacks in a Web Worker instead, with
+independent JS libraries that speak the same envelope, so a `.zst.age` made
+there opens with `lat unlock`); the CLI is a validator + inspect/repair tool
+(no query/build); DuckDB is
 a **read-only** SQL reader that queries and joins but doesn't validate, certify,
 or mutate (validation and certification live in the CLI + library; the extension
 only _consumes_ an externally-minted `.ags.idx`); the `python-ags4` compat shim

@@ -15,9 +15,11 @@ non-closures, enumerated below.
 
 **Reproduce it yourself:** `./tools/parity-coverage.sh` clones python-ags4 1.2.0,
 runs its own test suite through `laterite.compat`, and reports the parity count
-**and** how much of `laterite.compat` that suite exercises (currently **76%** line
-coverage — the uncovered remainder is the Rust-backed Excel I/O). It exits
-non-zero if parity drops below 122.
+**and** how much of `laterite.compat` that suite exercises (the script prints
+the line-coverage figure on every run — the uncovered remainder is the
+Rust-backed Excel I/O). It exits non-zero if the passing count drops below the
+floor the script itself carries (`PARITY_MIN`, overridable per run via
+`PARITY_MIN_PASSING`).
 
 The 121/131 count is anchored against python-ags4 **1.2.0**
 specifically — the parity-pin (`PYTHON_AGS4_COMPAT`) is exact, not a
@@ -66,6 +68,7 @@ links to the relevant catalogue entry.
 | `test_rule_6_1`                               | O-2 / O-34 | we refuse non-CSV input as `NotAgs4Error` |
 | `test_checking_without_dictionary_raises_error` | H-1    | we raise typed `MissingDictionaryError`; python-ags4 wraps |
 | `test_duplicate_groups_raises_error`          | H-1      | same |
+| `test_rule_6_2`                               | O-47     | embedded CR/LF in a quoted field: we keep the row whole and report Rule 6; python-ags4 tears it into Rule 4/5 |
 
 Both `H-1` items are an error-shape choice. python-ags4 swallows the
 failure into a generic report; we surface a typed exception that
@@ -76,7 +79,7 @@ every caller that benefits from the typed shape.
 
 | python-ags4 module | tests | laterite passes | covered by |
 |---|---|---|---|
-| `test_ags4.py` (parser, AGS4_to_dataframe, write_AGS4_file, …) | 30 | 30 | `packages/laterite/tests/test_laterite.py` (compat surface) |
+| `test_ags4.py` (parser, AGS4_to_dataframe, write_AGS4_file, …) | 30 | 29 | `packages/laterite/tests/test_laterite.py` (compat surface); the miss is `test_version`, the identity non-closure above |
 | `test_check.py::test_rule_*` (Rules 1–20) | ~85 | 82 | `packages/laterite/tests/test_laterite.py` + Rust crate tests under `rust-packages/laterite-ags4-validator/src/rules/` |
 | `test_check.py::test_AGS4_check_file*` | 9 | 8 | `packages/laterite/tests/test_laterite.py` (end-to-end check) |
 | `test_main.py` (CLI shim) | 4 | 4 | `laterite._cli` + `packages/laterite/tests/test_laterite.py` |

@@ -92,9 +92,12 @@ opening a parallel one.
 **(d) Re-parenting or overriding a STANDARD heading is honour + warn, never a
 silent shadow.** The overlay takes effect — a client CAN re-point a standard
 group's parent or redefine a standard heading's type/status — but every such
-override against the base is surfaced as a loud WARNING finding
-(`emit_override_warnings`, `repo:rust-packages/laterite-ags4-validator/src/lib.rs`),
-with a KEY→non-KEY status demotion called out as the loudest case. A full
+override against the base is surfaced as a laterite-originated finding
+(`emit_override_findings`, `repo:rust-packages/laterite-ags4-validator/src/lib.rs`).
+The loudness has been tiered since [[O-51]]: re-parenting and a KEY→non-KEY
+status demotion (the cases that change row identity) stay WARNING findings,
+while a plain type/status override reports as an FYI
+(`"FYI (Related to DICT)"`), gated on the tier flags like every other FYI. A full
 replacement (`--dict-replace`) is exempt from this — it declares a wholesale
 new schema, so there is no "standard" to have silently diverged from.
 

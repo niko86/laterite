@@ -1,6 +1,6 @@
 ---
 type: index
-generated: 2026-09-05
+generated: 2026-09-06
 counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
 ---
 # AGS Wiki — Content Catalog
@@ -26,7 +26,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concept
 | **Total (live)** | **429** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 40 · `confirmed` 18 · `drafted` 340 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 40 · `confirmed` 19 · `drafted` 340 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 1 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -454,7 +454,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concept
 | [[rule1-ascii-strict-vs-extended]] | hypothesis | spec-ambiguity |
 | [[rule15-example-tracks-eres-elrg-removal]] | confirmed | cross-edition-regression |
 | [[rule19-spec-allows-numbers-validator-may-not]] | confirmed | spec-vs-rust |
-| [[rule8-dt-yyyy-mm-false-positive]] | refuted | validator-bug |
+| [[rule8-dt-yyyy-mm-false-positive]] | confirmed | validator-bug |
 | [[type-mc-legacy-dead]] | confirmed | rule-weakness |
 
 ## Test Strategies

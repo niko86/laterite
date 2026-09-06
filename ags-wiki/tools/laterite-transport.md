@@ -61,8 +61,11 @@ Errors are one `TransportError` enum; consumers map it to their own type
 
 `repo:rust-packages/laterite-transport`. Deps are `zstd`, `age`, and `thiserror`
 only. The `age` envelope pulls `getrandom`, so this crate is **not wasm-clean** —
-which is exactly why [[laterite-ags4-core]] gates it behind a `transport` feature
-(off by default) rather than making every core consumer carry it. Direct
+which is exactly why [[laterite-ags4-core]] gates it behind its `transport`
+feature. That feature is **default-ON** (the host consumers get pack/unpack
+transparently); a wasm-safe or size-sensitive consumer opts out with
+`default-features = false` rather than every consumer carrying the crypto
+unconditionally. Direct
 consumers are core (re-exporting these behind `transport`) and [[laterite-node]];
 the wheel ([[laterite-py]]) reaches it by enabling core's `transport` feature.
 

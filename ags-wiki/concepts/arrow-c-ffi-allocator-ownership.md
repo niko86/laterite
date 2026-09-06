@@ -623,14 +623,14 @@ only **~6% read** versus v3. Dropping mimalloc entirely would have cost read
    the boundary is correct by construction; §6 shows the ecosystem's mitigations
    all live in allocator configuration. The `no-mimalloc` arm rides in #301 only
    as the **control** that rules out masking.
+4. **`laterite-node` and `laterite-cli` pinned to v2 as well** — #301's second
+   commit swept both (`rust-packages/laterite-node/Cargo.toml` and
+   `rust-packages/laterite-cli/Cargo.toml` both carry `features = ["v2"]`),
+   closing the same `dlopen`'d-extension exposure shape on the node addon.
+   This item used to sit under Outstanding as "owner's call"; the call was
+   made inside #301 itself.
 
 **Outstanding:**
-
-4. **`laterite-node` and `laterite-cli` still declare bare `mimalloc = "0.1"`**,
-   so both still build **v3.3.2**. Neither loads pyarrow today, so neither is
-   known-exposed — but they carry the same allocator version, and the node addon
-   is the same `dlopen`'d-extension shape that microsoft/mimalloc#1327 describes.
-   **Owner's call**, deliberately not swept into #301.
 5. ~~**arrow-rs#10439 is mis-filed.**~~ **Done** — closed with the evidence and a
    correction. It blamed the Arrow FFI for what is a mimalloc bug, and §2 plus the
    §3b matrix show the FFI is not on the path.
