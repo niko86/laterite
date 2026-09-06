@@ -67,10 +67,10 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.16.0" }
 laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.12.0", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.
-laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.0", features = ["arrow"] }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.1", features = ["arrow"] }
 # `hostopts` (#923, its own crate since #947): the shared option-normalisation
 # seam — edition labels, write modes, the custom-dict ladder.
-laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.0" }
+laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.1" }
 # AGS4 ↔ XLSX converter (laterite-dev#358) — the same crate laterite-py binds for
 # to_excel/from_excel. Pure Rust (calamine + rust_xlsxwriter), DuckDB-free.
 laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1" }
@@ -84,7 +84,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1" }
 laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0", default-features = false }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.1" }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
 # Transport (pack/unpack/lock/unlock) — zstd + age passphrase, the shared

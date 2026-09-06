@@ -14,7 +14,7 @@
 
 [package]
 name = "laterite-ags4-hostopts"
-version = "0.1.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
+version = "0.1.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
 rust-version = "1.85"
 description = "Shared caller-facing option normalisation for the laterite AGS4 surfaces — edition labels, write modes, custom dictionaries, staged writes"

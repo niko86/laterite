@@ -92,7 +92,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.12.0" }
 laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.15.0" }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
-laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.0" }
+laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.16.1" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
 # carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.
@@ -102,10 +102,10 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.13.1" }
 # DuckDB hands over pyarrow-free — the read boundary reversed. The `arrow`
 # feature pulls the shared Arrow→Value transpose (group_from_arrow) so the
 # native + wasm hosts share one conversion.
-laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.0", features = ["arrow"] }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.18.1", features = ["arrow"] }
 # `hostopts` (#923, its own crate since #947): the shared option-normalisation
 # seam — edition labels, write modes, the custom-dict ladder, the staged write.
-laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.0" }
+laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.1.1" }
 # The KEY-aware/type-aware revision-diff leaf (#204): `diff_parsed` over two
 # parsed files + a Dictionary — the same diff wasm + the CLI use.
 laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.12.2" }
