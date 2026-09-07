@@ -33,7 +33,7 @@ include = [
 
 [dependencies]
 # libzstd (auto-bundled). The AGS sweet spot is level 9 (see pack()).
-zstd = "0.13"
+zstd = "0.14"
 # The audited X25519 + ChaCha20-Poly1305 format; we use its scrypt passphrase
 # mode. `age::secrecy` is re-exported, so no direct `secrecy` dep is needed.
 age = "0.12"
