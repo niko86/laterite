@@ -99,7 +99,7 @@
     "@napi-rs/cli": "^3.7.2",
     "@types/node": "^26.0.1",
     "@types/semver": "^7.8.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.0",
     "@vitest/eslint-plugin": "^1.6.23",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
