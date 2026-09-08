@@ -1,17 +1,30 @@
-# Keep our dependencies + the GitHub Actions we depend on current. Each CODE
-# ecosystem groups its weekly MINOR + PATCH updates into one PR (low churn) and
-# opens MAJOR updates INDIVIDUALLY — so a single breaking bump can't drag a whole
-# batch red (which is exactly what sank the first cargo/npm grouped-everything
-# PRs). Actions stay fully grouped (they rarely break). GitHub's security updates
-# still arrive promptly, outside the schedule. Once third-party actions are
-# SHA-pinned, Dependabot bumps the pinned SHA with the human-readable version.
+# Keep our dependencies + the GitHub Actions we depend on current — at a MONTHLY
+# cadence. The weekly sweep opened nine PRs in one evening (2026-09-07), and full
+# CI times nine is exactly the churn a batching config exists to avoid; security
+# updates still arrive promptly, outside both the schedule and the cooldown.
+#
+# Each CODE ecosystem groups its MINOR + PATCH updates into one PR and opens
+# MAJOR updates INDIVIDUALLY — so a single breaking bump can't drag a whole batch
+# red (which is exactly what sank the first cargo/npm grouped-everything PRs).
+# Note dependabot counts a 0.x minor-position bump (zstd 0.13 → 0.14) as MAJOR,
+# so those arrive solo and age under the major cooldown too. Actions stay fully
+# grouped (they rarely break). Once third-party actions are SHA-pinned,
+# Dependabot bumps the pinned SHA with the human-readable version.
+#
+# Cooldown: a release must age before we take it — 30 days for a major (let the
+# ecosystem find a new major's regressions first; vitest 5.0.0 reached us the
+# week it shipped), 7 days for the rest (the yanked-next-day and
+# compromised-tarball classes are usually caught within days). uv supports only
+# the flat default, so every uv bump waits 7 days regardless of size.
 version: 2
 updates:
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
     groups:
@@ -22,7 +35,10 @@ updates:
   - package-ecosystem: cargo
     directory: /rust-packages
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
     commit-message:
       prefix: build
     groups:
@@ -33,7 +49,9 @@ updates:
   - package-ecosystem: uv
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: build
     groups:
@@ -46,9 +64,19 @@ updates:
       - /rust-packages/laterite-node
       - /web
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
     commit-message:
       prefix: build
     groups:
+      # vitest and @vitest/coverage-v8 are peers pinned to the same version —
+      # bumped separately, `npm ci` fails ERESOLVE on BOTH PRs by construction
+      # (#963–#966 were the four unresolvable halves of one upgrade). Their
+      # majors travel together or not at all; minors already share the npm group.
+      vitest-major:
+        patterns: ["vitest", "@vitest/*"]
+        update-types: ["major"]
       npm:
         update-types: ["minor", "patch"]
