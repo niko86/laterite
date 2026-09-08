@@ -17,6 +17,7 @@ Files come back born-typed — a `2DP` heading is a float, a `DT` a datetime, an
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
 [![npm](https://img.shields.io/npm/v/laterite.svg)](https://www.npmjs.com/package/laterite)
+[![crates.io](https://img.shields.io/crates/v/laterite.svg)](https://crates.io/crates/laterite)
 [![DuckDB](https://img.shields.io/badge/DuckDB-laterite__ags4-FFF000?logo=duckdb&logoColor=black)](https://community-extensions.duckdb.org/extensions/laterite_ags4.html)
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -41,10 +42,12 @@ scriptable output is byte-identical across them.
 | **DuckDB** | `INSTALL laterite_ags4 FROM community;` | SQL straight over `.ags` files, no conversion step | [guide](https://docs.laterite.dev/duckdb/) |
 | **Browser** | `npm i @laterite/ags4-wasm` | validate + explore in the page, nothing uploaded anywhere | [guide](https://docs.laterite.dev/reference/wasm-api/) |
 
-All five are **[in beta](https://docs.laterite.dev/reference/support/)** —
-the engine is tested; what it hasn't had is your files. The Rust crate
-(`cargo add laterite`) is the one surface that isn't: same engine, but not yet at
-parity with these five.
+Every surface above is **[in beta](https://docs.laterite.dev/reference/support/)** —
+the engine is tested; what it hasn't had is your files. So is the **Rust crate**
+(`cargo add laterite`): it reached parity with the Python and Node surfaces and
+joined the product line at 0.12.0. It's a library for Rust programs rather than
+a door you pick from this table — see it on
+[crates.io](https://crates.io/crates/laterite) and [docs.rs](https://docs.rs/laterite).
 
 The **[web app](https://app.laterite.dev/)** is built on the browser package
 and nothing else — a worked example of that surface rather than a sixth one. Go and
@@ -119,6 +122,29 @@ JOIN read_ags('delivery.ags', 'LOCA') l ON s._parent_id = l._id;
 </details>
 
 <details>
+<summary><b>Rust</b></summary>
+
+```rust
+use laterite::ags4;
+
+let mut doc = ags4::read("delivery.ags").run()?;
+for group in doc.groups() {
+    println!("{} — {} rows", group.code(), group.len());
+}
+
+let report = ags4::validate("delivery.ags").warnings(true).run()?;
+println!("{} finding(s)", report.findings().len());
+
+doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
+ags4::write(&doc).to_path("out.ags")?;
+```
+
+Excel ↔ AGS4 sits behind the `excel` feature
+(`cargo add laterite --features excel`), keeping the spreadsheet dependencies
+out of builds that don't want them. Full API on [docs.rs](https://docs.rs/laterite).
+</details>
+
+<details>
 <summary><b>Python — typed graph and the <code>python-ags4</code> drop-in</b></summary>
 
 ```python
@@ -147,7 +173,7 @@ matches that and adds a cross-surface toolchain on top:
 
 | | `laterite` | `python-ags4` |
 |---|:---:|:---:|
-| Runs on | Python · Node · CLI · DuckDB · browser | Python |
+| Runs on | Rust · Python · Node · CLI · DuckDB · browser | Python |
 | Validate — numbered AGS4 rules | ✅ | ✅ |
 | Read → typed data | ✅ born-typed | strings; opt-in `convert_to_numeric` |
 | Build / write AGS4 · Excel ↔ AGS4 | ✅ | ✅ |
