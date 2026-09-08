@@ -6,10 +6,15 @@
 # Each CODE ecosystem groups its MINOR + PATCH updates into one PR and opens
 # MAJOR updates INDIVIDUALLY — so a single breaking bump can't drag a whole batch
 # red (which is exactly what sank the first cargo/npm grouped-everything PRs).
-# Note dependabot counts a 0.x minor-position bump (zstd 0.13 → 0.14) as MAJOR,
-# so those arrive solo and age under the major cooldown too. Actions stay fully
-# grouped (they rarely break). Once third-party actions are SHA-pinned,
-# Dependabot bumps the pinned SHA with the human-readable version.
+# The 0.x caveat, ecosystem-split and both halves observed here: CARGO counts a
+# 0.x minor-position bump (zstd 0.13 → 0.14, #960) as MAJOR — solo PR, 30-day
+# cooldown — matching cargo's own caret semantics. NPM does NOT: a 0.x minor
+# rides the minor/patch group on the 7-day default (eslint-plugin-solid
+# 0.16 → 0.17 arrived inside the group twice, #961/#968), so a breaking-by-
+# convention npm 0.x dep gets no major treatment and a bad one needs an
+# `ignore` below. Actions stay fully grouped (they rarely break). Once
+# third-party actions are SHA-pinned, Dependabot bumps the pinned SHA with the
+# human-readable version.
 #
 # Cooldown: a release must age before we take it — 30 days for a major (let the
 # ecosystem find a new major's regressions first; vitest 5.0.0 reached us the
@@ -80,3 +85,9 @@ updates:
         update-types: ["major"]
       npm:
         update-types: ["minor", "patch"]
+    ignore:
+      # 0.17.0's reactivity analysis misfires on 19 correct sites (#969); held
+      # at 0.16.0. Scoped to the one bad version so a fixed 0.17.x IS offered —
+      # evaluate it against #969, then delete this block.
+      - dependency-name: eslint-plugin-solid
+        versions: ["0.17.0"]
