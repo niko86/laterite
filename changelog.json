@@ -150,6 +150,9 @@
       },
       {
         "text": "**The facade's wait-state ledger empties — both deliberate copies retired (#930).** The `pending_adoptions` table existed because a published crate's tarball verifies against the crates.io versions of its deps, so a sibling's new API is unusable until the registry carries it. It carried two rows; both are now adoptions: the build doors' staged atomic `out=` write is `laterite_ags4_hostopts::staged_write_io` (the facade keeps only its own error mapping, the marshal → call → map shape every host uses — and the `staging_dir` pin test went with the copy, since the property is asserted at the one shared copy now), and `read_options` is a one-line call to `ags4_codec::ReadOptions::from_flags` (core 0.15.0). The ledger module stays with an empty table: the constraint is permanent even when no copy is currently waiting."
+      },
+      {
+        "text": "**The compiled dependency set moves forward: `zstd` 0.13.3 → 0.14.0.** The compressor behind the transport envelope (`pack`/`unpack`/`lock`/`unlock`) takes its 0.x minor, reaching the surfaces that ship those verbs — the wheel, the npm addon and `lat`. The envelope format is untouched: zstd frames are a stable on-disk format, so an archive packed before the bump unpacks after it, and vice versa."
       }
     ],
     "deprecated": [],
