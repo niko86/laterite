@@ -43,12 +43,14 @@ export const TransportTool: Component = () => {
 
   // What Lock acts on: an uploaded file wins, else the file loaded in Validate.
   const lockSource = () => {
-    const f = lockFile();
-    if (f)
+    // `static` prefix: the descriptor deliberately wraps THIS file — a caller
+    // re-invokes lockSource() to see a new pick, the object never re-aims.
+    const staticFile = lockFile();
+    if (staticFile)
       return {
-        size: f.size,
-        name: f.name,
-        bytes: async () => new Uint8Array(await f.arrayBuffer()),
+        size: staticFile.size,
+        name: staticFile.name,
+        bytes: async () => new Uint8Array(await staticFile.arrayBuffer()),
       };
     const b = fileStore.bytes();
     if (b)
