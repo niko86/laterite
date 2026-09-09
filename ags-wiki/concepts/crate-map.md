@@ -366,14 +366,16 @@ as stable):
   its own canonical repo `niko86/laterite-duckdb` with its own CI (a now-retired
   in-workspace copy drifted; [[dec-duckdb-extension]] → Distribution). It reuses
   the pure-Rust engine wholesale — `laterite-ags4-core`'s codec + the
-  deterministic-key `keychain` + `laterite-ags4-types`' typing, pulled via a git
-  submodule of the public mirror. **Ships via DuckDB Community Extensions
-  from a *dedicated* public repo** (`niko86/laterite-duckdb`, which submodules
-  the wheel mirror for its lib deps — community-extensions needs a root-`Cargo.toml`
-  extension-repo shape the monorepo mirror can't give; a sanctioned
-  [[dec-monorepo-structure]] exception), **NOT the PyPI/npm wheel mirror** — so it
-  stays in the `private` set of the wheel-mirror rewriter
-  (`tools/release/rewrite-internal-refs.sh`, dev satellite). See
+  deterministic-key `keychain` + `laterite-ags4-types`' typing — consumed as
+  **crates.io version deps** since the engine tier's first publish (its
+  `Cargo.toml` records the retirement of the earlier mirror-submodule
+  path-deps, and of the flip-retired wheel-mirror rewriter with it).
+  **Ships via DuckDB Community Extensions
+  from that *dedicated* public repo** (community-extensions needs a
+  root-`Cargo.toml`
+  extension-repo shape this monorepo can't give; a sanctioned
+  [[dec-monorepo-structure]] exception) — no publish path in this repo
+  carries it. See
   [[dec-duckdb-extension]].
 
 **Dev / QA — never shipped:**

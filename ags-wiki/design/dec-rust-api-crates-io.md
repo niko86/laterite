@@ -628,26 +628,31 @@ Considered and rejected, on one ground: the facade is meant to be **brought in
 line** with the other products once it reaches parity. Under per-product
 versioning there is no line to join — "in line" is not a state that exists — so
 `laterite` would keep its own number forever, which is the opposite of the
-intent. Its 0.1.x today is an exemption because it is *incomplete*, not a
-precedent for independence.
+intent. Its 0.1.x was an exemption because it was *incomplete*, not a
+precedent for independence. *(Resolved 2026-09-04: parity reached, and the
+facade joined the product line — [[dec-facade-parity]] phase 8.)*
 
 The cost of choosing the shared number is real and worth writing down: a
 one-line browser fix re-ships the wheel, npm and `lat` unchanged.
 
 ### Mechanics
 
-- `tools/release/engine-version.toml` — the engine's bump config. One file, eight
-  substitutions: `[workspace.package].version` plus the seven
-  `[workspace.dependencies]` pins.
+- `tools/release/engine-version.toml` — the engine's lockstep bump config —
+  **retired with the lockstep** (the update note above): engine crates now
+  bump per-crate via `tools/release/bump_crate.py`.
 - `[tool.bumpversion]` in the umbrella `pyproject.toml` — the product's. It no
   longer stamps `rust-packages/Cargo.toml`.
-- `bump-version.sh <product|engine>` — the target is **required**. A default here
+- `bump-version.sh product <part>` — the tier argument is **required**, and
+  `product` is the only tier left; the script's own usage line points an
+  engine bump at `bump_crate.py`. A default here
   would be a way to bump the wrong tier by omission, which is the failure the
   split exists to prevent.
-- `test_version_faithful.py` asserts each tier is internally consistent, that the
+- `test_version_faithful.py` asserts each tier is internally consistent and
+  that the
   two stamping paths are **disjoint** (an entry in the wrong config would
-  silently restore the lockstep, and would look fine today because the numbers
-  are equal), and that the facade's exemption is deliberate.
+  silently restore the lockstep). The facade exemption it once guarded is
+  retired (2026-09-04): the facade rides the product number, and the test
+  holds it there.
 
 `laterite-cli` moved onto the **product** number, off `version.workspace = true`.
 `lat` exists twice — that binary and the wheel's `lat` console script — and clap

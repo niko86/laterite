@@ -121,7 +121,7 @@ graph TD
 - **Observations** — `observations/` (the O-N divergence entries)
 - **Tools** — `tools/` (CLIs/crates/packages/scripts)
 - **Editions** — `editions/` (4.0.3 → 4.2) · **Sources** — `sources/` · **Comparisons** — `comparisons/`
-- **Campaign registers** — [[insights/_README|Insights & Gaps]] · [[strategies/_README|Test Strategies]] · [[design/_README|AGS5 Design]] (see `.bootstrap/INGEST-PLAN.md`)
+- **Campaign registers** — [[insights/_README|Insights & Gaps]] · [[strategies/_README|Test Strategies]] · [[design/_README|AGS5 Design]] (see `.bootstrap/INGEST-PLAN.md`, dev-satellite material)
 - Full catalog: [[index]] · Activity: [[log]]
 
 > [!note] **Page counts live in [[index]]'s Coverage table**, which `reindex.py`
