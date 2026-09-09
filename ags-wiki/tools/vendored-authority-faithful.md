@@ -78,7 +78,7 @@ fails loud instead.
 ## The missing half: noticing when upstream moves
 
 `data/PROVENANCE.md` documents the refresh path (`tools/sync-standard-dicts.sh`
-/ `.ps1`) but nothing ever ran it proactively. `parity.yml`'s header claims
+/ `.ps1`, dev-satellite tooling) but nothing ever ran it proactively. `parity.yml`'s header claims
 the scheduled cron exists "so an upstream silent drift surfaces
 before it bites a user" — thirty lines above `PYTHON_AGS4_VERSION: "1.2.0"`,
 which pins the cron to one frozen oracle forever and makes that sentence

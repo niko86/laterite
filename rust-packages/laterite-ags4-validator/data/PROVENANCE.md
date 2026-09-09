@@ -124,7 +124,8 @@ us to the source we chose rather than auditing it.
 ## Refresh
 
 `tools/sync-standard-dicts.sh` (Mac/Linux) or `tools/sync-standard-dicts.ps1`
-(Windows) copies them from the installed `python-ags4`. When a new AGS4
+(Windows) — dev-satellite tooling, not in this repo — copies them from the
+installed `python-ags4`. When a new AGS4
 edition is published, re-copy from the AGS-DFWG source, bump the retrieval
 date above, and regenerate the union with `tools/gen_dictionary.py`. The
 test named above will fail until the copy and this note agree again.
