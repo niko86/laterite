@@ -145,7 +145,8 @@ and filling it. One class → one template → one frontmatter `type:`.
 edition · comparison`
 
 **Campaign classes** (added Phase 0 of the Ingest campaign — see
-`.bootstrap/INGEST-PLAN.md`): `insight` (gap register) · `strategy`
+`.bootstrap/INGEST-PLAN.md`, dev-satellite material like the probes
+below): `insight` (gap register) · `strategy`
 (Rust↔python test-probe register) · `decision` (the `design/` strand).
 These are *campaign-authored*, not bootstrap stubs — they progress past
 `stub` (see §13). Phase 0 also added `requirement` and `experiment`,
@@ -268,7 +269,8 @@ Greppable: `^## \[(\d{4}-\d{2}-\d{2})\] (ingest|query|lint) \| (.+)$`.
 
 > The current multi-phase campaign that fills the scaffold (full
 > 4.0.3→4.2 spec diff → Rust code → OBSERVATIONS → synthesis) is
-> specified in **`.bootstrap/INGEST-PLAN.md`** — read it before
+> specified in **`.bootstrap/INGEST-PLAN.md`** (dev-satellite material,
+> not in this repo) — read it before
 > running an Ingest session; resume from `index.md` status + `log.md`.
 
 1. **Classify the source**: spec erratum/new edition · new
@@ -359,7 +361,8 @@ page/source); the next Ingest clears them.
 - Spec PDFs are held once, never duplicated — and **not redistributed in this
   public repo** (AGS's own copyright); `sources/spec-*` says where to get them.
   `reports/AGS 4_1.pdf` & `reports/AGS 4_2.pdf` were deleted; the
-  `AGSL4_2_*.xlsx` stay in `reports/` and are cited there.
+  `AGSL4_2_*.xlsx` stay in the dev satellite's `reports/`, outside this
+  repo, and are cited there.
 - Sub-rules get their own pages; `nDP/nSF/nSCI` are one parametric
   page each.
 - New decisions appended here as the schema co-evolves.

@@ -1,6 +1,6 @@
 ---
 type: index
-generated: 2026-09-06
+generated: 2026-09-09
 counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
 ---
 # AGS Wiki — Content Catalog
@@ -533,7 +533,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 56, tools: 31, concept
 
 - Content pages still `stub` (await later Ingest phases): **13**.
 - Insights with `proposes_observation: true` await user ratification before any `OBSERVATIONS.md` change (AGS-WIKI §12.5).
-- See `.bootstrap/INGEST-PLAN.md` for phase status; `log.md` for activity.
+- See `.bootstrap/INGEST-PLAN.md` (dev-satellite material, not in this repo) for phase status; `log.md` for activity.
 
 ## Related
 [[start-here]] · [[log]] · [[AGS-WIKI]]

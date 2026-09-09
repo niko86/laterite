@@ -139,9 +139,9 @@ implementation.
   point at `laterite-ags4-types/src/lib.rs`.
 - Non-breaking: the `pub use` keeps `laterite_ags4_core::ags_types`;
   `laterite-ags4-types`/`laterite-ags4-core`/`ags5db` cargo suites stay green.
-- Allowlist + workspace/rewriter headers updated for the new crate
-  (`tools/release/public-allowlist.txt`,
-  `tools/release/rewrite-internal-refs.sh`).
+- Allowlist + workspace/rewriter headers updated for the new crate (the
+  release-staging allowlist and ref-rewriter — private dev infra, outside this
+  repo).
 
 ## Crate graph
 

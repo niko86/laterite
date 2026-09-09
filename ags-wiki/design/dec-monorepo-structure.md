@@ -94,7 +94,7 @@ not by a repo boundary — which keeps that concern orthogonal to this decision.
 > 2. A **separate maintainer** should own one component without commit rights to
 >    the whole tree.
 > 3. An **open-source subset** must ship while the rest stays private *and* the
->    file-level `public-tree-gate` proves insufficient.
+>    file-level release-staging gate proves insufficient.
 >
 > **First fire (2026-06-17): the `laterite_ags4` DuckDB extension** — triggers #1
 > (distinct audience + distribution channel) and #3 (community-extensions builds

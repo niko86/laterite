@@ -11,9 +11,11 @@ repo_refs: {}
 # Test Strategies — register
 
 Concrete Rust↔python-ags4 cross-check probes. Each page is one
-hypothesis about where `lat` and `tools/py_ags4_check_json.py`
+hypothesis about where `lat` and the oracle bridge
+(`tools/py_ags4_check_json.py`)
 could disagree on a rule, plus the crafted probe to settle it. Probe
-fixtures live in `.bootstrap/probes/` — **never**
+fixtures and the oracle bridge are **dev-satellite material, not in this
+public repo**; the fixtures live in its `.bootstrap/probes/` — **never**
 `laterite-ags4-validator/tests/fixtures/` (corpus-qa e2e asserts that dir
 hard-error-free). `proposed` → `probed` → `confirmed` (with recorded
 `evidence`).

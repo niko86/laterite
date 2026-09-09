@@ -146,7 +146,8 @@ confirming the separate-export design protected byte-faithful JSON.
   toolchain (1.94.1 here) won't emit — `clippy::unnecessary_sort_by`
   fired only on CI. When a clippy `-D warnings` failure can't be
   reproduced locally, `rustup update stable` to match the runner before
-  assuming it's spurious. (See `concepts/ci-and-runners.md`.)
+  assuming it's spurious. (See `concepts/ci-and-runners.md` in the
+  private dev notes, outside this repo.)
 
 Sequenced **after A**: A's deep rule survey + finding/location model is
 the foundation a fix engine builds on.
