@@ -1,8 +1,9 @@
 # The `.ags.idx` certificate lifecycle
 
 Validating a delivery runs the full rule engine. When you'll reopen the same
-file, a **certificate** lets you skip that work: a clean validate mints an
-`.ags.idx` sidecar recording a content hash + a byte index of every group. Reopen
+file, a **certificate** lets you skip that work: `certify()` mints an
+`.ags.idx` sidecar recording a content hash, the verdict every severity tier
+returned, and a byte index of every group. Reopen
 with a _fresh, matching_ cert and `.validate()` resolves without re-running a
 single rule.
 
@@ -14,7 +15,8 @@ single rule.
 --8<-- "python/ex08_certify.out"
 ```
 
-`certify()` needs a prior clean `validate()` on the same handle. It writes
+`certify()` runs the validation itself, every tier on, and refuses a file with
+rule errors. It writes
 `<path>.ags.idx` next to the file. Re-reading with `index=` hands that cert back;
 because the file's content hash still matches the one baked into the cert,
 `validate()` returns immediately and `report.certified` is `True` instead of
@@ -26,12 +28,12 @@ The check is exact: the cert vouches for _those_ bytes only. Edit one character
 and the hash no longer matches, so the cert is ignored and the rule engine runs
 as normal: a stale cert can never pass a changed file.
 
-!!! warning "It vouches error-clean only"
-    A certificate is minted from an error-clean validate (note `warnings=False`
-    above). It says "this file has no rule **errors**". It does **not** capture
-    warnings or `fyi`-tier findings, which bypass it entirely. If you need to
-    surface warnings, run a normal `.validate()`; the fast-path is for confirming
-    error-cleanliness on a file you've already cleared.
+!!! warning "What it vouches for"
+    Minting refuses a file with rule **errors**; warnings and FYI don't block
+    it, but the cert records what each tier returned. On reopen it stands in
+    for any tier it measured and found **clean**; a tier it found dirty, or a
+    request for the findings themselves rather than the verdict, re-runs the
+    engine. See [Tiers and the certificate fast-path](severity-tiers.md).
 
 ## Two doors, and they cost different amounts
 

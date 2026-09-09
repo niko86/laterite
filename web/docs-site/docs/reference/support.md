@@ -59,7 +59,7 @@ manifest; `pip install laterite` has no equivalent and takes the newest release 
 time. Pin it or lock it if you want that to be your decision.
 
 **The engine crates make no version promise at all, and they are on their own line.**
-Said above and worth saying as a rule: they are reshaped whenever the toolchain needs
+They are reshaped whenever the toolchain needs
 it, so any release of one can move anything. Each says so on its own crates.io page.
 Their version is **not** the product's either, so a number you see on crates.io will
 not match the one in a release announcement. That is two clocks, not a mistake.

@@ -22,9 +22,8 @@ numbers.
     `severity` (`error`, or `mixed` where the rule flags some findings for
     information only), a `fixable` flag (whether `.fix()` / `lat fix` can
     repair it mechanically), and the `observations` it relates to in the
-    [divergence catalogue](../concepts/dictionary-selection.md). It's the
-    programmatic mirror of the rule table the CLI prints. Drive a docs page, a UI
-    legend, or a coverage check off it without hard-coding rule numbers.
+    [divergence catalogue](../reference/divergences.md). It's the
+    programmatic mirror of the rule table the CLI prints.
 
     `laterite.dict_for(path)` resolves a file to the dictionary edition the
     validator will judge it against, as a `(version, reason)` tuple: here

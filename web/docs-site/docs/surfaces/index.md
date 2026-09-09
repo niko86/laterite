@@ -56,8 +56,7 @@ independent JS libraries that speak the same envelope, so a `.zst.age` made
 there opens with `lat unlock`); the CLI is a validator + inspect/repair tool
 (no query/build); DuckDB is
 a **read-only** SQL reader that queries and joins but doesn't validate, certify,
-or mutate (validation and certification live in the CLI + library; the extension
-only _consumes_ an externally-minted `.ags.idx`); the `python-ags4` compat shim
+or mutate (see [DuckDB](../duckdb/index.md)); the `python-ags4` compat shim
 is a Python-only concern.
 
 ## The shared vocabulary
@@ -79,10 +78,9 @@ The browser package does it too; its worked examples live in the
 ## Not re-implementations: one core, proven
 
 The surfaces don't each re-implement AGS4; they wrap the same Rust core. A
-cross-surface **compliance harness** runs every read surface (the Rust core,
-Python, Node, wasm, DuckDB, and the python-ags4 incumbent) over a real
-corpus and asserts they report **byte-identical findings**, as a per-PR gate plus
-a full-matrix report run on-demand. So "the same verdict everywhere" is a tested
-guarantee, not a claim. See [Cross-surface parity](../concepts/cross-surface-parity.md).
+cross-surface **compliance harness** holds every read surface to
+**byte-identical findings** over a real corpus, as a per-PR gate plus
+a full-matrix report run on-demand. See
+[Cross-surface parity](../concepts/cross-surface-parity.md).
 <!-- cadence: compliance -->
 <!-- cadence: compliance-report -->

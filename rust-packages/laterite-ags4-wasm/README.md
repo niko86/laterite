@@ -110,7 +110,7 @@ you're calling, and it lists exactly the features you built with.
 import init, { validate, read, version } from "@laterite/ags4-wasm";
 
 await init();                       // required, once, before anything else
-version();                          // "0.12.0"
+version();                          // the package version
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
@@ -132,10 +132,6 @@ report.finding_count;      // the TRUE total, never clipped
 report.findings;           // grouped by rule: [{ rule, total, items: [{ line, group, desc, … }] }]
 report.error;              // { kind, message } when the input wasn't validatable at all
 ```
-
-`validate`'s positional arguments mirror the CLI's flags, in order:
-`dict_version`, `include_warnings`, `include_fyi`, `encoding_label`,
-`max_per_rule`, `dict_bytes`, `dict_replace`. Pass `undefined` for the defaults.
 
 The **findings** are the same on every surface; the **envelope** is not. This
 report is shaped for a UI — findings pre-grouped by rule, with counts — where
@@ -305,13 +301,7 @@ The migrated exports call the text-encoding option `encoding`, matching Python,
 Node and the CLI. The positional ones still name it `encoding_label` — the
 browser was the only surface ever carrying that `_label` suffix, and the name
 moves with each export rather than being changed underneath a signature that
-hasn't. So a mixed spelling in one module is a **recorded state**, not an
-oversight; it ends when the table's second row empties.
-
-An arity gate (`test_modality_parity.py`) holds the migrated exports at their
-current shape and lists the rest with the reason, because CI excludes this crate
-from clippy — `too_many_arguments` has never fired here and would not fire on
-the next export either.
+hasn't.
 
 ## See it running
 

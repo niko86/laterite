@@ -38,14 +38,12 @@ The AGS4 numbered rules are a functional standard (not copyrightable);
 python-ags4 source may be read to understand *which* rules exist and
 *how* it interprets ambiguous spec wording, but its code — structure,
 control flow, algorithms — must never be copied. Each `src/rules/*`
-module carries a clean-room header. Primary source is the AGS4.1 spec
-PDF (`reports/AGS 4_1.pdf`), not code.
+module carries a clean-room header. Primary source is the published
+AGS 4.1 specification, not code.
 
 The bundled standard dictionaries under `data/` are ©AGS reference
 data, redistributed as a documented repository-owner decision — see
 [`data/PROVENANCE.md`](data/PROVENANCE.md).
-
-For the interim Python-based workflow, see
 
 ## Observations log
 

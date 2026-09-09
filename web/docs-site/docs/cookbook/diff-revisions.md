@@ -82,8 +82,8 @@ Rev A and Rev B: not a line diff, but a KEY-aware, type-aware delta.
     other surface. When you need the cell-level `a`/`b` detail shown in the
     Python/Node tabs, reach for `diff()` in a script.
 
-Every door runs the same diff leaf and reports the same delta, so a `1.50` vs
-`1.5` non-change stays a non-change everywhere. Reach for `lat diff` in a
+Every door runs the same diff leaf and reports the same delta, so a non-change
+stays a non-change everywhere. Reach for `lat diff` in a
 resubmission gate, `diff()` in a pipeline when you need the cell-level detail, or
 the browser tool for a quick visual compare.
 

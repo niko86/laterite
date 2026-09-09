@@ -20,10 +20,10 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     [`Ags4File`](../learn/read.md), so it chains; the verdict rides on `.report`.
     `is_valid` is the headline verdict and reflects errors only, so a file whose
     findings are all warnings passes with a non-zero `count`. `dict_version` and
-    `resolution` tell you *which* edition the rules came from. Both read straight
-    off the file: the edition is taken from `TRAN_AGS`, and `resolution='exact'` means
-    that edition was matched on the nose (otherwise laterite falls back to the
-    nearest dictionary it ships). You never pass an edition.
+    `resolution` tell you *which* edition the rules came from, read straight off
+    the file's `TRAN_AGS`
+    ([Dictionary selection](../concepts/dictionary-selection.md)). You never
+    pass an edition.
 
     Because `.validate()` hands the file back, keep going on the same handle
     without re-reading from disk: query it, slice a group, or emit it.

@@ -53,9 +53,7 @@ Drop the warning tier and the _same file_ reads clean. The exit code was already
 --8<-- "cli/validate_no_warnings.out"
 ```
 
-`--no-warnings` is errors-only; the default keeps warnings; `--show-fyi` adds the
-informational tier on top. See [the CLI reference](../reference/cli.md) for the
-full flag list.
+See [the CLI reference](../reference/cli.md) for the full flag list.
 
 ## The same dials in Python
 

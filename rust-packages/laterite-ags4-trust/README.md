@@ -49,16 +49,11 @@ This crate versions independently of the engine.
 
 ## Why this is a crate
 
-The question was previously answered in five places — a CLI, the Rust and
-Python halves of one binding, another binding's TypeScript, and a wasm
-surface — each with its own hand-written conjunction of freshness, engine
-identity and profile checks. They did not agree, and four of the five would
-report a file clean when it was not:
-
-- a certificate minted with file-tree checking, then the tree deleted, stayed
-  trusted — because the certified bytes themselves had not moved;
-- a certificate whose warning count was never actually measured satisfied a
-  request that asked to see warnings.
+The question was previously answered separately by every surface, each with its
+own hand-written conjunction of freshness, engine identity and profile checks.
+They did not agree, and most would report a file clean when it was not — one
+let a certificate whose warning count was never actually measured satisfy a
+request that asked to see warnings.
 
 Consolidating the decision is the point. A trust check that is subtly different
 in each caller is worse than no trust check, because it produces confident

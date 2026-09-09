@@ -69,8 +69,7 @@ Staying on laterite's own terminals avoids the question entirely:
     the Arrow backend, e.g. handing native `pyarrow.Table` objects to another
     Arrow-native library, or calling `.pl()` / `.arrow()` on a `.sql()` relation.
 
-So a base user gets polars + duckdb and an Arrow-capable bridge without dragging
-in two heavyweight dataframe stacks. Importing `laterite.compat` without the
+Importing `laterite.compat` without the
 extra is safe: the lazy materialiser only raises (with a
 `pip install laterite[compat]` hint) when a pandas-backed call is actually made.
 

@@ -130,10 +130,6 @@ version**: `cargo add laterite` and `pip install laterite` name the same
 release, in beta together with every other surface.
 [What beta means here](https://docs.laterite.dev/reference/support/).
 
-Parity was reached once, then the crate left `0.1.x` for the product line in a
-single jump. There was never a 0.2 — deliberately, rather than stopping at a
-waypoint on a crate whose whole purpose is to be stable.
-
 ## Other surfaces
 
 The same engine ships as a Python package (`pip install laterite`), a Node

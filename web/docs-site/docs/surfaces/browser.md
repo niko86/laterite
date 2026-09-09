@@ -7,8 +7,7 @@ explore, and convert it, backed by a guarantee no server-side tool can make:
 > Runs entirely in your browser, so your file never leaves your machine. No
 > server, nothing uploaded.
 
-That makes it safe for confidential ground-investigation data: nothing is
-transmitted, so there's nothing to leak.
+That makes it safe for confidential ground-investigation data.
 
 It is also a **showcase**, not a product. Everything below runs on
 `@laterite/ags4-wasm`, the same package you can install, so the app doubles as

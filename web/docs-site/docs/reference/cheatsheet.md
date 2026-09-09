@@ -46,7 +46,8 @@ materialised value.
 ## `AgsQuery`: the lazy query handle
 
 `.at(...)` and `.query(...)` return this. Builder methods are immutable: each
-returns a **new** `AgsQuery`, so the plan only runs when you call a terminal.
+returns a **new** `AgsQuery` and leaves the original unchanged (branch a plan
+freely); the plan only runs when you call a terminal.
 
 | Method           | Returns                | Chainable?                                 |
 | ---------------- | ---------------------- | ------------------------------------------ |
@@ -63,9 +64,7 @@ returns a **new** `AgsQuery`, so the plan only runs when you call a terminal.
     An `AgsQuery` is _either_ a single-result query (use `.frame` / `.to_polars`
     / `.to_pandas` / `.relation`) _or_ a fan-out (use `.frames` / `.groups`).
     `.at(code, [ids])` produces the fan-out shape, `.query(sql)` the
-    single-result shape. Calling the wrong family raises. And every builder call
-    (`.filter`, `.select`) returns a **new immutable** `AgsQuery`; the original
-    is unchanged, so you can branch a plan safely. See
+    single-result shape. Calling the wrong family raises. See
     [ex04](../learn/query.md) and [ex05](../learn/query.md).
 
 ## `Report`: the validation verdict

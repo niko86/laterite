@@ -142,9 +142,5 @@ peak is lean. What usually dominates a build-from-a-read workflow is the
   have them: anything exposing `__arrow_c_stream__` goes straight through,
   without a whole-file frame materialisation beside it.
 
-Both were measured on the perf campaign's write workflow (the variant table
-on #848 records each hold's share); they are the caller's allocations, which
-is why they live here as a recipe rather than inside the door.
-
 → See the whole fluent API assembled in the
 [Chaining Showcase](../chaining/index.md).

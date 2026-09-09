@@ -11,9 +11,8 @@ Excel — with a modern, born-typed **polars** API.
 
 Coming from [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)?
 `laterite.compat` is a faithful, faster stand-in for its `AGS4`, `check`, `utils`
-and `data` modules — **one token changes**: `python_ags4` → `laterite.compat`.
-`from python_ags4 import AGS4` becomes `from laterite.compat import AGS4`, and
-your code keeps working.
+and `data` modules — **one token changes**: `from python_ags4 import AGS4`
+becomes `from laterite.compat import AGS4`, and your code keeps working.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -159,12 +158,12 @@ still leaves dates as text; `laterite.read` is born-typed, dates included.
 
 Peak RSS of one fresh process per cell; the ratio is python-ags4's
 peak over laterite's, so above 1 laterite holds less. The largest
-rung is time-only (epic #820 decision 7). Read → strings measured
+rung is time-only. Read → strings measured
 on the pyarrow accelerator hop.
 
 The compat door holds *more* than python-ags4 — those ratios sit below 1 on
-purpose: the frames it returns are the product, and the remaining gap is the
-dataframe-bridge premium the perf ledger's M5 row records. `laterite.validate`
+purpose: that is the cost of the pandas bridge, and publishing it is the
+point. `laterite.validate`
 and `laterite.read` are the recommended paths, on memory as on time.
 
 The time ratio holds as files grow — the gap is a constant factor, not a head

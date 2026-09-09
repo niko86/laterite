@@ -26,8 +26,7 @@ headings)` 2-tuple, same pandas frames.
 code already uses, so `AGS4.AGS4_to_dataframe(path)` returns the faithful
 2-tuple: `result[0]` maps each group code to a pandas `DataFrame` (including the
 metadata groups `TRAN`/`UNIT`/`TYPE`/`ABBR`), and `result[1]` carries the
-heading metadata. The import-swap _is_ the migration. There are no call-site
-edits.
+heading metadata.
 
 The shim is faithful by design: it mirrors python-ags4's verdicts and is gated
 against that library's own test suite. The pandas backend is the default, so

@@ -13,7 +13,9 @@ LOAD laterite_ags4;
 This extension is a **read-only reader**. There is no `validate_ags` /
 `certify_ags` in SQL. Run the numbered rules and mint an `.ags.idx` certificate
 with the [`lat` CLI](cli.md) (`lat validate` / `lat certify`) or the `laterite`
-Python/Node library. `read_ags` then **consumes** an externally-minted `.ags.idx`
+Python/Node library; the
+[capability matrix](../surfaces/index.md#what-each-door-can-do) maps every
+door. `read_ags` then **consumes** an externally-minted `.ags.idx`
 beside the file to range-read a single group's bytes instead of parsing the
 whole file.
 
@@ -98,8 +100,3 @@ Each group becomes an `ags_<group>` table indexed on `_id`, and on `_parent_id`
 too where the group has a dictionary parent. Those keys are byte-identical to
 `read_ags`'s, so the resulting file matches what the Python and Node
 `to_duckdb()` produce: one store shape that every surface agrees on.
-
-!!! note "Read-only query surface"
-    DuckDB is a **read** door. It reads and inspects, but doesn't validate,
-    certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
-    surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).
