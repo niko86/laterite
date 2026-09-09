@@ -139,7 +139,8 @@ def render(today: str | None = None) -> str:
         f"**{len(stub_pages)}**.",
         "- Insights with `proposes_observation: true` await user "
         "ratification before any `OBSERVATIONS.md` change (AGS-WIKI §12.5).",
-        "- See `.bootstrap/INGEST-PLAN.md` for phase status; `log.md` for activity.",
+        "- See `.bootstrap/INGEST-PLAN.md` (dev-satellite material, not in "
+        "this repo) for phase status; `log.md` for activity.",
     ]
 
     fm = (

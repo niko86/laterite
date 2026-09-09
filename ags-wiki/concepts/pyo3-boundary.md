@@ -61,7 +61,8 @@ no type casting) rather than the typed path's born-typed columns. python-ags4
 frames are raw-string either way, so this is a transport-cost fix, not a shape
 change: measured **~2× faster than python-ags4** on that bench's 3-group fixture
 (was ~2–7× slower — the old path reshaped Python primitives per cell;
-reproducible via `tools/bench_compat_dataframe.py`, dev satellite). The
+reproducible via `tools/bench-vs-python-ags4.py`, which absorbed the old
+`bench_compat_dataframe.py`). The
 **published** figure is **~3×** — the same call on forge's 123-group `wide`
 scaffold (`repo:packages/laterite/README.md`); quote that one outside the wiki.
 Each backend then takes its cheapest

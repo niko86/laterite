@@ -54,7 +54,8 @@ and a `report` module in [[laterite-cliutil]]; a behaviour-neutral
 green); the validator library's lean dep-graph stays intact (parity
 depends on the validator, never the reverse); confirmed findings flow
 through the §12.5 insight→`OBSERVATIONS.md` O-N path; generated
-reproducers live in `ags-wiki/.bootstrap/probes/`, **never**
+reproducers live in `ags-wiki/.bootstrap/probes/` (dev-satellite
+material, not in this repo), **never**
 `laterite-ags4-validator/tests/fixtures/`.
 
 ## Related
