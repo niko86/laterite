@@ -119,7 +119,7 @@ jobs:
               - '.github/actions/build-accel/**'
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
-              - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
+              - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — ruff lints them in the python job (their drift gate, tests/test_groups_catalogue_faithful.py, is dev satellite)
               - 'web/docs-site/hooks/**'    # mkdocs build hooks — ruff lints them in the python job, so they must fire `code`
               # The docs stylesheets were listed here for test_docs_band_containment
               # (#401) — band colour may only paint the nav, the TOC rail, the

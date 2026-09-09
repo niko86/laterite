@@ -110,9 +110,10 @@ AGS4 heading that carries identifying data (`project_id`, `project`, `client`,
 `geology` — named formations/BGS codes, location-revealing offshore —,
 `method`, `remark`, `freetext`) plus a default `scrub_policy` per category. It is
 **generated** from `ags_dictionary.json` by `tools/gen_sensitive_headings.py`
-(category rules over each heading's code + description, plus a curated overlay for
+(dev satellite; category rules over each heading's code + description, plus a
+curated overlay for
 the vendor-custom cases the rules can't infer — discovered by an exhaustive scan of
-the real corpus, `output/audit_leaks.py`), and **gated** by
+the real corpus via a one-off script in gitignored working space), and **gated** by
 `tests/test_sensitive_headings_faithful.py` (dev satellite) (regenerate == committed) — the same
 generate→gate pattern as the dictionary and observations. It replaces the web
 Anonymiser's lone hand-maintained regex: both consumers now read it —
