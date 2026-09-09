@@ -39,7 +39,9 @@ repo_refs:
 > that the facade's own surface holds still, and both clauses were being printed
 > alone. Three promises for the three clocks, "read the changelog" scoped to the
 > product line, and the engine tier's anti-promise generated rather than written.
-> Expires at [[dec-facade-parity]] phase 8.
+> Expires at [[dec-facade-parity]] phase 8. **(Expired 2026-09-04 — phase 8
+> landed; the facade row in the promises table is updated to the post-jump
+> promise.)**
 
 ## Context
 
@@ -220,8 +222,10 @@ deciding that question now.
 > `test_surface_engine_pins_record_what_ships` holds the pins equal to each
 > crate's own version; cargo itself refuses to resolve a path crate a pin no
 > longer admits, so a drifted pin is a loud build error rather than a quiet
-> lie. Unpublished laterite deps (`excel`, `censor`, `cliutil`) deliberately
-> carry **no** version: nothing published exists for one to record.
+> lie. Unpublished laterite deps (`censor`, `cliutil`) deliberately
+> carry **no** version: nothing published exists for one to record. (Excel left
+> this set at [[dec-facade-parity]] phases 5–6 — published, and pinned
+> everywhere like the rest.)
 
 **Revised 2026-08-14 — what the rules above are a promise *about*.** Everything in
 this section is the mechanism by which the facade absorbs **engine** reshaping. It
@@ -240,7 +244,7 @@ already implies):
 | tier | promise |
 |---|---|
 | product line | one version, one changelog, pre-1.0 minor-for-breaking, in beta |
-| `laterite` facade | not at parity, changes faster, outside the beta claim, own clock |
+| `laterite` facade | at parity since 2026-09-04 — product number, in beta ([[dec-facade-parity]] phase 8) |
 | engine crates | an anti-promise — machinery, not a door; reshapes freely |
 
 Three consequences worth recording here rather than only in the prose:

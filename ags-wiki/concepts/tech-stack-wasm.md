@@ -79,7 +79,7 @@ build, plus seven more behind the features described below
   ceiling — a pathologically dirty file can yield millions of findings
   (hundreds of MB of JSON) — and is **wasm-only**: the CLI's `--json` is
   built independently in `repo:rust-packages/laterite-cli/src/main.rs`.
-- `parse(bytes, encoding)` → a `ParsedDataset` exposing `group_codes()`,
+- `read(bytes, encoding)` → a `ParsedDataset` exposing `group_codes()`,
   `meta(code)` (`{headings, units, types, sql_types}`), and
   `arrow_ipc(code)` — one **typed Apache Arrow IPC stream per group**,
   built lazily so peak residency is a single batch.
@@ -96,13 +96,13 @@ build, plus seven more behind the features described below
   The dictionary edition is derived **internally** from the new (B) file's
   `TRAN_AGS` (not an option); `maxRowsPerGroup` caps how many per-row
   deltas are serialized per group (the counts stay true totals).
-- `to_ags4(groups_json, edition, mode)` → `{ text, findings, fixes_applied }` —
+- `build_ags4(groups_json, opts)` → `{ text, findings, applied, fixes_applied }` —
   the **AGS4 *producer*** (the read path reversed): a JSON array of
   `{code, headings, units?, types?, rows}` → valid AGS4 `text` (UTF-8, CRLF) for
   a `Blob` download, via the shared `laterite-ags4-emit` orchestrator (dict UNIT/TYPE
   fill + AutoFix). The browser/offline half of the data→AGS4 feature
   ([[ags4-output]]).
-- `to_ags4_ipc(groups, edition, mode)` → same `{ text, findings, fixes_applied }`,
+- `build_ags4_ipc(groups, opts)` → the same report shape,
   but **columnar**: `groups` is a JS array of `{code, ipc: Uint8Array}` Arrow IPC
   streams (e.g. a duckdb-wasm result), decoded via `StreamReader` and the *same*
   shared `laterite-ags4-emit` Arrow→Value transpose the native host uses — the read path's

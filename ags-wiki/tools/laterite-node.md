@@ -29,7 +29,8 @@ sources: []
 
 > [!important] **Published.** `laterite` shipped to npm at **0.1.0 (2026-06-15)**
 > This page claimed "not yet published to npm (that is P4)" for six weeks after it
-> stopped being true — `laterite@0.8.0` is current, alongside the three
+> stopped being true — the package tracks the product line (the `node-v*` tag
+> series is the record; 0.8.0 when this note was written), alongside the three
 > `@laterite/native-*` platform packages, and releases run from CI via OIDC with
 > provenance. The npm package is a **released surface** on its own `node-v*` tag
 > train. See `repo:RELEASING-node.md`.

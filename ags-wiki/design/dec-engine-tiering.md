@@ -368,9 +368,9 @@ ships; it no longer describes what the app precaches. Tier 1 needs its own gate
 or nothing watches the artifact this whole design depends on staying small — it
 has one, and it ran before the app had switched to the artifact it guards.
 
-**The offline claim gets larger.** `repo:web/src/components/PwaUpdater.tsx` says
-"Validate & Fix now work offline", which was honestly scoped when written and is
-now understated — Tools works offline too.
+**The offline claim got larger — done (#355).** `repo:web/src/components/PwaUpdater.tsx`
+now reads "Validate, Fix, Export & Tools now work offline"; its comment records
+what stays unpromised (the DuckDB engine, the OSTN15 grid, the tier-2 engine).
 
 ## Related
 

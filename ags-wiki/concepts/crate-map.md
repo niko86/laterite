@@ -340,14 +340,15 @@ as stable):
 - [[laterite-node]] — the napi-rs cdylib + co-located TS `laterite` package: the
   **Node.js** host binding (the Node analog of `laterite-py`), re-expressing the
   DuckDB-free engine through `#[napi]` as per-group Arrow IPC `Buffer`s (the same
-  marshalling `laterite-ags4-wasm` frames for the browser). Deps — ten, per
+  marshalling `laterite-ags4-wasm` frames for the browser). Deps per
   `repo:rust-packages/laterite-node/Cargo.toml`, and the diagram below is the
   authority for the edges: `laterite-ags4-validator`, `-parse`, `-diff`,
   `-merge`, `-types` (`arrow`), `-emit` (`arrow`), `-core`, `-trust`,
-  `laterite-ags4-excel`, `laterite-transport`. Shipping: P3–P4 landed (DuckDB,
-  typed-graph, npm) — `test/p3-*.test.ts` exercise them and `git tag -l
-  "node-v*"` runs to `node-v0.10.1`. This paragraph listed three deps and called
-  P3–P4 pending long after both stopped being true.
+  `-hostopts`, `laterite-ags4-excel`, `laterite-transport`. Shipping: P3–P4
+  landed (DuckDB, typed-graph, npm) — `test/p3-*.test.ts` exercise them and the
+  `node-v*` tag series is the release record. This paragraph listed three deps,
+  called P3–P4 pending long after both stopped being true, then pinned a dep
+  count and a tag high-water mark that rotted the same way.
 - `laterite_ags4` — the **DuckDB loadable extension** (crate `laterite-duckdb`):
   reads AGS4 files as typed, UUID-keyed tables straight from SQL (`read_ags(path,
   group)` + `ags_groups`/`ags_headings`/`ags_dictionary`/`ags_relationships`) —
@@ -479,7 +480,8 @@ flowchart LR
 
 ## A crate README's example is a doctest
 
-Ten of these crates publish to crates.io, and a published version's README is
+The `PUBLISH_SET` crates (`repo:tools/check_package_contents.py`) publish to
+crates.io, and a published version's README is
 **frozen** — `repo:tools/check_doc_refs.py` already treats those pages as a
 strict special case for their *links*, with no repo-root fallback, because the
 person deciding whether to `cargo add` cannot see this repo. Their *code* was
