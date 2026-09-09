@@ -43,28 +43,30 @@ publishable and independently useful; this crate is the curated surface over
 them, and `unstable-engine` is the escape hatch for callers who want the raw
 crates without waiting for the facade to grow a verb.
 
-## Its own version line
+## Its version line — the product's
 
-It is the one crate here that does **not** inherit the workspace version. The
-engine moves in lockstep on 0.9.x; the facade carries its own 0.1.x because it
-is a different promise to a different audience — the engine's version tracks
-the shared implementation, the facade's tracks the API a Rust consumer depends
-on. The card above states both the number and which line it is on.
+Since parity ([[dec-facade-parity]] phase 8, 2026-09-04) the facade carries
+the **product** number — the same version as the wheel, the npm package and
+`lat`. The engine crates underneath version per-crate (#781) and their numbers
+are not readable from this crate's. The card above states the number and which
+line it is on.
 
-## Parity, and what it still owes
+## Parity — reached
 
-The facade does not yet reach the capability floor the other surfaces meet.
-[[dec-facade-parity]] is the plan that closes it, and
-[[modality-register]] measures the gap per capability with a `facade_verdict`
-on each cell — `planned`, `by-design` or `no-floor` — so the shortfall can be
-counted rather than read. Excel joins the facade behind an optional feature;
-the CLI deliberately does not.
+The facade reached the capability floor 2026-09-04 ([[dec-facade-parity]]
+phase 8): `tools/gen_modality.py --summary` reads to add = 0, UNDECIDED = 0,
+which is decision 7's ratified predicate. [[modality-register]] still measures
+per capability with a `facade_verdict` on each cell — `planned`, `by-design`
+or `no-floor` — and records the one standing by-design exclusion
+(`read-output-arrow`, whose engine door is `laterite-ags4-types`' `arrow`
+feature). Excel joined the facade behind an optional feature; the CLI
+deliberately did not.
 
 ## Relation to the other surfaces
 
 | Thing | Where it lives | Registry | Version line |
 |---|---|---|---|
-| **this crate** | `repo:rust-packages/laterite` | crates.io | its own 0.1.x |
+| **this crate** | `repo:rust-packages/laterite` | crates.io | product |
 | [[laterite]] — the wheel | `repo:packages/laterite` | PyPI | product |
 | [[laterite-node]] — the Node addon | `repo:rust-packages/laterite-node` | npm | product |
 | [[laterite-cli]] — `lat` | `repo:rust-packages/laterite-cli` | not published | product |
@@ -75,8 +77,8 @@ The Rust↔Python boundary runs one way — Rust drives Python, never the revers
 ## Gotchas
 
 - **`cargo add laterite` gets this crate; `pip install laterite` gets the
-  wheel.** Same word, different artifact, different version number. A version
-  like 0.1.2 is this crate; 0.10.x is the product line.
+  wheel.** Same word, different artifact — one shared version line since
+  parity (both carry the product number).
 - The facade's dependency edges are the authority for what it can expose
   without a new dependency — see [[crate-dependency-graph]], which is generated
   from the manifests.

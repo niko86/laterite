@@ -40,9 +40,10 @@ frames instead of carrying an unconditional pandas dependency. The
 Rust↔python-ags4 behavioural-equivalence story is tracked in [[parity-model]].
 
 > [!note] Stability
-> `Development Status :: 3 - Alpha` in the pyproject classifiers
+> `Development Status :: 4 - Beta` in the pyproject classifiers
 > (`repo:packages/laterite/pyproject.toml`). The AGS4 read/write/validate
-> surface is the stable core; treat the API as alpha-but-converging.
+> surface is the stable core; the whole product line is in beta
+> ([[dec-beta-claim]]).
 
 ## Install & dependency shape
 

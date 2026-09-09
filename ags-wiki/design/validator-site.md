@@ -456,7 +456,7 @@ useful — the relationships. **No data work was needed**: the wasm Explore tabl
 keep the *denormalised* AGS layout (every child carries its parent's KEY
 columns; depth cols are `2DP`→DOUBLE), so equi-joins on shared keys AND the GEOL
 depth-range join already work in SQL. This is a **UI + sqlgen** feature driven
-off the dictionary (`web/public/ags5_dictionary.json`, already loaded by
+off the dictionary (`web/public/ags_dictionary.json`, already loaded by
 `analytics.ts`/`AnalyseView`).
 
 - **`lib/relationships.ts`** (new) — dict-driven derivation, all pure/unit-

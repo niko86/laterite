@@ -487,7 +487,9 @@ tier both stay where they are. Publishing diff, merge and excel adds crates at
 `PUBLISH_SET` — semver, public-API snapshot, packaging contents — grow with it.
 That is the standing cost decision 4 accepts. As of 2026-08-05 it was **ten**
 (phase 2 published diff and merge); 2026-09-04 made it **eleven** — phase 6
-published excel, and the engine tier is complete.
+published excel. (It did not stop there — `laterite-ags4-hostopts` joined
+2026-09-06; the standing membership lives in `PUBLISH_SET` in
+`tools/check_package_contents.py`, not in this page's arithmetic.)
 
 **The version gate changes shape at the jump.** `test_version_faithful` currently
 asserts the facade starts with `0.1.` and explains why. At parity that assertion
@@ -504,10 +506,11 @@ leaves it behind.
 `repo:tools/gen_modality.py` keeps the tri-state for a future exclusion or drops
 it is a phase-5 question, not one to answer now — but it should not be left
 sitting there unexercised without a decision either way. **Answered at phase 5
-(2026-09-04): kept, with no current member.** The tri-state is the door a
-future exclusion arrives through, and the census's standing "deliberately not
-adding (0)" line is a statement about the surface, not dead code — the
-generator's `summary()` carries the dated rationale.
+(2026-09-04): kept — and no longer memberless.** The tri-state is the door a
+future exclusion arrives through, and decision 7's revision walked
+`read-output-arrow` through it the same day, so the census's standing
+"deliberately not adding" line now counts a real member — the generator's
+`summary()` carries the dated rationale.
 
 **What this rules out:** `cargo install laterite-cli` as a supported route, and
 any reading of "0.2" as a facade milestone. If the CLI is ever wanted on
