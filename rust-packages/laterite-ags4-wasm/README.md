@@ -303,6 +303,46 @@ browser was the only surface ever carrying that `_label` suffix, and the name
 moves with each export rather than being changed underneath a signature that
 hasn't.
 
+## Performance
+
+Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+groups**, realistic type mix, zero findings. Median of 10 warm in-process
+runs on macOS arm64, executed under Node's V8 — a browser engine will differ,
+so treat these as indicative rather than promised. The JS→wasm boundary copy
+of the input rides inside every number, because a browser pays it for real.
+
+| File (123 groups) | `validate` | read → Arrow IPC | `build_ags4_ipc` |
+|------------------:|-----------:|-----------------:|-----------------:|
+| 4.9 MB | 49 ms · 100 MB/s | 19 ms · 254 MB/s | 75 ms · 65 MB/s |
+| 25.0 MB | 226 ms · 111 MB/s | 89 ms · 282 MB/s | 355 ms · 71 MB/s |
+| 103.0 MB | 998 ms · 103 MB/s | 353 ms · 291 MB/s | 1.6 s · 64 MB/s |
+| 276.5 MB | 2.4 s · 116 MB/s | 923 ms · 299 MB/s | 3.6 s · 76 MB/s |
+
+`validate` is this package as shipped. The two Arrow ops need the `arrow`
+feature ([build from source](#building-a-bigger-engine)) — the engine bytes
+are the same; the exports are simply absent from the trimmed artifact.
+
+Peak **wasm linear memory** — a fresh instantiation per cell, read after one
+end-to-end op (linear memory only grows, so the size at exit is the peak).
+This is a different instrument from the native surfaces' process RSS; don't
+compare the two kinds of column across READMEs:
+
+| File | `validate` | read → Arrow IPC | `build_ags4_ipc` |
+|-----:|-----------:|-----------------:|-----------------:|
+| 4.9 MB | 24 MB | 21 MB | 39 MB |
+| 25.0 MB | 110 MB | 99 MB | 124 MB |
+| 103.0 MB | 438 MB | 396 MB | 396 MB |
+| 276.5 MB | 1274 MB | 1165 MB | 1702 MB |
+
+A `build_ags4_ipc` cell's peak includes preparing its input through the read
+door — you cannot write what you do not hold — so attribute it against the
+same rung's read cell.
+
+Reproduce in the repo: `uv run python tools/perf-ladder.py`,
+`npm run build:wasm-full`, then `npm run bench:matrix` from `web/` — fixtures
+are pinned by SHA-256, so a generator change cannot move the numbers
+unnoticed.
+
 ## See it running
 
 <https://app.laterite.dev/> is this engine — a full AGS4 validator and data

@@ -1,0 +1,542 @@
+{
+  "schema": "laterite-perf-matrix/1",
+  "generated": "2026-09-09T23:20:47+00:00",
+  "surfaces": {
+    "cli": {
+      "tool": "tools/perf-cli.py",
+      "iters": 10,
+      "schema": 2,
+      "skipped": []
+    },
+    "node": {
+      "tool": "laterite-node/bench/perf-matrix.mjs",
+      "iters": 10,
+      "schema": 2,
+      "skipped": []
+    },
+    "rust": {
+      "tool": "laterite-ags4-perf",
+      "iters": 10,
+      "schema": 2,
+      "skipped": []
+    },
+    "wasm": {
+      "tool": "web/bench/perf-matrix.mjs",
+      "iters": 10,
+      "schema": 2,
+      "skipped": []
+    }
+  },
+  "cells": {
+    "validate": {
+      "5MB": {
+        "cli": {
+          "bytes": 4886318,
+          "median_ms": 45.775209087878466,
+          "throughput_mb_s": 106.74594605607,
+          "door": "lat validate <rung> --quiet",
+          "mem": {
+            "peak_rss_bytes": 29884416,
+            "x_output": 6.12
+          }
+        },
+        "node": {
+          "bytes": 4886318,
+          "median_ms": 41.0715,
+          "throughput_mb_s": 118.97101396345397,
+          "mem": {
+            "peak_rss_bytes": 97976320,
+            "x_output": 20.05
+          }
+        },
+        "rust": {
+          "bytes": 4886318,
+          "median_ms": 43.651917,
+          "throughput_mb_s": 111.9382225527461,
+          "mem": {
+            "peak_rss_bytes": 29229056,
+            "x_output": 5.98
+          }
+        },
+        "wasm": {
+          "bytes": 4886318,
+          "median_ms": 48.819834,
+          "throughput_mb_s": 100.08878768412035,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 24182784,
+            "x_output": 4.95
+          }
+        }
+      },
+      "25MB": {
+        "cli": {
+          "bytes": 25009164,
+          "median_ms": 198.113749967888,
+          "throughput_mb_s": 126.23638694464016,
+          "door": "lat validate <rung> --quiet",
+          "mem": {
+            "peak_rss_bytes": 110673920,
+            "x_output": 4.43
+          }
+        },
+        "node": {
+          "bytes": 25009164,
+          "median_ms": 189.622208,
+          "throughput_mb_s": 131.88942510362497,
+          "mem": {
+            "peak_rss_bytes": 178864128,
+            "x_output": 7.15
+          }
+        },
+        "rust": {
+          "bytes": 25009164,
+          "median_ms": 205.043792,
+          "throughput_mb_s": 121.96986680776953,
+          "mem": {
+            "peak_rss_bytes": 107085824,
+            "x_output": 4.28
+          }
+        },
+        "wasm": {
+          "bytes": 25009164,
+          "median_ms": 226.202,
+          "throughput_mb_s": 110.56119751372667,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 110166016,
+            "x_output": 4.41
+          }
+        }
+      },
+      "100MB": {
+        "cli": {
+          "bytes": 103024062,
+          "median_ms": 787.8828749526292,
+          "throughput_mb_s": 130.7606311486263,
+          "door": "lat validate <rung> --quiet",
+          "mem": {
+            "peak_rss_bytes": 405274624,
+            "x_output": 3.93
+          }
+        },
+        "node": {
+          "bytes": 103024062,
+          "median_ms": 770.561292,
+          "throughput_mb_s": 133.70002239873736,
+          "mem": {
+            "peak_rss_bytes": 473399296,
+            "x_output": 4.6
+          }
+        },
+        "rust": {
+          "bytes": 103024062,
+          "median_ms": 834.153958,
+          "throughput_mb_s": 123.50725068429155,
+          "mem": {
+            "peak_rss_bytes": 411336704,
+            "x_output": 3.99
+          }
+        },
+        "wasm": {
+          "bytes": 103024062,
+          "median_ms": 997.645334,
+          "throughput_mb_s": 103.26722181612489,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 438239232,
+            "x_output": 4.25
+          }
+        }
+      },
+      "265MB": {
+        "cli": {
+          "bytes": 276462834,
+          "median_ms": 2012.3090001288801,
+          "throughput_mb_s": 137.38587561964573,
+          "door": "lat validate <rung> --quiet",
+          "mem": {
+            "peak_rss_bytes": 1056571392,
+            "x_output": 3.82
+          }
+        },
+        "node": {
+          "bytes": 276462834,
+          "median_ms": 1977.485208,
+          "throughput_mb_s": 139.80526017669206,
+          "mem": {
+            "peak_rss_bytes": 1124352000,
+            "x_output": 4.07
+          }
+        },
+        "rust": {
+          "bytes": 276462834,
+          "median_ms": 2181.803667,
+          "throughput_mb_s": 126.71297522390678,
+          "mem": {
+            "peak_rss_bytes": 1016397824,
+            "x_output": 3.68
+          }
+        },
+        "wasm": {
+          "bytes": 276462834,
+          "median_ms": 2388.513875,
+          "throughput_mb_s": 115.74679841455809,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 1274019840,
+            "x_output": 4.61
+          }
+        }
+      }
+    },
+    "read": {
+      "5MB": {
+        "cli": {
+          "bytes": 4886318,
+          "median_ms": 19.748666090890765,
+          "throughput_mb_s": 247.42521735449537,
+          "door": "lat read <rung> GEOL --csv --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 28229632,
+            "x_output": 5.78
+          }
+        }
+      },
+      "25MB": {
+        "cli": {
+          "bytes": 25009164,
+          "median_ms": 84.05174990184605,
+          "throughput_mb_s": 297.5448343336718,
+          "door": "lat read <rung> GEOL --csv --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 109084672,
+            "x_output": 4.36
+          }
+        }
+      },
+      "100MB": {
+        "cli": {
+          "bytes": 103024062,
+          "median_ms": 320.0045828707516,
+          "throughput_mb_s": 321.94558301563745,
+          "door": "lat read <rung> GEOL --csv --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 408862720,
+            "x_output": 3.97
+          }
+        }
+      },
+      "265MB": {
+        "cli": {
+          "bytes": 276462834,
+          "median_ms": 820.4457920510322,
+          "throughput_mb_s": 336.96660605555746,
+          "door": "lat read <rung> GEOL --csv --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 1105854464,
+            "x_output": 4.0
+          }
+        }
+      }
+    },
+    "merge": {
+      "5MB": {
+        "cli": {
+          "bytes": 4886318,
+          "median_ms": 193.1731249205768,
+          "throughput_mb_s": 25.295019698050705,
+          "door": "lat merge <rung> <rung> --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 93863936,
+            "x_output": 19.21,
+            "out_bytes": 4886318
+          }
+        }
+      },
+      "25MB": {
+        "cli": {
+          "bytes": 25009164,
+          "median_ms": 953.9693749975413,
+          "throughput_mb_s": 26.21589817814063,
+          "door": "lat merge <rung> <rung> --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 421806080,
+            "x_output": 16.87,
+            "out_bytes": 25009164
+          }
+        }
+      },
+      "100MB": {
+        "cli": {
+          "bytes": 103024062,
+          "median_ms": 3956.4556248951703,
+          "throughput_mb_s": 26.03948376211845,
+          "door": "lat merge <rung> <rung> --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 1593786368,
+            "x_output": 15.47,
+            "out_bytes": 103024062
+          }
+        }
+      },
+      "265MB": {
+        "cli": {
+          "bytes": 276462834,
+          "median_ms": 11467.027290957049,
+          "throughput_mb_s": 24.109372637319865,
+          "door": "lat merge <rung> <rung> --out <scratch> --quiet",
+          "mem": {
+            "peak_rss_bytes": 4275339264,
+            "x_output": 15.46,
+            "out_bytes": 276462834
+          }
+        }
+      }
+    },
+    "parse-to-typed": {
+      "5MB": {
+        "node": {
+          "bytes": 4886318,
+          "median_ms": 21.815916,
+          "throughput_mb_s": 223.9795019379429,
+          "mem": {
+            "peak_rss_bytes": 111198208,
+            "x_output": 22.76
+          }
+        },
+        "rust": {
+          "bytes": 4886318,
+          "median_ms": 17.981792,
+          "throughput_mb_s": 271.7369881711456,
+          "mem": {
+            "peak_rss_bytes": 25788416,
+            "x_output": 5.28
+          }
+        },
+        "wasm": {
+          "bytes": 4886318,
+          "median_ms": 19.237584,
+          "throughput_mb_s": 253.99852704996638,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 21430272,
+            "x_output": 4.39
+          }
+        }
+      },
+      "25MB": {
+        "node": {
+          "bytes": 25009164,
+          "median_ms": 98.322625,
+          "throughput_mb_s": 254.35818053067644,
+          "mem": {
+            "peak_rss_bytes": 200966144,
+            "x_output": 8.04
+          }
+        },
+        "rust": {
+          "bytes": 25009164,
+          "median_ms": 90.148875,
+          "throughput_mb_s": 277.42069992553985,
+          "mem": {
+            "peak_rss_bytes": 93847552,
+            "x_output": 3.75
+          }
+        },
+        "wasm": {
+          "bytes": 25009164,
+          "median_ms": 88.748958,
+          "throughput_mb_s": 281.79670571456177,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 99352576,
+            "x_output": 3.97
+          }
+        }
+      },
+      "100MB": {
+        "node": {
+          "bytes": 103024062,
+          "median_ms": 409.8515,
+          "throughput_mb_s": 251.36924471424408,
+          "mem": {
+            "peak_rss_bytes": 552026112,
+            "x_output": 5.36
+          }
+        },
+        "rust": {
+          "bytes": 103024062,
+          "median_ms": 357.237709,
+          "throughput_mb_s": 288.3907812766765,
+          "mem": {
+            "peak_rss_bytes": 358187008,
+            "x_output": 3.48
+          }
+        },
+        "wasm": {
+          "bytes": 103024062,
+          "median_ms": 353.484625,
+          "throughput_mb_s": 291.4527385738489,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 395968512,
+            "x_output": 3.84
+          }
+        }
+      },
+      "265MB": {
+        "node": {
+          "bytes": 276462834,
+          "median_ms": 1079.165167,
+          "throughput_mb_s": 256.18213268368027,
+          "mem": {
+            "peak_rss_bytes": 1342128128,
+            "x_output": 4.85
+          }
+        },
+        "rust": {
+          "bytes": 276462834,
+          "median_ms": 937.832083,
+          "throughput_mb_s": 294.7892687949342,
+          "mem": {
+            "peak_rss_bytes": 922894336,
+            "x_output": 3.34
+          }
+        },
+        "wasm": {
+          "bytes": 276462834,
+          "median_ms": 923.29425,
+          "throughput_mb_s": 299.4309062360131,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 1164902400,
+            "x_output": 4.21
+          }
+        }
+      }
+    },
+    "write": {
+      "5MB": {
+        "node": {
+          "bytes": 4886318,
+          "median_ms": 53.138,
+          "throughput_mb_s": 91.95524859799013,
+          "mem": {
+            "peak_rss_bytes": 143998976,
+            "x_output": 29.47
+          }
+        },
+        "rust": {
+          "bytes": 4886318,
+          "median_ms": 60.53425,
+          "throughput_mb_s": 80.71988997963963,
+          "mem": {
+            "peak_rss_bytes": 39600128,
+            "x_output": 8.1
+          }
+        },
+        "wasm": {
+          "bytes": 4886318,
+          "median_ms": 75.267959,
+          "throughput_mb_s": 64.91896505390827,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 39059456,
+            "x_output": 7.99
+          }
+        }
+      },
+      "25MB": {
+        "node": {
+          "bytes": 25009164,
+          "median_ms": 239.963666,
+          "throughput_mb_s": 104.22062813459435,
+          "mem": {
+            "peak_rss_bytes": 337281024,
+            "x_output": 13.49
+          }
+        },
+        "rust": {
+          "bytes": 25009164,
+          "median_ms": 292.13525,
+          "throughput_mb_s": 85.60816950368023,
+          "mem": {
+            "peak_rss_bytes": 195149824,
+            "x_output": 7.8
+          }
+        },
+        "wasm": {
+          "bytes": 25009164,
+          "median_ms": 354.715083,
+          "throughput_mb_s": 70.5049353652661,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 124387328,
+            "x_output": 4.97
+          }
+        }
+      },
+      "100MB": {
+        "node": {
+          "bytes": 103024062,
+          "median_ms": 987.246791,
+          "throughput_mb_s": 104.35492213212977,
+          "mem": {
+            "peak_rss_bytes": 1069907968,
+            "x_output": 10.39
+          }
+        },
+        "rust": {
+          "bytes": 103024062,
+          "median_ms": 1180.413667,
+          "throughput_mb_s": 87.27793050874595,
+          "mem": {
+            "peak_rss_bytes": 524353536,
+            "x_output": 5.09
+          }
+        },
+        "wasm": {
+          "bytes": 103024062,
+          "median_ms": 1605.529583,
+          "throughput_mb_s": 64.16827387726806,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 395968512,
+            "x_output": 3.84
+          }
+        }
+      },
+      "265MB": {
+        "node": {
+          "bytes": 276462834,
+          "median_ms": 2623.709667,
+          "throughput_mb_s": 105.37097052972058,
+          "mem": {
+            "peak_rss_bytes": 3043164160,
+            "x_output": 11.01
+          }
+        },
+        "rust": {
+          "bytes": 276462834,
+          "median_ms": 3076.474667,
+          "throughput_mb_s": 89.86351715016414,
+          "mem": {
+            "peak_rss_bytes": 1382940672,
+            "x_output": 5.0
+          }
+        },
+        "wasm": {
+          "bytes": 276462834,
+          "median_ms": 3627.281583,
+          "throughput_mb_s": 76.21763782985579,
+          "mem": {
+            "instrument": "wasm-linear-memory",
+            "peak_linear_memory_bytes": 1701838848,
+            "x_output": 6.16
+          }
+        }
+      }
+    }
+  }
+}

@@ -130,6 +130,45 @@ version**: `cargo add laterite` and `pip install laterite` name the same
 release, in beta together with every other surface.
 [What beta means here](https://docs.laterite.dev/reference/support/).
 
+## Performance
+
+Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+groups**, realistic type mix, zero findings. macOS arm64 (Apple Silicon), hot
+in-memory bytes, median of 10 warm runs. The facade re-exports the engine, so
+these are the engine's numbers.
+
+| File (123 groups) | `validate` | parse → typed Arrow | emit from Arrow |
+|------------------:|-----------:|--------------------:|----------------:|
+| 4.9 MB | 44 ms · 112 MB/s | 18 ms · 272 MB/s | 61 ms · 81 MB/s |
+| 25.0 MB | 205 ms · 122 MB/s | 90 ms · 277 MB/s | 292 ms · 86 MB/s |
+| 103.0 MB | 834 ms · 124 MB/s | 357 ms · 288 MB/s | 1.2 s · 87 MB/s |
+| 276.5 MB | 2.2 s · 127 MB/s | 938 ms · 295 MB/s | 3.1 s · 90 MB/s |
+
+Peak RSS — one fresh process per cell, the operation run once end-to-end:
+
+| File | `validate` | parse → typed Arrow | emit from Arrow |
+|-----:|-----------:|--------------------:|----------------:|
+| 4.9 MB | 29 MB | 26 MB | 40 MB |
+| 25.0 MB | 107 MB | 94 MB | 195 MB |
+| 103.0 MB | 411 MB | 358 MB | 524 MB |
+| 276.5 MB | 1016 MB | 923 MB | 1383 MB |
+
+The middle and right columns are the toolkit's shared cross-surface ops —
+parse + materialise every group to typed Arrow, and emit from held Arrow —
+the work the Python, Node and browser bindings pay on read and write. The
+facade's own `ags4::read` stops at the byte-faithful document (no Arrow
+materialisation), so the parse column is an upper bound on it. An emit
+memory cell includes reading and typing its own input — you cannot write
+what you do not hold — so attribute it against the same rung's parse cell.
+Throughput holds as files grow: a quarter-gigabyte delivery runs at the same
+MB/s as a 5 MB one.
+
+Reproduce in the repo: `uv run python tools/perf-ladder.py`, then
+`cargo run --release -p laterite-ags4-perf` — fixtures are pinned by SHA-256,
+so a generator change cannot move the numbers unnoticed. The
+[Python package's README](https://pypi.org/project/laterite/) carries the same
+operations compared end-to-end against `python-ags4`.
+
 ## Other surfaces
 
 The same engine ships as a Python package (`pip install laterite`), a Node
