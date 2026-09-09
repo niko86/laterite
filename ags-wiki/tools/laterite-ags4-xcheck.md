@@ -26,7 +26,8 @@ sources: []
 > parses/emits a cell differently is caught — the layer below findings
 > agreement.
 
-It's a deliberately **lean** crate — deps only `validator + emit + parse` — so
+It's a deliberately **lean** crate — deps only `validator + emit + parse +
+core` — so
 the gate builds fast and carries none of the findings-agreement harness's deps.
 It was extracted out of the (larger) findings harness for exactly that reason;
 see [[laterite-ags4-compliance]] for the split.
@@ -75,7 +76,8 @@ two are decoupled.
 
 ## Where it lives
 `repo:rust-packages/laterite-ags4-xcheck`. Deps [[laterite-ags4-emit]] +
-`laterite-ags4-validator` + `laterite-ags4-parse` — all lean leaves.
+`laterite-ags4-validator` + `laterite-ags4-parse` + [[laterite-ags4-core]] —
+all lean leaves.
 
 ## Relationship to other components
 ```mermaid
@@ -83,6 +85,7 @@ flowchart LR
   emit[laterite-ags4-emit] --> xcheck[laterite-ags4-xcheck]
   val[laterite-ags4-validator lib] --> xcheck
   parse[laterite-ags4-parse] --> xcheck
+  core[laterite-ags4-core] --> xcheck
   xcheck -->|value-agreement verdict| ci[output-value CI gate]
 ```
 

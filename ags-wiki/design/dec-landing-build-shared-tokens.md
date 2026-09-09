@@ -58,8 +58,8 @@ copy of the app. That is the thing this page is arranged against.
 `repo:web/landing/vite.config.ts` is the apex's own config with its own root,
 its own entry and its own output. It shares `repo:web/package.json` and nothing
 else. Both configs resolve `@shared` to `repo:web/src/shared`, and the tokens
-live there — `repo:web/src/shared/styles/tokens.css` and the three files it
-composes.
+live there — `repo:web/src/shared/styles/tokens.css` and the files it
+composes (its own `@import` lines are the roster).
 
 The pairing's display face is **Figtree**, and no slab is referenced anywhere in
 the token layer or the surfaces consuming it.

@@ -20,7 +20,7 @@ sources: []
 <!-- END GENERATED: crate-card -->
 
 ## What it is
-> [!quote] The clean-room Rust AGS4 validator CLI crate; ships the `lat` binary (lib `laterite_ags4_validator` + bin). Implements Rules 1–20 from the spec PDF (clean-room: python-ags4 LGPL read only for behavioural parity, never copied). Edition auto-resolved from TRAN_AGS (lib.rs::resolve_dict_version).
+> [!quote] The clean-room Rust AGS4 validator CLI crate; ships the `lat` binary (bin-only — `autobins = false`, no lib target; the rule engine is its `laterite-ags4-validator` dependency). Implements Rules 1–20 from the spec PDF (clean-room: python-ags4 LGPL read only for behavioural parity, never copied). Edition auto-resolved from TRAN_AGS (`laterite_ags4_hostopts::edition`, called from `commands/common.rs`).
 
 ## Commands
 
@@ -61,7 +61,7 @@ declaration-level half of the same question.
 | `excel` | `<in> <out>` | convert AGS4 ↔ Excel (direction from the output extension) |
 <!-- /generated:cli-verbs -->
 
-Global flags, valid before or after the verb: `--json` / `--ndjson` (machine-readable findings) and `--quiet`. `pack`/`unpack`/`lock`/`unlock` (transport) and `excel` are on by default and compile out under `--no-default-features`.
+Only `--quiet` is global (valid before or after the verb); `--json` / `--ndjson` (machine-readable findings) are declared per-verb, on the verbs that emit findings — `cli.rs`'s own module doc records the split. `pack`/`unpack`/`lock`/`unlock` (transport) and `excel` are on by default and compile out under `--no-default-features`.
 
 ## Inputs / outputs
 > [!quote] In: an `.ags` path plus per-verb flags — the dictionary edition (`--dict-version auto|4.0.3…4.2`, resolved from `TRAN_AGS` by default) and source `--encoding`. Out: `validate` prints a findings table (Rule·Line·Group·Description) or `--json`/`--ndjson`, with typed exit codes (0 passed · 1 failed · 3 not-found · 4 not-AGS4 · 5 bad-args · 6 schema). Since #203 errors AND WARNINGs show by default (like a compiler); `--no-warnings` is errors-only, `--show-fyi` adds the FYI tier. Since #321 those are **display** dials only — what the run CONCLUDES is decided by errors alone, so exit 0 no longer means "no findings", and `--warnings-as-errors` (the compiler's `-Werror`, contradicting `--no-warnings`) is what makes a warning fatal. Every launcher reads one `laterite_ags4_validator::verdict::Verdict` for that answer rather than each deriving its own.

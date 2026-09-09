@@ -59,9 +59,12 @@ gather→check→cross-check), plus two added 2026-06-21:
   engine, not two implementations. See [[crate-map]] ·
   [[dec-ags4-censor-leaf]].
 
-`validate.rs::parse_dict_version` asks the generated `DictVersion::from_edition`
-(fixed 2026-07-14) rather than its own hand-written `match` on the five edition
-strings — one of three such copies found across the tree; see
+`validate.rs::parse_dict_version` asks the shared
+`laterite_ags4_hostopts::edition` resolver (which itself asks the generated
+`DictVersion::from_edition` — the 2026-07-14 fix retired this crate's own
+hand-written `match` on the five edition
+strings, one of three such copies found across the tree; the hostopts
+extraction then moved the call itself out of every host); see
 [[edition-resolution]] and [[data-single-source-audit]] (row 2).
 
 ## Inputs / outputs
@@ -84,9 +87,10 @@ flowchart LR
 See [[crate-map]] for the workspace dependency graph.
 
 See [[parity-model]] for the lat ↔ py-ags4-check-json
-cross-check. `parity.rs` is being extracted into [[laterite-ags4-parity]]
+cross-check. `parity.rs` was extracted into [[laterite-ags4-parity]] (P1)
 so [[laterite-ags4-forge]] shares the identical `classify`/`reconcile` without
-duplication (behaviour-neutral refactor).
+duplication (behaviour-neutral refactor, complete); this crate now consumes
+the parity crate.
 
 ## Related
 [[parity-model]] · [[laterite-cli]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[crate-map]] · [[data-single-source-audit]] · [[edition-resolution]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-wasm]]
