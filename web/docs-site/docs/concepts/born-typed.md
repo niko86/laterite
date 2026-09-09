@@ -19,9 +19,9 @@ heading like `TRAN_DATE` reads as `Datetime(time_unit='us')` (this file's `LOCA`
 carries no `DT` column, so it doesn't appear here).
 
 !!! note "Why it matters"
-    A born-typed frame means arithmetic, sorting, and joins just work. Add a
+    A born-typed frame means arithmetic, sorting, and joins just work: add a
     depth to a ground level, sort boreholes by easting, join `SAMP` to `LOCA` on
-    `LOCA_ID`. No per-column casting, and no silent string-vs-number bugs from
-    AGS data arriving as text.
+    `LOCA_ID`, with no silent string-vs-number bugs from AGS data arriving as
+    text.
 
 ← Back to [Read](../learn/read.md)

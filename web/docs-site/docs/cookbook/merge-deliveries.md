@@ -123,8 +123,7 @@ least informative answer available. `promote` keeps the column _numeric_.
     ```
 
 **`promote` never rounds and never demotes.** It only ever _appends zeros_, so no
-digit you wrote is ever changed, and taking the **maximum** precision is the only
-direction that cannot destroy data. That also makes the result independent of
+digit you wrote is ever changed. That also makes the result independent of
 argument order (unlike a KEY conflict, where the later file deliberately wins). A
 value it cannot pad losslessly is kept verbatim and warned about, never rounded.
 

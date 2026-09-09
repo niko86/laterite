@@ -99,8 +99,8 @@ QUALIFY row_number() OVER (PARTITION BY loca_id ORDER BY ver DESC) = 1;
 
 ### Keep every distinct value with `_content_hash`
 
-`_id` keys on identity, so the `DISTINCT ON (_id)` above collapses a _revised_
-borehole (same `LOCA_ID`, changed data) to a single arbitrary row. To keep one
+As above, `DISTINCT ON (_id)` folds a revised borehole to one arbitrary
+row. To keep one
 row per distinct **value** instead (folding away rows that are genuinely
 identical, but keeping both the original and its revision), dedup on
 `_content_hash`, the value twin of `_id`:

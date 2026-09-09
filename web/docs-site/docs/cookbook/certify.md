@@ -26,7 +26,8 @@ skip the rule engine.
     tell you what happened: `.report.certified` is `True` when the cert matched
     the file's current bytes and the rule engine was skipped, and
     `.report.resolution` reports how the dictionary edition was resolved
-    (`"exact"` or a fallback; see [Validate](../learn/validate.md)).
+    (`"exact"` or a fallback; see
+    [Dictionary selection](../concepts/dictionary-selection.md)).
 
 === "Node"
 

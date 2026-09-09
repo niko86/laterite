@@ -9,6 +9,7 @@ _"how do I…?"_.
 ## Reading & typing
 
 - [**Get one group as a typed frame**](get-typed-frame.md): `read(...)["LOCA"]`, born-typed.
+- [**Read a group at the shell**](read-a-group.md): `lat read` → table, CSV or JSON, no import.
 - [**Read XN columns as numeric**](read-xn-numeric.md): opt-in `xn="numeric"` for the AGS numeric-or-text type.
 - [**Explore the registry & KEY chain**](explore-registry.md): `child_groups` / `inherited_key_names`.
 
@@ -27,17 +28,19 @@ _"how do I…?"_.
 ## Producing AGS4
 
 - [**Build from frames**](build-from-frames.md): `build_ags4({code: frame})`.
-- [**Build from a typed graph**](build-from-typed-graph.md): `build_ags4(PROJ(...))` (#214).
+- [**Build from a typed graph**](build-from-typed-graph.md): `build_ags4(PROJ(...))`.
 
 ## Repairing & comparing
 
 - [**Fix a dirty file**](fix-a-dirty-file.md): `.fix()` → a new, repaired handle.
 - [**Diff two revisions**](diff-revisions.md): KEY-aware, type-aware.
+- [**Merge two deliveries**](merge-deliveries.md): reconcile a phased or revised project into one file.
 - [**Certify a clean file**](certify.md): mint an `.ags.idx` and skip re-validation.
 
 ## Sharing & migrating
 
 - [**Pack / encrypt for transport**](transport.md): zstd + optional age encryption.
+- [**Excel ↔ AGS4**](excel.md): round-trip through a spreadsheet, one sheet per group.
 - [**Drop-in for python-ags4**](compat.md): `from laterite import compat as AGS4`.
 
 !!! tip

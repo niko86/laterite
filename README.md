@@ -44,8 +44,7 @@ scriptable output is byte-identical across them.
 
 Every surface above is **[in beta](https://docs.laterite.dev/reference/support/)** —
 the engine is tested; what it hasn't had is your files. So is the **Rust crate**
-(`cargo add laterite`): it reached parity with the Python and Node surfaces and
-joined the product line at 0.12.0. It's a library for Rust programs rather than
+(`cargo add laterite`), a library for Rust programs rather than
 a door you pick from this table — see it on
 [crates.io](https://crates.io/crates/laterite) and [docs.rs](https://docs.rs/laterite).
 

@@ -69,11 +69,10 @@ Inside the wheel it would collide with the real library in
 `site-packages/python_ags4/`, leaving two distributions claiming one import path,
 with install order deciding which one wins. That is a packaging hazard, not a feature.
 
-As a separate distribution it would break this repo's own parity oracle. The
-oracle installs the **genuine** python-ags4 and runs its test suite against
-`laterite.compat` through a `sys.modules` shim. A laterite-published `python_ags4`
-would fight the real one for the same directory, and the comparison that keeps
-`compat` honest is the first thing it would take out.
+As a separate distribution it would break the parity testing that keeps `compat`
+honest: that machinery installs the **genuine** python-ags4 beside laterite, and
+a laterite-published `python_ags4` would fight the real one for the same
+directory.
 
 ## Which python-ags4 version you are getting
 

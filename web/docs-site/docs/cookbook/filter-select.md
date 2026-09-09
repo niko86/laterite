@@ -71,8 +71,6 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
 
 Every door narrows the same born-typed group: Python's builder stays lazy and
 composable, Node and DuckDB say it in SQL, the browser does it by point-and-click.
-Reach for `.query()`/`sql()` on one group; step up to a join across groups with
-[SQL across groups](./sql-across-groups.md).
 
 See also: [SQL across groups](./sql-across-groups.md) ·
 [Chaining](../chaining/index.md).

@@ -16,8 +16,8 @@ pip install laterite[compat,pyarrow]  # + pyarrow accelerator (faster pandas hop
 pip install laterite[pyarrow]         # the Arrow backend (adds pyarrow)
 ```
 
-`[compat]` alone is already **~4× faster than python-ags4** (object-dtype pandas
-via DuckDB). pyarrow is an optional accelerator. See
+`[compat]` alone is already **~4× faster than python-ags4**; pyarrow is an
+optional accelerator, never required. See
 [Dependency shape](../concepts/dependency-shape.md).
 
 ## First validate, from the command line
@@ -59,9 +59,11 @@ the file is clean:
 ```
 
 !!! note "The exit-code contract"
-    `lat` exits **`0`** when the file is clean and **`1`** when there are
-    findings. Nothing else. That makes it a drop-in gate for CI or a pre-commit
-    hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
-    output parsing required.
+    `lat` exits **`0`** when the file passes and **`1`** when a rule **error**
+    fired; a warning alone never fails the run, and the
+    [CLI guide](../surfaces/cli.md) lists the remaining codes for unreadable or
+    malformed input. That makes it a drop-in gate for CI or a pre-commit
+    hook: `lat validate delivery.ags` fails the step the moment an error fires,
+    no output parsing required.
 
 Next → [Read & explore a file](./read.md)

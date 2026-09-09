@@ -29,8 +29,9 @@ actually needs and leaves the rest to a from-source build:
 | `ags4_to_xlsx` · `xlsx_to_ags4` | build from source |
 | `certify` · `diff` · `merge` · `censor` | build from source |
 
-That is **1.8 MiB raw / 749 KiB gzipped**, against 5.1 MiB / 1.71 MiB for
-everything, which is roughly 2.3× smaller on the wire. The whole read → validate → **fix** → write
+The published package is **roughly 2–3× smaller on the wire** than the full
+from-source build; the per-release figures are in the
+[package README](https://www.npmjs.com/package/@laterite/ags4-wasm). The whole read → validate → **fix** → write
 chain is present; nothing shipped breaks it in the middle.
 
 Two of the omissions have a replacement rather than simply being absent:
@@ -94,11 +95,9 @@ early calls queue instead.
 ```
 
 **An absent `severity` means `error`.** The engine omits the field rather than
-spelling it out, so the default you write is load-bearing. It belongs in one
-resolver that everything calls. The app defaulted to `"warning"` at five separate
-sites, which silently reclassified every error in the browser: the summary banner
-counted errors as warnings, and the severity filter hid them from the "error"
-selection while showing them under "warning".
+spelling it out, so the default you write is load-bearing: put it in one
+resolver that everything calls. The app once defaulted to `"warning"` at five
+separate sites, silently reclassifying every error in the browser.
 
 Note also `report.error` versus `report.findings`. A parseable file with problems
 returns findings and a `null` error; only an input that is not AGS4 at all comes

@@ -16,14 +16,12 @@ graph to the emitter. Use this when your data is already a graph in memory
     --8<-- "python/ex09b_build_from_typed_graph.out"
     ```
 
-    `build_ags4(PROJ(...))` walks the graph depth-first (#214) and emits exactly
+    `build_ags4(PROJ(...))` walks the graph depth-first and emits exactly
     the groups you built. You handed it a `PROJ` with one `LOCA` child; you got
     those two back, plus three findings naming the mandatory metadata catalogs your
-    graph doesn't carry: Rules 14 (`TRAN`), 15 (`UNIT`) and 17 (`TYPE`). Pass
-    `synthesise_metadata=True` to derive `UNIT` and `TYPE` (`ABBR` too, when `PA`
-    pick-list codes are used). `TRAN` is not derivable; state it with the five
-    `tran_*` arguments, and a sparse graph builds clean in one call once you
-    supply the transmission it represents.
+    graph doesn't carry: Rules 14 (`TRAN`), 15 (`UNIT`) and 17 (`TYPE`).
+    `synthesise_metadata=True` and the five `tran_*` arguments clear them,
+    exactly as on the frames door ([Build from frames](./build-from-frames.md)).
 
     Children attach two ways, shown above: `.locas.append(LOCA(...))` after the
     fact, or the `locas=[...]` constructor kwarg up front. Either way the typed-graph
@@ -54,10 +52,9 @@ graph to the emitter. Use this when your data is already a graph in memory
     nicety.)
 
 !!! tip
-    `build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
-    Inspect `res.text` / `res.bytes` in memory, check `res.findings` for any
-    caveats autofix couldn't resolve, or `res.save("out.ags")` to persist a
-    byte-faithful AGS4 file.
+    `build_ags4` / `buildAgs4` returns the same `BuildResult` as the
+    [frames door](./build-from-frames.md): `res.text` / `res.bytes` in memory,
+    `res.findings` for caveats, `res.save("out.ags")` to persist.
 
 See also: [Build from frames](./build-from-frames.md) ·
 [Produce AGS4](../learn/produce.md).

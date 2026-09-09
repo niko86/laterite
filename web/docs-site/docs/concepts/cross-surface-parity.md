@@ -3,17 +3,15 @@
 Four surfaces run "the same" AGS4 validator. That's a strong claim, so it's
 **tested**, not asserted.
 
-## One engine, many doors
+## The premise
 
-Python, Node, the browser (wasm), and the `lat` CLI don't each re-implement the
-AGS4 rules. They're thin bindings over **one** Rust core. A finding
-you get in Python is produced by the exact code that produces it in the browser.
-The only thing that differs is the door.
+[One engine, many doors](one-engine-many-doors.md): the surfaces are thin
+bindings over one Rust core, so a finding you get in Python is produced by the
+exact code that produces it in the browser.
 
-The DuckDB extension is a fifth door, but a **read-only** one: it shares the same
-core read path and runs no rules at all, so it has no findings to compare. Its
-agreement is proven on what it actually does: that its `read_ags` produces the
-same content-addressed key set as the core reader.
+The DuckDB extension is the read-only exception: it runs no rules, so it has no
+findings to compare. Its agreement is proven on what it actually does: that its
+`read_ags` produces the same content-addressed key set as the core reader.
 
 ## How it's proven
 

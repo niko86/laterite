@@ -61,8 +61,7 @@ This crate versions independently of the engine.
 
 ## Flagged for rewrite
 
-This crate is a rough extraction from `laterite-ags4-core`, made so that core
-consumers which never touch Excel stop carrying the XLSX machinery. The
+This crate is a rough extraction from `laterite-ags4-core`. The
 surface is AGS4-specific and will be redesigned; expect breaking versions. The
 [`laterite`](https://crates.io/crates/laterite) facade wraps it opaquely, so
 facade users never see those breaks.

@@ -7,8 +7,7 @@ fails if the two disagree, so it cannot quietly fall behind what shipped:
 **→ [CHANGELOG.md](https://github.com/niko86/laterite/blob/main/CHANGELOG.md)**
 
 Pre-1.0 a breaking change takes the minor ([how versions move](support.md#how-versions-move)),
-and those are indexed at the top of that file, one line each with the version it
-landed in, so "does this upgrade break me" is a short list rather than a read:
+and those are indexed at the top of that file:
 
 **→ [Breaking changes](https://github.com/niko86/laterite/blob/main/CHANGELOG.md#breaking-changes)**
 

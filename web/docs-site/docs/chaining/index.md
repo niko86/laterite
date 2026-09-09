@@ -118,7 +118,8 @@ both `Ags4File` and `AgsQuery`.
 
 A clean `.validate()` can mint a `.ags.idx` certificate via `.certify()`.
 Re-read with that fresh cert and `.validate()` resolves without ever running the
-rule engine; `resolution` reads `certified`, not `exact`.
+rule engine: `report.certified` says the engine was skipped, while `resolution`
+still names the dictionary match.
 
 ```python
 --8<-- "python/ex08_certify.py:code"
@@ -133,9 +134,7 @@ rule engine; `resolution` reads `certified`, not `exact`.
     `.to_polars()` / `.to_pandas()` / `.relation()`) and the fan-out terminals
     (`.frames()` / `.groups`) belong to different `AgsQuery` shapes, a
     `.query(sql)` builder versus an `.at(...)` fan-out, and are mutually
-    exclusive on a given handle. And because every builder call returns a **new**
-    immutable `AgsQuery`, reassign (`q = q.filter(...)`) rather than expecting
-    in-place mutation.
+    exclusive on a given handle.
 
 ## Where next
 
