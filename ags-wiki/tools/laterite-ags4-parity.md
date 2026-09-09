@@ -44,10 +44,10 @@ sources: []
 > and must stay green.
 
 ## Where it lives
-Planned `repo:rust-packages/laterite-ags4-parity`. Today the source-of-truth is
-`repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` (the [[parity-model]]
-authority); the `from_outcome` shim + graceful-degradation/oracle-drift
-policy stay at the [[laterite-ags4-corpus-qa]] call site.
+`repo:rust-packages/laterite-ags4-parity` — extracted at P1; the crate is the
+[[parity-model]] source of truth. The `from_outcome` shim +
+graceful-degradation/oracle-drift policy stay at the
+[[laterite-ags4-corpus-qa]] call site.
 
 ## Relationship to other components
 ```mermaid

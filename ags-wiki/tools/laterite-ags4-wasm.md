@@ -157,8 +157,10 @@ none. [[tech-stack-wasm]] carries the split and the measurements:
   (`web/src/components/tools/Anonymiser.tsx`) is deleted. See
   [[dec-ags4-censor-leaf]].
 
-Since Phase 1.5, `validate` takes a 5th arg `max_per_rule` (a UI safety
-cap on findings *serialized* per rule — totals stay true) and is called
+Since Phase 1.5, `validate` accepts a `maxPerRule` cap — today a named
+field of its options-object argument (`validate(data, opts)`), originally
+a positional 5th arg — a UI safety cap on findings *serialized* per rule
+(totals stay true) — and is called
 **inside a Web Worker**, never the main thread. See [[tech-stack-wasm]]
 and [[validator-site]] Phase 1.5.
 

@@ -31,9 +31,15 @@ generates from it.
    `laterite-ags4-core`, `laterite-validator`, `laterite-ags5`), each released
    independently.
 2. **One repo, one package** — collapse everything into a single wheel.
-3. **One repo, many published artifacts** *(current)* — a single workspace that
+3. **One repo, many published artifacts** *(chosen — as the tree stood at
+   decision time)* — a single workspace that
    publishes the `laterite` + `laterite-ags5` wheels and the `lat-db` /
    `lat` binaries, with heavy capability gated behind the `[ags5]` extra.
+   *(2026-09-09 note: the AGS5 strand — wheel, `lat-db`, `[ags5]` extra — left
+   this tree 2026-06-23 and remains a dormant concept elsewhere; the shape that
+   survives is one workspace publishing the `laterite` wheel, the npm/browser
+   packages, `lat` and the crates.io tier. The monorepo decision itself is
+   unchanged.)*
 4. **Split a single outlier later, only if it earns it** — keep the monorepo,
    carve out one component to its own repo *only* when a concrete trigger fires
    (see Revisit triggers).
@@ -75,7 +81,8 @@ Commits the toolkit to: a single Cargo workspace + uv workspace; lockstep
 versioning across Rust and Python; capability/weight separation via wheel extras
 ([[crate-map]] "wheels split by weight, not repo"). Rules out: per-component
 repos, cross-repo version matrices, and N parallel release pipelines. The
-public/private split is handled at *file* level by `.github/workflows/public-tree-gate.yml`,
+public/private split is handled at *file* level by the private release-staging
+gate (it lives with the dev satellite's infra, not in this repo),
 not by a repo boundary — which keeps that concern orthogonal to this decision.
 
 > [!todo] **Revisit triggers — when a split (Option 4) earns itself**

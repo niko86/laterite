@@ -249,8 +249,10 @@ isn't benign; reading the two paths together, it cannot happen at all.
 - They differ in exactly one option, and it is the harmless direction:
   `compute_fixes_core` takes `include_warnings` from `CheckOptions::default()`
   (off), the report runs with it on.
-  `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs` is the only
-  rule module that reads the flag, and no rule in `FIXABLE_RULE_LABELS` sits
+  `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs` was the only
+  rule module reading the flag when this was written; `relational.rs` has since
+  joined it (#844/#846, Rule 10c's orphan warning). Still true either way: no
+  rule in `FIXABLE_RULE_LABELS` sits
   behind it — warnings-on merely ADDS the `Warning (Related to Rule N)` labels,
   and the one key warnings-off can hold alone is the top-level `FYI` bucket,
   which no fixer gates on.

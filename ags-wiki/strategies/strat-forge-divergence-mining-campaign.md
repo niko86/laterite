@@ -33,12 +33,12 @@ inject more rule classes (below).
 | axis | values | meaning |
 |---|---|---|
 | **k** (combination size) | 2 → 3 → 4 → … | how many faults co-occur in ONE file |
-| **injectors** | the 9: `rule10a rule10c rule8 rule5 rule19 rule13 rule14 rule16 rule17` | which rule-breaks |
+| **injectors** | the 10: `rule10a rule10b rule10c rule8 rule5 rule19 rule13 rule14 rule16 rule17` | which rule-breaks |
 | **scaffold** | `loca-samp` → `wide` | which GROUPs carry them (LOCA/SAMP/GEOL/ABBR → ~50 groups) |
 | **seeds** | 4 → 8 | placement variety — teases distinct signatures from one combo |
 
-Combination counts (per scaffold, before the seed multiplier): k=2 → 36,
-k=3 → 84, k=4 → 126 (`C(9,k)`). The python-oracle cost is bounded
+Combination counts (per scaffold, before the seed multiplier): k=2 → 45,
+k=3 → 120, k=4 → 210 (`C(10,k)`). The python-oracle cost is bounded
 separately by `--max-oracle` (only the divergence-prone gaps are spent on).
 
 ## The funnel (forge mine, per stage)
@@ -66,11 +66,12 @@ separately by `--max-oracle` (only the divergence-prone gaps are spent on).
 - **Stage D+** — higher k / new injectors as they land (below).
 
 ## The "improvements still" (parallel track — widens the matrix)
-forge can inject 9 rules today; the rest are `not_single_injectable`
+forge can inject 10 rules today; the rest are `not_single_injectable`
 (`forge catalog`). Adding injectors is forge work (#169) and each widens
 this campaign:
-- **candidate injectors** (forge already flags them): `rule10b`
-  (empty REQUIRED), `rule15` (undefined UNIT).
+- **candidate injectors** (forge already flags them): `rule15`
+  (undefined UNIT). (`rule10b` — empty REQUIRED — has since landed and is
+  in the 10 above.)
 - **byte-level emitter**: Rules 1 / 2a / 3 / 6 (need >255 code points,
   LF-only lines, bad descriptors, embedded CR) — also unlocks the
   field-count class (Rule 4) behind #191's early-failure axis.

@@ -448,11 +448,13 @@ the optimisations that need them.
 at **0.84×** (`check_parsed` / `parse_bytes`). Band closed. Parity held by
 identity. Coverage: the cache-reuse and `char_span` tests below both landed.
 
-> [!warning] #1 is **not** the landed 10a/10c fix. What landed was the
+> [!warning] #1 is **not** the landed 10a/10c fix. What landed first was the
 > *column-index hoist* (`cols()`, whose doc comment names exactly what it
-> removed). Untouched by that hoist are the per-child-group rebuild of
-> `parent_tuples` and the double `tuple_at` per row — a different mechanism in
-> the same function. Read `relational.rs:438-450` before touching it.
+> removed). The rest — the per-child-group rebuild of `parent_tuples` and the
+> double `tuple_at` per row — was retired later by T1: `parent_tuples` is now
+> built once per parent and cached ("built once and cached", `relational.rs`,
+> the RULE_10C block) and `tuple_at` runs once per row. Nothing of the warned
+> mechanism remains.
 
 **Coverage closed:** a multi-byte-character-before-the-CR test pinning
 `char_span` (the CR's char offset, which a byte offset would have got wrong), and
@@ -824,10 +826,11 @@ row carries the close.)
 > [!warning] **Ledger correction.** The old Open row reading
 > "`laterite-ags4-types::arrow_cols` … never benched in isolation" was **wrong**.
 > `rust-packages/laterite-ags4-types/benches/arrow_cols.rs` benches
-> `build_record_batch` **per type family and mixed**. What is genuinely unbenched
-> is narrower: no file rung; the `Integer`/`Bool` arms; the null/empty branch;
-> and `build_record_batch_compat`, `build_record_batch_with_ids` and `ipc.rs`.
-> T2 closes exactly those four.
+> `build_record_batch` **per type family and mixed**. What was genuinely
+> unbenched was narrower: no file rung; the `Integer`/`Bool` arms; the
+> null/empty branch; and `build_record_batch_compat`,
+> `build_record_batch_with_ids` and `ipc.rs`. T2 (DONE, below) closed exactly
+> those four — `arrow_cols.rs` now carries them all.
 
 - **"`from_shared` makes a second heap copy of every DATA cell."** Already landed
   in `d3d3867` — it takes `ParsedFile` **by value** and moves every
@@ -844,7 +847,9 @@ row carries the close.)
   untouched by the #9 fix; removing it needs a different row representation.
 - **`encoding_rs`' decode as the source of the per-line allocation.**
   `decode_without_bom_handling` returns `Cow::Borrowed` with zero allocation for
-  valid UTF-8 — the common case. The malloc is 100% the deliberate `.into_owned()`.
+  valid UTF-8 — the common case. The malloc was 100% the deliberate
+  `.into_owned()` — since retired by the M4 span rewrite (`parse`'s `lib.rs` now
+  documents "Deliberately NOT `into_owned()`").
 - **`desc.into()`/`group.to_string()` as unconditional allocations in
   `findings::add`.** Several call sites already pass an owned `String`, and
   `"".to_string()` allocates nothing. The one that genuinely fires every call is
@@ -880,7 +885,7 @@ nothing more.
 
 - **Every cell up to the 265 MB rung measured** — no swap growth, no deaths —
   so the table above is fully populated. The 524 MB rung is time-only by
-  rule 11, and the results file records that as eleven `beyond-mem-cap`
+  rule 11, and the results file records that as nine `beyond-mem-cap`
   **refusal cells** rather than silence: the rung was run through the
   harness and refused, not skipped.
 - The write cells include materialising the input through the same library's

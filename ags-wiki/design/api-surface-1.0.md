@@ -98,7 +98,8 @@ feeds it as IPC.
   `repo:rust-packages/laterite-py/src/lib.rs`) and hands pandas an object-dtype frame
   via DuckDB's NumPy `rel.df()` (the same trick as the core) — already **~2× faster
   than python-ags4** on that bench's 3-group fixture (was ~2–7× slower before the
-  Arrow move; reproducible via `tools/bench_compat_dataframe.py`). The **published**
+  Arrow move; reproducible via `tools/bench-vs-python-ags4.py`, which absorbed
+  the old `bench_compat_dataframe.py`). The **published**
   figure is **~3×** — the same call, measured across five file sizes on forge's
   123-group `wide` scaffold (`repo:packages/laterite/README.md`). Two fixtures, not
   two claims; quote the published one outside the wiki.
@@ -109,8 +110,10 @@ feeds it as IPC.
   `str`, the pandas-3 baseline — `object` stays the default, numpy, today's
   python-ags4-compatible dtype). Absent, the DuckDB `.df()` object hop above still
   runs; the explicit `pyarrow` backend / `ags.connection` route is unaffected. CI
-  proves both isolated shapes (`ci.yml` wheel-smoke: `tools/compat_smoke.py` for
-  `[compat]`, `tools/compat_pyarrow_smoke.py` for `[compat,pyarrow]`).
+  proves both isolated shapes in `nightly.yml`'s release-wheel job
+  (`tools/compat_smoke.py` for `[compat]`, `tools/compat_pyarrow_smoke.py` for
+  `[compat,pyarrow]`) — `ci.yml`'s wheel-smoke deliberately defers them to
+  nightly, and its comment says so.
 - **No `[ags5]` extra.** The experimental `.ags5db` companion was decoupled from the
   shipped package (#177); `laterite` is AGS4-only.
 

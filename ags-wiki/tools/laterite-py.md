@@ -88,7 +88,10 @@ See [[dec-dictionary-single-source]].
 tuple. The same change fixed `emit_typed.rs::parse_edition` — a *second*,
 hand-written edition `match` sitting in this crate alongside `lib.rs::parse_dv`,
 which already asked the authority correctly — to call `DictVersion::from_edition`
-and the generated `FALLBACK` instead of its own hard-coded `V4_1_1`. See
+and the generated `FALLBACK` instead of its own hard-coded `V4_1_1`. Both
+parsers have since moved again: they now delegate to the shared
+`laterite_ags4_hostopts::edition` resolver (#923/#947), so the crate no longer
+carries either copy. See
 [[edition-resolution]].
 
 ## Where it fits
