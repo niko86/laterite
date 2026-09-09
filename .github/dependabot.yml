@@ -85,14 +85,3 @@ updates:
         update-types: ["major"]
       npm:
         update-types: ["minor", "patch"]
-    ignore:
-      # The capture analysis that misfires on this codebase (#969, reported
-      # upstream as eslint-plugin-solid#223) was INTRODUCED in 0.16.1 — an
-      # A/B/A on a minimal repro pinned it: 0.16.0 clean, 0.16.1 and 0.17.0
-      # flag it. Ignoring only 0.17.0 taught dependabot to offer 0.16.1
-      # instead (#971, red with the same warnings), so both bad versions are
-      # named. Still an exact list, not a range, so the first FIXED release
-      # (0.17.1+?) IS offered — evaluate it against #969, then delete this
-      # block.
-      - dependency-name: eslint-plugin-solid
-        versions: ["0.16.1", "0.17.0"]
