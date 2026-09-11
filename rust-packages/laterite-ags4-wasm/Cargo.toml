@@ -107,7 +107,7 @@ censor = ["dep:laterite-ags4-censor", "dep:sha2", "dep:hex"]
 
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.15.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.15.1" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
 # ONE shared id maths every surface uses (byte-identical to the extension + wheel
