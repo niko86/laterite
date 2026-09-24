@@ -4,7 +4,7 @@ pub laterite_ags4_hostopts::DictFlags::replace: &'static str
 pub laterite_ags4_hostopts::DictFlags::source: &'static str
 pub laterite_ags4_hostopts::DictFlags::version: &'static str
 impl core::clone::Clone for laterite_ags4_hostopts::DictFlags
-pub fn laterite_ags4_hostopts::DictFlags::clone(&self) -> laterite_ags4_hostopts::DictFlags
+pub fn laterite_ags4_hostopts::DictFlags::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_hostopts::DictFlags
 pub fn laterite_ags4_hostopts::DictFlags::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_hostopts::DictFlags
@@ -20,10 +20,10 @@ pub laterite_ags4_hostopts::OptError::code: i32
 pub laterite_ags4_hostopts::OptError::kind: &'static str
 pub laterite_ags4_hostopts::OptError::message: alloc::string::String
 impl core::clone::Clone for laterite_ags4_hostopts::OptError
-pub fn laterite_ags4_hostopts::OptError::clone(&self) -> laterite_ags4_hostopts::OptError
+pub fn laterite_ags4_hostopts::OptError::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_hostopts::OptError
 impl core::cmp::PartialEq for laterite_ags4_hostopts::OptError
-pub fn laterite_ags4_hostopts::OptError::eq(&self, &laterite_ags4_hostopts::OptError) -> bool
+pub fn laterite_ags4_hostopts::OptError::eq(&self, &Self) -> bool
 impl core::error::Error for laterite_ags4_hostopts::OptError
 impl core::fmt::Debug for laterite_ags4_hostopts::OptError
 pub fn laterite_ags4_hostopts::OptError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result

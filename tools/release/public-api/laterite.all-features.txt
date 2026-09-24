@@ -7,9 +7,9 @@ pub laterite::ags4::Cell::Int(i64)
 pub laterite::ags4::Cell::Null
 pub laterite::ags4::Cell::Text(alloc::string::String)
 impl core::clone::Clone for laterite::ags4::Cell
-pub fn laterite::ags4::Cell::clone(&self) -> laterite::ags4::Cell
+pub fn laterite::ags4::Cell::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite::ags4::Cell
-pub fn laterite::ags4::Cell::eq(&self, &laterite::ags4::Cell) -> bool
+pub fn laterite::ags4::Cell::eq(&self, &Self) -> bool
 impl core::convert::From<&alloc::string::String> for laterite::ags4::Cell
 pub fn laterite::ags4::Cell::from(&alloc::string::String) -> laterite::ags4::Cell
 impl core::convert::From<&str> for laterite::ags4::Cell
@@ -41,10 +41,10 @@ pub laterite::ags4::Change::Added
 pub laterite::ags4::Change::Changed
 pub laterite::ags4::Change::Removed
 impl core::clone::Clone for laterite::ags4::Change
-pub fn laterite::ags4::Change::clone(&self) -> laterite::ags4::Change
+pub fn laterite::ags4::Change::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ags4::Change
 impl core::cmp::PartialEq for laterite::ags4::Change
-pub fn laterite::ags4::Change::eq(&self, &laterite::ags4::Change) -> bool
+pub fn laterite::ags4::Change::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite::ags4::Change
 pub fn laterite::ags4::Change::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite::ags4::Change
@@ -60,12 +60,12 @@ impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Change
 pub laterite::ags4::MissingTran::Reconcile
 pub laterite::ags4::MissingTran::Refuse
 impl core::clone::Clone for laterite::ags4::MissingTran
-pub fn laterite::ags4::MissingTran::clone(&self) -> laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ags4::MissingTran
 impl core::cmp::PartialEq for laterite::ags4::MissingTran
-pub fn laterite::ags4::MissingTran::eq(&self, &laterite::ags4::MissingTran) -> bool
+pub fn laterite::ags4::MissingTran::eq(&self, &Self) -> bool
 impl core::default::Default for laterite::ags4::MissingTran
-pub fn laterite::ags4::MissingTran::default() -> laterite::ags4::MissingTran
+pub fn laterite::ags4::MissingTran::default() -> Self
 impl core::fmt::Debug for laterite::ags4::MissingTran
 pub fn laterite::ags4::MissingTran::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite::ags4::MissingTran
@@ -84,14 +84,14 @@ pub laterite::ags4::Severity::Warning
 impl laterite::ags4::Severity
 pub fn laterite::ags4::Severity::as_str(self) -> &'static str
 impl core::clone::Clone for laterite::ags4::Severity
-pub fn laterite::ags4::Severity::clone(&self) -> laterite::ags4::Severity
+pub fn laterite::ags4::Severity::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ags4::Severity
 impl core::cmp::Ord for laterite::ags4::Severity
-pub fn laterite::ags4::Severity::cmp(&self, &laterite::ags4::Severity) -> core::cmp::Ordering
+pub fn laterite::ags4::Severity::cmp(&self, &Self) -> core::cmp::Ordering
 impl core::cmp::PartialEq for laterite::ags4::Severity
-pub fn laterite::ags4::Severity::eq(&self, &laterite::ags4::Severity) -> bool
+pub fn laterite::ags4::Severity::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for laterite::ags4::Severity
-pub fn laterite::ags4::Severity::partial_cmp(&self, &laterite::ags4::Severity) -> core::option::Option<core::cmp::Ordering>
+pub fn laterite::ags4::Severity::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
 impl core::fmt::Debug for laterite::ags4::Severity
 pub fn laterite::ags4::Severity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for laterite::ags4::Severity
@@ -110,12 +110,12 @@ pub laterite::ags4::TypeClash::Promote
 pub laterite::ags4::TypeClash::Refuse
 pub laterite::ags4::TypeClash::Widen
 impl core::clone::Clone for laterite::ags4::TypeClash
-pub fn laterite::ags4::TypeClash::clone(&self) -> laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ags4::TypeClash
 impl core::cmp::PartialEq for laterite::ags4::TypeClash
-pub fn laterite::ags4::TypeClash::eq(&self, &laterite::ags4::TypeClash) -> bool
+pub fn laterite::ags4::TypeClash::eq(&self, &Self) -> bool
 impl core::default::Default for laterite::ags4::TypeClash
-pub fn laterite::ags4::TypeClash::default() -> laterite::ags4::TypeClash
+pub fn laterite::ags4::TypeClash::default() -> Self
 impl core::fmt::Debug for laterite::ags4::TypeClash
 pub fn laterite::ags4::TypeClash::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite::ags4::TypeClash
@@ -132,12 +132,12 @@ pub laterite::ags4::WriteMode::AutoFix
 pub laterite::ags4::WriteMode::Report
 pub laterite::ags4::WriteMode::Strict
 impl core::clone::Clone for laterite::ags4::WriteMode
-pub fn laterite::ags4::WriteMode::clone(&self) -> laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ags4::WriteMode
 impl core::cmp::PartialEq for laterite::ags4::WriteMode
-pub fn laterite::ags4::WriteMode::eq(&self, &laterite::ags4::WriteMode) -> bool
+pub fn laterite::ags4::WriteMode::eq(&self, &Self) -> bool
 impl core::default::Default for laterite::ags4::WriteMode
-pub fn laterite::ags4::WriteMode::default() -> laterite::ags4::WriteMode
+pub fn laterite::ags4::WriteMode::default() -> Self
 impl core::fmt::Debug for laterite::ags4::WriteMode
 pub fn laterite::ags4::WriteMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite::ags4::WriteMode
@@ -201,7 +201,7 @@ pub fn laterite::ags4::CellChange::baseline(&self) -> core::option::Option<&str>
 pub fn laterite::ags4::CellChange::heading(&self) -> &str
 pub fn laterite::ags4::CellChange::revision(&self) -> core::option::Option<&str>
 impl core::clone::Clone for laterite::ags4::CellChange
-pub fn laterite::ags4::CellChange::clone(&self) -> laterite::ags4::CellChange
+pub fn laterite::ags4::CellChange::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::CellChange
 pub fn laterite::ags4::CellChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::CellChange
@@ -254,7 +254,7 @@ pub fn laterite::ags4::Delta::groups_removed(&self) -> &[alloc::string::String]
 pub fn laterite::ags4::Delta::is_unchanged(&self) -> bool
 pub fn laterite::ags4::Delta::removed(&self) -> usize
 impl core::clone::Clone for laterite::ags4::Delta
-pub fn laterite::ags4::Delta::clone(&self) -> laterite::ags4::Delta
+pub fn laterite::ags4::Delta::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::Delta
 pub fn laterite::ags4::Delta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Delta
@@ -384,7 +384,7 @@ pub fn laterite::ags4::Group<'a>::units(&self) -> alloc::vec::Vec<&'a str>
 impl core::fmt::Debug for laterite::ags4::Group<'_>
 pub fn laterite::ags4::Group<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::clone::Clone for laterite::ags4::Group<'a>
-pub fn laterite::ags4::Group<'a>::clone(&self) -> laterite::ags4::Group<'a>
+pub fn laterite::ags4::Group<'a>::clone(&self) -> Self
 impl<'a> core::marker::Copy for laterite::ags4::Group<'a>
 impl<'a> core::marker::Freeze for laterite::ags4::Group<'a>
 impl<'a> core::marker::Send for laterite::ags4::Group<'a>
@@ -405,7 +405,7 @@ pub fn laterite::ags4::GroupChange::keyed(&self) -> bool
 pub fn laterite::ags4::GroupChange::removed(&self) -> usize
 pub fn laterite::ags4::GroupChange::rows(&self) -> &[laterite::ags4::RowChange]
 impl core::clone::Clone for laterite::ags4::GroupChange
-pub fn laterite::ags4::GroupChange::clone(&self) -> laterite::ags4::GroupChange
+pub fn laterite::ags4::GroupChange::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::GroupChange
 pub fn laterite::ags4::GroupChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::GroupChange
@@ -425,7 +425,7 @@ pub fn laterite::ags4::GroupData::row<I, C>(self, I) -> laterite::ags4::GroupDat
 pub fn laterite::ags4::GroupData::types<I, S>(self, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
 pub fn laterite::ags4::GroupData::units<I, S>(self, I) -> laterite::ags4::GroupData where I: core::iter::traits::collect::IntoIterator<Item = S>, S: core::convert::Into<alloc::string::String>
 impl core::clone::Clone for laterite::ags4::GroupData
-pub fn laterite::ags4::GroupData::clone(&self) -> laterite::ags4::GroupData
+pub fn laterite::ags4::GroupData::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::GroupData
 pub fn laterite::ags4::GroupData::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::GroupData
@@ -478,7 +478,7 @@ pub fn laterite::ags4::Note::heading(&self) -> core::option::Option<&str>
 pub fn laterite::ags4::Note::kind(&self) -> &str
 pub fn laterite::ags4::Note::message(&self) -> &str
 impl core::clone::Clone for laterite::ags4::Note
-pub fn laterite::ags4::Note::clone(&self) -> laterite::ags4::Note
+pub fn laterite::ags4::Note::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::Note
 pub fn laterite::ags4::Note::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Note
@@ -546,7 +546,7 @@ pub fn laterite::ags4::Revision::group(&self) -> &str
 pub fn laterite::ags4::Revision::key(&self) -> &[alloc::string::String]
 pub fn laterite::ags4::Revision::winner(&self) -> usize
 impl core::clone::Clone for laterite::ags4::Revision
-pub fn laterite::ags4::Revision::clone(&self) -> laterite::ags4::Revision
+pub fn laterite::ags4::Revision::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::Revision
 pub fn laterite::ags4::Revision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Revision
@@ -564,7 +564,7 @@ pub fn laterite::ags4::Row<'a>::len(&self) -> usize
 impl core::fmt::Debug for laterite::ags4::Row<'_>
 pub fn laterite::ags4::Row<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::clone::Clone for laterite::ags4::Row<'a>
-pub fn laterite::ags4::Row<'a>::clone(&self) -> laterite::ags4::Row<'a>
+pub fn laterite::ags4::Row<'a>::clone(&self) -> Self
 impl<'a> core::marker::Copy for laterite::ags4::Row<'a>
 impl<'a> core::marker::Freeze for laterite::ags4::Row<'a>
 impl<'a> core::marker::Send for laterite::ags4::Row<'a>
@@ -581,7 +581,7 @@ pub fn laterite::ags4::RowChange::key(&self) -> &[alloc::string::String]
 pub fn laterite::ags4::RowChange::line_baseline(&self) -> core::option::Option<u32>
 pub fn laterite::ags4::RowChange::line_revision(&self) -> core::option::Option<u32>
 impl core::clone::Clone for laterite::ags4::RowChange
-pub fn laterite::ags4::RowChange::clone(&self) -> laterite::ags4::RowChange
+pub fn laterite::ags4::RowChange::clone(&self) -> Self
 impl core::fmt::Debug for laterite::ags4::RowChange
 pub fn laterite::ags4::RowChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::RowChange
@@ -824,10 +824,10 @@ impl laterite::ErrorKind
 pub fn laterite::ErrorKind::as_str(self) -> &'static str
 pub fn laterite::ErrorKind::exit_code(self) -> i32
 impl core::clone::Clone for laterite::ErrorKind
-pub fn laterite::ErrorKind::clone(&self) -> laterite::ErrorKind
+pub fn laterite::ErrorKind::clone(&self) -> Self
 impl core::cmp::Eq for laterite::ErrorKind
 impl core::cmp::PartialEq for laterite::ErrorKind
-pub fn laterite::ErrorKind::eq(&self, &laterite::ErrorKind) -> bool
+pub fn laterite::ErrorKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite::ErrorKind
 pub fn laterite::ErrorKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for laterite::ErrorKind

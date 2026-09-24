@@ -4,7 +4,7 @@ pub laterite_ags4_excel::ExcelStats::rows_written: usize
 pub laterite_ags4_excel::ExcelStats::sheets_written: usize
 pub laterite_ags4_excel::ExcelStats::warnings: alloc::vec::Vec<alloc::string::String>
 impl core::clone::Clone for laterite_ags4_excel::ExcelStats
-pub fn laterite_ags4_excel::ExcelStats::clone(&self) -> laterite_ags4_excel::ExcelStats
+pub fn laterite_ags4_excel::ExcelStats::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_excel::ExcelStats
 pub fn laterite_ags4_excel::ExcelStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_excel::ExcelStats

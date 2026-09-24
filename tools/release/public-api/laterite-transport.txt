@@ -27,7 +27,7 @@ pub laterite_transport::PackStats::bytes: u64
 pub laterite_transport::PackStats::elapsed_s: f64
 pub laterite_transport::PackStats::ratio: f64
 impl core::clone::Clone for laterite_transport::PackStats
-pub fn laterite_transport::PackStats::clone(&self) -> laterite_transport::PackStats
+pub fn laterite_transport::PackStats::clone(&self) -> Self
 impl core::fmt::Debug for laterite_transport::PackStats
 pub fn laterite_transport::PackStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_transport::PackStats
@@ -41,7 +41,7 @@ pub struct laterite_transport::UnpackStats
 pub laterite_transport::UnpackStats::bytes: u64
 pub laterite_transport::UnpackStats::elapsed_s: f64
 impl core::clone::Clone for laterite_transport::UnpackStats
-pub fn laterite_transport::UnpackStats::clone(&self) -> laterite_transport::UnpackStats
+pub fn laterite_transport::UnpackStats::clone(&self) -> Self
 impl core::fmt::Debug for laterite_transport::UnpackStats
 pub fn laterite_transport::UnpackStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_transport::UnpackStats

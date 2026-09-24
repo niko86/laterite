@@ -30,12 +30,12 @@ impl laterite_ags4_merge::MissingTranMode
 pub const laterite_ags4_merge::MissingTranMode::ALL: [laterite_ags4_merge::MissingTranMode; 2]
 pub fn laterite_ags4_merge::MissingTranMode::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_merge::MissingTranMode
-pub fn laterite_ags4_merge::MissingTranMode::clone(&self) -> laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_merge::MissingTranMode
 impl core::cmp::PartialEq for laterite_ags4_merge::MissingTranMode
-pub fn laterite_ags4_merge::MissingTranMode::eq(&self, &laterite_ags4_merge::MissingTranMode) -> bool
+pub fn laterite_ags4_merge::MissingTranMode::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_merge::MissingTranMode
-pub fn laterite_ags4_merge::MissingTranMode::default() -> laterite_ags4_merge::MissingTranMode
+pub fn laterite_ags4_merge::MissingTranMode::default() -> Self
 impl core::fmt::Debug for laterite_ags4_merge::MissingTranMode
 pub fn laterite_ags4_merge::MissingTranMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_merge::MissingTranMode
@@ -58,12 +58,12 @@ impl laterite_ags4_merge::TypeClashMode
 pub const laterite_ags4_merge::TypeClashMode::ALL: [laterite_ags4_merge::TypeClashMode; 3]
 pub fn laterite_ags4_merge::TypeClashMode::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_merge::TypeClashMode
-pub fn laterite_ags4_merge::TypeClashMode::clone(&self) -> laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_merge::TypeClashMode
 impl core::cmp::PartialEq for laterite_ags4_merge::TypeClashMode
-pub fn laterite_ags4_merge::TypeClashMode::eq(&self, &laterite_ags4_merge::TypeClashMode) -> bool
+pub fn laterite_ags4_merge::TypeClashMode::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_merge::TypeClashMode
-pub fn laterite_ags4_merge::TypeClashMode::default() -> laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::default() -> Self
 impl core::fmt::Debug for laterite_ags4_merge::TypeClashMode
 pub fn laterite_ags4_merge::TypeClashMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_merge::TypeClashMode
@@ -85,7 +85,7 @@ pub laterite_ags4_merge::MergeOpts::on_missing_tran: laterite_ags4_merge::Missin
 pub laterite_ags4_merge::MergeOpts::on_type_clash: laterite_ags4_merge::TypeClashMode
 pub laterite_ags4_merge::MergeOpts::tran: core::option::Option<laterite_ags4_emit::emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_merge::MergeOpts
-pub fn laterite_ags4_merge::MergeOpts::clone(&self) -> laterite_ags4_merge::MergeOpts
+pub fn laterite_ags4_merge::MergeOpts::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_merge::MergeOpts
 pub fn laterite_ags4_merge::MergeOpts::default() -> Self
 impl core::fmt::Debug for laterite_ags4_merge::MergeOpts
@@ -116,10 +116,10 @@ pub laterite_ags4_merge::MergeWarning::heading: core::option::Option<alloc::stri
 pub laterite_ags4_merge::MergeWarning::kind: &'static str
 pub laterite_ags4_merge::MergeWarning::message: alloc::string::String
 impl core::clone::Clone for laterite_ags4_merge::MergeWarning
-pub fn laterite_ags4_merge::MergeWarning::clone(&self) -> laterite_ags4_merge::MergeWarning
+pub fn laterite_ags4_merge::MergeWarning::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_merge::MergeWarning
 impl core::cmp::PartialEq for laterite_ags4_merge::MergeWarning
-pub fn laterite_ags4_merge::MergeWarning::eq(&self, &laterite_ags4_merge::MergeWarning) -> bool
+pub fn laterite_ags4_merge::MergeWarning::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_merge::MergeWarning
 pub fn laterite_ags4_merge::MergeWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_merge::MergeWarning
@@ -138,10 +138,10 @@ pub laterite_ags4_merge::RevisionNote::group: alloc::string::String
 pub laterite_ags4_merge::RevisionNote::key: alloc::vec::Vec<alloc::string::String>
 pub laterite_ags4_merge::RevisionNote::winner_file: usize
 impl core::clone::Clone for laterite_ags4_merge::RevisionNote
-pub fn laterite_ags4_merge::RevisionNote::clone(&self) -> laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::RevisionNote::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_merge::RevisionNote
 impl core::cmp::PartialEq for laterite_ags4_merge::RevisionNote
-pub fn laterite_ags4_merge::RevisionNote::eq(&self, &laterite_ags4_merge::RevisionNote) -> bool
+pub fn laterite_ags4_merge::RevisionNote::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_merge::RevisionNote
 pub fn laterite_ags4_merge::RevisionNote::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_merge::RevisionNote
