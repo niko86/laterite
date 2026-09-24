@@ -5,12 +5,12 @@ pub enum laterite_ags4_core::ags4_codec::DuplicateHeadings
 pub laterite_ags4_core::ags4_codec::DuplicateHeadings::Error
 pub laterite_ags4_core::ags4_codec::DuplicateHeadings::Recover
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::DuplicateHeadings
-pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::clone(&self) -> laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::ags4_codec::DuplicateHeadings
 impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::DuplicateHeadings
-pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::eq(&self, &laterite_ags4_core::ags4_codec::DuplicateHeadings) -> bool
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_core::ags4_codec::DuplicateHeadings
-pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::default() -> laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::default() -> Self
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::DuplicateHeadings
 pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::ags4_codec::DuplicateHeadings
@@ -26,12 +26,12 @@ pub enum laterite_ags4_core::ags4_codec::ExcessFields
 pub laterite_ags4_core::ags4_codec::ExcessFields::Error
 pub laterite_ags4_core::ags4_codec::ExcessFields::Truncate
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ExcessFields
-pub fn laterite_ags4_core::ags4_codec::ExcessFields::clone(&self) -> laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::ags4_codec::ExcessFields
 impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::ExcessFields
-pub fn laterite_ags4_core::ags4_codec::ExcessFields::eq(&self, &laterite_ags4_core::ags4_codec::ExcessFields) -> bool
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_core::ags4_codec::ExcessFields
-pub fn laterite_ags4_core::ags4_codec::ExcessFields::default() -> laterite_ags4_core::ags4_codec::ExcessFields
+pub fn laterite_ags4_core::ags4_codec::ExcessFields::default() -> Self
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ExcessFields
 pub fn laterite_ags4_core::ags4_codec::ExcessFields::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::ags4_codec::ExcessFields
@@ -59,7 +59,7 @@ pub fn laterite_ags4_core::ags4_codec::AgsGroup::set_cell(&mut self, usize, usiz
 pub fn laterite_ags4_core::ags4_codec::AgsGroup::types(&self) -> &[alloc::string::String]
 pub fn laterite_ags4_core::ags4_codec::AgsGroup::units(&self) -> &[alloc::string::String]
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::AgsGroup
-pub fn laterite_ags4_core::ags4_codec::AgsGroup::clone(&self) -> laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::AgsGroup
 pub fn laterite_ags4_core::ags4_codec::AgsGroup::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::AgsGroup
@@ -80,7 +80,7 @@ pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::order(&self) -> &[alloc::stri
 pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::retain_only(&mut self, &[alloc::string::String])
 pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::take_group(&mut self, &str) -> core::option::Option<laterite_ags4_core::ags4_codec::AgsGroup>
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ParsedAgs4
-pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::clone(&self) -> laterite_ags4_core::ags4_codec::ParsedAgs4
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ParsedAgs4
 pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_core::ags4_codec::ParsedAgs4
@@ -96,9 +96,9 @@ pub laterite_ags4_core::ags4_codec::ReadOptions::excess_fields: laterite_ags4_co
 impl laterite_ags4_core::ags4_codec::ReadOptions
 pub fn laterite_ags4_core::ags4_codec::ReadOptions::from_flags(bool, bool) -> Self
 impl core::clone::Clone for laterite_ags4_core::ags4_codec::ReadOptions
-pub fn laterite_ags4_core::ags4_codec::ReadOptions::clone(&self) -> laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_core::ags4_codec::ReadOptions
-pub fn laterite_ags4_core::ags4_codec::ReadOptions::default() -> laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::default() -> Self
 impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ReadOptions
 pub fn laterite_ags4_core::ags4_codec::ReadOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::ags4_codec::ReadOptions
@@ -152,10 +152,10 @@ pub enum laterite_ags4_core::index::Decision
 pub laterite_ags4_core::index::Decision::Revalidate(laterite_ags4_core::index::RevalidateReason)
 pub laterite_ags4_core::index::Decision::Vouched
 impl core::clone::Clone for laterite_ags4_core::index::Decision
-pub fn laterite_ags4_core::index::Decision::clone(&self) -> laterite_ags4_core::index::Decision
+pub fn laterite_ags4_core::index::Decision::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::Decision
 impl core::cmp::PartialEq for laterite_ags4_core::index::Decision
-pub fn laterite_ags4_core::index::Decision::eq(&self, &laterite_ags4_core::index::Decision) -> bool
+pub fn laterite_ags4_core::index::Decision::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::Decision
 pub fn laterite_ags4_core::index::Decision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Decision
@@ -177,10 +177,10 @@ pub fn laterite_ags4_core::index::EditionInput::edition(&self) -> &str
 pub fn laterite_ags4_core::index::EditionInput::is_forced(&self) -> bool
 pub fn laterite_ags4_core::index::EditionInput::resolution(&self) -> laterite_ags4_reference::dict::DictResolution
 impl core::clone::Clone for laterite_ags4_core::index::EditionInput
-pub fn laterite_ags4_core::index::EditionInput::clone(&self) -> laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::EditionInput
 impl core::cmp::PartialEq for laterite_ags4_core::index::EditionInput
-pub fn laterite_ags4_core::index::EditionInput::eq(&self, &laterite_ags4_core::index::EditionInput) -> bool
+pub fn laterite_ags4_core::index::EditionInput::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::EditionInput
 pub fn laterite_ags4_core::index::EditionInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::EditionInput
@@ -200,10 +200,10 @@ pub laterite_ags4_core::index::RemoteFreshness::MustRehash
 pub laterite_ags4_core::index::RemoteFreshness::ProbablyFresh
 pub laterite_ags4_core::index::RemoteFreshness::Trusted
 impl core::clone::Clone for laterite_ags4_core::index::RemoteFreshness
-pub fn laterite_ags4_core::index::RemoteFreshness::clone(&self) -> laterite_ags4_core::index::RemoteFreshness
+pub fn laterite_ags4_core::index::RemoteFreshness::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::RemoteFreshness
 impl core::cmp::PartialEq for laterite_ags4_core::index::RemoteFreshness
-pub fn laterite_ags4_core::index::RemoteFreshness::eq(&self, &laterite_ags4_core::index::RemoteFreshness) -> bool
+pub fn laterite_ags4_core::index::RemoteFreshness::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::RemoteFreshness
 pub fn laterite_ags4_core::index::RemoteFreshness::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::index::RemoteFreshness
@@ -229,10 +229,10 @@ pub laterite_ags4_core::index::RevalidateReason::TierNotMeasured(laterite_ags4_c
 impl laterite_ags4_core::index::RevalidateReason
 pub fn laterite_ags4_core::index::RevalidateReason::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_core::index::RevalidateReason
-pub fn laterite_ags4_core::index::RevalidateReason::clone(&self) -> laterite_ags4_core::index::RevalidateReason
+pub fn laterite_ags4_core::index::RevalidateReason::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::RevalidateReason
 impl core::cmp::PartialEq for laterite_ags4_core::index::RevalidateReason
-pub fn laterite_ags4_core::index::RevalidateReason::eq(&self, &laterite_ags4_core::index::RevalidateReason) -> bool
+pub fn laterite_ags4_core::index::RevalidateReason::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::RevalidateReason
 pub fn laterite_ags4_core::index::RevalidateReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::index::RevalidateReason
@@ -249,10 +249,10 @@ pub laterite_ags4_core::index::Tier::Errors
 pub laterite_ags4_core::index::Tier::Fyi
 pub laterite_ags4_core::index::Tier::Warnings
 impl core::clone::Clone for laterite_ags4_core::index::Tier
-pub fn laterite_ags4_core::index::Tier::clone(&self) -> laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::Tier
 impl core::cmp::PartialEq for laterite_ags4_core::index::Tier
-pub fn laterite_ags4_core::index::Tier::eq(&self, &laterite_ags4_core::index::Tier) -> bool
+pub fn laterite_ags4_core::index::Tier::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::Tier
 pub fn laterite_ags4_core::index::Tier::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::index::Tier
@@ -275,10 +275,10 @@ pub laterite_ags4_core::index::TierCoverage::NotMeasured
 impl laterite_ags4_core::index::TierCoverage
 pub fn laterite_ags4_core::index::TierCoverage::is_measured_clean(self) -> bool
 impl core::clone::Clone for laterite_ags4_core::index::TierCoverage
-pub fn laterite_ags4_core::index::TierCoverage::clone(&self) -> laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::TierCoverage
 impl core::cmp::PartialEq for laterite_ags4_core::index::TierCoverage
-pub fn laterite_ags4_core::index::TierCoverage::eq(&self, &laterite_ags4_core::index::TierCoverage) -> bool
+pub fn laterite_ags4_core::index::TierCoverage::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::TierCoverage
 pub fn laterite_ags4_core::index::TierCoverage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_core::index::TierCoverage
@@ -298,10 +298,10 @@ pub struct laterite_ags4_core::index::CustomDictRef
 pub laterite_ags4_core::index::CustomDictRef::hash: alloc::string::String
 pub laterite_ags4_core::index::CustomDictRef::name: alloc::string::String
 impl core::clone::Clone for laterite_ags4_core::index::CustomDictRef
-pub fn laterite_ags4_core::index::CustomDictRef::clone(&self) -> laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::CustomDictRef
 impl core::cmp::PartialEq for laterite_ags4_core::index::CustomDictRef
-pub fn laterite_ags4_core::index::CustomDictRef::eq(&self, &laterite_ags4_core::index::CustomDictRef) -> bool
+pub fn laterite_ags4_core::index::CustomDictRef::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::CustomDictRef
 pub fn laterite_ags4_core::index::CustomDictRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::CustomDictRef
@@ -321,10 +321,10 @@ pub laterite_ags4_core::index::EngineId::compat: core::option::Option<alloc::str
 pub laterite_ags4_core::index::EngineId::fingerprint: alloc::string::String
 pub laterite_ags4_core::index::EngineId::validator: alloc::string::String
 impl core::clone::Clone for laterite_ags4_core::index::EngineId
-pub fn laterite_ags4_core::index::EngineId::clone(&self) -> laterite_ags4_core::index::EngineId
+pub fn laterite_ags4_core::index::EngineId::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::EngineId
 impl core::cmp::PartialEq for laterite_ags4_core::index::EngineId
-pub fn laterite_ags4_core::index::EngineId::eq(&self, &laterite_ags4_core::index::EngineId) -> bool
+pub fn laterite_ags4_core::index::EngineId::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::EngineId
 pub fn laterite_ags4_core::index::EngineId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::EngineId
@@ -341,10 +341,10 @@ pub laterite_ags4_core::index::FileMeta::last_modified: core::option::Option<all
 pub laterite_ags4_core::index::FileMeta::sha256: alloc::string::String
 pub laterite_ags4_core::index::FileMeta::size: u64
 impl core::clone::Clone for laterite_ags4_core::index::FileMeta
-pub fn laterite_ags4_core::index::FileMeta::clone(&self) -> laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::FileMeta
 impl core::cmp::PartialEq for laterite_ags4_core::index::FileMeta
-pub fn laterite_ags4_core::index::FileMeta::eq(&self, &laterite_ags4_core::index::FileMeta) -> bool
+pub fn laterite_ags4_core::index::FileMeta::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::FileMeta
 pub fn laterite_ags4_core::index::FileMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::FileMeta
@@ -367,10 +367,10 @@ pub fn laterite_ags4_core::index::GroupIndex::is_unambiguous(&self, &str) -> boo
 pub fn laterite_ags4_core::index::GroupIndex::range(&self, &str) -> core::option::Option<laterite_ags4_core::index::Range>
 pub fn laterite_ags4_core::index::GroupIndex::spans(&self, &str) -> &[laterite_ags4_core::index::Range]
 impl core::clone::Clone for laterite_ags4_core::index::GroupIndex
-pub fn laterite_ags4_core::index::GroupIndex::clone(&self) -> laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::GroupIndex::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::GroupIndex
 impl core::cmp::PartialEq for laterite_ags4_core::index::GroupIndex
-pub fn laterite_ags4_core::index::GroupIndex::eq(&self, &laterite_ags4_core::index::GroupIndex) -> bool
+pub fn laterite_ags4_core::index::GroupIndex::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::GroupIndex
 pub fn laterite_ags4_core::index::GroupIndex::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::GroupIndex
@@ -388,10 +388,10 @@ pub laterite_ags4_core::index::Question::forced_edition: core::option::Option<al
 pub laterite_ags4_core::index::Question::want_fyi: bool
 pub laterite_ags4_core::index::Question::want_warnings: bool
 impl core::clone::Clone for laterite_ags4_core::index::Question
-pub fn laterite_ags4_core::index::Question::clone(&self) -> laterite_ags4_core::index::Question
+pub fn laterite_ags4_core::index::Question::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::Question
 impl core::cmp::PartialEq for laterite_ags4_core::index::Question
-pub fn laterite_ags4_core::index::Question::eq(&self, &laterite_ags4_core::index::Question) -> bool
+pub fn laterite_ags4_core::index::Question::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::Question
 pub fn laterite_ags4_core::index::Question::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Question
@@ -421,10 +421,10 @@ pub fn laterite_ags4_core::index::Sidecar::size_matches(&self, u64) -> bool
 pub fn laterite_ags4_core::index::Sidecar::to_json(&self) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::Sidecar::with_origin(self, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> Self
 impl core::clone::Clone for laterite_ags4_core::index::Sidecar
-pub fn laterite_ags4_core::index::Sidecar::clone(&self) -> laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::Sidecar
 impl core::cmp::PartialEq for laterite_ags4_core::index::Sidecar
-pub fn laterite_ags4_core::index::Sidecar::eq(&self, &laterite_ags4_core::index::Sidecar) -> bool
+pub fn laterite_ags4_core::index::Sidecar::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::Sidecar
 pub fn laterite_ags4_core::index::Sidecar::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Sidecar
@@ -451,10 +451,10 @@ pub laterite_ags4_core::index::ValidationStamp::fyi: laterite_ags4_core::index::
 pub laterite_ags4_core::index::ValidationStamp::validator: alloc::string::String
 pub laterite_ags4_core::index::ValidationStamp::warnings: laterite_ags4_core::index::TierCoverage
 impl core::clone::Clone for laterite_ags4_core::index::ValidationStamp
-pub fn laterite_ags4_core::index::ValidationStamp::clone(&self) -> laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_core::index::ValidationStamp
 impl core::cmp::PartialEq for laterite_ags4_core::index::ValidationStamp
-pub fn laterite_ags4_core::index::ValidationStamp::eq(&self, &laterite_ags4_core::index::ValidationStamp) -> bool
+pub fn laterite_ags4_core::index::ValidationStamp::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_core::index::ValidationStamp
 pub fn laterite_ags4_core::index::ValidationStamp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_core::index::ValidationStamp

@@ -33,12 +33,12 @@ pub laterite_ags4_emit::EmitMode::AutoFix
 pub laterite_ags4_emit::EmitMode::Report
 pub laterite_ags4_emit::EmitMode::Strict
 impl core::clone::Clone for laterite_ags4_emit::EmitMode
-pub fn laterite_ags4_emit::EmitMode::clone(&self) -> laterite_ags4_emit::EmitMode
+pub fn laterite_ags4_emit::EmitMode::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_emit::EmitMode
 impl core::cmp::PartialEq for laterite_ags4_emit::EmitMode
-pub fn laterite_ags4_emit::EmitMode::eq(&self, &laterite_ags4_emit::EmitMode) -> bool
+pub fn laterite_ags4_emit::EmitMode::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_emit::EmitMode
-pub fn laterite_ags4_emit::EmitMode::default() -> laterite_ags4_emit::EmitMode
+pub fn laterite_ags4_emit::EmitMode::default() -> Self
 impl core::fmt::Debug for laterite_ags4_emit::EmitMode
 pub fn laterite_ags4_emit::EmitMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_emit::EmitMode
@@ -94,7 +94,7 @@ pub laterite_ags4_emit::EmitOpts::mode: laterite_ags4_emit::EmitMode
 pub laterite_ags4_emit::EmitOpts::synthesise_metadata: bool
 pub laterite_ags4_emit::EmitOpts::tran: core::option::Option<laterite_ags4_emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_emit::EmitOpts
-pub fn laterite_ags4_emit::EmitOpts::clone(&self) -> laterite_ags4_emit::EmitOpts
+pub fn laterite_ags4_emit::EmitOpts::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_emit::EmitOpts
 pub fn laterite_ags4_emit::EmitOpts::default() -> Self
 impl core::fmt::Debug for laterite_ags4_emit::EmitOpts
@@ -158,9 +158,9 @@ pub fn laterite_ags4_emit::TranStamp::new(impl core::convert::Into<alloc::string
 pub fn laterite_ags4_emit::TranStamp::with_description(self, impl core::convert::Into<alloc::string::String>) -> laterite_ags4_emit::TranStamp
 pub fn laterite_ags4_emit::TranStamp::with_remarks(self, impl core::convert::Into<alloc::string::String>) -> laterite_ags4_emit::TranStamp
 impl core::clone::Clone for laterite_ags4_emit::TranStamp
-pub fn laterite_ags4_emit::TranStamp::clone(&self) -> laterite_ags4_emit::TranStamp
+pub fn laterite_ags4_emit::TranStamp::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_emit::TranStamp
-pub fn laterite_ags4_emit::TranStamp::default() -> laterite_ags4_emit::TranStamp
+pub fn laterite_ags4_emit::TranStamp::default() -> Self
 impl core::fmt::Debug for laterite_ags4_emit::TranStamp
 pub fn laterite_ags4_emit::TranStamp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_emit::TranStamp
@@ -173,10 +173,10 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::TranStamp
 pub struct laterite_ags4_emit::TranStampError
 pub laterite_ags4_emit::TranStampError::missing: alloc::vec::Vec<alloc::string::String>
 impl core::clone::Clone for laterite_ags4_emit::TranStampError
-pub fn laterite_ags4_emit::TranStampError::clone(&self) -> laterite_ags4_emit::TranStampError
+pub fn laterite_ags4_emit::TranStampError::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_emit::TranStampError
 impl core::cmp::PartialEq for laterite_ags4_emit::TranStampError
-pub fn laterite_ags4_emit::TranStampError::eq(&self, &laterite_ags4_emit::TranStampError) -> bool
+pub fn laterite_ags4_emit::TranStampError::eq(&self, &Self) -> bool
 impl core::error::Error for laterite_ags4_emit::TranStampError
 impl core::fmt::Debug for laterite_ags4_emit::TranStampError
 pub fn laterite_ags4_emit::TranStampError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result

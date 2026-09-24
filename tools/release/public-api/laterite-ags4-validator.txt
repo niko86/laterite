@@ -49,12 +49,12 @@ pub laterite_ags4_validator::findings::Severity::Warning
 impl laterite_ags4_validator::findings::Severity
 pub fn laterite_ags4_validator::findings::Severity::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::findings::Severity
-pub fn laterite_ags4_validator::findings::Severity::clone(&self) -> laterite_ags4_validator::findings::Severity
+pub fn laterite_ags4_validator::findings::Severity::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::findings::Severity
 impl core::cmp::PartialEq for laterite_ags4_validator::findings::Severity
-pub fn laterite_ags4_validator::findings::Severity::eq(&self, &laterite_ags4_validator::findings::Severity) -> bool
+pub fn laterite_ags4_validator::findings::Severity::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_validator::findings::Severity
-pub fn laterite_ags4_validator::findings::Severity::default() -> laterite_ags4_validator::findings::Severity
+pub fn laterite_ags4_validator::findings::Severity::default() -> Self
 impl core::fmt::Debug for laterite_ags4_validator::findings::Severity
 pub fn laterite_ags4_validator::findings::Severity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::findings::Severity
@@ -74,12 +74,12 @@ pub laterite_ags4_validator::findings::Target::Group
 pub laterite_ags4_validator::findings::Target::Heading
 pub laterite_ags4_validator::findings::Target::Line
 impl core::clone::Clone for laterite_ags4_validator::findings::Target
-pub fn laterite_ags4_validator::findings::Target::clone(&self) -> laterite_ags4_validator::findings::Target
+pub fn laterite_ags4_validator::findings::Target::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::findings::Target
 impl core::cmp::PartialEq for laterite_ags4_validator::findings::Target
-pub fn laterite_ags4_validator::findings::Target::eq(&self, &laterite_ags4_validator::findings::Target) -> bool
+pub fn laterite_ags4_validator::findings::Target::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_validator::findings::Target
-pub fn laterite_ags4_validator::findings::Target::default() -> laterite_ags4_validator::findings::Target
+pub fn laterite_ags4_validator::findings::Target::default() -> Self
 impl core::fmt::Debug for laterite_ags4_validator::findings::Target
 pub fn laterite_ags4_validator::findings::Target::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::findings::Target
@@ -100,10 +100,10 @@ pub laterite_ags4_validator::findings::Finding::line: core::option::Option<u32>
 pub laterite_ags4_validator::findings::Finding::location: laterite_ags4_validator::findings::Location
 pub laterite_ags4_validator::findings::Finding::severity: laterite_ags4_validator::findings::Severity
 impl core::clone::Clone for laterite_ags4_validator::findings::Finding
-pub fn laterite_ags4_validator::findings::Finding::clone(&self) -> laterite_ags4_validator::findings::Finding
+pub fn laterite_ags4_validator::findings::Finding::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::findings::Finding
 impl core::cmp::PartialEq for laterite_ags4_validator::findings::Finding
-pub fn laterite_ags4_validator::findings::Finding::eq(&self, &laterite_ags4_validator::findings::Finding) -> bool
+pub fn laterite_ags4_validator::findings::Finding::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::findings::Finding
 pub fn laterite_ags4_validator::findings::Finding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::findings::Finding
@@ -123,12 +123,12 @@ pub laterite_ags4_validator::findings::Location::field_index: core::option::Opti
 pub laterite_ags4_validator::findings::Location::heading: core::option::Option<alloc::string::String>
 pub laterite_ags4_validator::findings::Location::target: laterite_ags4_validator::findings::Target
 impl core::clone::Clone for laterite_ags4_validator::findings::Location
-pub fn laterite_ags4_validator::findings::Location::clone(&self) -> laterite_ags4_validator::findings::Location
+pub fn laterite_ags4_validator::findings::Location::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::findings::Location
 impl core::cmp::PartialEq for laterite_ags4_validator::findings::Location
-pub fn laterite_ags4_validator::findings::Location::eq(&self, &laterite_ags4_validator::findings::Location) -> bool
+pub fn laterite_ags4_validator::findings::Location::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_validator::findings::Location
-pub fn laterite_ags4_validator::findings::Location::default() -> laterite_ags4_validator::findings::Location
+pub fn laterite_ags4_validator::findings::Location::default() -> Self
 impl core::fmt::Debug for laterite_ags4_validator::findings::Location
 pub fn laterite_ags4_validator::findings::Location::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::findings::Location
@@ -165,10 +165,10 @@ pub laterite_ags4_validator::fixes::FixKind::StripEmbeddedCr
 impl laterite_ags4_validator::fixes::FixKind
 pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind
-pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> laterite_ags4_validator::fixes::FixKind
+pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixKind
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::FixKind
-pub fn laterite_ags4_validator::fixes::FixKind::eq(&self, &laterite_ags4_validator::fixes::FixKind) -> bool
+pub fn laterite_ags4_validator::fixes::FixKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::FixKind
 pub fn laterite_ags4_validator::fixes::FixKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::fixes::FixKind
@@ -190,10 +190,10 @@ pub laterite_ags4_validator::fixes::FixRisk::Safe
 impl laterite_ags4_validator::fixes::FixRisk
 pub const fn laterite_ags4_validator::fixes::FixRisk::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixRisk
-pub fn laterite_ags4_validator::fixes::FixRisk::clone(&self) -> laterite_ags4_validator::fixes::FixRisk
+pub fn laterite_ags4_validator::fixes::FixRisk::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixRisk
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::FixRisk
-pub fn laterite_ags4_validator::fixes::FixRisk::eq(&self, &laterite_ags4_validator::fixes::FixRisk) -> bool
+pub fn laterite_ags4_validator::fixes::FixRisk::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::FixRisk
 pub fn laterite_ags4_validator::fixes::FixRisk::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::fixes::FixRisk
@@ -217,9 +217,9 @@ pub laterite_ags4_validator::fixes::Fix::line: core::option::Option<u32>
 pub laterite_ags4_validator::fixes::Fix::risk: laterite_ags4_validator::fixes::FixRisk
 pub laterite_ags4_validator::fixes::Fix::rule: alloc::string::String
 impl core::clone::Clone for laterite_ags4_validator::fixes::Fix
-pub fn laterite_ags4_validator::fixes::Fix::clone(&self) -> laterite_ags4_validator::fixes::Fix
+pub fn laterite_ags4_validator::fixes::Fix::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::Fix
-pub fn laterite_ags4_validator::fixes::Fix::eq(&self, &laterite_ags4_validator::fixes::Fix) -> bool
+pub fn laterite_ags4_validator::fixes::Fix::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::Fix
 pub fn laterite_ags4_validator::fixes::Fix::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::Fix
@@ -255,9 +255,9 @@ pub laterite_ags4_validator::fixes::SpanEdit::line: u32
 pub laterite_ags4_validator::fixes::SpanEdit::replacement: alloc::string::String
 pub laterite_ags4_validator::fixes::SpanEdit::start: u32
 impl core::clone::Clone for laterite_ags4_validator::fixes::SpanEdit
-pub fn laterite_ags4_validator::fixes::SpanEdit::clone(&self) -> laterite_ags4_validator::fixes::SpanEdit
+pub fn laterite_ags4_validator::fixes::SpanEdit::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::SpanEdit
-pub fn laterite_ags4_validator::fixes::SpanEdit::eq(&self, &laterite_ags4_validator::fixes::SpanEdit) -> bool
+pub fn laterite_ags4_validator::fixes::SpanEdit::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::SpanEdit
 pub fn laterite_ags4_validator::fixes::SpanEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::SpanEdit
@@ -323,10 +323,10 @@ pub fn laterite_ags4_validator::verdict::Verdict::is_valid(&self) -> bool
 pub fn laterite_ags4_validator::verdict::Verdict::of(&laterite_ags4_validator::findings::Findings, bool) -> Self
 pub fn laterite_ags4_validator::verdict::Verdict::total(&self) -> usize
 impl core::clone::Clone for laterite_ags4_validator::verdict::Verdict
-pub fn laterite_ags4_validator::verdict::Verdict::clone(&self) -> laterite_ags4_validator::verdict::Verdict
+pub fn laterite_ags4_validator::verdict::Verdict::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::verdict::Verdict
 impl core::cmp::PartialEq for laterite_ags4_validator::verdict::Verdict
-pub fn laterite_ags4_validator::verdict::Verdict::eq(&self, &laterite_ags4_validator::verdict::Verdict) -> bool
+pub fn laterite_ags4_validator::verdict::Verdict::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::verdict::Verdict
 pub fn laterite_ags4_validator::verdict::Verdict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::verdict::Verdict
@@ -343,10 +343,10 @@ pub enum laterite_ags4_validator::world::WorldScope
 pub laterite_ags4_validator::world::WorldScope::None
 pub laterite_ags4_validator::world::WorldScope::OnDisk(std::path::PathBuf)
 impl core::clone::Clone for laterite_ags4_validator::world::WorldScope
-pub fn laterite_ags4_validator::world::WorldScope::clone(&self) -> laterite_ags4_validator::world::WorldScope
+pub fn laterite_ags4_validator::world::WorldScope::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::world::WorldScope
 impl core::cmp::PartialEq for laterite_ags4_validator::world::WorldScope
-pub fn laterite_ags4_validator::world::WorldScope::eq(&self, &laterite_ags4_validator::world::WorldScope) -> bool
+pub fn laterite_ags4_validator::world::WorldScope::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::world::WorldScope
 pub fn laterite_ags4_validator::world::WorldScope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::world::WorldScope
@@ -373,10 +373,10 @@ pub laterite_ags4_validator::FixKind::StripEmbeddedCr
 impl laterite_ags4_validator::fixes::FixKind
 pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind
-pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> laterite_ags4_validator::fixes::FixKind
+pub fn laterite_ags4_validator::fixes::FixKind::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::fixes::FixKind
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::FixKind
-pub fn laterite_ags4_validator::fixes::FixKind::eq(&self, &laterite_ags4_validator::fixes::FixKind) -> bool
+pub fn laterite_ags4_validator::fixes::FixKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::FixKind
 pub fn laterite_ags4_validator::fixes::FixKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_validator::fixes::FixKind
@@ -426,10 +426,10 @@ pub enum laterite_ags4_validator::WorldScope
 pub laterite_ags4_validator::WorldScope::None
 pub laterite_ags4_validator::WorldScope::OnDisk(std::path::PathBuf)
 impl core::clone::Clone for laterite_ags4_validator::world::WorldScope
-pub fn laterite_ags4_validator::world::WorldScope::clone(&self) -> laterite_ags4_validator::world::WorldScope
+pub fn laterite_ags4_validator::world::WorldScope::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::world::WorldScope
 impl core::cmp::PartialEq for laterite_ags4_validator::world::WorldScope
-pub fn laterite_ags4_validator::world::WorldScope::eq(&self, &laterite_ags4_validator::world::WorldScope) -> bool
+pub fn laterite_ags4_validator::world::WorldScope::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::world::WorldScope
 pub fn laterite_ags4_validator::world::WorldScope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::world::WorldScope
@@ -448,7 +448,7 @@ pub laterite_ags4_validator::CheckOptions::encoding: &'static encoding_rs::Encod
 pub laterite_ags4_validator::CheckOptions::include_fyi: bool
 pub laterite_ags4_validator::CheckOptions::include_warnings: bool
 impl core::clone::Clone for laterite_ags4_validator::CheckOptions
-pub fn laterite_ags4_validator::CheckOptions::clone(&self) -> laterite_ags4_validator::CheckOptions
+pub fn laterite_ags4_validator::CheckOptions::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_validator::CheckOptions
 pub fn laterite_ags4_validator::CheckOptions::default() -> Self
 impl core::fmt::Debug for laterite_ags4_validator::CheckOptions
@@ -467,10 +467,10 @@ pub laterite_ags4_validator::Finding::line: core::option::Option<u32>
 pub laterite_ags4_validator::Finding::location: laterite_ags4_validator::findings::Location
 pub laterite_ags4_validator::Finding::severity: laterite_ags4_validator::findings::Severity
 impl core::clone::Clone for laterite_ags4_validator::findings::Finding
-pub fn laterite_ags4_validator::findings::Finding::clone(&self) -> laterite_ags4_validator::findings::Finding
+pub fn laterite_ags4_validator::findings::Finding::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_validator::findings::Finding
 impl core::cmp::PartialEq for laterite_ags4_validator::findings::Finding
-pub fn laterite_ags4_validator::findings::Finding::eq(&self, &laterite_ags4_validator::findings::Finding) -> bool
+pub fn laterite_ags4_validator::findings::Finding::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::findings::Finding
 pub fn laterite_ags4_validator::findings::Finding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::findings::Finding
@@ -491,9 +491,9 @@ pub laterite_ags4_validator::Fix::line: core::option::Option<u32>
 pub laterite_ags4_validator::Fix::risk: laterite_ags4_validator::fixes::FixRisk
 pub laterite_ags4_validator::Fix::rule: alloc::string::String
 impl core::clone::Clone for laterite_ags4_validator::fixes::Fix
-pub fn laterite_ags4_validator::fixes::Fix::clone(&self) -> laterite_ags4_validator::fixes::Fix
+pub fn laterite_ags4_validator::fixes::Fix::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::Fix
-pub fn laterite_ags4_validator::fixes::Fix::eq(&self, &laterite_ags4_validator::fixes::Fix) -> bool
+pub fn laterite_ags4_validator::fixes::Fix::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::Fix
 pub fn laterite_ags4_validator::fixes::Fix::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::Fix
@@ -529,9 +529,9 @@ pub laterite_ags4_validator::SpanEdit::line: u32
 pub laterite_ags4_validator::SpanEdit::replacement: alloc::string::String
 pub laterite_ags4_validator::SpanEdit::start: u32
 impl core::clone::Clone for laterite_ags4_validator::fixes::SpanEdit
-pub fn laterite_ags4_validator::fixes::SpanEdit::clone(&self) -> laterite_ags4_validator::fixes::SpanEdit
+pub fn laterite_ags4_validator::fixes::SpanEdit::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_validator::fixes::SpanEdit
-pub fn laterite_ags4_validator::fixes::SpanEdit::eq(&self, &laterite_ags4_validator::fixes::SpanEdit) -> bool
+pub fn laterite_ags4_validator::fixes::SpanEdit::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_validator::fixes::SpanEdit
 pub fn laterite_ags4_validator::fixes::SpanEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::SpanEdit

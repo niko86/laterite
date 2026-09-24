@@ -13,10 +13,10 @@ pub laterite_ags4_reference::dict::DictResolution::StructuralBase
 impl laterite_ags4_reference::dict::DictResolution
 pub fn laterite_ags4_reference::dict::DictResolution::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_reference::dict::DictResolution
-pub fn laterite_ags4_reference::dict::DictResolution::clone(&self) -> laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::dict::DictResolution
 impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictResolution
-pub fn laterite_ags4_reference::dict::DictResolution::eq(&self, &laterite_ags4_reference::dict::DictResolution) -> bool
+pub fn laterite_ags4_reference::dict::DictResolution::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::dict::DictResolution
 pub fn laterite_ags4_reference::dict::DictResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::dict::DictResolution
@@ -43,12 +43,12 @@ pub const laterite_ags4_reference::dict::DictVersion::ALL: &'static [laterite_ag
 pub fn laterite_ags4_reference::dict::DictVersion::as_str(self) -> &'static str
 pub fn laterite_ags4_reference::dict::DictVersion::from_edition(&str) -> core::option::Option<laterite_ags4_reference::dict::DictVersion>
 impl core::clone::Clone for laterite_ags4_reference::dict::DictVersion
-pub fn laterite_ags4_reference::dict::DictVersion::clone(&self) -> laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::dict::DictVersion
 impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictVersion
-pub fn laterite_ags4_reference::dict::DictVersion::eq(&self, &laterite_ags4_reference::dict::DictVersion) -> bool
+pub fn laterite_ags4_reference::dict::DictVersion::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_reference::dict::DictVersion
-pub fn laterite_ags4_reference::dict::DictVersion::default() -> laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::default() -> Self
 impl core::fmt::Debug for laterite_ags4_reference::dict::DictVersion
 pub fn laterite_ags4_reference::dict::DictVersion::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::dict::DictVersion
@@ -78,7 +78,7 @@ pub fn laterite_ags4_reference::dict::Dictionary<'a>::layered(&'a laterite_ags4_
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::tran_ags(&self) -> &'a str
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::version(&self) -> laterite_ags4_reference::dict::DictVersion
 impl<'a> core::clone::Clone for laterite_ags4_reference::dict::Dictionary<'a>
-pub fn laterite_ags4_reference::dict::Dictionary<'a>::clone(&self) -> laterite_ags4_reference::dict::Dictionary<'a>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::clone(&self) -> Self
 impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::Dictionary<'a>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for laterite_ags4_reference::dict::Dictionary<'a>
@@ -93,7 +93,7 @@ pub struct laterite_ags4_reference::dict::BundledDict
 impl laterite_ags4_reference::dict::BundledDict
 pub fn laterite_ags4_reference::dict::BundledDict::bundled(laterite_ags4_reference::dict::DictVersion) -> Self
 impl core::clone::Clone for laterite_ags4_reference::dict::BundledDict
-pub fn laterite_ags4_reference::dict::BundledDict::clone(&self) -> laterite_ags4_reference::dict::BundledDict
+pub fn laterite_ags4_reference::dict::BundledDict::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_reference::dict::BundledDict
 pub fn laterite_ags4_reference::dict::BundledDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::dict::BundledDict
@@ -110,10 +110,10 @@ pub laterite_ags4_reference::dict::DictEntry::desc: &'static str
 pub laterite_ags4_reference::dict::DictEntry::status: &'static str
 pub laterite_ags4_reference::dict::DictEntry::unit: &'static str
 impl core::clone::Clone for laterite_ags4_reference::dict::DictEntry
-pub fn laterite_ags4_reference::dict::DictEntry::clone(&self) -> laterite_ags4_reference::dict::DictEntry
+pub fn laterite_ags4_reference::dict::DictEntry::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::dict::DictEntry
 impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictEntry
-pub fn laterite_ags4_reference::dict::DictEntry::eq(&self, &laterite_ags4_reference::dict::DictEntry) -> bool
+pub fn laterite_ags4_reference::dict::DictEntry::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::dict::DictEntry
 pub fn laterite_ags4_reference::dict::DictEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::dict::DictEntry
@@ -170,10 +170,10 @@ pub struct laterite_ags4_reference::dict::GroupMeta
 pub laterite_ags4_reference::dict::GroupMeta::desc: &'static str
 pub laterite_ags4_reference::dict::GroupMeta::parent: &'static str
 impl core::clone::Clone for laterite_ags4_reference::dict::GroupMeta
-pub fn laterite_ags4_reference::dict::GroupMeta::clone(&self) -> laterite_ags4_reference::dict::GroupMeta
+pub fn laterite_ags4_reference::dict::GroupMeta::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::dict::GroupMeta
 impl core::cmp::PartialEq for laterite_ags4_reference::dict::GroupMeta
-pub fn laterite_ags4_reference::dict::GroupMeta::eq(&self, &laterite_ags4_reference::dict::GroupMeta) -> bool
+pub fn laterite_ags4_reference::dict::GroupMeta::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::dict::GroupMeta
 pub fn laterite_ags4_reference::dict::GroupMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::dict::GroupMeta
@@ -189,10 +189,10 @@ pub struct laterite_ags4_reference::dict::GroupRef<'a>
 pub laterite_ags4_reference::dict::GroupRef::desc: &'a str
 pub laterite_ags4_reference::dict::GroupRef::parent: &'a str
 impl<'a> core::clone::Clone for laterite_ags4_reference::dict::GroupRef<'a>
-pub fn laterite_ags4_reference::dict::GroupRef<'a>::clone(&self) -> laterite_ags4_reference::dict::GroupRef<'a>
+pub fn laterite_ags4_reference::dict::GroupRef<'a>::clone(&self) -> Self
 impl<'a> core::cmp::Eq for laterite_ags4_reference::dict::GroupRef<'a>
 impl<'a> core::cmp::PartialEq for laterite_ags4_reference::dict::GroupRef<'a>
-pub fn laterite_ags4_reference::dict::GroupRef<'a>::eq(&self, &laterite_ags4_reference::dict::GroupRef<'a>) -> bool
+pub fn laterite_ags4_reference::dict::GroupRef<'a>::eq(&self, &Self) -> bool
 impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::GroupRef<'a>
 pub fn laterite_ags4_reference::dict::GroupRef<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for laterite_ags4_reference::dict::GroupRef<'a>
@@ -210,10 +210,10 @@ pub laterite_ags4_reference::dict::HeadingRef::desc: &'a str
 pub laterite_ags4_reference::dict::HeadingRef::status: &'a str
 pub laterite_ags4_reference::dict::HeadingRef::unit: &'a str
 impl<'a> core::clone::Clone for laterite_ags4_reference::dict::HeadingRef<'a>
-pub fn laterite_ags4_reference::dict::HeadingRef<'a>::clone(&self) -> laterite_ags4_reference::dict::HeadingRef<'a>
+pub fn laterite_ags4_reference::dict::HeadingRef<'a>::clone(&self) -> Self
 impl<'a> core::cmp::Eq for laterite_ags4_reference::dict::HeadingRef<'a>
 impl<'a> core::cmp::PartialEq for laterite_ags4_reference::dict::HeadingRef<'a>
-pub fn laterite_ags4_reference::dict::HeadingRef<'a>::eq(&self, &laterite_ags4_reference::dict::HeadingRef<'a>) -> bool
+pub fn laterite_ags4_reference::dict::HeadingRef<'a>::eq(&self, &Self) -> bool
 impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::HeadingRef<'a>
 pub fn laterite_ags4_reference::dict::HeadingRef<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for laterite_ags4_reference::dict::HeadingRef<'a>
@@ -239,7 +239,7 @@ pub laterite_ags4_reference::effective_dict::DictRow::parent: &'a str
 pub laterite_ags4_reference::effective_dict::DictRow::status: &'a str
 pub laterite_ags4_reference::effective_dict::DictRow::unit: &'a str
 impl<'a> core::clone::Clone for laterite_ags4_reference::effective_dict::DictRow<'a>
-pub fn laterite_ags4_reference::effective_dict::DictRow<'a>::clone(&self) -> laterite_ags4_reference::effective_dict::DictRow<'a>
+pub fn laterite_ags4_reference::effective_dict::DictRow<'a>::clone(&self) -> Self
 impl<'a> core::fmt::Debug for laterite_ags4_reference::effective_dict::DictRow<'a>
 pub fn laterite_ags4_reference::effective_dict::DictRow<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for laterite_ags4_reference::effective_dict::DictRow<'a>
@@ -264,7 +264,7 @@ pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::parent(&self,
 pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::required_fields(&self, &str) -> alloc::vec::Vec<alloc::string::String>
 pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::std(&self) -> laterite_ags4_reference::dict::Dictionary<'a>
 impl<'a> core::clone::Clone for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
-pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::clone(&self) -> laterite_ags4_reference::effective_dict::EffectiveDict<'a>
+pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::clone(&self) -> Self
 impl<'a> core::fmt::Debug for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
 pub fn laterite_ags4_reference::effective_dict::EffectiveDict<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Freeze for laterite_ags4_reference::effective_dict::EffectiveDict<'a>
@@ -286,12 +286,12 @@ pub fn laterite_ags4_reference::effective_dict::FileDict::is_empty(&self) -> boo
 pub fn laterite_ags4_reference::effective_dict::FileDict::key_headings(&self, &str) -> impl core::iter::traits::iterator::Iterator<Item = &laterite_ags4_reference::effective_dict::FileHeading>
 pub fn laterite_ags4_reference::effective_dict::FileDict::parent(&self, &str) -> core::option::Option<&str>
 impl core::clone::Clone for laterite_ags4_reference::effective_dict::FileDict
-pub fn laterite_ags4_reference::effective_dict::FileDict::clone(&self) -> laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::effective_dict::FileDict
 impl core::cmp::PartialEq for laterite_ags4_reference::effective_dict::FileDict
-pub fn laterite_ags4_reference::effective_dict::FileDict::eq(&self, &laterite_ags4_reference::effective_dict::FileDict) -> bool
+pub fn laterite_ags4_reference::effective_dict::FileDict::eq(&self, &Self) -> bool
 impl core::default::Default for laterite_ags4_reference::effective_dict::FileDict
-pub fn laterite_ags4_reference::effective_dict::FileDict::default() -> laterite_ags4_reference::effective_dict::FileDict
+pub fn laterite_ags4_reference::effective_dict::FileDict::default() -> Self
 impl core::fmt::Debug for laterite_ags4_reference::effective_dict::FileDict
 pub fn laterite_ags4_reference::effective_dict::FileDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_reference::effective_dict::FileDict
@@ -309,10 +309,10 @@ pub laterite_ags4_reference::effective_dict::FileHeading::heading: alloc::string
 pub laterite_ags4_reference::effective_dict::FileHeading::status: alloc::string::String
 pub laterite_ags4_reference::effective_dict::FileHeading::unit: alloc::string::String
 impl core::clone::Clone for laterite_ags4_reference::effective_dict::FileHeading
-pub fn laterite_ags4_reference::effective_dict::FileHeading::clone(&self) -> laterite_ags4_reference::effective_dict::FileHeading
+pub fn laterite_ags4_reference::effective_dict::FileHeading::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::effective_dict::FileHeading
 impl core::cmp::PartialEq for laterite_ags4_reference::effective_dict::FileHeading
-pub fn laterite_ags4_reference::effective_dict::FileHeading::eq(&self, &laterite_ags4_reference::effective_dict::FileHeading) -> bool
+pub fn laterite_ags4_reference::effective_dict::FileHeading::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::effective_dict::FileHeading
 pub fn laterite_ags4_reference::effective_dict::FileHeading::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_reference::effective_dict::FileHeading
@@ -341,10 +341,10 @@ pub laterite_ags4_reference::overlay::BaseSpec::Auto
 pub laterite_ags4_reference::overlay::BaseSpec::Force(laterite_ags4_reference::dict::DictVersion)
 pub laterite_ags4_reference::overlay::BaseSpec::Replace
 impl core::clone::Clone for laterite_ags4_reference::overlay::BaseSpec
-pub fn laterite_ags4_reference::overlay::BaseSpec::clone(&self) -> laterite_ags4_reference::overlay::BaseSpec
+pub fn laterite_ags4_reference::overlay::BaseSpec::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::overlay::BaseSpec
 impl core::cmp::PartialEq for laterite_ags4_reference::overlay::BaseSpec
-pub fn laterite_ags4_reference::overlay::BaseSpec::eq(&self, &laterite_ags4_reference::overlay::BaseSpec) -> bool
+pub fn laterite_ags4_reference::overlay::BaseSpec::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::overlay::BaseSpec
 pub fn laterite_ags4_reference::overlay::BaseSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::overlay::BaseSpec
@@ -379,10 +379,10 @@ pub laterite_ags4_reference::overlay::DictError::UnknownType
 pub laterite_ags4_reference::overlay::DictError::UnknownType::line: u32
 pub laterite_ags4_reference::overlay::DictError::UnknownType::token: alloc::string::String
 impl core::clone::Clone for laterite_ags4_reference::overlay::DictError
-pub fn laterite_ags4_reference::overlay::DictError::clone(&self) -> laterite_ags4_reference::overlay::DictError
+pub fn laterite_ags4_reference::overlay::DictError::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::overlay::DictError
 impl core::cmp::PartialEq for laterite_ags4_reference::overlay::DictError
-pub fn laterite_ags4_reference::overlay::DictError::eq(&self, &laterite_ags4_reference::overlay::DictError) -> bool
+pub fn laterite_ags4_reference::overlay::DictError::eq(&self, &Self) -> bool
 impl core::error::Error for laterite_ags4_reference::overlay::DictError
 impl core::fmt::Debug for laterite_ags4_reference::overlay::DictError
 pub fn laterite_ags4_reference::overlay::DictError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -401,10 +401,10 @@ pub laterite_ags4_reference::overlay::DictFormat::Ags
 pub laterite_ags4_reference::overlay::DictFormat::Auto
 pub laterite_ags4_reference::overlay::DictFormat::Json
 impl core::clone::Clone for laterite_ags4_reference::overlay::DictFormat
-pub fn laterite_ags4_reference::overlay::DictFormat::clone(&self) -> laterite_ags4_reference::overlay::DictFormat
+pub fn laterite_ags4_reference::overlay::DictFormat::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::overlay::DictFormat
 impl core::cmp::PartialEq for laterite_ags4_reference::overlay::DictFormat
-pub fn laterite_ags4_reference::overlay::DictFormat::eq(&self, &laterite_ags4_reference::overlay::DictFormat) -> bool
+pub fn laterite_ags4_reference::overlay::DictFormat::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::overlay::DictFormat
 pub fn laterite_ags4_reference::overlay::DictFormat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_reference::overlay::DictFormat
@@ -426,7 +426,7 @@ pub laterite_ags4_reference::overlay::CustomDict::resolution: laterite_ags4_refe
 impl laterite_ags4_reference::overlay::CustomDict
 pub fn laterite_ags4_reference::overlay::CustomDict::build_delta(&self) -> core::result::Result<laterite_ags4_reference::overlay::OwnedDelta, laterite_ags4_reference::overlay::DictError>
 impl core::clone::Clone for laterite_ags4_reference::overlay::CustomDict
-pub fn laterite_ags4_reference::overlay::CustomDict::clone(&self) -> laterite_ags4_reference::overlay::CustomDict
+pub fn laterite_ags4_reference::overlay::CustomDict::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_reference::overlay::CustomDict
 pub fn laterite_ags4_reference::overlay::CustomDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_reference::overlay::CustomDict
@@ -444,7 +444,7 @@ pub laterite_ags4_reference::overlay::OwnedDelta::group_headings: std::collectio
 pub laterite_ags4_reference::overlay::OwnedDelta::groups: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_reference::overlay::OwnedGroupMeta>
 pub laterite_ags4_reference::overlay::OwnedDelta::headings: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_reference::overlay::OwnedDictEntry>
 impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedDelta
-pub fn laterite_ags4_reference::overlay::OwnedDelta::clone(&self) -> laterite_ags4_reference::overlay::OwnedDelta
+pub fn laterite_ags4_reference::overlay::OwnedDelta::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedDelta
 pub fn laterite_ags4_reference::overlay::OwnedDelta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_reference::overlay::OwnedDelta
@@ -460,10 +460,10 @@ pub laterite_ags4_reference::overlay::OwnedDictEntry::desc: alloc::string::Strin
 pub laterite_ags4_reference::overlay::OwnedDictEntry::status: alloc::string::String
 pub laterite_ags4_reference::overlay::OwnedDictEntry::unit: alloc::string::String
 impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedDictEntry
-pub fn laterite_ags4_reference::overlay::OwnedDictEntry::clone(&self) -> laterite_ags4_reference::overlay::OwnedDictEntry
+pub fn laterite_ags4_reference::overlay::OwnedDictEntry::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::overlay::OwnedDictEntry
 impl core::cmp::PartialEq for laterite_ags4_reference::overlay::OwnedDictEntry
-pub fn laterite_ags4_reference::overlay::OwnedDictEntry::eq(&self, &laterite_ags4_reference::overlay::OwnedDictEntry) -> bool
+pub fn laterite_ags4_reference::overlay::OwnedDictEntry::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedDictEntry
 pub fn laterite_ags4_reference::overlay::OwnedDictEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::OwnedDictEntry
@@ -478,10 +478,10 @@ pub struct laterite_ags4_reference::overlay::OwnedGroupMeta
 pub laterite_ags4_reference::overlay::OwnedGroupMeta::desc: alloc::string::String
 pub laterite_ags4_reference::overlay::OwnedGroupMeta::parent: alloc::string::String
 impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedGroupMeta
-pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::clone(&self) -> laterite_ags4_reference::overlay::OwnedGroupMeta
+pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_reference::overlay::OwnedGroupMeta
 impl core::cmp::PartialEq for laterite_ags4_reference::overlay::OwnedGroupMeta
-pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::eq(&self, &laterite_ags4_reference::overlay::OwnedGroupMeta) -> bool
+pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedGroupMeta
 pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::OwnedGroupMeta
@@ -502,7 +502,7 @@ pub laterite_ags4_reference::union::GroupDescriptor::parent: core::option::Optio
 impl laterite_ags4_reference::union::GroupDescriptor
 pub fn laterite_ags4_reference::union::GroupDescriptor::key_headings(&self) -> impl core::iter::traits::iterator::Iterator<Item = &laterite_ags4_reference::union::Heading>
 impl core::clone::Clone for laterite_ags4_reference::union::GroupDescriptor
-pub fn laterite_ags4_reference::union::GroupDescriptor::clone(&self) -> laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_reference::union::GroupDescriptor
 pub fn laterite_ags4_reference::union::GroupDescriptor::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl serde_core::ser::Serialize for laterite_ags4_reference::union::GroupDescriptor
@@ -525,7 +525,7 @@ pub laterite_ags4_reference::union::Heading::unit: core::option::Option<alloc::s
 impl laterite_ags4_reference::union::Heading
 pub fn laterite_ags4_reference::union::Heading::is_key(&self) -> bool
 impl core::clone::Clone for laterite_ags4_reference::union::Heading
-pub fn laterite_ags4_reference::union::Heading::clone(&self) -> laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_reference::union::Heading
 pub fn laterite_ags4_reference::union::Heading::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl serde_core::ser::Serialize for laterite_ags4_reference::union::Heading

@@ -8,10 +8,10 @@ pub laterite_ags4_parse::builder::RowTag::Heading
 pub laterite_ags4_parse::builder::RowTag::Type
 pub laterite_ags4_parse::builder::RowTag::Unit
 impl core::clone::Clone for laterite_ags4_parse::builder::RowTag
-pub fn laterite_ags4_parse::builder::RowTag::clone(&self) -> laterite_ags4_parse::builder::RowTag
+pub fn laterite_ags4_parse::builder::RowTag::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::builder::RowTag
 impl core::cmp::PartialEq for laterite_ags4_parse::builder::RowTag
-pub fn laterite_ags4_parse::builder::RowTag::eq(&self, &laterite_ags4_parse::builder::RowTag) -> bool
+pub fn laterite_ags4_parse::builder::RowTag::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::builder::RowTag
 pub fn laterite_ags4_parse::builder::RowTag::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::builder::RowTag
@@ -31,7 +31,7 @@ pub fn laterite_ags4_parse::builder::ParsedFileBuilder::new() -> Self
 pub fn laterite_ags4_parse::builder::ParsedFileBuilder::record_row(&mut self, laterite_ags4_parse::builder::RowTag, core::ops::range::Range<usize>, &[laterite_ags4_parse::builder::RecordedCell]) -> core::result::Result<(), laterite_ags4_parse::ParseError>
 pub fn laterite_ags4_parse::builder::ParsedFileBuilder::written(&self) -> usize
 impl core::default::Default for laterite_ags4_parse::builder::ParsedFileBuilder
-pub fn laterite_ags4_parse::builder::ParsedFileBuilder::default() -> laterite_ags4_parse::builder::ParsedFileBuilder
+pub fn laterite_ags4_parse::builder::ParsedFileBuilder::default() -> Self
 impl core::marker::Freeze for laterite_ags4_parse::builder::ParsedFileBuilder
 impl core::marker::Send for laterite_ags4_parse::builder::ParsedFileBuilder
 impl core::marker::Sync for laterite_ags4_parse::builder::ParsedFileBuilder
@@ -44,10 +44,10 @@ pub laterite_ags4_parse::builder::RecordedCell::end: usize
 pub laterite_ags4_parse::builder::RecordedCell::has_escape: bool
 pub laterite_ags4_parse::builder::RecordedCell::start: usize
 impl core::clone::Clone for laterite_ags4_parse::builder::RecordedCell
-pub fn laterite_ags4_parse::builder::RecordedCell::clone(&self) -> laterite_ags4_parse::builder::RecordedCell
+pub fn laterite_ags4_parse::builder::RecordedCell::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::builder::RecordedCell
 impl core::cmp::PartialEq for laterite_ags4_parse::builder::RecordedCell
-pub fn laterite_ags4_parse::builder::RecordedCell::eq(&self, &laterite_ags4_parse::builder::RecordedCell) -> bool
+pub fn laterite_ags4_parse::builder::RecordedCell::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::builder::RecordedCell
 pub fn laterite_ags4_parse::builder::RecordedCell::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::builder::RecordedCell
@@ -69,10 +69,10 @@ pub laterite_ags4_parse::scan::RawField::token_start: usize
 pub laterite_ags4_parse::scan::RawField::value_end: usize
 pub laterite_ags4_parse::scan::RawField::value_start: usize
 impl core::clone::Clone for laterite_ags4_parse::scan::RawField
-pub fn laterite_ags4_parse::scan::RawField::clone(&self) -> laterite_ags4_parse::scan::RawField
+pub fn laterite_ags4_parse::scan::RawField::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::scan::RawField
 impl core::cmp::PartialEq for laterite_ags4_parse::scan::RawField
-pub fn laterite_ags4_parse::scan::RawField::eq(&self, &laterite_ags4_parse::scan::RawField) -> bool
+pub fn laterite_ags4_parse::scan::RawField::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::scan::RawField
 pub fn laterite_ags4_parse::scan::RawField::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::scan::RawField
@@ -88,10 +88,10 @@ pub struct laterite_ags4_parse::scan::ValuePolicy
 pub laterite_ags4_parse::scan::ValuePolicy::trim_unquoted: bool
 pub laterite_ags4_parse::scan::ValuePolicy::unterminated_to_eol: bool
 impl core::clone::Clone for laterite_ags4_parse::scan::ValuePolicy
-pub fn laterite_ags4_parse::scan::ValuePolicy::clone(&self) -> laterite_ags4_parse::scan::ValuePolicy
+pub fn laterite_ags4_parse::scan::ValuePolicy::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::scan::ValuePolicy
 impl core::cmp::PartialEq for laterite_ags4_parse::scan::ValuePolicy
-pub fn laterite_ags4_parse::scan::ValuePolicy::eq(&self, &laterite_ags4_parse::scan::ValuePolicy) -> bool
+pub fn laterite_ags4_parse::scan::ValuePolicy::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::scan::ValuePolicy
 pub fn laterite_ags4_parse::scan::ValuePolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::scan::ValuePolicy
@@ -112,10 +112,10 @@ pub enum laterite_ags4_parse::InvalidUtf8
 pub laterite_ags4_parse::InvalidUtf8::LossyReplace
 pub laterite_ags4_parse::InvalidUtf8::Reject
 impl core::clone::Clone for laterite_ags4_parse::InvalidUtf8
-pub fn laterite_ags4_parse::InvalidUtf8::clone(&self) -> laterite_ags4_parse::InvalidUtf8
+pub fn laterite_ags4_parse::InvalidUtf8::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::InvalidUtf8
 impl core::cmp::PartialEq for laterite_ags4_parse::InvalidUtf8
-pub fn laterite_ags4_parse::InvalidUtf8::eq(&self, &laterite_ags4_parse::InvalidUtf8) -> bool
+pub fn laterite_ags4_parse::InvalidUtf8::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::InvalidUtf8
 pub fn laterite_ags4_parse::InvalidUtf8::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::InvalidUtf8
@@ -135,10 +135,10 @@ pub laterite_ags4_parse::LineTerminator::Unterminated
 impl laterite_ags4_parse::LineTerminator
 pub fn laterite_ags4_parse::LineTerminator::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_parse::LineTerminator
-pub fn laterite_ags4_parse::LineTerminator::clone(&self) -> laterite_ags4_parse::LineTerminator
+pub fn laterite_ags4_parse::LineTerminator::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::LineTerminator
 impl core::cmp::PartialEq for laterite_ags4_parse::LineTerminator
-pub fn laterite_ags4_parse::LineTerminator::eq(&self, &laterite_ags4_parse::LineTerminator) -> bool
+pub fn laterite_ags4_parse::LineTerminator::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::LineTerminator
 pub fn laterite_ags4_parse::LineTerminator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::LineTerminator
@@ -158,10 +158,10 @@ pub laterite_ags4_parse::ParseError::TooLarge
 pub laterite_ags4_parse::ParseError::UnsupportedEdition
 pub laterite_ags4_parse::ParseError::UnsupportedEdition::found: alloc::string::String
 impl core::clone::Clone for laterite_ags4_parse::ParseError
-pub fn laterite_ags4_parse::ParseError::clone(&self) -> laterite_ags4_parse::ParseError
+pub fn laterite_ags4_parse::ParseError::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::ParseError
 impl core::cmp::PartialEq for laterite_ags4_parse::ParseError
-pub fn laterite_ags4_parse::ParseError::eq(&self, &laterite_ags4_parse::ParseError) -> bool
+pub fn laterite_ags4_parse::ParseError::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::ParseError
 pub fn laterite_ags4_parse::ParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_parse::ParseError
@@ -178,10 +178,10 @@ impl laterite_ags4_parse::DataRow
 pub fn laterite_ags4_parse::DataRow::n_values(&self) -> usize
 pub fn laterite_ags4_parse::DataRow::span_range(&self) -> core::ops::range::Range<usize>
 impl core::clone::Clone for laterite_ags4_parse::DataRow
-pub fn laterite_ags4_parse::DataRow::clone(&self) -> laterite_ags4_parse::DataRow
+pub fn laterite_ags4_parse::DataRow::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::DataRow
 impl core::cmp::PartialEq for laterite_ags4_parse::DataRow
-pub fn laterite_ags4_parse::DataRow::eq(&self, &laterite_ags4_parse::DataRow) -> bool
+pub fn laterite_ags4_parse::DataRow::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::DataRow
 pub fn laterite_ags4_parse::DataRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::DataRow
@@ -198,10 +198,10 @@ pub laterite_ags4_parse::FieldSpan::end: usize
 pub laterite_ags4_parse::FieldSpan::has_escape: bool
 pub laterite_ags4_parse::FieldSpan::start: usize
 impl core::clone::Clone for laterite_ags4_parse::FieldSpan
-pub fn laterite_ags4_parse::FieldSpan::clone(&self) -> laterite_ags4_parse::FieldSpan
+pub fn laterite_ags4_parse::FieldSpan::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::FieldSpan
 impl core::cmp::PartialEq for laterite_ags4_parse::FieldSpan
-pub fn laterite_ags4_parse::FieldSpan::eq(&self, &laterite_ags4_parse::FieldSpan) -> bool
+pub fn laterite_ags4_parse::FieldSpan::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::FieldSpan
 pub fn laterite_ags4_parse::FieldSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::FieldSpan
@@ -218,10 +218,10 @@ pub laterite_ags4_parse::GroupRecord::byte_offset: u64
 pub laterite_ags4_parse::GroupRecord::code: alloc::string::String
 pub laterite_ags4_parse::GroupRecord::line: u32
 impl core::clone::Clone for laterite_ags4_parse::GroupRecord
-pub fn laterite_ags4_parse::GroupRecord::clone(&self) -> laterite_ags4_parse::GroupRecord
+pub fn laterite_ags4_parse::GroupRecord::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::GroupRecord
 impl core::cmp::PartialEq for laterite_ags4_parse::GroupRecord
-pub fn laterite_ags4_parse::GroupRecord::eq(&self, &laterite_ags4_parse::GroupRecord) -> bool
+pub fn laterite_ags4_parse::GroupRecord::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::GroupRecord
 pub fn laterite_ags4_parse::GroupRecord::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_parse::GroupRecord
@@ -238,10 +238,10 @@ pub laterite_ags4_parse::LineSpan::next: usize
 pub laterite_ags4_parse::LineSpan::start: usize
 pub laterite_ags4_parse::LineSpan::term: laterite_ags4_parse::LineTerminator
 impl core::clone::Clone for laterite_ags4_parse::LineSpan
-pub fn laterite_ags4_parse::LineSpan::clone(&self) -> laterite_ags4_parse::LineSpan
+pub fn laterite_ags4_parse::LineSpan::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::LineSpan
 impl core::cmp::PartialEq for laterite_ags4_parse::LineSpan
-pub fn laterite_ags4_parse::LineSpan::eq(&self, &laterite_ags4_parse::LineSpan) -> bool
+pub fn laterite_ags4_parse::LineSpan::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::LineSpan
 pub fn laterite_ags4_parse::LineSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::LineSpan
@@ -274,7 +274,7 @@ impl laterite_ags4_parse::ParseOptions
 pub fn laterite_ags4_parse::ParseOptions::lean() -> Self
 pub fn laterite_ags4_parse::ParseOptions::validating() -> Self
 impl core::clone::Clone for laterite_ags4_parse::ParseOptions
-pub fn laterite_ags4_parse::ParseOptions::clone(&self) -> laterite_ags4_parse::ParseOptions
+pub fn laterite_ags4_parse::ParseOptions::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_parse::ParseOptions
 pub fn laterite_ags4_parse::ParseOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::ParseOptions
@@ -300,7 +300,7 @@ impl laterite_ags4_parse::ParsedFile
 pub fn laterite_ags4_parse::ParsedFile::line_byte_offset(&self, usize) -> core::option::Option<u64>
 pub fn laterite_ags4_parse::ParsedFile::line_text<'a>(&'a self, &laterite_ags4_parse::RawLine) -> &'a str
 impl core::clone::Clone for laterite_ags4_parse::ParsedFile
-pub fn laterite_ags4_parse::ParsedFile::clone(&self) -> laterite_ags4_parse::ParsedFile
+pub fn laterite_ags4_parse::ParsedFile::clone(&self) -> Self
 impl core::fmt::Debug for laterite_ags4_parse::ParsedFile
 pub fn laterite_ags4_parse::ParsedFile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_parse::ParsedFile
@@ -332,7 +332,7 @@ pub fn laterite_ags4_parse::ParsedGroup::shared_text(&self) -> &alloc::sync::Arc
 pub fn laterite_ags4_parse::ParsedGroup::text(&self) -> &str
 pub fn laterite_ags4_parse::ParsedGroup::value_at(&self, &laterite_ags4_parse::DataRow, usize) -> core::option::Option<&str>
 impl core::clone::Clone for laterite_ags4_parse::ParsedGroup
-pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> laterite_ags4_parse::ParsedGroup
+pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::ParsedGroup
 impl core::cmp::PartialEq for laterite_ags4_parse::ParsedGroup
 pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &Self) -> bool
@@ -350,10 +350,10 @@ pub laterite_ags4_parse::RawLine::had_crlf: bool
 pub laterite_ags4_parse::RawLine::number: u32
 pub laterite_ags4_parse::RawLine::text: laterite_ags4_parse::Span
 impl core::clone::Clone for laterite_ags4_parse::RawLine
-pub fn laterite_ags4_parse::RawLine::clone(&self) -> laterite_ags4_parse::RawLine
+pub fn laterite_ags4_parse::RawLine::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::RawLine
 impl core::cmp::PartialEq for laterite_ags4_parse::RawLine
-pub fn laterite_ags4_parse::RawLine::eq(&self, &laterite_ags4_parse::RawLine) -> bool
+pub fn laterite_ags4_parse::RawLine::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::RawLine
 pub fn laterite_ags4_parse::RawLine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_parse::RawLine
@@ -372,10 +372,10 @@ pub fn laterite_ags4_parse::Span::is_empty(&self) -> bool
 pub fn laterite_ags4_parse::Span::len(&self) -> usize
 pub fn laterite_ags4_parse::Span::slice<'a>(&self, &'a str) -> &'a str
 impl core::clone::Clone for laterite_ags4_parse::Span
-pub fn laterite_ags4_parse::Span::clone(&self) -> laterite_ags4_parse::Span
+pub fn laterite_ags4_parse::Span::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_parse::Span
 impl core::cmp::PartialEq for laterite_ags4_parse::Span
-pub fn laterite_ags4_parse::Span::eq(&self, &laterite_ags4_parse::Span) -> bool
+pub fn laterite_ags4_parse::Span::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_parse::Span
 pub fn laterite_ags4_parse::Span::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_parse::Span

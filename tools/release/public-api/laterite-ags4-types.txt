@@ -4,7 +4,7 @@ pub struct laterite_ags4_types::arrow_cols::SynthColumns<'a>
 pub laterite_ags4_types::arrow_cols::SynthColumns::hashes: core::option::Option<&'a [alloc::string::String]>
 pub laterite_ags4_types::arrow_cols::SynthColumns::ids: core::option::Option<&'a [(alloc::string::String, core::option::Option<alloc::string::String>)]>
 impl<'a> core::default::Default for laterite_ags4_types::arrow_cols::SynthColumns<'a>
-pub fn laterite_ags4_types::arrow_cols::SynthColumns<'a>::default() -> laterite_ags4_types::arrow_cols::SynthColumns<'a>
+pub fn laterite_ags4_types::arrow_cols::SynthColumns<'a>::default() -> Self
 impl<'a> core::marker::Freeze for laterite_ags4_types::arrow_cols::SynthColumns<'a>
 impl<'a> core::marker::Send for laterite_ags4_types::arrow_cols::SynthColumns<'a>
 impl<'a> core::marker::Sync for laterite_ags4_types::arrow_cols::SynthColumns<'a>
@@ -35,10 +35,10 @@ impl laterite_ags4_types::CanonicalType
 pub fn laterite_ags4_types::CanonicalType::as_str(self) -> &'static str
 pub fn laterite_ags4_types::CanonicalType::sql_type(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_types::CanonicalType
-pub fn laterite_ags4_types::CanonicalType::clone(&self) -> laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::CanonicalType::clone(&self) -> Self
 impl core::cmp::Eq for laterite_ags4_types::CanonicalType
 impl core::cmp::PartialEq for laterite_ags4_types::CanonicalType
-pub fn laterite_ags4_types::CanonicalType::eq(&self, &laterite_ags4_types::CanonicalType) -> bool
+pub fn laterite_ags4_types::CanonicalType::eq(&self, &Self) -> bool
 impl core::fmt::Debug for laterite_ags4_types::CanonicalType
 pub fn laterite_ags4_types::CanonicalType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for laterite_ags4_types::CanonicalType
@@ -61,9 +61,9 @@ pub fn laterite_ags4_types::Cell::as_f64(&self) -> core::option::Option<f64>
 pub fn laterite_ags4_types::Cell::as_i64(&self) -> core::option::Option<i64>
 pub fn laterite_ags4_types::Cell::is_null(&self) -> bool
 impl core::clone::Clone for laterite_ags4_types::Cell
-pub fn laterite_ags4_types::Cell::clone(&self) -> laterite_ags4_types::Cell
+pub fn laterite_ags4_types::Cell::clone(&self) -> Self
 impl core::cmp::PartialEq for laterite_ags4_types::Cell
-pub fn laterite_ags4_types::Cell::eq(&self, &laterite_ags4_types::Cell) -> bool
+pub fn laterite_ags4_types::Cell::eq(&self, &Self) -> bool
 impl core::convert::From<&serde_json::value::Value> for laterite_ags4_types::Cell
 pub fn laterite_ags4_types::Cell::from(&serde_json::value::Value) -> laterite_ags4_types::Cell
 impl core::convert::From<&str> for laterite_ags4_types::Cell
