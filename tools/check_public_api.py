@@ -54,17 +54,23 @@ compile time. The snapshot finds them; the test asserts them.
 
 This also requires a NIGHTLY toolchain: rustdoc's JSON output is unstable, and
 `cargo public-api` reads it. That is a real cost — it is the reason this is a
-separate CI job rather than a step in the main `rust` one.
+separate CI job rather than a step in the main `rust` one. The nightly is
+PINNED ([`NIGHTLY`]) because rustdoc's rendering moves between nightlies with
+no change to our code, and the nightly cut reads a snapshot's textual diff as
+API delta — so an unpinned nightly both reddens this gate on a quiet `main` and
+mints spurious major versions.
 
 Usage:
-    python tools/check_public_api.py           # compare against the snapshots
-    python tools/check_public_api.py --write   # regenerate after an intended change
+    python tools/check_public_api.py                    # compare against the snapshots
+    python tools/check_public_api.py --write            # regenerate after an intended change
+    python tools/check_public_api.py --print-toolchain  # the pinned nightly (CI installs it)
 """
 
 from __future__ import annotations
 
 import argparse
 import difflib
+import os
 import re
 import subprocess
 import sys
@@ -79,6 +85,15 @@ SNAPSHOTS = REPO / "tools" / "release" / "public-api"
 # that silently stopped covering a crate is the one nobody would notice.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_package_contents import PUBLISH_SET  # noqa: E402
+
+#: The one place the rendering toolchain is named; ci.yml installs whatever
+#: `--print-toolchain` says. A floating `nightly` re-rendered the snapshots twice
+#: with no code change (#988's `Self` derives, then `alloc::sync::Arc` becoming
+#: `alloc::rcs::arc::Arc`), and each rewrite reads to the nightly cut as `-pub`
+#: lines — a major bump for a crate that did not change. Moving this pin is
+#: therefore a release event: regenerate with `--write` in the same PR, and
+#: expect the next cut to count the rewritten lines.
+NIGHTLY = "nightly-2026-09-29"
 
 
 def die(msg: str) -> None:
@@ -111,8 +126,9 @@ def render(crate: str, *, all_features: bool) -> list[str]:
     root: the root is a virtual manifest and `cargo public-api` refuses to
     render one.
 
-    No toolchain argument: it selects a nightly itself and offers no flag to
-    point it elsewhere. The only requirement is that one is installed.
+    No toolchain argument: it offers no flag for one. It does honour
+    `RUSTUP_TOOLCHAIN` when that names a nightly, which is how [`NIGHTLY`]
+    reaches it; without it, it falls back to whatever `nightly` is today.
     """
     proc = subprocess.run(
         [
@@ -126,9 +142,14 @@ def render(crate: str, *, all_features: bool) -> list[str]:
         ],
         capture_output=True,
         text=True,
+        env={**os.environ, "RUSTUP_TOOLCHAIN": NIGHTLY},
     )
     if proc.returncode != 0:
-        die(f"`cargo public-api` failed for {crate}:\n{proc.stderr.strip()}")
+        die(
+            f"`cargo public-api` failed for {crate} on {NIGHTLY} "
+            f"(install it: rustup toolchain install {NIGHTLY} --profile minimal):\n"
+            f"{proc.stderr.strip()}"
+        )
     lines = [ln.rstrip() for ln in proc.stdout.splitlines() if ln.strip()]
     # Zero is a bad witness: an empty rendering would make every comparison
     # below pass vacuously, and a crate whose surface really did vanish is a
@@ -274,7 +295,15 @@ def check_impl_trait_is_asserted(crate: str, lines: list[str]) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--write", action="store_true", help="regenerate the snapshots")
+    ap.add_argument(
+        "--print-toolchain",
+        action="store_true",
+        help="print the pinned nightly and exit (what CI installs)",
+    )
     args = ap.parse_args()
+    if args.print_toolchain:
+        print(NIGHTLY)
+        return 0
 
     SNAPSHOTS.mkdir(parents=True, exist_ok=True)
     problems: list[str] = []
@@ -319,7 +348,8 @@ def main() -> int:
 
     if args.write and not problems:
         print(
-            f"wrote {written} snapshots to {SNAPSHOTS.relative_to(REPO)} — {total} lines"
+            f"wrote {written} snapshots to {SNAPSHOTS.relative_to(REPO)} — "
+            f"{total} lines, rendered on {NIGHTLY}"
         )
         return 0
 
@@ -338,7 +368,10 @@ def main() -> int:
             )
         return 1
 
-    print(f"check_public_api: OK — {len(PUBLISH_SET)} crates, {total} lines, no drift")
+    print(
+        f"check_public_api: OK — {len(PUBLISH_SET)} crates, {total} lines, "
+        f"no drift (rendered on {NIGHTLY})"
+    )
     return 0
 
 
