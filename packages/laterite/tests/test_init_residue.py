@@ -157,6 +157,62 @@ def test_units_heading_validation_skips_unreadable_columns() -> None:
         L.build_ags4({"PROJ": frame}, units={"ZZZZ": {"ZZZZ_ID": ""}})
 
 
+# --- a `.columns` that is not the names (#1000) -------------------------------
+#
+# On a pyarrow.Table `.columns` is the column ARRAYS; the names are
+# `.column_names`. The heading probe used to `set()` the arrays and crash every
+# build handed a pyarrow table, whether or not units=/types= were passed.
+
+
+class _ArrayColumns(_CapsuleOnly):
+    """A capsule-bearing frame whose `.columns` answers with non-name objects."""
+
+    @property
+    def columns(self) -> Any:
+        return [object(), object()]
+
+
+def test_build_from_pyarrow_table() -> None:
+    pa = pytest.importorskip("pyarrow")
+    inner = pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    table = pa.table({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    want = L.build_ags4({"PROJ": inner}, synthesise_metadata=True).bytes
+    assert L.build_ags4({"PROJ": table}, synthesise_metadata=True).bytes == want
+    assert L.build_ags4_unchecked({"PROJ": table}) == L.build_ags4_unchecked(
+        {"PROJ": inner}
+    )
+
+
+def test_units_heading_validation_reads_pyarrow_column_names() -> None:
+    # Reading the names, not just not crashing: the typo check now vouches for
+    # a pyarrow table exactly as it does for polars.
+    pa = pytest.importorskip("pyarrow")
+    table = pa.table({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    with pytest.raises(ValueError, match="has no heading 'PROJ_NOPE'"):
+        L.build_ags4({"PROJ": table}, units={"PROJ": {"PROJ_NOPE": ""}})
+
+
+def test_pyarrow_table_synth_keys_are_dropped() -> None:
+    # Readable names now send a pyarrow table through the `_id`/`_parent_id`
+    # strip, a path it never reached before; pin that it still drops them.
+    pa = pytest.importorskip("pyarrow")
+    keyed = pa.table({"_id": [1], "PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    plain = pa.table({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    assert L.build_ags4_unchecked({"PROJ": keyed}) == L.build_ags4_unchecked(
+        {"PROJ": plain}
+    )
+
+
+def test_non_name_columns_read_as_unknown() -> None:
+    inner = pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["X"]})
+    br = L.build_ags4(
+        {"PROJ": _ArrayColumns(inner)},
+        units={"PROJ": {"PROJ_ID": ""}},
+        synthesise_metadata=True,
+    )
+    assert br.bytes == L.build_ags4({"PROJ": inner}, synthesise_metadata=True).bytes
+
+
 # --- certify from a data= handle --------------------------------------------
 
 
