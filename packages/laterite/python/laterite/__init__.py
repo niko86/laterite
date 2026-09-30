@@ -2581,6 +2581,13 @@ def _frames_to_tables(
             frame, "__arrow_c_stream__"
         ):
             frame = pl.from_pandas(frame)
+        # polars infers dtype `Null` for a column that is all `None` — an optional
+        # heading nobody filled — and exports it with a buffer the Rust Arrow FFI
+        # import rejects, so the build died in the C Data layer naming neither the
+        # group nor the heading (#996). An all-null column means empty cells, which
+        # is exactly what an all-null String column already emits; cast to that.
+        if isinstance(frame, pl.DataFrame) and pl.Null in frame.dtypes:
+            frame = frame.with_columns(pl.col(pl.Null).cast(pl.String))
         if hasattr(frame, "__arrow_c_stream__"):
             tables.append((code, frame))
             continue

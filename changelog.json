@@ -178,6 +178,9 @@
       },
       {
         "text": "**The README no longer denies the Rust crate its parity.** It still said the facade was “not yet at parity with these five” — false since it reached parity and joined the product line at 0.12.0. The paragraph now says so, the badge row gains crates.io, the engine-comparison table's “Runs on” row gains Rust, and the quickstart gains a Rust tab noting the `excel` feature flag."
+      },
+      {
+        "text": "**`build_ags4` accepts an all-null polars column.** polars infers dtype `Null` for a column whose values are all `None` (an optional heading nobody filled), and the build died with an Arrow C Data interface error that named neither the group nor the heading. Such a column now emits empty cells, the same as an all-null String column, on both `build_ags4` and `build_ags4_unchecked`. (#996)"
       }
     ],
     "security": []

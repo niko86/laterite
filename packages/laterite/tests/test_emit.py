@@ -534,6 +534,35 @@ def test_read_build_round_trip_of_a_date_only_dt_needs_no_fix(tmp_path):
         assert _data_rows(out.text, "LOCA")[0][1] == "2021-08-09"
 
 
+# --- an all-null (`Null`-dtype) column (#996) --------------------------------
+
+
+def test_null_dtype_column_emits_empty_cells():
+    # polars infers dtype `Null` for an all-None column; that used to die in the
+    # Arrow C Data import. Both doors share the normaliser, so pin both.
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_REM": [None]})
+    assert loca.schema["LOCA_REM"] == pl.Null
+    frames = {"PROJ": _proj(), "LOCA": loca}
+    out = laterite.build_ags4(frames, dict_version="4.2")
+    assert _group_rows(out.text, "LOCA")["headings"] == ["LOCA_ID", "LOCA_REM"]
+    assert _data_rows(out.text, "LOCA") == [["BH1", ""]]
+    raw = laterite.build_ags4_unchecked(frames, dict_version="4.2")
+    assert _data_rows(raw.decode("utf-8"), "LOCA") == [["BH1", ""]]
+
+
+def test_null_dtype_key_column_is_judged_like_an_empty_string_column():
+    # An all-None KEY is a finding, not a crash — and the SAME findings an
+    # all-null String column draws, since that is what the cast makes it.
+    def build(dtype: pl.DataType | None) -> laterite.BuildResult:
+        loca = pl.DataFrame({"LOCA_ID": pl.Series([None], dtype=dtype)})
+        return laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, mode="report")
+
+    as_null, as_string = build(None), build(pl.String)
+    assert as_null.findings, "an empty KEY must still be reported"
+    assert as_null.findings == as_string.findings
+    assert as_null.bytes == as_string.bytes
+
+
 # --- build_ags4_unchecked (#858): the no-verdict door -----------------------
 
 
