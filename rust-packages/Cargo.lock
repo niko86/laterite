@@ -2179,7 +2179,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.12.2"
+version = "0.13.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2319,7 +2319,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.16.1"
+version = "0.17.0"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
