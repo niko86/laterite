@@ -728,10 +728,16 @@ pub fn pad_decimals(raw: &str, n: usize) -> Option<String> {
     Some(format!("{sign}{int_part}.{frac}{zeros}"))
 }
 
+// `%.f` also accepts no fraction at all, so each seconds entry covers the
+// millisecond precision (`yyyy-mm-ddThh:mm:ss.sss`) too. Both the `T` and the
+// space join exist at every precision: the `T`-minute form is the dictionary
+// UNIT of many 4.1+ DT headings (SAMP_DTIM, ERES_DTIM, …), and missing it
+// nulled every such cell on the typed read without a word (#992).
 const DATETIME_FORMATS: &[&str] = &[
-    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S%.f",
     "%Y-%m-%d %H:%M",
-    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S%.f",
+    "%Y-%m-%dT%H:%M",
     "%Y-%m-%d",
     "%Y/%m/%d",
     "%d/%m/%Y",
@@ -772,8 +778,10 @@ pub fn parse_value(raw: Option<&str>, ags_type: &str) -> Value {
         // `parse_datetime` owns the date-only-promoted-to-midnight rule (a
         // `DT` cell legally carries just `2020-08-18` under a `yyyy-mm-dd`
         // UNIT); on export the midnight value renders back to date-only form.
+        // `%.f` writes nothing for a whole second, so only a value that HAS a
+        // fraction gains one — which it used to lose here.
         CanonicalType::Datetime => parse_datetime(s).map_or(Value::Null, |dt| {
-            Value::String(dt.format("%Y-%m-%d %H:%M:%S").to_string())
+            Value::String(dt.format("%Y-%m-%d %H:%M:%S%.f").to_string())
         }),
         CanonicalType::Date => parse_date(s).map_or(Value::Null, |d| {
             Value::String(d.format("%Y-%m-%d").to_string())
@@ -1650,6 +1658,42 @@ mod tests {
         assert_eq!(midnight.format("%H:%M:%S").to_string(), "00:00:00");
         // Alternate date format.
         assert!(parse_datetime("18/08/2020").is_some());
+    }
+
+    #[test]
+    fn parse_datetime_reads_every_canonical_precision_and_join() {
+        // #992: `T`-minute and fractional seconds used to fall through every
+        // format and null the cell.
+        let at = |s: &str| {
+            parse_datetime(s)
+                .unwrap_or_else(|| panic!("{s:?} should parse"))
+                .format("%Y-%m-%d %H:%M:%S%.f")
+                .to_string()
+        };
+        assert_eq!(at("2026-03-02T09:15"), "2026-03-02 09:15:00");
+        assert_eq!(at("2026-03-02 09:15"), "2026-03-02 09:15:00");
+        assert_eq!(at("2026-03-02T09:15:00.500"), "2026-03-02 09:15:00.500");
+        assert_eq!(at("2026-03-02 09:15:00.500"), "2026-03-02 09:15:00.500");
+        assert_eq!(at("2026-03-02T09:15:00"), "2026-03-02 09:15:00");
+    }
+
+    #[test]
+    fn parse_value_keeps_a_fraction_and_adds_none_to_a_whole_second() {
+        assert_eq!(
+            parse_value(Some("2026-03-02T09:15"), "DT"),
+            Value::String("2026-03-02 09:15:00".into()),
+        );
+        assert_eq!(
+            parse_value(Some("2026-03-02T09:15:00.500"), "DT"),
+            Value::String("2026-03-02 09:15:00.500".into()),
+        );
+        // Unchanged for every value without a fraction.
+        assert_eq!(
+            parse_value(Some("2026-03-02T09:15:00"), "DT"),
+            Value::String("2026-03-02 09:15:00".into()),
+        );
+        // Malformed still nulls: a stray trailing dot is not a fraction.
+        assert_eq!(parse_value(Some("2026-03-02T09:15:00."), "DT"), Value::Null);
     }
 
     #[test]
