@@ -294,3 +294,63 @@ fn merge_tran_stamp_lands_even_when_no_input_has_tran() {
         Some("Merger")
     );
 }
+
+// --- #993/#994: the merged file is written in dictionary heading order ------
+//
+// The union keeps the first file's order and appends what later files add, so a
+// later input introducing LOCA_TYPE put it after LOCA_FDEP. Emit now writes
+// every registered group in dictionary order, so the union cannot fail Rule 7.
+
+fn loca_file(headings: &str, units: &str, types: &str, data: &str) -> String {
+    format!(
+        "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\
+         \"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"LOCA\"\r\n\"HEADING\",{headings}\r\n\
+         \"UNIT\",{units}\r\n\"TYPE\",{types}\r\n\"DATA\",{data}\r\n"
+    )
+}
+
+#[test]
+fn a_heading_a_later_input_adds_lands_in_dictionary_order() {
+    let a = loca_file(
+        r#""LOCA_ID","LOCA_FDEP""#,
+        r#""","m""#,
+        r#""ID","2DP""#,
+        r#""BH1","10.00""#,
+    );
+    let b = loca_file(
+        r#""LOCA_ID","LOCA_TYPE","LOCA_FDEP""#,
+        r#""","","m""#,
+        r#""ID","PA","2DP""#,
+        r#""BH2","CP","5.00""#,
+    );
+    let res = merge_parsed(&[p(&a), p(&b)], &lenient_no_tran()).unwrap();
+    let out = reparse(&res.bytes);
+    let loca = &out.groups["LOCA"];
+    assert_eq!(loca.headings, ["LOCA_ID", "LOCA_TYPE", "LOCA_FDEP"]);
+    let bh2 = rows_with(loca, "LOCA_ID", "BH2")[0];
+    assert_eq!(cell(loca, bh2, "LOCA_TYPE").as_deref(), Some("CP"));
+    assert_eq!(cell(loca, bh2, "LOCA_FDEP").as_deref(), Some("5.00"));
+    let bh1 = rows_with(loca, "LOCA_ID", "BH1")[0];
+    assert_eq!(cell(loca, bh1, "LOCA_FDEP").as_deref(), Some("10.00"));
+    assert_eq!(cell(loca, bh1, "LOCA_TYPE").as_deref(), Some(""));
+}
+
+#[test]
+fn a_stamped_merge_tran_with_a_description_is_in_dictionary_order() {
+    // merge's own TRAN synthesiser appended TRAN_DESC after TRAN_REM.
+    let a = loca_file(r#""LOCA_ID""#, r#""""#, r#""ID""#, r#""BH1""#);
+    let opts = MergeOpts {
+        tran: Some(TranStamp::new("2", "2026-01-02", "A", "B", "Draft").with_description("what")),
+        ..lenient_no_tran()
+    };
+    let out = reparse(&merge_parsed(&[p(&a)], &opts).unwrap().bytes);
+    let tran = &out.groups["TRAN"];
+    let desc = tran.headings.iter().position(|h| h == "TRAN_DESC").unwrap();
+    let stat = tran.headings.iter().position(|h| h == "TRAN_STAT").unwrap();
+    let ags = tran.headings.iter().position(|h| h == "TRAN_AGS").unwrap();
+    assert!(
+        stat < desc && desc < ags,
+        "TRAN_DESC out of place: {:?}",
+        tran.headings
+    );
+}

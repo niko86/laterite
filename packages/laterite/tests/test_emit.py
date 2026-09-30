@@ -563,6 +563,41 @@ def test_null_dtype_key_column_is_judged_like_an_empty_string_column():
     assert as_null.bytes == as_string.bytes
 
 
+# --- headings are written in dictionary order (#993, #994) ------------------
+
+
+def test_frame_columns_are_written_in_dictionary_order():
+    # LOCA_TYPE precedes LOCA_FDEP in the dictionary; each cell moves with its
+    # heading, so assert the DATA row, not only the HEADING row.
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_FDEP": [10.0], "LOCA_TYPE": ["CP"]})
+    out = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, dict_version="4.2")
+    rows = _group_rows(out.text, "LOCA")
+    assert rows["headings"] == ["LOCA_ID", "LOCA_TYPE", "LOCA_FDEP"]
+    assert rows["units"] == ["", "", "m"]
+    assert _data_rows(out.text, "LOCA") == [["BH1", "CP", "10.00"]]
+    assert not [f for f in out.findings if f["rule"] == "AGS Format Rule 7"]
+
+
+def test_a_tran_description_does_not_break_rule_7():
+    # The #993 reproduction: a stamped description used to land after TRAN_RCON.
+    frames = {"PROJ": _proj(), "LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})}
+    tran = laterite.TranStamp(
+        issue="1",
+        date="2026-01-01",
+        producer="A",
+        recipient="B",
+        status="Draft",
+        description="Example",
+    )
+    out = laterite.build_ags4(
+        frames, dict_version="4.2", synthesise_metadata=True, tran=tran
+    )
+    headings = _group_rows(out.text, "TRAN")["headings"]
+    assert headings.index("TRAN_STAT") < headings.index("TRAN_DESC")
+    assert headings.index("TRAN_DESC") < headings.index("TRAN_AGS")
+    assert out.findings == []
+
+
 # --- build_ags4_unchecked (#858): the no-verdict door -----------------------
 
 

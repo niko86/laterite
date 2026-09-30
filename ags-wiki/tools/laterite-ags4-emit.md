@@ -53,8 +53,11 @@ Two layers, both public:
   host-agnostic orchestrator every surface actually calls: resolve UNIT/TYPE per
   heading (**hybrid** — the caller's explicit value wins, else the per-edition
   standard dictionary fills, else `""` / `"X"`), format each cell
-  (`laterite_ags4_types::ags4_str` for typed values, verbatim for strings), write the
-  sections, then apply the chosen `EmitMode`.
+  (`laterite_ags4_types::ags4_str` for typed values, verbatim for strings), put
+  each dictionary group's headings (and their cells) in dictionary order, with
+  headings the dictionary does not know kept after them in arrival order, so no
+  producer can fail Rule 7 by column order (#993, #994), write the sections, then
+  apply the chosen `EmitMode`.
 
 The pipeline **streams and judges its own writing**
 ([[dec-emit-streamed-verdict]]): each group's section is formatted, written

@@ -481,3 +481,40 @@ def test_on_build_remarks_are_verbatim_because_there_is_no_provenance_note():
     assert "BUILD-DESC" in text
     assert "BUILD-REM" in text
     assert "Merged from" not in text, "a build has no inputs to have provenance about"
+
+
+def test_a_heading_a_later_input_adds_is_merged_in_dictionary_order():
+    """The #994 reproduction: two inputs that each validate clean, where the
+    later one populates an optional heading the first did not. The union used
+    to append it at the end, and the merged file failed Rule 7."""
+    import polars as pl
+
+    stamp = laterite.TranStamp(
+        issue="1", date="2026-01-01", producer="A", recipient="B", status="Draft"
+    )
+
+    def build(loca: str, extra: dict) -> bytes:
+        frames = [
+            ("PROJ", pl.DataFrame({"PROJ_ID": ["P1"]})),
+            ("LOCA", pl.DataFrame({"LOCA_ID": [loca], **extra})),
+        ]
+        out = laterite.build_ags4(
+            frames, dict_version="4.2", synthesise_metadata=True, tran=stamp
+        )
+        assert out.findings == [], out.findings
+        return out.bytes
+
+    a = build("BH1", {"LOCA_FDEP": [10.0]})
+    b = build("BH2", {"LOCA_TYPE": ["CP"], "LOCA_FDEP": [5.0]})
+    m = laterite.merge(
+        a,
+        b,
+        dict_version="4.2",
+        tran=laterite.TranStamp(
+            issue="2", date="2026-01-02", producer="A", recipient="B", status="Draft"
+        ),
+    )
+    heading = next(ln for ln in m.text.splitlines() if ln.startswith('"HEADING","LOCA'))
+    assert heading == '"HEADING","LOCA_ID","LOCA_TYPE","LOCA_FDEP"'
+    rules = laterite.validate(m.bytes).findings["rule"].to_list()
+    assert "AGS Format Rule 7" not in rules
