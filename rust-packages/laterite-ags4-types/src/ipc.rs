@@ -16,7 +16,8 @@ use arrow::ipc::writer::StreamWriter;
 use arrow::record_batch::RecordBatch;
 
 use crate::arrow_cols::{
-    SynthColumns, build_record_batch, build_record_batch_synth, build_record_batch_with_ids,
+    SynthColumns, build_record_batch, build_record_batch_synth,
+    build_record_batch_synth_with_units, build_record_batch_with_ids,
 };
 
 /// Build one group's typed [`RecordBatch`] (via [`build_record_batch`]) and
@@ -71,6 +72,26 @@ where
     F: Fn(usize, usize) -> Option<&'a str>,
 {
     let batch = build_record_batch_synth(synth, headings, ags_types, n_rows, cell)?;
+    record_batch_to_ipc(&batch)
+}
+
+/// [`build_group_ipc_synth`], typing each `DT` column against its heading's
+/// UNIT (see [`build_record_batch_synth_with_units`]) — the entry a host
+/// holding the file's UNIT row should frame with, so a `DT` column declared
+/// `hh:mm` or `yyyy-mm` is typed rather than read as nulls (#999).
+pub fn build_group_ipc_synth_with_units<'a, F>(
+    synth: &SynthColumns,
+    headings: &[String],
+    ags_types: &[String],
+    units: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Result<Vec<u8>, ArrowError>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    let batch =
+        build_record_batch_synth_with_units(synth, headings, ags_types, units, n_rows, cell)?;
     record_batch_to_ipc(&batch)
 }
 

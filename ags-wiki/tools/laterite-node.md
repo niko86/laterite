@@ -50,7 +50,8 @@ co-located TypeScript `laterite` package layers the high-level API on top
 The typing is **byte-identical across hosts by construction**: the addon,
 [[laterite-py]] and [[laterite-ags4-wasm]] all call the one shared
 `laterite_ags4_types::arrow_cols::build_record_batch` (a 2DP heading → Float64, YN →
-Bool, DT → Timestamp(µs), ID/X → Utf8). Engine crates reused unchanged:
+Bool, DT → Timestamp(µs) — or Time64(µs) under a time-of-day UNIT, #999 —
+ID/X → Utf8). Engine crates reused unchanged:
 [[laterite-ags4-validator]], [[laterite-ags4-types]] (`arrow`), `laterite-ags4-emit` (`arrow`).
 
 ## Two layers

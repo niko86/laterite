@@ -16,16 +16,17 @@ use std::sync::Arc;
 
 use arrow::array::{
     ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringArray, StringBuilder,
-    TimestampMicrosecondBuilder,
+    Time64MicrosecondBuilder, TimestampMicrosecondBuilder,
 };
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
+use chrono::Timelike;
 use serde_json::Value;
 
 use crate::{
-    CanonicalType, canonical_type, parse_ags_decimal, parse_ags_integer, parse_datetime,
-    parse_value,
+    CanonicalType, canonical_type, is_time_of_day_unit, parse_ags_decimal, parse_ags_integer,
+    parse_datetime, parse_datetime_for_unit, parse_time, parse_value,
 };
 
 /// Caller-computed synthetic columns folded into a batch in ONE place, rather
@@ -48,6 +49,25 @@ pub fn build_record_batch_synth<'a, F>(
     synth: &SynthColumns,
     headings: &[String],
     ags_types: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Result<RecordBatch, ArrowError>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    build_record_batch_synth_with_units(synth, headings, ags_types, &[], n_rows, cell)
+}
+
+/// [`build_record_batch_synth`], typing each `DT` column against its heading's
+/// declared UNIT (`units[col]`; a missing entry is no UNIT) — see
+/// [`build_column_for_unit`]. A reader holding the file's UNIT row should call
+/// this one: without the UNIT, a `DT` column declared `hh:mm` or `yyyy-mm`
+/// cannot be typed, and every cell in it reads as null (#999).
+pub fn build_record_batch_synth_with_units<'a, F>(
+    synth: &SynthColumns,
+    headings: &[String],
+    ags_types: &[String],
+    units: &[String],
     n_rows: usize,
     cell: F,
 ) -> Result<RecordBatch, ArrowError>
@@ -77,7 +97,15 @@ where
         columns.push(Arc::new(pid_b.finish()) as ArrayRef);
     }
 
-    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
+    append_heading_columns(
+        &mut fields,
+        &mut columns,
+        headings,
+        ags_types,
+        units,
+        n_rows,
+        cell,
+    );
 
     if let Some(hashes) = synth.hashes {
         let mut h_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
@@ -206,6 +234,7 @@ fn append_heading_columns<'a, F>(
     columns: &mut Vec<ArrayRef>,
     headings: &[String],
     ags_types: &[String],
+    units: &[String],
     n_rows: usize,
     cell: F,
 ) where
@@ -213,7 +242,8 @@ fn append_heading_columns<'a, F>(
 {
     for (col, heading) in headings.iter().enumerate() {
         let ags_type = ags_types.get(col).map_or("X", String::as_str);
-        let (array, dt) = build_column(n_rows, ags_type, |row| cell(col, row));
+        let unit = units.get(col).map_or("", String::as_str);
+        let (array, dt) = build_column_for_unit(n_rows, ags_type, unit, |row| cell(col, row));
         fields.push(Field::new(heading, dt, true));
         columns.push(array);
     }
@@ -324,6 +354,59 @@ where
     }
 }
 
+/// [`build_column`], but a `DT` column is typed by the precision its UNIT
+/// declares rather than always as a datetime:
+///
+/// * a time-of-day UNIT (`hh:mm`, `hh:mm:ss`) holds a time with no date, so
+///   the column is Arrow `Time64(Microsecond)` — a fixed "datum" date would
+///   put a day nobody recorded into the data (#999);
+/// * a year or month UNIT (`yyyy`, `yyyy-mm`) reads each value as the start
+///   of the period it names (`2026-03` → 2026-03-01 00:00), as a date-only
+///   value already reads as midnight;
+/// * anything else is exactly [`build_column`].
+///
+/// A value that does not fit its UNIT is null, as an unparseable value always
+/// has been; Rule 8 is what reports it.
+pub fn build_column_for_unit<'a, F>(
+    n_rows: usize,
+    ags_type: &str,
+    unit: &str,
+    cell: F,
+) -> (ArrayRef, DataType)
+where
+    F: Fn(usize) -> Option<&'a str>,
+{
+    if canonical_type(ags_type) != Some(CanonicalType::Datetime) {
+        return build_column(n_rows, ags_type, cell);
+    }
+    if is_time_of_day_unit(unit) {
+        let mut b = Time64MicrosecondBuilder::with_capacity(n_rows);
+        for row in 0..n_rows {
+            let micros = cell(row).and_then(parse_time).map(|t| {
+                i64::from(t.num_seconds_from_midnight()) * 1_000_000
+                    + i64::from(t.nanosecond() / 1_000)
+            });
+            b.append_option(micros);
+        }
+        return (
+            Arc::new(b.finish()) as ArrayRef,
+            DataType::Time64(TimeUnit::Microsecond),
+        );
+    }
+    let mut b = TimestampMicrosecondBuilder::with_capacity(n_rows);
+    for row in 0..n_rows {
+        let micros = cell(row)
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| parse_datetime_for_unit(s, unit))
+            .map(|dt| dt.and_utc().timestamp_micros());
+        b.append_option(micros);
+    }
+    (
+        Arc::new(b.finish()) as ArrayRef,
+        DataType::Timestamp(TimeUnit::Microsecond, None),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,6 +479,69 @@ mod tests {
     /// A `None` (missing/ragged) cell must decode to a typed NULL in every arm,
     /// not a default value — the branch a real sparse delivery takes constantly,
     /// and the one the `null-half` bench rung exercises for cost.
+    #[test]
+    fn a_dt_column_is_typed_by_the_precision_its_unit_declares() {
+        use arrow::array::{Array, Time64MicrosecondArray, TimestampMicrosecondArray};
+        // #999: a time-of-day UNIT → Time64 (no invented date); a mismatched
+        // value is null, as an unparseable value always was.
+        let cells = ["09:15", "09:15:30", "2026-03", ""];
+        let (arr, dt) = build_column_for_unit(cells.len(), "DT", "hh:mm", |r| Some(cells[r]));
+        assert_eq!(dt, DataType::Time64(TimeUnit::Microsecond));
+        let t = arr
+            .as_any()
+            .downcast_ref::<Time64MicrosecondArray>()
+            .unwrap();
+        assert_eq!(t.value(0), (9 * 3600 + 15 * 60) * 1_000_000);
+        assert_eq!(t.value(1), (9 * 3600 + 15 * 60 + 30) * 1_000_000);
+        assert!(t.is_null(2) && t.is_null(3));
+
+        // A period UNIT → the start of the period, still a timestamp.
+        let micros = |y, m| {
+            chrono::NaiveDate::from_ymd_opt(y, m, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()
+                .timestamp_micros()
+        };
+        for (unit, cell, want) in [
+            ("yyyy-mm", "2026-03", micros(2026, 3)),
+            ("yyyy", "2026", micros(2026, 1)),
+        ] {
+            let (arr, dt) = build_column_for_unit(1, "DT", unit, |_| Some(cell));
+            assert_eq!(dt, DataType::Timestamp(TimeUnit::Microsecond, None));
+            let ts = arr
+                .as_any()
+                .downcast_ref::<TimestampMicrosecondArray>()
+                .unwrap();
+            assert_eq!(ts.value(0), want, "{cell:?} under {unit:?}");
+        }
+
+        // Any other UNIT, and any non-DT type, is exactly build_column.
+        let (_, dt) = build_column_for_unit(1, "DT", "yyyy-mm-dd", |_| Some("2026-03-02"));
+        assert_eq!(dt, build_column(1, "DT", |_| Some("2026-03-02")).1);
+        let (_, dt) = build_column_for_unit(1, "X", "hh:mm", |_| Some("09:15"));
+        assert_eq!(dt, DataType::Utf8);
+    }
+
+    #[test]
+    fn the_unit_less_batch_builder_is_the_unit_aware_one_with_no_units() {
+        let headings = vec!["T".to_string()];
+        let types = vec!["DT".to_string()];
+        let cell = |_c: usize, _r: usize| Some("2026-03-02T09:15");
+        let plain = build_record_batch(&headings, &types, 1, cell).unwrap();
+        let with = build_record_batch_synth_with_units(
+            &SynthColumns::default(),
+            &headings,
+            &types,
+            &["yyyy-mm-ddThh:mm".to_string()],
+            1,
+            cell,
+        )
+        .unwrap();
+        assert_eq!(plain, with);
+    }
+
     #[test]
     fn build_column_maps_a_missing_cell_to_a_typed_null() {
         use arrow::array::{

@@ -127,7 +127,8 @@ per group** — no per-cell JS objects, no `TRY_CAST` in the browser.
   parse_datetime}` off the file's TYPE row, exactly as
   `laterite-ags5-db`'s converter does (dormant, not in this tree).
 - Arrow mapping: [[DT]] → `Timestamp(µs)` (tz-naive; full datetime,
-  date-only → midnight, blank → null), [[0DP]] → `Int64`,
+  date-only → midnight, `yyyy`/`yyyy-mm` → the period's start, blank →
+  null), or `Time64(µs)` under a time-of-day UNIT (#999), [[0DP]] → `Int64`,
   `2DP/RL/nSF/nSCI` → `Float64`, [[YN]] → `Boolean`, `ID/X/PA/…` →
   `Utf8`.
 

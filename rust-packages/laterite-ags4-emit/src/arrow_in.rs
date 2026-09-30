@@ -297,19 +297,17 @@ fn owned_group_from_arrow(g: ArrowGroup, dict: &Dictionary) -> OwnedGroup {
     );
 
     // Per column: the declared UNIT to render a temporal cell against, or
-    // None to leave Arrow's rendering. Resolved once, not per row.
+    // None to leave Arrow's rendering. Resolved once, not per row. The
+    // RESOLVED unit — the one this group's UNIT row will say — so a caller's
+    // `units=` override is honoured; reading the dictionary's here wrote a
+    // `yyyy-mm` UNIT row over a full-date value (#999).
     let dt_units: Vec<Option<String>> = g
         .schema
         .fields()
         .iter()
-        .map(|f| {
-            if !is_temporal(f.data_type()) {
-                return None;
-            }
-            let unit = dict
-                .heading(&g.code, f.name())
-                .map(|h| h.unit.to_string())?;
-            (!unit.trim().is_empty()).then_some(unit)
+        .zip(&units)
+        .map(|(f, unit)| {
+            (is_temporal(f.data_type()) && !unit.trim().is_empty()).then(|| unit.clone())
         })
         .collect();
 
@@ -387,6 +385,8 @@ mod tests {
     const MIDNIGHT_MS: i64 = 1_628_467_200_000;
     /// 2021-08-09T14:30:00 UTC — a genuine time of day.
     const AFTERNOON_MS: i64 = 1_628_519_400_000;
+    /// 2021-08-01T00:00:00 UTC — the first of a month.
+    const FIRST_OF_AUGUST_MS: i64 = 1_627_776_000_000;
 
     /// #695. A typed temporal column is rendered at the precision its heading's
     /// declared UNIT asks for — because Arrow's canonical form fails the very
@@ -430,6 +430,38 @@ mod tests {
             "2021-08-09T14:30:00",
             "a lossy render must be refused, not applied"
         );
+    }
+
+    /// #999: a caller's `units=` override is the UNIT the row will declare, so
+    /// it is the precision a temporal cell renders at — a read-back `yyyy-mm`
+    /// or `hh:mm` DT column round-trips to its own short form. Reading the
+    /// dictionary's UNIT here instead wrote a `yyyy-mm` UNIT row over a
+    /// full-date value.
+    #[test]
+    fn a_temporal_cell_renders_at_the_callers_unit_override() {
+        use arrow::array::Time64MicrosecondArray;
+        let rendered = |col: ArrayRef, unit: &str| {
+            let schema = Schema::new(vec![Field::new("SAMP_DTIM", col.data_type().clone(), true)]);
+            let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![col]).unwrap();
+            let mut g = arrow_group("SAMP", schema, vec![batch]);
+            g.units = Some(HashMap::from([("SAMP_DTIM".to_string(), unit.to_string())]));
+            let og = owned_group_from_arrow(g, &Dictionary::bundled(DictVersion::V4_2));
+            (og.units[0].clone(), og.rows[0][0].clone())
+        };
+        let month = Arc::new(TimestampMillisecondArray::from(vec![FIRST_OF_AUGUST_MS]));
+        assert_eq!(
+            rendered(month.clone(), "yyyy-mm"),
+            ("yyyy-mm".into(), "2021-08".into())
+        );
+        // A real day under a month UNIT is refused, left for Rule 8.
+        let (_, day) = rendered(
+            Arc::new(TimestampMillisecondArray::from(vec![MIDNIGHT_MS])),
+            "yyyy-mm",
+        );
+        assert_eq!(day, "2021-08-09T00:00:00");
+        let quarter_past_nine = (9 * 3600 + 15 * 60) * 1_000_000;
+        let time = Arc::new(Time64MicrosecondArray::from(vec![quarter_past_nine]));
+        assert_eq!(rendered(time, "hh:mm"), ("hh:mm".into(), "09:15".into()));
     }
 
     /// A heading the standard dictionary does not carry — a DICT-defined one —

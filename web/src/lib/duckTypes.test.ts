@@ -65,6 +65,20 @@ describe("scalarText", () => {
   });
 });
 
+describe("formatCell with a TIME column (#999)", () => {
+  // 09:15:30 as micros since midnight — what DuckDB hands back for TIME.
+  const MICROS = (9 * 3600 + 15 * 60 + 30) * 1_000_000;
+
+  it("renders a time of day from a bigint or a number", () => {
+    expect(formatCell(BigInt(MICROS), "TIME")).toBe("09:15:30");
+    expect(formatCell(MICROS, "TIME")).toBe("09:15:30");
+  });
+
+  it("never shows a time of day as a 1970 instant", () => {
+    expect(formatCell(MICROS, "TIME")).not.toContain("1970");
+  });
+});
+
 describe("formatCell with a temporal column", () => {
   // 2020-08-18T09:30:15Z. Derived rather than hand-typed: a transposed digit in a
   // literal like this is invisible, and it would have to be wrong in the SAME way

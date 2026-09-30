@@ -127,6 +127,19 @@ pub fn sql_type(ags_type: &str) -> &'static str {
     canonical_type(ags_type).map_or("VARCHAR", CanonicalType::sql_type)
 }
 
+/// [`sql_type`] for a column whose UNIT is known: a `DT` column declaring a
+/// time-of-day UNIT is `TIME`, matching the `Time64` the typed read builds for
+/// it (`arrow_cols::build_column_for_unit`, #999). A host describing columns
+/// to a query engine should call this one, or it will label a `TIME` column
+/// `TIMESTAMP` and render times of day as instants on 1970-01-01.
+#[must_use]
+pub fn sql_type_for_unit(ags_type: &str, unit: &str) -> &'static str {
+    if canonical_type(ags_type) == Some(CanonicalType::Datetime) && is_time_of_day_unit(unit) {
+        return CanonicalType::Time.sql_type();
+    }
+    sql_type(ags_type)
+}
+
 /// One emit-side cell value, before AGS4 formatting.
 ///
 /// Deliberately NOT `serde_json::Value`, which this replaced (#790). A cell is
@@ -437,12 +450,24 @@ pub fn ags4_str(value: &Cell, ags_type: &str) -> String {
 /// these prefixes; so is a well-formed value.
 const DT_LAYOUT: &str = "yyyy-mm-ddThh:mm:ss.sss";
 
-/// The zero tail a shorter value is padded with to reach a longer precision.
-/// Positionally aligned to `DT_LAYOUT`, so `ZERO_TAIL[10..16]` is `T00:00`.
-const DT_ZERO_TAIL: &str = "0000-00-00T00:00:00.000";
+/// The tail a shorter value is padded with to reach a longer precision: the
+/// START of the period the shorter value names, so `2026-03` pads to
+/// `2026-03-01T00:00…`. Positionally aligned to `DT_LAYOUT`, so
+/// `DT_PERIOD_START[10..16]` is `T00:00`. From the time on it is all zeros,
+/// which is all this tail was before year and month precision existed (#999).
+const DT_PERIOD_START: &str = "0000-01-01T00:00:00.000";
 
-/// The precisions the layout admits: date, minute, second, millisecond.
-const DT_PRECISIONS: [usize; 4] = [10, 16, 19, 23];
+/// The precisions the layout admits: year, month, date, minute, second,
+/// millisecond.
+const DT_PRECISIONS: [usize; 6] = [4, 7, 10, 16, 19, 23];
+
+/// The time-of-day layout a `DT` heading declares with a time-only UNIT
+/// (`hh:mm`, `hh:mm:ss`), longest first — the same shape `DT_LAYOUT` has from
+/// its `T` on.
+const TIME_LAYOUT: &str = "hh:mm:ss.sss";
+
+/// The precisions `TIME_LAYOUT` admits: minute, second, millisecond.
+const TIME_PRECISIONS: [usize; 3] = [5, 8, 12];
 
 /// The character `n` of a canonical DT string: a separator, or a digit.
 /// `None` for a position the layout does not define.
@@ -496,6 +521,45 @@ fn dt_unit_precision(unit: &str) -> Option<usize> {
         .find(|&n| u.len() == n && u == &DT_LAYOUT[..n])
 }
 
+/// The precision a time-of-day UNIT asks for (`hh:mm` → 5, `hh:mm:ss` → 8),
+/// else `None`.
+fn time_unit_precision(unit: &str) -> Option<usize> {
+    let u = unit.trim();
+    TIME_PRECISIONS
+        .into_iter()
+        .find(|&n| u.len() == n && u == &TIME_LAYOUT[..n])
+}
+
+/// Is `unit` a time-of-day UNIT (`hh:mm`, `hh:mm:ss`, `hh:mm:ss.sss`)? A `DT`
+/// heading declaring one holds a time with no date, which is why the typed
+/// read gives such a column a time type rather than a datetime (#999).
+#[must_use]
+pub fn is_time_of_day_unit(unit: &str) -> bool {
+    time_unit_precision(unit).is_some()
+}
+
+/// The precision of `value` if it is a well-formed time of day in
+/// `TIME_LAYOUT`'s shape, else `None`. Same ASCII-first guard as
+/// [`dt_value_precision`], for the same reason: every later slice is then on
+/// a char boundary.
+fn time_value_precision(value: &str) -> Option<usize> {
+    let n = value.len();
+    if !TIME_PRECISIONS.contains(&n) {
+        return None;
+    }
+    for (i, b) in value.bytes().enumerate() {
+        let ok = match i {
+            2 | 5 => b == b':',
+            8 => b == b'.',
+            _ => b.is_ascii_digit(),
+        };
+        if !ok {
+            return None;
+        }
+    }
+    Some(n)
+}
+
 /// Render a canonical DT `value` at the precision `unit` declares, but **only
 /// when doing so loses no information**.
 ///
@@ -506,6 +570,11 @@ fn dt_unit_precision(unit: &str) -> Option<usize> {
 /// * `("2021-08-09T14:30:00", "yyyy-mm-dd")` → `None` — truncating would
 ///   discard a real time. The caller leaves the value alone so the validity
 ///   mode reports the mismatch rather than silently dropping caller data.
+/// * `("2026-03-01T00:00:00", "yyyy-mm")` → `Some("2026-03")` — a year or
+///   month UNIT names a period, and the dropped day and time are exactly the
+///   period's start; `("2026-03-02", "yyyy-mm")` → `None`, a real day (#999).
+/// * `("09:15:00", "hh:mm")` → `Some("09:15")` — a time-of-day UNIT, against
+///   a time value.
 /// * anything malformed, non-ASCII, or a non-DT unit → `None`.
 ///
 /// Returning `None` for both "cannot" and "must not" is deliberate: every
@@ -513,26 +582,36 @@ fn dt_unit_precision(unit: &str) -> Option<usize> {
 /// validity mode judge it.
 #[must_use]
 pub fn dt_to_unit_precision(value: &str, unit: &str) -> Option<String> {
+    if let Some(want) = time_unit_precision(unit) {
+        // A time-of-day UNIT. A time value renders like the tail of a
+        // datetime; its implicit start is midnight, all zeros.
+        return rescale(value, time_value_precision(value)?, want, "00:00:00.000");
+    }
     let want = dt_unit_precision(unit)?;
-    let have = dt_value_precision(value)?;
+    rescale(value, dt_value_precision(value)?, want, DT_PERIOD_START)
+}
+
+/// Move a validated `value` of precision `have` to precision `want`, padding
+/// from or comparing against `start` (the layout-aligned start of a period).
+///
+/// Truncating is lossless only if every DIGIT being dropped equals the
+/// period start's — `2026-03-01T00:00` → `2026-03` drops a day that IS the
+/// first; `2026-03-02` → `2026-03` would drop a real day, so it is refused.
+/// Separators in the dropped tail (`T` or space, `:`, `.`) carry no
+/// information. Padding up only ever adds the period start, so it is always
+/// lossless.
+fn rescale(value: &str, have: usize, want: usize, start: &str) -> Option<String> {
     if have == want {
         return Some(value.to_string());
     }
     if have > want {
-        // Lossless only if every DIGIT being dropped is a zero; the separators
-        // in the dropped tail (`T`, `:`, `.`) carry no information.
-        if value[want..]
-            .bytes()
-            .any(|b| b.is_ascii_digit() && b != b'0')
-        {
+        let mut dropped = value[want..].bytes().zip(start[want..have].bytes());
+        if dropped.any(|(v, s)| v.is_ascii_digit() && v != s) {
             return None;
         }
         return Some(value[..want].to_string());
     }
-    // Padding up to a longer declared precision adds only zeros — always
-    // lossless, and it is what makes a date-only cell satisfy a heading that
-    // declares time precision.
-    Some(format!("{}{}", value, &DT_ZERO_TAIL[have..want]))
+    Some(format!("{}{}", value, &start[have..want]))
 }
 
 // --- AGS4 field quoting (the write-side line primitive) ---------------
@@ -743,7 +822,7 @@ const DATETIME_FORMATS: &[&str] = &[
     "%d/%m/%Y",
 ];
 const DATE_FORMATS: &[&str] = &["%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y"];
-const TIME_FORMATS: &[&str] = &["%H:%M:%S", "%H:%M"];
+const TIME_FORMATS: &[&str] = &["%H:%M:%S%.f", "%H:%M"];
 const BOOL_TRUE: &[&str] = &["Y", "YES", "TRUE", "1"];
 const BOOL_FALSE: &[&str] = &["N", "NO", "FALSE", "0"];
 
@@ -816,6 +895,33 @@ pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
         }
     }
     None
+}
+
+/// Parse a `DT` cell against the precision its heading's UNIT declares.
+///
+/// A year (`yyyy`) or month (`yyyy-mm`) UNIT names a period, and its value
+/// reads as the period's first instant — `2026-03` → 2026-03-01 00:00, the
+/// same start-of-period rule a date-only value already follows (midnight).
+/// Those two shapes are accepted ONLY under their own UNIT: a bare `2026`
+/// under a full-date UNIT is a Rule 8 finding, and reading it as a date would
+/// hide it. Every other UNIT reads through [`parse_datetime`] unchanged. A
+/// time-of-day UNIT is not a datetime at all — see [`is_time_of_day_unit`] —
+/// and a value that does not fit is `None`, a null (#999).
+#[must_use]
+pub fn parse_datetime_for_unit(s: &str, unit: &str) -> Option<NaiveDateTime> {
+    let s = s.trim();
+    match dt_unit_precision(unit) {
+        Some(n @ (4 | 7)) => {
+            if dt_value_precision(s)? != n {
+                return None;
+            }
+            let padded = rescale(s, n, 10, DT_PERIOD_START)?;
+            NaiveDate::parse_from_str(&padded, "%Y-%m-%d")
+                .ok()?
+                .and_hms_opt(0, 0, 0)
+        }
+        _ => parse_datetime(s),
+    }
 }
 
 /// Parse an AGS4 DATE cell into a `NaiveDate`, trying the same
@@ -1122,6 +1228,10 @@ mod tests {
         assert_eq!(sql_type("0DP"), "BIGINT");
         assert_eq!(sql_type("2DP"), "DOUBLE");
         assert_eq!(sql_type("DT"), "TIMESTAMP");
+        // #999: only a DT column under a time-of-day UNIT changes.
+        assert_eq!(sql_type_for_unit("DT", "hh:mm"), "TIME");
+        assert_eq!(sql_type_for_unit("DT", "yyyy-mm"), "TIMESTAMP");
+        assert_eq!(sql_type_for_unit("X", "hh:mm"), "VARCHAR");
         assert_eq!(sql_type("YN"), "BOOLEAN");
         // RL is a delimited RECORD LINK (`GROUP|KEY1|KEY2`, AGS Rule 11), so it
         // stores as text. It was DOUBLE — which nulled every link on read (laterite-dev#503).
@@ -1409,6 +1519,74 @@ mod tests {
             dt_to_unit_precision("2021-08-09 00:00:00", "yyyy-mm-dd").as_deref(),
             Some("2021-08-09")
         );
+    }
+
+    /// #999: a year or month UNIT names a period, so its canonical instant is
+    /// the period's START — truncating to it is lossless exactly when the
+    /// dropped day/month are the first, not when they are zero.
+    #[test]
+    fn a_period_unit_renders_its_start_and_refuses_a_real_day() {
+        for (value, unit, want) in [
+            ("2026-03-01T00:00:00", "yyyy-mm", Some("2026-03")),
+            ("2026-03-01", "yyyy-mm", Some("2026-03")),
+            ("2026-01-01T00:00:00", "yyyy", Some("2026")),
+            ("2026-03-02", "yyyy-mm", None),          // a real day
+            ("2026-03-01T09:00:00", "yyyy-mm", None), // a real time
+            ("2026-02-01", "yyyy", None),             // a real month
+            ("2026-03", "yyyy-mm-dd", Some("2026-03-01")),
+            ("2026", "yyyy-mm", Some("2026-01")),
+            ("2026", "yyyy", Some("2026")),
+        ] {
+            assert_eq!(
+                dt_to_unit_precision(value, unit).as_deref(),
+                want,
+                "{value:?} under {unit:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_time_of_day_unit_renders_a_time_value() {
+        for (value, unit, want) in [
+            ("09:15:00", "hh:mm", Some("09:15")),
+            ("09:15:30", "hh:mm", None), // a real second
+            ("09:15", "hh:mm:ss", Some("09:15:00")),
+            ("09:15:30", "hh:mm:ss", Some("09:15:30")),
+            ("2026-03-01", "hh:mm", None), // a date is not a time
+            ("9:15", "hh:mm", None),       // unpadded
+        ] {
+            assert_eq!(
+                dt_to_unit_precision(value, unit).as_deref(),
+                want,
+                "{value:?} under {unit:?}"
+            );
+        }
+        assert!(is_time_of_day_unit("hh:mm") && is_time_of_day_unit(" hh:mm:ss "));
+        assert!(!is_time_of_day_unit("yyyy-mm-ddThh:mm") && !is_time_of_day_unit("h"));
+    }
+
+    #[test]
+    fn a_period_unit_reads_as_the_start_of_the_period_and_only_under_itself() {
+        let at = |s: &str, unit: &str| {
+            parse_datetime_for_unit(s, unit).map(|d| d.format("%Y-%m-%d %H:%M").to_string())
+        };
+        assert_eq!(
+            at("2026-03", "yyyy-mm").as_deref(),
+            Some("2026-03-01 00:00")
+        );
+        assert_eq!(at("2026", "yyyy").as_deref(), Some("2026-01-01 00:00"));
+        // The wrong shape for the declared period is a null, not a guess.
+        assert_eq!(at("2026-03-02", "yyyy-mm"), None);
+        assert_eq!(at("2026", "yyyy-mm"), None);
+        assert_eq!(at("2026-13", "yyyy-mm"), None); // no 13th month
+        // A bare year under a full-date UNIT is a Rule 8 finding, not a date.
+        assert_eq!(at("2026", "yyyy-mm-dd"), None);
+        // Every other UNIT reads exactly as parse_datetime does.
+        assert_eq!(
+            at("2026-03-02T09:15", "yyyy-mm-ddThh:mm").as_deref(),
+            Some("2026-03-02 09:15")
+        );
+        assert_eq!(at("2026-03-02", ""), at("2026-03-02", "yyyy-mm-dd"));
     }
 
     #[test]

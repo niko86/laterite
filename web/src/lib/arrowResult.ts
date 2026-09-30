@@ -31,6 +31,7 @@ export interface ResultSet {
 function arrowSqlType(field: Field): string {
   const t = field.type as DataType;
   if (DataType.isTimestamp(t)) return "TIMESTAMP";
+  if (DataType.isTime(t)) return "TIME";
   if (DataType.isDate(t)) return "DATE";
   if (DataType.isBool(t)) return "BOOLEAN";
   if (DataType.isFloat(t)) return "DOUBLE";

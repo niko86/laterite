@@ -251,13 +251,16 @@ impl Reading {
         } else {
             None
         };
-        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
+        // The UNIT row travels too: a `DT` column declared `hh:mm` or
+        // `yyyy-mm` can only be typed against it (#999).
+        let buf = laterite_ags4_types::ipc::build_group_ipc_synth_with_units(
             &laterite_ags4_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
             &group.headings,
             &group.types,
+            &group.units,
             group.rows.len(),
             |col, row| group.cell(col, row),
         )
