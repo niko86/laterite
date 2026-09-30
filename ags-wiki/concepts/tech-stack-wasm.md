@@ -208,7 +208,9 @@ The casting in `parse()` shares the [[laterite-ags4-types]] leaf crate, so the
 browser casts a file **identically** to a native `.ags5db` — parity by
 construction, not a second implementation that can drift
 ([[dec-laterite-ags4-types-leaf]]). Arrow type mapping (off the file's TYPE row):
-[[DT]] → `Timestamp(µs)` (tz-naive), [[0DP]] → `Int64`,
+[[DT]] → `Timestamp(µs)` (tz-naive; a time-of-day UNIT such as `hh:mm` →
+`Time64(µs)`, and a `yyyy`/`yyyy-mm` UNIT reads as the period's start, #999),
+[[0DP]] → `Int64`,
 `2DP/RL/nSF/nSCI` → `Float64`, [[YN]] → `Boolean`, `ID/X/PA/…` → `Utf8`.
 
 `getrandom` is a **host** proc-macro (`const-random` bakes ahash's seed

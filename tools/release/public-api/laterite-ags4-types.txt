@@ -13,13 +13,16 @@ impl<'a> core::marker::UnsafeUnpin for laterite_ags4_types::arrow_cols::SynthCol
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_types::arrow_cols::SynthColumns<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_types::arrow_cols::SynthColumns<'a>
 pub fn laterite_ags4_types::arrow_cols::build_column<'a, F>(usize, &str, F) -> (arrow_array::array::ArrayRef, arrow_schema::datatype::DataType) where F: core::ops::function::Fn(usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_column_for_unit<'a, F>(usize, &str, &str, F) -> (arrow_array::array::ArrayRef, arrow_schema::datatype::DataType) where F: core::ops::function::Fn(usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::arrow_cols::build_record_batch<'a, F>(&[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::arrow_cols::build_record_batch_compat<'a, F>(&[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::arrow_cols::build_record_batch_synth<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_record_batch_synth_with_units<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::arrow_cols::build_record_batch_with_ids<'a, F>(&[(alloc::string::String, core::option::Option<alloc::string::String>)], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub mod laterite_ags4_types::ipc
 pub fn laterite_ags4_types::ipc::build_group_ipc<'a, F>(&[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::ipc::build_group_ipc_synth<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::ipc::build_group_ipc_synth_with_units<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::ipc::build_group_ipc_with_ids<'a, F>(&[(alloc::string::String, core::option::Option<alloc::string::String>)], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
 pub fn laterite_ags4_types::ipc::record_batch_to_ipc(&arrow_array::record_batch::RecordBatch) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError>
 pub enum laterite_ags4_types::CanonicalType
@@ -98,14 +101,17 @@ pub fn laterite_ags4_types::dt_to_unit_precision(&str, &str) -> core::option::Op
 pub fn laterite_ags4_types::format_ndp(f64, usize) -> alloc::string::String
 pub fn laterite_ags4_types::format_nsci(f64, usize) -> alloc::string::String
 pub fn laterite_ags4_types::format_nsf(f64, usize) -> alloc::string::String
+pub fn laterite_ags4_types::is_time_of_day_unit(&str) -> bool
 pub fn laterite_ags4_types::pad_decimals(&str, usize) -> core::option::Option<alloc::string::String>
 pub fn laterite_ags4_types::parse_ags_decimal(&str) -> core::option::Option<f64>
 pub fn laterite_ags4_types::parse_ags_integer(&str) -> core::option::Option<i64>
 pub fn laterite_ags4_types::parse_bool(&str) -> core::option::Option<bool>
 pub fn laterite_ags4_types::parse_date(&str) -> core::option::Option<chrono::naive::date::NaiveDate>
 pub fn laterite_ags4_types::parse_datetime(&str) -> core::option::Option<chrono::naive::datetime::NaiveDateTime>
+pub fn laterite_ags4_types::parse_datetime_for_unit(&str, &str) -> core::option::Option<chrono::naive::datetime::NaiveDateTime>
 pub fn laterite_ags4_types::parse_time(&str) -> core::option::Option<chrono::naive::time::NaiveTime>
 pub fn laterite_ags4_types::parse_value(core::option::Option<&str>, &str) -> serde_json::value::Value
 pub fn laterite_ags4_types::quote_field(&str) -> alloc::string::String
 pub fn laterite_ags4_types::sql_type(&str) -> &'static str
+pub fn laterite_ags4_types::sql_type_for_unit(&str, &str) -> &'static str
 pub fn laterite_ags4_types::write_quoted_field<W: core::io::write::Write>(&mut W, &str) -> core::io::error::Result<()>

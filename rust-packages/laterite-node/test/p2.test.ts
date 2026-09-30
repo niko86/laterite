@@ -41,6 +41,26 @@ const AGS =
 
 const typeOf = (t: Table, name: string) => t.getChild(name)!.type.toString();
 
+describe("read → a DT column typed by its UNIT (#999)", () => {
+  // Same file shape across surfaces: a time-of-day UNIT is a Time column, a
+  // month UNIT is the start of the month — through the ONE shared builder.
+  const PARTIAL =
+    '"GROUP","PROJ"\r\n' +
+    '"HEADING","PROJ_ID","PROJ_TIME","PROJ_MNTH"\r\n' +
+    '"UNIT","","hh:mm","yyyy-mm"\r\n' +
+    '"TYPE","ID","DT","DT"\r\n' +
+    '"DATA","P1","09:15","2026-03"\r\n';
+
+  it("types an hh:mm DT column as Time and a yyyy-mm one as a timestamp", () => {
+    const proj = read(undefined, { text: PARTIAL }).table("PROJ");
+    expect(typeOf(proj, "PROJ_TIME")).toMatch(/Time/);
+    expect(typeOf(proj, "PROJ_TIME")).not.toMatch(/Timestamp/);
+    expect(proj.getChild("PROJ_TIME")!.get(0)).not.toBeNull();
+    expect(typeOf(proj, "PROJ_MNTH")).toMatch(/Timestamp/);
+    expect(proj.getChild("PROJ_MNTH")!.get(0)).not.toBeNull();
+  });
+});
+
 describe("read → Arrow-direct, born-typed", () => {
   it("decodes a group to a typed arrow-js Table (cross-host typing invariant)", () => {
     const ags = read(undefined, { text: AGS });

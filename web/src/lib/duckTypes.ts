@@ -44,7 +44,8 @@ export function scalarText(value: unknown): string {
  *   - Int64 / BIGINT come back as a JS `bigint` (rendering one in JSX, or
  *     `JSON.stringify`-ing it, throws);
  *   - TIMESTAMP comes back as an integer count of MICROSECONDS since the
- *     epoch (not a `Date` — DuckDB-wasm issue #393).
+ *     epoch (not a `Date` — DuckDB-wasm issue #393), and TIME as micros
+ *     since midnight.
  *  This is the single audited place those are normalised; every grid runs
  *  cells through it. `null`/`undefined` → empty string (an em-dash is
  *  applied at the view layer if a placeholder is wanted). */
@@ -70,6 +71,22 @@ export function formatCell(value: unknown, sqlType: string): string {
         .replace("T", " ")
         .replace(/\.\d+Z$/, "")
         .replace("Z", "");
+    }
+    return scalarText(value);
+  }
+
+  if (t === "TIME") {
+    // A DT heading with a time-of-day UNIT (`hh:mm`) is typed TIME (#999):
+    // MICROSECONDS since midnight, no date. Rendered as the TIMESTAMP branch
+    // renders a time — HH:MM:SS — so it never shows as a 1970 instant.
+    const micros =
+      typeof value === "bigint"
+        ? Number(value)
+        : typeof value === "number"
+          ? value
+          : null;
+    if (micros !== null && Number.isFinite(micros)) {
+      return new Date(micros / 1000).toISOString().slice(11, 19);
     }
     return scalarText(value);
   }

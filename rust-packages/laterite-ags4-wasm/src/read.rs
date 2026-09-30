@@ -11,7 +11,7 @@
 //! the native conversion — parity by construction.
 use crate::resolve::resolve_encoding;
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
-use laterite_ags4_types::sql_type;
+use laterite_ags4_types::sql_type_for_unit;
 use laterite_ags4_validator::ValidatorError;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -178,12 +178,21 @@ impl ParsedDataset {
                     .unwrap_or_else(|| "X".to_string())
             })
             .collect();
+        let units: Vec<String> = (0..n)
+            .map(|i| group.units.get(i).cloned().unwrap_or_default())
+            .collect();
+        // Unit-aware, like the IPC this meta describes: a `DT` column declared
+        // `hh:mm` is TIME, and labelling it TIMESTAMP would render its times
+        // of day as 1970-01-01 instants in the grid (#999).
+        let sql_types = types
+            .iter()
+            .zip(&units)
+            .map(|(t, u)| sql_type_for_unit(t, u).to_string())
+            .collect();
         Some(GroupMeta {
             headings: group.headings.clone(),
-            units: (0..n)
-                .map(|i| group.units.get(i).cloned().unwrap_or_default())
-                .collect(),
-            sql_types: types.iter().map(|t| sql_type(t).to_string()).collect(),
+            units,
+            sql_types,
             types,
         })
     }
@@ -281,13 +290,16 @@ impl ParsedDataset {
         } else {
             None
         };
-        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
+        // The UNIT row travels too: a `DT` column declared `hh:mm` or
+        // `yyyy-mm` can only be typed against it (#999).
+        let buf = laterite_ags4_types::ipc::build_group_ipc_synth_with_units(
             &laterite_ags4_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
             &group.headings,
             &group.types,
+            &group.units,
             group.rows.len(),
             |col, row| group.cell(col, row),
         )
@@ -327,6 +339,7 @@ mod tests {
     use super::*;
     use crate::build::{BuildOptions, build_ags4_core};
     use crate::testdata::{CLEAN, LOCA_A, err};
+    use laterite_ags4_types::sql_type;
 
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
     // shape of what the shared laterite-ags4-types builder hands back.
@@ -488,6 +501,31 @@ mod tests {
         let a = arr.as_any().downcast_ref::<Float64Array>().unwrap();
         assert_eq!(a.len(), 1);
         assert!(a.is_null(0));
+    }
+
+    #[cfg(feature = "arrow")]
+    #[test]
+    fn a_time_of_day_dt_column_is_time64_in_the_ipc_and_time_in_the_meta() {
+        // #999: the browser gets the same typing as the native read, and the
+        // meta the grid formats by must agree with the IPC it describes.
+        use arrow::array::Time64MicrosecondArray;
+        const SRC: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_TIME\"\r\n\
+\"UNIT\",\"\",\"hh:mm\"\r\n\"TYPE\",\"ID\",\"DT\"\r\n\"DATA\",\"P1\",\"09:15\"\r\n";
+        let ds = ParsedDataset {
+            parsed: parse_bytes(SRC, encoding_rs::UTF_8).expect("parses"),
+        };
+        assert_eq!(ds.meta_core("PROJ").unwrap().sql_types, ["VARCHAR", "TIME"]);
+        let ipc = ds.arrow_ipc_core("PROJ", false, false).unwrap();
+        let mut r =
+            arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(ipc), None).unwrap();
+        let batch = r.next().unwrap().unwrap();
+        let col = batch.column(batch.schema().index_of("PROJ_TIME").unwrap());
+        assert_eq!(col.data_type(), &DataType::Time64(TimeUnit::Microsecond));
+        let t = col
+            .as_any()
+            .downcast_ref::<Time64MicrosecondArray>()
+            .unwrap();
+        assert_eq!(t.value(0), (9 * 3600 + 15 * 60) * 1_000_000);
     }
 
     #[cfg(feature = "arrow")]
