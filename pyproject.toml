@@ -1,6 +1,6 @@
 [project]
 name = "laterite-workspace"
-version = "0.12.0"
+version = "0.13.0"
 description = "uv workspace root for the laterite AGS toolkit (dev monorepo aggregator; ships no wheel)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -297,7 +297,7 @@ python-version = "3.12"
 #   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
 #   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
 [tool.bumpversion]
-current_version = "0.12.0"
+current_version = "0.13.0"
 # Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
 # — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
 # trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
@@ -415,25 +415,30 @@ replace = "`{new_version}` — the laterite release."
 #
 # All four were left on `version.workspace = true` when the tiers split (#202),
 # which was harmless only while the two numbers were equal.
+#
+# The leading `\n` anchors the search to the [package] line. Unanchored, it also
+# matched any dependency whose `version = "…"` pin happened to equal the product
+# number — the 0.13.0 cut rewrote laterite-node's `laterite-transport` pin
+# (transport and the product were both 0.12.0), which broke `cargo update`.
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite-cli/Cargo.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
+search = "\nversion = \"{current_version}\""
+replace = "\nversion = \"{new_version}\""
 
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite-py/Cargo.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
+search = "\nversion = \"{current_version}\""
+replace = "\nversion = \"{new_version}\""
 
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite-node/Cargo.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
+search = "\nversion = \"{current_version}\""
+replace = "\nversion = \"{new_version}\""
 
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite-ags4-wasm/Cargo.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
+search = "\nversion = \"{current_version}\""
+replace = "\nversion = \"{new_version}\""
 
 # The facade joined the product line at parity (dec-facade-parity phase 8,
 # 2026-09-04), jumping off its own 0.1.x. It stays a literal version rather
@@ -441,20 +446,8 @@ replace = 'version = "{new_version}"'
 # unpublished members — so the product bump is what moves it from here on.
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite/Cargo.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
-# The wasm README's usage example PRINTS the version — `version(); // "0.11.0"`
-# — which makes it a version stamp in all but name, and it ships to npm where
-# the page is permanent. Exactly the class `laterite-cli`'s doc-output step
-# above exists for (`examples/wasm/ex01_init.mjs`, #243); this was the second
-# instance and was not stamped, so `test_shipped_readmes_carry_no_superseded
-# _version` failed the FIRST time a bump was attempted after it was written.
-# Found by running `cut-release.sh` for real rather than by reading (#716).
-[[tool.bumpversion.files]]
-filename = "rust-packages/laterite-ags4-wasm/README.md"
-search = 'version();                          // "{current_version}"'
-replace = 'version();                          // "{new_version}"'
+search = "\nversion = \"{current_version}\""
+replace = "\nversion = \"{new_version}\""
 
 # Node / npm (`laterite`): unified onto the single version (#372) — only the
 # package `version` is stamped now.

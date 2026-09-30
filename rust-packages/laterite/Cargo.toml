@@ -11,7 +11,7 @@
 # gap.
 [package]
 name = "laterite"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Read, validate and write AGS4 — the geotechnical data transfer format"
