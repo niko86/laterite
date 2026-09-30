@@ -2267,18 +2267,31 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     return items
 
 
-def _columns_of(frame: Any) -> Any:
-    """``frame.columns`` if it can actually be read, else ``None``. A plain
-    ``getattr`` default only swallows AttributeError, but ``.columns`` may be a
-    *property that raises* — pyo3-arrow's ``PyTable.columns`` imports its arro3
-    companion package and dies with ModuleNotFoundError in a venv without it,
-    even though the object's ``__arrow_c_stream__`` capsule (the only thing the
-    build consumes) is fine. Both probes below want "no columns", not a foreign
-    import error, for such inputs. (#852)"""
+def _columns_of(frame: Any) -> list[str] | None:
+    """The frame's column NAMES if they can actually be read, else ``None``.
+
+    ``column_names`` is tried before ``.columns`` because the two mean different
+    things across libraries: on polars and pandas ``.columns`` is the names, but
+    on a ``pyarrow.Table`` it is the column *arrays*, which crashed the heading
+    check's ``set()`` (#1000). Anything whose answer is not all strings reads as
+    "no columns" rather than being guessed at.
+
+    A plain ``getattr`` default only swallows AttributeError, but either
+    attribute may be a *property that raises* — pyo3-arrow's ``PyTable.columns``
+    imports its arro3 companion package and dies with ModuleNotFoundError in a
+    venv without it, even though the object's ``__arrow_c_stream__`` capsule
+    (the only thing the build consumes) is fine. Both probes below want "no
+    columns", not a foreign import error, for such inputs. (#852)"""
     try:
-        return getattr(frame, "columns", None)
+        cols = getattr(frame, "column_names", None)
+        if cols is None:
+            cols = getattr(frame, "columns", None)
+        if cols is None:
+            return None
+        names = list(cols)
     except Exception:
         return None
+    return names if all(isinstance(n, str) for n in names) else None
 
 
 def _drop_synth_keys(frame: Any) -> Any:
@@ -2290,12 +2303,12 @@ def _drop_synth_keys(frame: Any) -> Any:
     cols = _columns_of(frame)
     if cols is None:
         return frame  # not a columnar frame (e.g. an Arrow capsule) — nothing to strip
-    synth = [c for c in cols if isinstance(c, str) and c.startswith("_")]
+    synth = [c for c in cols if c.startswith("_")]
     if not synth:
         return frame
     if isinstance(frame, pl.DataFrame):
         return frame.drop(synth)
-    return frame.drop(columns=synth)  # pandas
+    return frame.drop(columns=synth)  # pandas, and pyarrow.Table (#1000)
 
 
 @overload
@@ -2379,7 +2392,8 @@ def build_ags4(
             object exposing an Arrow C-stream capsule (``__arrow_c_stream__``),
             e.g. an Arrow table, which is handed to the emitter zero-copy. The
             ``units=``/``types=`` heading check only vouches for frames whose
-            ``.columns`` it can read; capsule-only inputs skip it.
+            column names it can read (``column_names``, else ``.columns``);
+            capsule-only inputs skip it.
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
             ``None`` (default) uses the engine's bundled fallback edition —
