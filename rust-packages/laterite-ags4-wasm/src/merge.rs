@@ -331,6 +331,35 @@ mod tests {
 
     #[cfg(feature = "merge")]
     #[test]
+    fn a_stamped_merge_tran_carries_the_record_link_characters() {
+        // #995: the browser shares merge's TRAN synthesiser, so it must also
+        // write TRAN_DLIM/TRAN_RCON — without TRAN_RCON, Rule 16 cannot split a
+        // concatenated code like `B+D`.
+        let o = MergeOptions {
+            tran: Some(TranInput {
+                issue: Some("2".into()),
+                date: Some("2026-01-02".into()),
+                producer: Some("A".into()),
+                recipient: Some("B".into()),
+                status: Some("Draft".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let res = merge_core(LOCA_A, LOCA_B, o).expect("a complete stamp merges");
+        let text = String::from_utf8(res.bytes()).expect("UTF-8");
+        let heading = text
+            .lines()
+            .find(|l| l.starts_with("\"HEADING\",\"TRAN_"))
+            .expect("a TRAN heading row");
+        assert!(
+            heading.contains("\"TRAN_DLIM\",\"TRAN_RCON\""),
+            "merge TRAN lacks the record-link headings: {heading}"
+        );
+    }
+
+    #[cfg(feature = "merge")]
+    #[test]
     fn the_merge_result_getters_return_what_the_core_built() {
         // These three getters are the entire JS-visible surface of a merge, and
         // the web worker reads them before calling `.free()`. Empty JSON here

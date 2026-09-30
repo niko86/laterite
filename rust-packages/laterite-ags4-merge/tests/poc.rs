@@ -264,3 +264,99 @@ fn merged_tran_is_synthesised_with_provenance() {
     let rem = cell(tran, r, "TRAN_REM").unwrap_or_default();
     assert!(rem.contains("Merged from 2"), "provenance recorded: {rem}");
 }
+
+// --- merged TRAN carries the record-link characters (#995) ------------------
+//
+// Without TRAN_RCON, Rule 16 cannot split a concatenated code, so a merge of two
+// valid deliveries using `B+D` came out failing it.
+
+/// One synthesised-metadata delivery at 4.2 whose `SAMP_TYPE` is the concatenated
+/// `B+D`, each part defined in ABBR — valid on its own.
+fn concatenated_code_delivery(loca: &str) -> ParsedFile {
+    use laterite_ags4_emit::{Cell, DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
+    let group = |code: &str, headings: &[&str], rows: Vec<Vec<&str>>| GroupInput {
+        code: code.to_string(),
+        headings: headings.iter().map(|h| (*h).to_string()).collect(),
+        units: None,
+        types: None,
+        rows: rows
+            .into_iter()
+            .map(|r| r.into_iter().map(|c| Cell::Text(c.to_string())).collect())
+            .collect(),
+    };
+    let groups = [
+        group("PROJ", &["PROJ_ID"], vec![vec!["P1"]]),
+        group(
+            "ABBR",
+            &["ABBR_HDNG", "ABBR_CODE", "ABBR_DESC"],
+            vec![
+                vec!["SAMP_TYPE", "B", "Bulk disturbed sample"],
+                vec!["SAMP_TYPE", "D", "Small disturbed sample"],
+            ],
+        ),
+        group("LOCA", &["LOCA_ID"], vec![vec![loca]]),
+        group(
+            "SAMP",
+            &["LOCA_ID", "SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID"],
+            vec![vec![loca, "1.00", "1", "B+D", ""]],
+        ),
+    ];
+    // AutoFix: metadata synthesis runs in no other mode.
+    let opts = EmitOpts {
+        mode: EmitMode::AutoFix,
+        edition: DictVersion::V4_2,
+        tran: Some(TranStamp::new("1", "2026-01-01", "A", "B", "Draft")),
+        synthesise_metadata: true,
+    };
+    let out = emit_ags4(&groups, &opts).unwrap();
+    assert!(
+        out.findings.is_empty(),
+        "each input is valid on its own: {:?}",
+        out.findings
+    );
+    parse_str(std::str::from_utf8(&out.bytes).unwrap()).unwrap()
+}
+
+fn strict_merge_opts() -> MergeOpts {
+    MergeOpts {
+        edition: laterite_ags4_emit::DictVersion::V4_2,
+        emit_mode: laterite_ags4_emit::EmitMode::Strict,
+        tran: Some(TranStamp::new("2", "2026-01-02", "A", "B", "Draft")),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn merged_tran_carries_record_link_characters() {
+    let files = [
+        concatenated_code_delivery("BH1"),
+        concatenated_code_delivery("BH2"),
+    ];
+    // Strict refuses any error-severity finding, Rule 16 included — so Ok IS
+    // the "merged file validates" assertion.
+    let res = merge_parsed(&files, &strict_merge_opts()).expect("the merge must validate");
+    let out = parse_str(std::str::from_utf8(&res.bytes).unwrap()).unwrap();
+    let tran = &out.groups["TRAN"];
+    let r = &tran.rows[0];
+    assert_eq!(cell(tran, r, "TRAN_DLIM").as_deref(), Some("|"));
+    assert_eq!(cell(tran, r, "TRAN_RCON").as_deref(), Some("+"));
+}
+
+#[test]
+fn merged_tran_record_link_characters_match_build() {
+    // Merge writes the two characters itself rather than sharing emit's; this is
+    // what stops the copies drifting. The input's TRAN comes from emit's own
+    // synthesiser, so compare the merged cells against it.
+    let input = concatenated_code_delivery("BH1");
+    let built = &input.groups["TRAN"];
+    let res = merge_parsed(std::slice::from_ref(&input), &strict_merge_opts()).unwrap();
+    let out = parse_str(std::str::from_utf8(&res.bytes).unwrap()).unwrap();
+    let merged = &out.groups["TRAN"];
+    for h in ["TRAN_DLIM", "TRAN_RCON"] {
+        assert_eq!(
+            cell(merged, &merged.rows[0], h),
+            cell(built, &built.rows[0], h),
+            "{h}: merge and build must stamp the same character"
+        );
+    }
+}

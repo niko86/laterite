@@ -184,6 +184,9 @@
       },
       {
         "text": "**`build_ags4` accepts a `pyarrow.Table` frame, as its docstring always said.** Every build handed a pyarrow table crashed with `TypeError: cannot use 'pyarrow.lib.ChunkedArray' as a set element`, even with no `units=`/`types=` passed: the heading check read `.columns`, which on pyarrow is the column arrays rather than their names. It now reads `column_names` first, so a pyarrow table builds on both `build_ags4` and `build_ags4_unchecked` and gets the same heading-typo check as a polars frame. Anything else whose `.columns` is not a list of names skips the check instead of crashing. (#1000)"
+      },
+      {
+        "text": "**A merge of two valid files that use a concatenated code like `B+D` now validates.** The TRAN that `merge` writes from a `TranStamp` left out `TRAN_DLIM` and `TRAN_RCON`, which `build_ags4` always writes. Without `TRAN_RCON` the validator cannot split `B+D` into its parts, so Rule 16 failed even when every part was defined in ABBR. The merged TRAN now carries `|` and `+`, the same characters the build stamps, on every surface that merges (Python, `lat merge`, Node and the browser). (#995)"
       }
     ],
     "security": []

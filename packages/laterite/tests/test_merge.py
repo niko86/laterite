@@ -452,6 +452,8 @@ def test_a_stamp_description_and_remarks_reach_the_emitted_tran():
         if ln.startswith('"DATA"') and "CALLER-REMARK" in ln
     )
     assert tran_row.index("Merged from") < tran_row.index("CALLER-REMARK")
+    # #995: the record-link characters Rule 16 needs to split `B+D`.
+    assert '"TRAN_DLIM","TRAN_RCON"' in text, "merge TRAN lacks TRAN_DLIM/RCON"
 
 
 def test_on_build_remarks_are_verbatim_because_there_is_no_provenance_note():

@@ -759,6 +759,11 @@ fn merge_synthesises_a_tran_stamp_when_a_complete_stamp_is_given() {
         stamped.contains("Merged from 2 deliveries"),
         "merge TRAN_REM missing: {stamped}"
     );
+    // #995: the record-link characters Rule 16 needs to split `B+D`.
+    assert!(
+        stamped.contains("\"TRAN_DLIM\",\"TRAN_RCON\""),
+        "merge TRAN lacks TRAN_DLIM/TRAN_RCON: {stamped}"
+    );
 }
 
 // --- transport (pack / unpack / lock / unlock) ------------------------------
