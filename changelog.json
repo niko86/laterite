@@ -190,6 +190,9 @@
       },
       {
         "text": "**Every build and merge writes headings in dictionary order, so column order can no longer fail Rule 7.** The emitter used to write headings in whatever order it was given, and autofix does not repair order. So a `merge` whose later input populated an optional heading the first did not (#994), a `TranStamp` with a `description` (#993, whose `TRAN_DESC` landed after `TRAN_RCON`), merge's own stamped TRAN, and any frame with its columns out of order all produced files failing Rule 7. The emitter now writes each dictionary group's headings in dictionary order, moving every UNIT, TYPE and DATA cell with its heading. Headings the dictionary does not know (DICT-defined ones included) follow in the order they arrived, so DICT headings listed in DICT order stay as the rule wants them. An unknown group, or one with a row narrower than its HEADING row, is left exactly as given. This covers every surface that builds or merges. The python-ags4 drop-in writer (`laterite.compat`) is unchanged and keeps the caller's column order. (#993, #994)"
+      },
+      {
+        "text": "**`read` no longer blanks `DT` values written at minute precision or with fractional seconds.** The typed read turned every `DT` cell whose value matched none of its parser's formats into a null, with no finding. Two canonical forms were missing: the `T`-separated minute form (`2026-03-02T09:15`), which is the 4.1+ dictionary UNIT of many DT headings such as `SAMP_DTIM` and `ERES_DTIM`, and fractional seconds (`…T09:15:00.500`). So a file laterite had just built at 4.2 read back with those dates null, and a read → build round trip wrote them out blank. Both forms now parse on every surface that reads typed columns, and `laterite.ags_types.parse_value` keeps a fraction instead of dropping it (whole-second values are unchanged). DT cells under partial units (`yyyy`, `yyyy-mm`, `hh:mm`) are #999. (#992)"
       }
     ],
     "security": []
