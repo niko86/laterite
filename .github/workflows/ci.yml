@@ -595,7 +595,10 @@ jobs:
       # stable so the tools below behave as they do locally.
       #
       # `nightly`: rustdoc's JSON output is unstable, and cargo public-api reads
-      # it. There is no flag to point it elsewhere; it finds nightly via rustup.
+      # it. A DATED nightly, named once in check_public_api.py's NIGHTLY and read
+      # back here: rustdoc's rendering drifts between nightlies with no code
+      # change, and each drift reddened a quiet `main` and read to the nightly
+      # cut as removed API. Stdlib-only, so `python3` works before uv exists.
       #
       # `1.85`: the `rust-version` all but one crate declares. It is a promise
       # to a stranger's toolchain, and until this job existed nothing tested it —
@@ -610,7 +613,7 @@ jobs:
       # cannot pass silently, only fail asking for its install line.
       - name: Install the nightly + MSRV toolchains
         run: |
-          rustup toolchain install nightly --profile minimal
+          rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
           rustup toolchain install 1.85 --profile minimal
           rustup toolchain install 1.88 --profile minimal
 
@@ -626,7 +629,9 @@ jobs:
       - name: install cargo-public-api + cargo-semver-checks
         uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
         with:
-          tool: cargo-public-api,cargo-semver-checks
+          # cargo-public-api pinned for the same reason as the nightly: its
+          # renderer is half of what writes a snapshot line.
+          tool: cargo-public-api@0.52.0,cargo-semver-checks
 
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
