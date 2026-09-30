@@ -187,6 +187,9 @@
       },
       {
         "text": "**A merge of two valid files that use a concatenated code like `B+D` now validates.** The TRAN that `merge` writes from a `TranStamp` left out `TRAN_DLIM` and `TRAN_RCON`, which `build_ags4` always writes. Without `TRAN_RCON` the validator cannot split `B+D` into its parts, so Rule 16 failed even when every part was defined in ABBR. The merged TRAN now carries `|` and `+`, the same characters the build stamps, on every surface that merges (Python, `lat merge`, Node and the browser). (#995)"
+      },
+      {
+        "text": "**Every build and merge writes headings in dictionary order, so column order can no longer fail Rule 7.** The emitter used to write headings in whatever order it was given, and autofix does not repair order. So a `merge` whose later input populated an optional heading the first did not (#994), a `TranStamp` with a `description` (#993, whose `TRAN_DESC` landed after `TRAN_RCON`), merge's own stamped TRAN, and any frame with its columns out of order all produced files failing Rule 7. The emitter now writes each dictionary group's headings in dictionary order, moving every UNIT, TYPE and DATA cell with its heading. Headings the dictionary does not know (DICT-defined ones included) follow in the order they arrived, so DICT headings listed in DICT order stay as the rule wants them. An unknown group, or one with a row narrower than its HEADING row, is left exactly as given. This covers every surface that builds or merges. The python-ags4 drop-in writer (`laterite.compat`) is unchanged and keeps the caller's column order. (#993, #994)"
       }
     ],
     "security": []

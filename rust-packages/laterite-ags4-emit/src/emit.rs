@@ -484,6 +484,7 @@ impl<'a> EmitStream<'a> {
     /// caller keep the formatted slab alive across the stream.
     #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
+        let og = in_dictionary_order(og, self.dict);
         if let Some(acc) = &mut self.synth {
             acc.fold(&og);
         }
@@ -496,7 +497,7 @@ impl<'a> EmitStream<'a> {
     pub(crate) fn assemble(mut self) -> Result<(ParsedFile, usize), EmitError> {
         if let Some(acc) = self.synth.take() {
             for og in acc.synthesised(self.dict, self.opts.tran.as_ref()) {
-                self.write_group(&og)?;
+                self.write_group(&in_dictionary_order(og, self.dict))?;
             }
         }
         // A zero-group build fails exactly as the parse-back used to:
@@ -663,6 +664,54 @@ pub(crate) struct OwnedGroup {
     pub(crate) units: Vec<String>,
     pub(crate) types: Vec<String>,
     pub(crate) rows: Vec<Vec<String>>,
+}
+
+/// Put a group's headings — and every UNIT, TYPE and DATA cell with them — in
+/// the order Rule 7 checks: the edition's standard headings in dictionary
+/// order, then any heading the dictionary does not know, in the order it
+/// arrived.
+///
+/// Emit used to write whatever order it was handed, so a merge whose later
+/// input introduced a heading (#994), a stamped TRAN with a description
+/// (#993), or a caller frame with its columns in any other order came out
+/// failing Rule 7, and autofix does not repair order. Doing it here, the one
+/// place every group is written from, covers every producer at once.
+///
+/// Non-standard headings keep their relative order because the emitter
+/// streams groups and so cannot rely on having seen the DICT group that
+/// orders them; a caller who lists DICT headings in DICT order (the order
+/// Rule 7 wants) gets them back unchanged. A group the dictionary does not
+/// know, or one with a row whose width differs from its HEADING row, is left
+/// exactly as given — the validity mode reports those, and a permutation
+/// would only guess.
+fn in_dictionary_order(mut og: OwnedGroup, dict: &Dictionary) -> OwnedGroup {
+    let order = dict.group_headings(&og.code);
+    let width = og.headings.len();
+    if order.is_empty() || og.rows.iter().any(|r| r.len() != width) {
+        return og;
+    }
+    let mut perm: Vec<usize> = (0..width).collect();
+    // Stable, so duplicate or unknown headings keep their incoming order.
+    perm.sort_by_key(|&i| {
+        order
+            .iter()
+            .position(|h| *h == og.headings[i])
+            .map_or((1, i), |rank| (0, rank))
+    });
+    if perm.iter().enumerate().all(|(to, &from)| to == from) {
+        return og; // already in order — the common case costs no row work
+    }
+    // Moves each cell rather than cloning it: a permuted group costs one
+    // Vec per row, never a copy of its strings.
+    let permute = |v: &mut Vec<String>| {
+        let mut old = std::mem::take(v);
+        *v = perm.iter().map(|&i| std::mem::take(&mut old[i])).collect();
+    };
+    permute(&mut og.headings);
+    permute(&mut og.units);
+    permute(&mut og.types);
+    og.rows.iter_mut().for_each(permute);
+    og
 }
 
 /// Hybrid metadata resolution: the caller's explicit non-blank value
@@ -1636,6 +1685,178 @@ mod tests {
         assert!(!cell("TRAN_AGS").is_empty(), "the edition must be filled");
         assert_eq!(cell("TRAN_DLIM"), "|");
         assert_eq!(cell("TRAN_RCON"), "+");
+    }
+
+    // --- dictionary heading order (#993, #994) ------------------------------
+
+    /// `code`'s HEADING, UNIT and DATA rows as the emitted bytes re-parse.
+    fn emitted_group(bytes: &[u8], code: &str) -> (Vec<String>, Vec<String>, Vec<Vec<String>>) {
+        let p = parse_bytes(bytes, encoding_rs::UTF_8).unwrap();
+        let g = &p.groups[code];
+        let rows = g
+            .rows
+            .iter()
+            .map(|r| {
+                (0..g.headings.len())
+                    .map(|i| g.value_at(r, i).unwrap_or_default().to_string())
+                    .collect()
+            })
+            .collect();
+        (g.headings.clone(), g.units.clone(), rows)
+    }
+
+    fn strings(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    const RULE_7: &str = "AGS Format Rule 7";
+
+    #[test]
+    fn caller_columns_are_written_in_dictionary_order_with_their_cells() {
+        // LOCA_TYPE precedes LOCA_FDEP in the dictionary; the caller had them
+        // the other way round. Every row of the section must move together.
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: strings(&["LOCA_ID", "LOCA_FDEP", "LOCA_TYPE"]),
+            units: None,
+            types: None,
+            rows: vec![vec![c("BH1"), c(10.0), c("CP")]],
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca], &opts).unwrap();
+        let (headings, units, rows) = emitted_group(&r.bytes, "LOCA");
+        assert_eq!(headings, strings(&["LOCA_ID", "LOCA_TYPE", "LOCA_FDEP"]));
+        assert_eq!(units, strings(&["", "", "m"]));
+        assert_eq!(rows, vec![strings(&["BH1", "CP", "10.00"])]);
+        assert!(!r.findings.contains_key(RULE_7), "{:?}", r.findings);
+    }
+
+    #[test]
+    fn a_stamped_tran_with_description_and_remarks_is_in_dictionary_order() {
+        // #993: TRAN_DESC used to be appended after TRAN_RCON.
+        let stamp = stamp().with_description("what").with_remarks("why");
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            tran: Some(stamp),
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca()], &opts).unwrap();
+        let (headings, _, _) = emitted_group(&r.bytes, "TRAN");
+        assert_eq!(
+            headings,
+            strings(&[
+                "TRAN_ISNO",
+                "TRAN_DATE",
+                "TRAN_PROD",
+                "TRAN_STAT",
+                "TRAN_DESC",
+                "TRAN_AGS",
+                "TRAN_RECV",
+                "TRAN_DLIM",
+                "TRAN_RCON",
+                "TRAN_REM",
+            ])
+        );
+        assert!(r.findings.is_empty(), "{:?}", r.findings);
+    }
+
+    #[test]
+    fn unknown_headings_follow_the_standard_ones_in_arrival_order() {
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: strings(&["LOCA_XTRB", "LOCA_ID", "LOCA_XTRA", "LOCA_TYPE"]),
+            units: None,
+            types: None,
+            rows: vec![vec![c("b"), c("BH1"), c("a"), c("CP")]],
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca], &opts).unwrap();
+        let (headings, _, rows) = emitted_group(&r.bytes, "LOCA");
+        assert_eq!(
+            headings,
+            strings(&["LOCA_ID", "LOCA_TYPE", "LOCA_XTRB", "LOCA_XTRA"])
+        );
+        assert_eq!(rows, vec![strings(&["BH1", "CP", "b", "a"])]);
+    }
+
+    #[test]
+    fn a_dict_defined_heading_listed_in_dict_order_passes_rule_7() {
+        let dict = GroupInput {
+            code: "DICT".into(),
+            headings: strings(&[
+                "DICT_TYPE",
+                "DICT_GRP",
+                "DICT_HDNG",
+                "DICT_STAT",
+                "DICT_DTYP",
+                "DICT_DESC",
+            ]),
+            units: None,
+            types: None,
+            rows: vec![vec![
+                c("HEADING"),
+                c("LOCA"),
+                c("LOCA_XTRA"),
+                c("OTHER"),
+                c("X"),
+                c("An extra heading"),
+            ]],
+        };
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: strings(&["LOCA_XTRA", "LOCA_TYPE", "LOCA_ID"]),
+            units: None,
+            types: None,
+            rows: vec![vec![c("x"), c("CP"), c("BH1")]],
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), dict, loca], &opts).unwrap();
+        let (headings, _, _) = emitted_group(&r.bytes, "LOCA");
+        assert_eq!(headings, strings(&["LOCA_ID", "LOCA_TYPE", "LOCA_XTRA"]));
+        assert!(!r.findings.contains_key(RULE_7), "{:?}", r.findings);
+    }
+
+    #[test]
+    fn an_unknown_group_and_a_ragged_group_are_left_as_given() {
+        // Nothing to order an unknown group by, and a row narrower than its
+        // HEADING row has no well-defined permutation — both are the validity
+        // mode's to report, not the emitter's to guess at.
+        let custom = GroupInput {
+            code: "ZZZZ".into(),
+            headings: strings(&["ZZZZ_B", "ZZZZ_A"]),
+            units: None,
+            types: None,
+            rows: vec![vec![c("b"), c("a")]],
+        };
+        let ragged = GroupInput {
+            code: "LOCA".into(),
+            headings: strings(&["LOCA_ID", "LOCA_FDEP", "LOCA_TYPE"]),
+            units: None,
+            types: None,
+            rows: vec![vec![c("BH1"), c(1.0)]],
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), custom, ragged], &opts).unwrap();
+        assert_eq!(
+            emitted_group(&r.bytes, "ZZZZ").0,
+            strings(&["ZZZZ_B", "ZZZZ_A"])
+        );
+        assert_eq!(
+            emitted_group(&r.bytes, "LOCA").0,
+            strings(&["LOCA_ID", "LOCA_FDEP", "LOCA_TYPE"])
+        );
     }
 
     fn stamp() -> TranStamp {
