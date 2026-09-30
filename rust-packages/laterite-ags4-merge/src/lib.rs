@@ -981,6 +981,8 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp, edition: DictVersion
         "TRAN_STAT".to_string(),
         "TRAN_AGS".to_string(),
         "TRAN_RECV".to_string(),
+        "TRAN_DLIM".to_string(),
+        "TRAN_RCON".to_string(),
         "TRAN_REM".to_string(),
     ];
     let mut row = vec![
@@ -998,6 +1000,14 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp, edition: DictVersion
             stamp.ags.clone()
         }),
         Cell::Text(stamp.recv.clone()),
+        // The delimiter and concatenator describe the file being WRITTEN, so
+        // they are emit's standard `|` / `+`, never an input's. Omitting them
+        // was not neutral: with no TRAN_RCON, Rule 16 cannot split `B+D`, so a
+        // merge of two valid files failed it (#995). The literals match emit's
+        // `synth_tran`; `merged_tran_record_link_characters_match_build`
+        // fails if the two ever disagree.
+        Cell::Text("|".to_string()),
+        Cell::Text("+".to_string()),
         Cell::Text(remarks),
     ];
     if let Some(d) = &stamp.desc {
