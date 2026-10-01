@@ -318,9 +318,9 @@ maintainer merges, a stacked PR runs zero CI).
 
 ### Triage labels
 
-The five canonical roles, each label string equal to its name. Only `wontfix`
-exists on the repo today; the other four have to be created. See
-`docs/agents/triage-labels.md`.
+The five canonical roles, each label string equal to its name; all five exist
+on the repo. `tracking` marks an issue that is not itself a ticket, so it
+takes no state role. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
