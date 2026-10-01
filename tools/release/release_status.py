@@ -391,19 +391,17 @@ def api_delta(
         return ApiDelta(0, 0, [], "snapshot")
     snap = SNAPSHOTS / f"{crate}.txt"
     diff = sh("git", "diff", f"{since}..HEAD", "--", str(snap.relative_to(ROOT)))
-    text = net_delta(diff.splitlines())
+    counted = net_delta(diff.splitlines())
     pin_then, pin_now = pin_at(since), pin_at("HEAD")
-    if (pin_then and pin_then == pin_now) or text == (0, 0, []):
-        return ApiDelta(*text, "snapshot")
+    if (pin_then and pin_then == pin_now) or counted == (0, 0, []):
+        return ApiDelta(*counted, "snapshot")
     mismatch = f"snapshots rendered on {pin_then or 'an unpinned nightly'} vs {pin_now}"
+
+    def unmeasured(why: str) -> ApiDelta:
+        return ApiDelta(0, 0, [], "unavailable", f"{mismatch}, and {why}")
+
     if not live:
-        return ApiDelta(
-            0,
-            0,
-            [],
-            "unavailable",
-            f"{mismatch}, and no published version to render against",
-        )
+        return unmeasured("no published version to render against")
     # The facade keeps two snapshots (default + all-features), so it renders
     # both; every engine crate's single snapshot is the all-features one.
     variants = (False, True) if crate == cpa.FACADE else (True,)
@@ -411,12 +409,8 @@ def api_delta(
     for all_features in variants:
         out = render(crate, live, pin_now, all_features=all_features)
         if out is None:
-            return ApiDelta(
-                0,
-                0,
-                [],
-                "unavailable",
-                f"{mismatch}, and `cargo public-api diff {live}` on {pin_now} could not run",
+            return unmeasured(
+                f"`cargo public-api diff {live}` on {pin_now} could not run"
             )
         lines += out
     return ApiDelta(*net_delta(lines), "render")
