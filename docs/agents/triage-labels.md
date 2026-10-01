@@ -18,13 +18,18 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 ## Which of these exist on the repo today
 
-Only **`wontfix`** exists — it is one of GitHub's stock labels, described there
-as "This will not be worked on", which matches the role above. The other four
-have never been created. So the first triage run has to create
-`needs-triage`, `needs-info`, `ready-for-agent` and `ready-for-human`
-(`gh label create <name> --description "..."`), and must **not** create
-`wontfix`, which would fail as a duplicate.
+All five. `wontfix` is one of GitHub's stock labels ("This will not be worked
+on"); the other four were created for triage, each with the meaning in the table
+above as its description. Don't create any of them again — `gh label create`
+fails on a duplicate.
 
-Nothing in the repo's existing label set (`bug`, `enhancement`, `documentation`,
-`question`, the Dependabot ecosystem labels, `no-changelog`) plays a triage role,
-so there is no pre-existing vocabulary to map onto instead.
+## Issues outside the state machine
+
+`tracking` marks an issue that is not itself a ticket: an epic whose children
+are the tickets, a standing ledger (the wiki small-writes ledger), or a
+bot-maintained status issue (the nightly engine-release tracker). It takes no
+category or state role, and a triage sweep should skip it rather than report it
+as unlabeled.
+
+Nothing else in the label set (`bug`, `enhancement`, `documentation`,
+`question`, the Dependabot ecosystem labels, `no-changelog`) plays a triage role.
