@@ -274,7 +274,10 @@ jobs:
   engine-cut:
     needs: [coverage]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A ceiling, not a cost. A night that renders on the pinned nightly (#998)
+    # builds cargo-public-api and documents published crates; a normal night
+    # takes none of it.
+    timeout-minutes: 45
     permissions:
       contents: write # PR mode pushes the cut branch
       pull-requests: write # PR mode opens/updates the cut PR
@@ -293,9 +296,32 @@ jobs:
           enable-cache: false
       # ONE registry sweep; every later step reads this file, so the tracker,
       # the dispatch and the cut PR cannot act on answers that disagree.
-      - name: release status + the derived cut
+      - name: release status
+        id: status
         run: |
           uv run --no-project python tools/release/release_status.py --json > /tmp/status.json
+          echo "unmeasured=$(jq '[.engine_crates[] | select(.api_delta_source == "unavailable")] | length' /tmp/status.json)" >> "$GITHUB_OUTPUT"
+      # A crate whose published snapshot was rendered on another nightly than
+      # HEAD's pin, and whose snapshot text moved, cannot trust a text diff
+      # (#998). It needs both sides rendered on the pinned nightly. Installing
+      # that is minutes of source build, so only a night that needs it pays:
+      # the first sweep finds those crates "unmeasured", and this re-sweeps
+      # with the toolchain present, replacing the file whole.
+      - name: Install the pinned nightly (only when a delta is unmeasured)
+        if: steps.status.outputs.unmeasured != '0'
+        run: rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
+      - name: install cargo-public-api (only when a delta is unmeasured)
+        if: steps.status.outputs.unmeasured != '0'
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+        with:
+          # The version ci.yml's publish-gates pins: its renderer is half of
+          # what writes a snapshot line.
+          tool: cargo-public-api@0.52.0
+      - name: re-measure on one toolchain
+        if: steps.status.outputs.unmeasured != '0'
+        run: uv run --no-project python tools/release/release_status.py --json > /tmp/status.json
+      - name: render the report + the derived cut
+        run: |
           uv run --no-project python tools/release/engine_cut.py --render /tmp/status.json | tee /tmp/report.txt
           {
             echo "### Release status + engine cut"

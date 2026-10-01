@@ -91,9 +91,25 @@ from check_package_contents import PUBLISH_SET  # noqa: E402
 #: with no code change (#988's `Self` derives, then `alloc::sync::Arc` becoming
 #: `alloc::rcs::arc::Arc`), and each rewrite reads to the nightly cut as `-pub`
 #: lines — a major bump for a crate that did not change. Moving this pin is
-#: therefore a release event: regenerate with `--write` in the same PR, and
-#: expect the next cut to count the rewritten lines.
+#: therefore a release event: regenerate with `--write` in the same PR. The cut
+#: notices the move (#998): for a crate whose published snapshot was rendered on
+#: another nightly, it renders both sides on this one rather than trusting the
+#: text diff.
 NIGHTLY = "nightly-2026-09-29"
+
+_PIN = re.compile(r'^NIGHTLY = "([^"]+)"', re.MULTILINE)
+
+
+def pinned_nightly(source: str) -> str:
+    """The nightly a version of THIS file pins, or '' if it predates the pin.
+
+    The cut reads this file at a published crate's commit
+    (`release_status.api_delta`) to learn which nightly that crate's snapshot
+    was rendered on. `--print-toolchain` prints through this parser too, so CI
+    breaks if the parser stops matching the constant above.
+    """
+    m = _PIN.search(source)
+    return m.group(1) if m else ""
 
 
 def die(msg: str) -> None:
@@ -302,7 +318,10 @@ def main() -> int:
     )
     args = ap.parse_args()
     if args.print_toolchain:
-        print(NIGHTLY)
+        pin = pinned_nightly(Path(__file__).read_text(encoding="utf-8"))
+        if pin != NIGHTLY:
+            die(f"pinned_nightly() reads {pin!r} from this file, not {NIGHTLY!r}")
+        print(pin)
         return 0
 
     SNAPSHOTS.mkdir(parents=True, exist_ok=True)
