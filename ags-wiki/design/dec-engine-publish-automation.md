@@ -219,6 +219,15 @@ equivalent per-stamp PR review.
     prerequisite's first cut used the stamp and immediately over-reported emit
     (+7 −4 already on the registry). When the tarball's commit cannot be
     placed in history, an API/code delta is reported but never acted on.
+  - **The API delta is measured on one toolchain (#998).** A snapshot text
+    diff is only valid when both sides were rendered on the same rustdoc
+    nightly. #988's re-render read as `+30 −30` per crate, and the 2026-09-30
+    cut spent twelve minors on no API movement. The cut now reads the nightly
+    pinned in `repo:tools/check_public_api.py` at the baseline commit. If it
+    differs from HEAD's (or predates the pin) and the text moved, both sides
+    are rendered with `cargo public-api diff <published>` on HEAD's nightly.
+    A render that cannot run sends the crate to a human. Every report names
+    each crate's measure.
   - **A fourth signal existed that no crate-local reading has**: a
     `[workspace.dependencies]` floor moved past the pins a published sibling
     carries (#809 — three crates stranded with every local gate green). The

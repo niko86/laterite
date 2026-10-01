@@ -88,6 +88,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -97,13 +98,22 @@ import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOTS = ROOT / "tools" / "release" / "public-api"
+
+# The snapshot tool owns the pin and the facade's name; read both from it
+# rather than restating them here. Stdlib-only, so the project-free nightly
+# job can import it.
+sys.path.insert(0, str(ROOT / "tools"))
+import check_public_api as cpa  # noqa: E402
+
+#: Where the rendering nightly is pinned, read at a commit by `pin_at`.
+PIN_SOURCE = "tools/check_public_api.py"
 CHANGELOG = ROOT / "changelog.json"
 ENGINE_MANIFEST = ROOT / "rust-packages" / "Cargo.toml"
 PRODUCT_MANIFEST = ROOT / "pyproject.toml"
@@ -184,6 +194,7 @@ class CrateStatus:
     part_required: str
     cut_action: str
     cut_why: str
+    api_delta_source: str
 
 
 @dataclass(frozen=True)
@@ -275,25 +286,134 @@ def last_stamp(manifest: Path, anchor: str) -> tuple[str, str]:
     return sha, rest
 
 
-def api_delta(since: str, crate: str) -> tuple[int, int, list[str]]:
-    """Net public-API additions and removals in ONE crate's snapshot since `since`.
+class ApiDelta(NamedTuple):
+    """One crate's API delta, and which measure produced it (#998).
 
-    Net, not raw: a snapshot regeneration can rewrite a line in place, which
-    shows as one `-pub` and one `+pub` for the same signature and is not a
-    change to the surface at all.
+    `source` is `snapshot` (the committed snapshots' text diff), `render` (both
+    sides rendered on HEAD's nightly) or `unavailable` (the render was needed
+    and could not run; `note` says why, and the counts mean nothing).
+    """
+
+    added: int
+    removed: int
+    removed_names: list[str]
+    source: str
+    note: str = ""
+
+
+def net_delta(lines: list[str]) -> tuple[int, int, list[str]]:
+    """Net `+pub`/`-pub` lines: added, removed, and the removed lines' text.
+
+    Net, not raw: a line removed and re-added verbatim is not a change to the
+    surface. Shared by the snapshot text diff and `cargo public-api diff`,
+    which lists a changed item as a `-`/`+` pair, so the two measures count
+    alike.
+    """
+    added = {ln[1:] for ln in lines if ln.startswith("+pub")}
+    removed = {ln[1:] for ln in lines if ln.startswith("-pub")}
+    net_add, net_rm = added - removed, removed - added
+    return len(net_add), len(net_rm), sorted(net_rm)
+
+
+def pin_at(rev: str) -> str:
+    """The rendering nightly pinned at `rev`; '' before #997 pinned one."""
+    return cpa.pinned_nightly(sh("git", "show", f"{rev}:{PIN_SOURCE}"))
+
+
+#: Generous: the render documents the published crate and its deps from
+#: scratch. A render that times out is a failed render, not a zero.
+RENDER_TIMEOUT_S = 900
+
+
+def render_api_diff(
+    crate: str, version: str, toolchain: str, *, all_features: bool
+) -> list[str] | None:
+    """`cargo public-api diff <version>` on `toolchain`: both sides, one renderer.
+
+    It fetches the published `version` from crates.io, so the old side is
+    what consumers actually have. `None` on any failure (no nightly, no
+    `cargo-public-api`, the registry), never an empty list: an empty list
+    would read as "no API change".
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "cargo",
+                "public-api",
+                "--manifest-path",
+                str(ROOT / "rust-packages" / crate / "Cargo.toml"),
+                *(["--all-features"] if all_features else []),
+                "--omit",
+                "blanket-impls",
+                "diff",
+                version,
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=RENDER_TIMEOUT_S,
+            env={**os.environ, "RUSTUP_TOOLCHAIN": toolchain},
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.splitlines()
+
+
+def api_delta(
+    since: str,
+    crate: str,
+    live: str,
+    render: Callable[..., list[str] | None] = render_api_diff,
+) -> ApiDelta:
+    """Net public-API additions and removals in ONE crate since `since`.
+
+    The cheap measure is the text diff of the committed snapshot. It is only
+    right when both sides were rendered on the same nightly. A new nightly
+    rewrites lines with no API change: #988's `-> Self` derives read as +30
+    -30 and cut twelve minors with no API movement behind any of them. So:
+
+    * same pin at `since` and HEAD: the text diff stands;
+    * the text did not move at all: zero, whatever the pins. A re-render
+      would have rewritten something;
+    * otherwise (pins differ, or `since` predates the pin and the toolchain
+      is unknown): render the published `live` version and HEAD on HEAD's
+      nightly, and count that. If it cannot run, the delta is `unavailable`
+      and the cut sends the crate to a human.
 
     Per crate since #781: the whole-directory diff this used to take collapsed
     eleven independently versioned surfaces into one verdict, which is exactly
     the reading lockstep imposed and per-crate versioning exists to retire.
     """
     if not since:
-        return 0, 0, []
+        return ApiDelta(0, 0, [], "snapshot")
     snap = SNAPSHOTS / f"{crate}.txt"
     diff = sh("git", "diff", f"{since}..HEAD", "--", str(snap.relative_to(ROOT)))
-    added = {ln[1:] for ln in diff.splitlines() if ln.startswith("+pub")}
-    removed = {ln[1:] for ln in diff.splitlines() if ln.startswith("-pub")}
-    net_add, net_rm = added - removed, removed - added
-    return len(net_add), len(net_rm), sorted(net_rm)
+    counted = net_delta(diff.splitlines())
+    pin_then, pin_now = pin_at(since), pin_at("HEAD")
+    if (pin_then and pin_then == pin_now) or counted == (0, 0, []):
+        return ApiDelta(*counted, "snapshot")
+    mismatch = f"snapshots rendered on {pin_then or 'an unpinned nightly'} vs {pin_now}"
+
+    def unmeasured(why: str) -> ApiDelta:
+        return ApiDelta(0, 0, [], "unavailable", f"{mismatch}, and {why}")
+
+    if not live:
+        return unmeasured("no published version to render against")
+    # The facade keeps two snapshots (default + all-features), so it renders
+    # both; every engine crate's single snapshot is the all-features one.
+    variants = (False, True) if crate == cpa.FACADE else (True,)
+    lines: list[str] = []
+    for all_features in variants:
+        out = render(crate, live, pin_now, all_features=all_features)
+        if out is None:
+            return unmeasured(
+                f"`cargo public-api diff {live}` on {pin_now} could not run"
+            )
+        lines += out
+    return ApiDelta(*net_delta(lines), "render")
 
 
 def index_path(crate: str) -> str:
@@ -609,6 +729,7 @@ def cut_action(
     part: str,
     baseline_kind: str,
     deps_stale: bool,
+    delta_unavailable: str = "",
 ) -> tuple[str, str]:
     """(action, why) for one crate: none | bump | publish | human | unconcluded.
 
@@ -620,6 +741,10 @@ def cut_action(
     because the delta may already be on the registry and a bump would spend a
     version on nothing. The stale-pin signal is registry-derived and survives
     that doubt.
+
+    `delta_unavailable` (#998) is the reason an API delta could not be
+    measured on one toolchain. The counts then mean nothing, so even a patch
+    owed for code movement would undersell an API change nobody could see.
     """
     if tier != "engine":
         return "none", f"tier is {tier!r} — outside the engine cut"
@@ -633,6 +758,8 @@ def cut_action(
         return "human", f"the registry ({live}) is ahead of the tree ({stamped})"
     if not baseline_kind:
         return "unconcluded", f"no baseline places the published {live} in this history"
+    if delta_unavailable:
+        return "human", f"API delta unmeasured: {delta_unavailable}"
     if part == "none":
         if state == "owed":
             return "publish", f"{stamped} is stamped; the registry has {live}"
@@ -669,6 +796,21 @@ def registry_scope(status: Report) -> str:
     )
 
 
+#: `ApiDelta.source` -> its tag on a crate's report line. Unmeasured is shouted,
+#: because its +0 -0 is an absence of knowledge, not a reading.
+DELTA_TAG = {"snapshot": "snapshot", "render": "render", "unavailable": "UNMEASURED"}
+
+
+def delta_scope(status: Report) -> str:
+    """Which measure each crate's API delta came from (#998), on every run."""
+    sources = [c.api_delta_source for c in status.engine_crates]
+    return (
+        f"api delta: {sources.count('snapshot')} from snapshot text, "
+        f"{sources.count('render')} from a same-toolchain render, "
+        f"{sources.count('unavailable')} unmeasured (toolchain mismatch, render failed)."
+    )
+
+
 def changelog_sections() -> dict[str, int]:
     if not CHANGELOG.exists():
         return {}
@@ -689,7 +831,10 @@ def verdict_from_api(added: int, removed: int) -> str:
     return "none"
 
 
-def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> Report:
+def collect(
+    fetch: Callable[[str], list[dict] | None] | None = fetch_index,
+    render: Callable[..., list[str] | None] = render_api_diff,
+) -> Report:
     """The whole report. `fetch=None` asks the registry nothing."""
     _, product_stamp = last_stamp(PRODUCT_MANIFEST, "/^version/,+1")
     sections = changelog_sections()
@@ -724,14 +869,15 @@ def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> R
             # own last stamp for the report, and conclude nothing in the cut.
             since, delta_baseline = sha, "last stamp"
             code = False
-        added, removed, removed_names = api_delta(since, crate)
+        delta = api_delta(since, crate, live, render)
+        added, removed, removed_names = delta.added, delta.removed, delta.removed_names
         # A crate being republished anyway (owed/new) carries fresh floors with
         # it, so stale pins are only a fact about crates the registry already
         # has at their stamped version.
         stale = deps_behind(rows, live, floors) if state == "ok" else []
         part = required_part(added, removed, code, bool(stale))
         action, why = cut_action(
-            state, tier, live, version, part, baseline_kind, bool(stale)
+            state, tier, live, version, part, baseline_kind, bool(stale), delta.note
         )
         if action == "bump":
             reasons = []
@@ -761,6 +907,7 @@ def collect(fetch: Callable[[str], list[dict] | None] | None = fetch_index) -> R
                 part_required=part,
                 cut_action=action,
                 cut_why=why,
+                api_delta_source=delta.source,
             )
         )
     return Report(
@@ -796,10 +943,11 @@ def render(s: Report) -> str:
             verdicts.append("PINS BEHIND FLOORS")
         flag = f"   ->  {', '.join(verdicts)}" if verdicts else ""
         reg = f"crates.io {c.registry_latest}"
+        measure = DELTA_TAG.get(c.api_delta_source, c.api_delta_source)
         lines.append(
             (
                 f"  {c.crate:<26} {c.version:<8} "
-                f"+{c.api_added} -{c.api_removed}  {reg:<18}{flag}"
+                f"+{c.api_added} -{c.api_removed} {f'[{measure}]':<14}{reg:<18}{flag}"
             ).rstrip()
         )
     lines += [
@@ -856,6 +1004,7 @@ def render(s: Report) -> str:
     )
     lines.append("  version whose tag was never cut is still invisible here.")
     lines.append(f"  {registry_scope(s)}")
+    lines.append(f"  {delta_scope(s)}")
     return "\n".join(lines)
 
 
@@ -925,6 +1074,7 @@ def render_cut(s: Report) -> str:
         )
     lines.append("")
     lines.append(f"  {registry_scope(s)}")
+    lines.append(f"  {delta_scope(s)}")
     return "\n".join(lines)
 
 
