@@ -335,7 +335,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
       # `--no-project --with pytest`: the test is stdlib + pytest and reads the
@@ -387,7 +387,7 @@ jobs:
           # watermark, so this is load-bearing and its absence fails loudly — the
           # same bargain changelog.yml struck for the same reason.
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
 
@@ -534,7 +534,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -627,14 +627,14 @@ jobs:
           workspaces: rust-packages
 
       - name: install cargo-public-api + cargo-semver-checks
-        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           # cargo-public-api pinned for the same reason as the nightly: its
           # renderer is half of what writes a snapshot line.
           tool: cargo-public-api@0.52.0,cargo-semver-checks
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
 
@@ -846,7 +846,7 @@ jobs:
       # verified almost nothing cannot be mistaken for one that verified
       # everything.
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
       - name: cargo package contents (crates.io allowlist)
@@ -889,7 +889,7 @@ jobs:
       # sccache + mold for the maturin (PyO3) build, if the runner has them.
       - uses: ./.github/actions/build-accel
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
       - name: Install Python 3.14 via uv
@@ -1038,7 +1038,7 @@ jobs:
       # the repo root — hence the full path to the node package's lcov.
       - name: Upload Node coverage to Codecov
         if: github.repository == 'niko86/laterite'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: rust-packages/laterite-node/coverage/lcov.info
           flags: node
@@ -1348,7 +1348,7 @@ jobs:
         # persistent runner home, so resolution stays warm locally; the
         # GitHub cache round-trip (+ the Windows tar/gzip save quirk) was
         # avoidable overhead.
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
 
@@ -1519,7 +1519,7 @@ jobs:
       # --cov-report=xml above (repo root).
       - name: Upload Python coverage to Codecov
         if: github.repository == 'niko86/laterite'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: coverage.xml
           flags: python
@@ -1571,7 +1571,7 @@ jobs:
       - uses: ./.github/actions/build-accel
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
 
@@ -1661,7 +1661,7 @@ jobs:
       # No Rust toolchain / build-accel here any more: the cdylib is built once
       # in build-ext and downloaded below, so this job no longer compiles
       # anything — it is a pure Python (uv + mkdocs) job.
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Install Python 3.14 via uv
         # Pin the interpreter to the one build-ext built the cdylib against (the
         # python job pins 3.14 too). The shipped wheel is abi3, so a single .so
