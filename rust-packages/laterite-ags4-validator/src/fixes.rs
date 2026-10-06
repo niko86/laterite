@@ -51,6 +51,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 
+use crate::dict::Dictionary;
+use crate::effective_dict::EffectiveDict;
 use crate::findings::{Findings, Target};
 use crate::parse::{ParsedFile, field_span, split_ags_line};
 use crate::rules::groups::AbbrLookup;
@@ -190,7 +192,11 @@ const RULE_5_NOT_ENCLOSED: &str = "Row has field(s) not enclosed in double quote
 /// finding. Pure read — never mutates `parsed` or `found` (the oracle
 /// stays intact). Findings whose fix would be ambiguous/unsafe (Rule 1
 /// non-ASCII, any rule not listed) are simply skipped.
-pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
+///
+/// `dict` must be the dictionary `found` was checked against: the Rule 16
+/// trim reads KEY identity from it (merged with the file's own DICT) to
+/// refuse a rewrite that would collapse two rows onto one KEY tuple.
+pub fn compute_fixes(parsed: &ParsedFile, found: &Findings, dict: Dictionary<'_>) -> Fixes {
     // Raw-line text by 1-based number, so a finding → its on-line span is
     // O(1). `field_span` runs over this raw text (quotes + tag intact).
     let line_text: HashMap<u32, &str> = parsed
@@ -696,9 +702,11 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
     //    under that heading that holds the value, in every group and whatever
     //    its declared TYPE: a padded KEY value is repeated down the parent/child
     //    chain, and rewriting only some copies would trade Rule 16 for Rule 10c.
-    //    Trimming can still make two rows that differed only by the padding
-    //    share a KEY tuple; Rule 10a then names a duplicate the padding hid,
-    //    which is the file's defect, not one the fix invents.
+    //    A rewrite that would make two rows of any group share a KEY tuple they
+    //    did not share before is withheld whole (`trims_merge_keys`): the padding
+    //    is then the only thing telling those rows apart, and a safe fix must
+    //    not trade a Rule 16 finding for a Rule 10a one. Those cells keep their
+    //    Rule 16 error and padding FYI; the rest of the file is still fixed.
     if found.contains_key(RULE_16) {
         if let Some(lookup) = AbbrLookup::of(parsed) {
             let mut repairs: BTreeMap<(&str, &str), String> = BTreeMap::new();
@@ -724,7 +732,18 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     }
                 }
             }
-            for ((hd, v), repaired) in repairs {
+            // Greedy, in (heading, value) order: each candidate is judged with
+            // the ones already accepted applied, so two trims that are harmless
+            // alone but collide together cannot both get through.
+            let eff = EffectiveDict::build(parsed, dict);
+            let mut accepted: BTreeMap<(&str, &str), String> = BTreeMap::new();
+            for (key, repaired) in repairs {
+                accepted.insert(key, repaired);
+                if trims_merge_keys(parsed, &eff, &accepted) {
+                    accepted.remove(&key);
+                }
+            }
+            for ((hd, v), repaired) in accepted {
                 let mut edits = Vec::new();
                 for code in &parsed.group_order {
                     let g = &parsed.groups[code];
@@ -781,6 +800,64 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
     }
 
     fixes
+}
+
+/// Whether applying `trims` — `(heading, value) → repaired` — would merge two
+/// rows of some group onto one KEY tuple that were distinct before. KEY
+/// identity is the effective dictionary's, as Rule 10a reads it, and a group
+/// missing one of its KEY headings is skipped because Rule 10a cannot judge
+/// its tuples either. Rows that already shared a tuple are not counted: a
+/// merge shows as the number of distinct tuples going down, and a duplicate
+/// the file already had leaves that number where it was.
+fn trims_merge_keys(
+    parsed: &ParsedFile,
+    eff: &EffectiveDict<'_>,
+    trims: &BTreeMap<(&str, &str), String>,
+) -> bool {
+    use std::collections::HashSet;
+    for code in &parsed.group_order {
+        let g = &parsed.groups[code];
+        let keys = eff.key_fields(code);
+        if keys.is_empty() {
+            continue;
+        }
+        let Some(idx) = keys
+            .iter()
+            .map(|k| g.headings.iter().position(|h| h == k))
+            .collect::<Option<Vec<usize>>>()
+        else {
+            continue;
+        };
+        if !idx
+            .iter()
+            .any(|&ci| trims.keys().any(|(hd, _)| g.headings[ci] == *hd))
+        {
+            continue; // no KEY column of this group is being rewritten
+        }
+        let mut before: HashSet<Vec<&str>> = HashSet::new();
+        let mut after: HashSet<Vec<&str>> = HashSet::new();
+        for row in &g.rows {
+            let cells: Vec<&str> = idx
+                .iter()
+                .map(|&ci| g.value_at(row, ci).unwrap_or(""))
+                .collect();
+            let moved: Vec<&str> = idx
+                .iter()
+                .zip(&cells)
+                .map(|(&ci, &v)| {
+                    trims
+                        .get(&(g.headings[ci].as_str(), v))
+                        .map_or(v, String::as_str)
+                })
+                .collect();
+            before.insert(cells);
+            after.insert(moved);
+        }
+        if after.len() < before.len() {
+            return true;
+        }
+    }
+    false
 }
 
 /// Walk a raw DATA line the way [`crate::parse::split_ags_line`] does,
@@ -1203,7 +1280,7 @@ pub fn fix_document_selective(
     let mut found = Findings::new();
     crate::rules::run_all(&pf, &dict, opts, &mut found);
 
-    let mut selected = compute_fixes(&pf, &found);
+    let mut selected = compute_fixes(&pf, &found, dict);
     // Per-rule selection applies to the full computed set first (short label).
     if only.is_some() || !exclude.is_empty() {
         selected.retain(|f| {
@@ -1345,7 +1422,7 @@ mod tests {
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert_eq!(kinds(&fixes), vec![FixKind::NormalizeCrlf]);
         let out = apply_fixes(src, parsed.has_bom, &fixes);
         assert!(!out.contains('\n') || out.contains("\r\n"));
@@ -1364,7 +1441,7 @@ mod tests {
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\""; // no trailing nl
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert_eq!(kinds(&fixes), vec![FixKind::NormalizeCrlf]);
         let out = apply_fixes(src, parsed.has_bom, &fixes);
         assert!(out.ends_with("\"DATA\",\"P1\"\r\n"));
@@ -1374,7 +1451,7 @@ mod tests {
     fn rule_6_embedded_cr_is_stripped() {
         let src = format!("{HEAD}\"DATA\",\"a\rb\"\r\n");
         let (parsed, found) = check(&src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(kinds(&fixes).contains(&FixKind::StripEmbeddedCr));
         let out = apply_fixes(&src, parsed.has_bom, &fixes);
         // The embedded CR (between a and b) is gone; the terminator stays.
@@ -1390,7 +1467,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\
                    \"DATA\",\"BH1\",\"BH1\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let f = fixes
             .iter()
             .find(|f| f.kind == FixKind::RenameDuplicateHeading)
@@ -1408,7 +1485,7 @@ mod tests {
                    \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\",\"ID\"\r\n\
                    \"DATA\",\"BH1\",\"BH1\",\"x\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let f = fixes
             .iter()
             .find(|f| f.kind == FixKind::RenameDuplicateHeading)
@@ -1424,7 +1501,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
                    \"DATA\",\"\",\"+\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let f = fixes
             .iter()
             .find(|f| f.kind == FixKind::InsertTranDlim)
@@ -1441,7 +1518,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
                    \"DATA\",\"|\",\"\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let f = fixes
             .iter()
             .find(|f| f.kind == FixKind::InsertTranRcon)
@@ -1460,7 +1537,7 @@ mod tests {
                    \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"2DP\",\"1SCI\",\"3SF\"\r\n\
                    \"DATA\",\"1.5\",\"150\",\"1234\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let repls: Vec<&str> = fixes
             .iter()
             .filter(|f| f.kind == FixKind::ReformatNumeric)
@@ -1485,7 +1562,7 @@ mod tests {
                    \"DATA\",\"abc\"\r\n";
         let (parsed, found) = check(src);
         assert!(found.contains_key(RULE_8), "Rule 8 should flag 'abc'");
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(!kinds(&fixes).contains(&FixKind::ReformatNumeric));
     }
 
@@ -1625,7 +1702,7 @@ mod tests {
                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
         let (parsed, found) = check(src);
         let before = found.clone();
-        let _ = compute_fixes(&parsed, &found);
+        let _ = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert_eq!(found, before, "compute_fixes must not mutate findings");
         // The line-only finding shape is still the historical minimal JSON.
         let mut f = Findings::new();
@@ -1645,7 +1722,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    \"DATA\",\"P1\",\"O\u{2019}Brien em\u{2014}dash\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let fix = fixes
             .iter()
             .find(|f| f.kind == FixKind::NormalizeTypography)
@@ -1696,7 +1773,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    \"DATA\",\"P1\",\"say \u{201C}hi\u{201D} now\"\r\n";
         let (parsed, found) = check(src);
-        let fix = compute_fixes(&parsed, &found)
+        let fix = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK))
             .into_iter()
             .find(|f| f.kind == FixKind::NormalizeTypography)
             .expect("a non-ASCII fold fix");
@@ -1732,7 +1809,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    \"DATA\",\"P1\",\"12\u{00B5}S 30\u{00B0}C Gro\u{00DF} caf\u{00E9} x\u{FFFD}y\"\r\n";
         let (parsed, found) = check(src);
-        let fix = compute_fixes(&parsed, &found)
+        let fix = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK))
             .into_iter()
             .find(|f| f.kind == FixKind::NormalizeTypography)
             .expect("a non-ASCII fold fix");
@@ -1752,7 +1829,7 @@ mod tests {
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_ID\"\r\n\
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\"DATA\",\"P1\",\"P2\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let rn = fixes
             .iter()
             .find(|f| f.kind == FixKind::RenameDuplicateHeading)
@@ -1767,7 +1844,7 @@ mod tests {
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             fixes
                 .iter()
@@ -1784,7 +1861,7 @@ mod tests {
         let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
                    \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"BH01\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let pad = fixes
             .iter()
             .find(|f| f.kind == FixKind::PadShortRow)
@@ -1801,7 +1878,7 @@ mod tests {
         let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH01\",\"extra\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             !fixes.iter().any(|f| f.kind == FixKind::PadShortRow),
             "a too-long row must not be padded"
@@ -1816,7 +1893,7 @@ mod tests {
         let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
                    \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"BH01\",\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let pad = fixes
             .iter()
             .find(|f| f.kind == FixKind::PadShortRow)
@@ -1838,7 +1915,7 @@ mod tests {
         let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
                    \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"a\"b\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             !fixes.iter().any(|f| f.kind == FixKind::PadShortRow),
             "a malformed-quote row must not be auto-padded"
@@ -1951,7 +2028,7 @@ mod tests {
                    \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
                    \"UNIT\",\"yyyy-mm-dd\"\r\n\"TYPE\",\"DT\"\r\n\"DATA\",\"18/08/2020\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let dt = fixes
             .iter()
             .find(|f| f.kind == FixKind::CanonicalizeDatetime)
@@ -1987,7 +2064,7 @@ mod tests {
                    \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
                    \"UNIT\",\"yyyy-mm-dd\"\r\n\"TYPE\",\"DT\"\r\n\"DATA\",\"01/02/2020\"\r\n";
         let (parsed, found) = check(src);
-        let dt = compute_fixes(&parsed, &found)
+        let dt = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK))
             .into_iter()
             .find(|f| f.kind == FixKind::CanonicalizeDatetime)
             .expect("a datetime canonicalisation fix");
@@ -2159,7 +2236,7 @@ mod tests {
         let src = padded_key_file(" D", "B + D");
         let (parsed, found) = check(&src);
         assert!(found.contains_key(RULE_16));
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let trims: Vec<&Fix> = fixes
             .iter()
             .filter(|f| f.kind == FixKind::TrimAbbreviation)
@@ -2185,7 +2262,7 @@ mod tests {
         let src = padded_key_file(" D+ X", "B");
         let (parsed, found) = check(&src);
         assert!(found.contains_key(RULE_16));
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             !kinds(&fixes).contains(&FixKind::TrimAbbreviation),
             "{fixes:?}"
@@ -2197,13 +2274,60 @@ mod tests {
         // "B" passes; " D" is the only padded value, so nothing else moves.
         let src = padded_key_file(" D", "B");
         let (parsed, found) = check(&src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let trims: Vec<&Fix> = fixes
             .iter()
             .filter(|f| f.kind == FixKind::TrimAbbreviation)
             .collect();
         assert_eq!(trims.len(), 1);
         assert!(trims[0].edits.iter().all(|e| e.expected == " D"));
+    }
+
+    /// SAMP carrying its whole dictionary KEY tuple, two rows that differ in
+    /// `SAMP_ID` by `id2` and in `SAMP_TYPE` by `a` / `b`.
+    const RULE_10A: &str = "AGS Format Rule 10a";
+
+    fn keyed_samp_file(a: &str, b: &str, id2: &str) -> String {
+        format!(
+            "\"GROUP\",\"SAMP\"\r\n\
+             \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\r\n\
+             \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{a:?},\"S1\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{b:?},{id2:?}\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"SAMP_TYPE\",\"D\",\"Disturbed\"\r\n"
+        )
+    }
+
+    #[test]
+    fn rule_16_withholds_a_trim_that_would_merge_two_keys() {
+        // The rows differ ONLY by the padding: trimming " D" would give them
+        // one KEY tuple, so the cell must stay as it is.
+        let src = keyed_samp_file(" D", "D", "S1");
+        let (parsed, found) = check(&src);
+        assert!(found.contains_key(RULE_16));
+        assert!(!found.contains_key(RULE_10A), "the fixture starts unique");
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
+        assert!(
+            !kinds(&fixes).contains(&FixKind::TrimAbbreviation),
+            "{fixes:?}"
+        );
+        let out = fix_document(src.as_bytes(), &CheckOptions::default(), true).expect("fixes");
+        assert!(String::from_utf8_lossy(&out.fixed).contains("\" D\",\"S1\""));
+        assert!(!out.residual.contains_key(RULE_10A), "{:?}", out.residual);
+        assert!(out.residual.contains_key(RULE_16));
+    }
+
+    #[test]
+    fn rule_16_trims_a_keyed_value_when_the_keys_stay_distinct() {
+        // Same shape, but SAMP_ID tells the rows apart: the trim is safe.
+        let src = keyed_samp_file(" D", "D", "S2");
+        let out = fix_document(src.as_bytes(), &CheckOptions::default(), false).expect("fixes");
+        assert!(kinds(&out.applied).contains(&FixKind::TrimAbbreviation));
+        assert!(!out.residual.contains_key(RULE_16), "{:?}", out.residual);
+        assert!(!out.residual.contains_key(RULE_10A), "{:?}", out.residual);
     }
 
     #[test]
@@ -2234,7 +2358,7 @@ mod tests {
                    \"GROUP\",\"MOND\"\r\n\"HEADING\",\"MOND_A\"\r\n\"UNIT\",\"\"\r\n\
                    \"TYPE\",\"2DP\"\r\n\"DATA\",\"1.5\"\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let dt = fixes
             .iter()
             .find(|f| f.kind == FixKind::CanonicalizeDatetime)
@@ -2334,7 +2458,7 @@ mod tests {
                    \"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n";
         let (parsed, found) = check(src);
         assert!(found.contains_key(RULE_2A), "all-LF should trip Rule 2a");
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             kinds(&fixes).contains(&FixKind::NormalizeCrlf),
             "all-LF file must still yield a CRLF-normalise fix: {:?}",
@@ -2349,7 +2473,7 @@ mod tests {
         // strip filter that the embedded-CR sibling test never lands on.
         let src = format!("{HEAD}\"DATA\",\"a\nb\"\r\n");
         let (parsed, found) = check(&src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             kinds(&fixes).contains(&FixKind::StripEmbeddedCr),
             "embedded LF should yield a strip fix: {:?}",
@@ -2371,7 +2495,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    DATA,P1,  padded  \r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let quote: Vec<&Fix> = fixes
             .iter()
             .filter(|f| f.kind == FixKind::QuoteUnquotedRow)
@@ -2399,7 +2523,7 @@ mod tests {
                    DATA,P1,Acme, Bloggs and Co\r\n";
         let (parsed, found) = check(src);
         assert!(found.contains_key(RULE_5), "fixture must trip Rule 5");
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow),
             "an overflowing row must not be re-quoted: {fixes:?}"
@@ -2415,7 +2539,7 @@ mod tests {
                    \"DATA\",\"P1\",\"ACME \"Gas Works\" Redevelopment\"\r\n";
         let (parsed, found) = check(src);
         assert!(found.contains_key(RULE_5), "fixture must trip Rule 5");
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         assert!(
             !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow),
             "an embedded-quote row must not be re-quoted: {fixes:?}"
@@ -2431,7 +2555,7 @@ mod tests {
                    \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\",\"X\"\r\n\
                    DATA,P1\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let ks = kinds(&fixes);
         assert!(
             ks.contains(&FixKind::QuoteUnquotedRow),
@@ -2457,7 +2581,7 @@ mod tests {
                    \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\",\"X\"\r\n\
                    DATA,P1,\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         let ks = kinds(&fixes);
         assert!(
             !ks.contains(&FixKind::QuoteUnquotedRow),
@@ -2473,7 +2597,7 @@ mod tests {
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    DATA,P1,5\" pipe\r\n";
         let (parsed, found) = check(src);
-        let fixes = compute_fixes(&parsed, &found);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
         if !kinds(&fixes).contains(&FixKind::QuoteUnquotedRow) {
             // The tokenizer may classify this line as quote-mangled rather
             // than unquoted; either way nothing lossy may be offered, and

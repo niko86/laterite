@@ -28,15 +28,19 @@ FYI16 = "FYI (Related to Rule 16)"
 R16 = "AGS Format Rule 16"
 
 
-def _clean(second: str = "D") -> bytes:
+def _clean(second: str = "D", first: str = "U", *, same_keys: bool = False) -> bytes:
+    """With ``same_keys`` the two samples share every KEY value but SAMP_TYPE."""
     k = {
         "LOCA_ID": ["BH1", "BH1"],
-        "SAMP_TOP": [1.0, 2.0],
-        "SAMP_REF": ["1", "2"],
-        "SAMP_TYPE": ["U", second],
-        "SAMP_ID": ["S1", "S2"],
+        "SAMP_TOP": [1.0, 1.0] if same_keys else [1.0, 2.0],
+        "SAMP_REF": ["1", "1"] if same_keys else ["1", "2"],
+        "SAMP_TYPE": [first, second],
+        "SAMP_ID": ["S1", "S1"] if same_keys else ["S1", "S2"],
     }
-    spec = {"SPEC_REF": ["1", "1"], "SPEC_DPTH": [1.0, 2.0]}
+    spec = {
+        "SPEC_REF": ["1", "1"],
+        "SPEC_DPTH": [1.0, 1.0] if same_keys else [1.0, 2.0],
+    }
     frames = {
         "PROJ": pl.DataFrame({"PROJ_ID": ["P1"]}),
         "LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]}),
@@ -146,3 +150,22 @@ def test_compat_keeps_python_ags4_rule_16_wording():
         and d.endswith(" not found in ABBR group.")
         for d in descs
     ), descs
+
+
+def test_fix_withholds_a_trim_that_would_merge_two_keys():
+    """Two samples identical but for SAMP_TYPE " D" vs "D": trimming would give
+    them one KEY tuple in every group, so the padded cells must stay."""
+    clean = _clean("D", "B", same_keys=True)
+    # SAMP_ID repeats, which Rule 8's ID-uniqueness flags (O-11); the KEY
+    # tuples themselves are distinct, so no Rule 10a yet.
+    start = set(laterite.validate(clean).findings["rule"].to_list())
+    assert "AGS Format Rule 10a" not in start, start
+    needle = b'"B","S1"'
+    assert clean.count(needle) == 3
+    data = clean.replace(needle, b'" D","S1"')
+    fixed = laterite.fix(data=data, risky=True)
+    assert not any(a["kind"] == "trim_abbreviation" for a in fixed.applied)
+    assert fixed.bytes.count(b'" D","S1"') == 3
+    rules = set(laterite.validate(fixed.bytes).findings["rule"].to_list())
+    assert R16 in rules
+    assert "AGS Format Rule 10a" not in rules

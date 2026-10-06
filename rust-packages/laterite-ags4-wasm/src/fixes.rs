@@ -66,10 +66,14 @@ fn compute_fixes_core(
     };
     // Through the door, so the fixes offered in the browser are computed against the
     // same dictionary `lat fix` would use on the same bytes (the O-42 guard included).
-    let Ok((found, _dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
+    let Ok((found, dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
         return Vec::new();
     };
-    laterite_ags4_validator::fixes::compute_fixes(&parsed, &found)
+    laterite_ags4_validator::fixes::compute_fixes(
+        &parsed,
+        &found,
+        laterite_ags4_validator::dict::Dictionary::bundled(dv),
+    )
 }
 
 /// Apply a user-selected subset of fixes to AGS4 bytes, returning the new

@@ -605,7 +605,7 @@ fn judge(parsed: ParsedFile, emitted_len: usize, opts: &EmitOpts) -> Result<Emit
         EmitMode::AutoFix => {
             // `compute_fixes` reads exactly the inventory the constructed
             // verdict populates (#848), so no parse runs to price the fixes.
-            let safe: Vec<_> = compute_fixes(&parsed, &found)
+            let safe: Vec<_> = compute_fixes(&parsed, &found, dict)
                 .into_iter()
                 .filter(|f| f.risk == FixRisk::Safe)
                 .collect();

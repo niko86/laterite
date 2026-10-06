@@ -275,7 +275,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes:
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::SpanEdit
 pub const laterite_ags4_validator::fixes::FIXABLE_RULE_LABELS: &[&str]
 pub fn laterite_ags4_validator::fixes::apply_fixes(&str, bool, &[laterite_ags4_validator::fixes::Fix]) -> alloc::string::String
-pub fn laterite_ags4_validator::fixes::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings) -> laterite_ags4_validator::fixes::Fixes
+pub fn laterite_ags4_validator::fixes::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::Dictionary<'_>) -> laterite_ags4_validator::fixes::Fixes
 pub fn laterite_ags4_validator::fixes::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::fixes::fix_document_selective(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String]) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub type laterite_ags4_validator::fixes::Fixes = alloc::vec::Vec<laterite_ags4_validator::fixes::Fix>
@@ -555,7 +555,7 @@ pub fn laterite_ags4_validator::check_file(&std::path::Path, &laterite_ags4_vali
 pub fn laterite_ags4_validator::check_file_with_dict(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<(laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_validator::findings::Findings, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::check_parsed_with_dict(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
-pub fn laterite_ags4_validator::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings) -> laterite_ags4_validator::fixes::Fixes
+pub fn laterite_ags4_validator::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::Dictionary<'_>) -> laterite_ags4_validator::fixes::Fixes
 pub fn laterite_ags4_validator::editions_joined(&str) -> alloc::string::String
 pub fn laterite_ags4_validator::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::fix_document_selective(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String]) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>

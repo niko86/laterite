@@ -782,6 +782,9 @@ O-N below is an internal decision or behavioural note, not for external circulat
   failing part becomes a defined code once trimmed, the failing parts are
   trimmed and rejoined with the bare concatenator, and every copy of the value
   under that heading is rewritten together so a KEY chain stays consistent.
+  A trim that would give two rows of any group the same KEY values (by the
+  effective dictionary) is withheld whole, since the padding is then the only
+  thing telling those rows apart; those cells keep their finding and FYI.
 
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 
