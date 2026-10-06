@@ -110,6 +110,7 @@ pub laterite_ags4_reference::dict::Dictionary::Layered::base: laterite_ags4_refe
 pub laterite_ags4_reference::dict::Dictionary::Layered::delta: &'a laterite_ags4_reference::overlay::OwnedDelta
 impl<'a> laterite_ags4_reference::dict::Dictionary<'a>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes(&self, &str) -> alloc::vec::Vec<&'a str>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes_ignoring_case(&self, &str, &str) -> alloc::vec::Vec<&'a str>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_desc(&self, &str, &str) -> core::option::Option<&'a str>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::all_heading_names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &'a str> + 'a
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::bundled(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::Dictionary<'static>

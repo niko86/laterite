@@ -524,6 +524,27 @@ impl<'a> Dictionary<'a> {
             .collect()
     }
 
+    /// Every standard `ABBR_CODE` for `heading` that equals `code` when letter
+    /// case is ignored, sorted, `code` itself included if it is standard;
+    /// empty if none. The exact lookups ([`Self::abbr_desc`]) cannot see a case
+    /// variant, yet the spec calls the ABBR list not case sensitive and some
+    /// importers key it that way, so a variant of a standard code is worth
+    /// naming. Several can match because the standard itself carries
+    /// case-only pairs (`PTST_TYPE` "CONSTANT HEAD" / "Constant Head").
+    /// Sorted so a message built from it is stable, unlike [`Self::abbr_codes`].
+    /// Case is folded with Unicode lowercasing. v1: base only.
+    #[must_use]
+    pub fn abbr_codes_ignoring_case(&self, heading: &str, code: &str) -> Vec<&'a str> {
+        let folded = code.to_lowercase();
+        let mut hits: Vec<&'a str> = self
+            .abbr_codes(heading)
+            .into_iter()
+            .filter(|c| c.to_lowercase() == folded)
+            .collect();
+        hits.sort_unstable();
+        hits
+    }
+
     #[must_use]
     pub fn version(&self) -> DictVersion {
         self.base().version
@@ -988,6 +1009,33 @@ mod tests {
             );
         }
         assert!(d.abbr_codes("NOPE_HDNG").is_empty());
+    }
+
+    #[test]
+    fn abbr_codes_ignoring_case_returns_every_case_variant_sorted() {
+        let d = Dictionary::bundled(DictVersion::V4_1_1);
+        // A case-only pair in the standard: both match, in sorted order,
+        // whichever spelling (standard or not) is asked about.
+        let pair = vec!["CONSTANT HEAD", "Constant Head"];
+        assert_eq!(
+            d.abbr_codes_ignoring_case("PTST_TYPE", "constant head"),
+            pair
+        );
+        assert_eq!(
+            d.abbr_codes_ignoring_case("PTST_TYPE", "Constant Head"),
+            pair
+        );
+        assert_eq!(
+            d.abbr_codes_ignoring_case("TRIG_COND", "Undisturbed"),
+            vec!["UNDISTURBED"]
+        );
+        // The heading scopes the match, and a code with no variant gives none.
+        assert!(
+            d.abbr_codes_ignoring_case("SAMP_TYPE", "undisturbed")
+                .is_empty()
+        );
+        assert!(d.abbr_codes_ignoring_case("TRIG_COND", "ZZ").is_empty());
+        assert!(d.abbr_codes_ignoring_case("NOPE_HDNG", "ZZ").is_empty());
     }
 
     // ---- layered (custom-dict overlay) paths ----

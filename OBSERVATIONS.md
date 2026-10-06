@@ -652,6 +652,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Assessment**: a clean-room data-quality signal that catches typo'd / invented abbreviations the error-tier rules cannot (the file IS Rule-16-valid). Informational (FYI) and opt-in, never changes the error verdict, so python-parity is untouched.
 - **Upstream-reportable**: **[NO]** — an additive laterite feature, not a python-ags4 defect (though their unimplemented Warnings section could adopt it).
 - **Our decision** (#199): ship as an FYI under the existing `FYI (Related to Rule 16)` bucket — no new finding key, so the compat severity classifier treats it as FYI unchanged. FYI, not WARNING: the file breaks no rule.
+- **Hint** (#1009): a non-standard code is often a standard one in the wrong case (`"Undisturbed"` for `TRIG_COND` `"UNDISTURBED"`). When the edition's standard picklist for the heading has codes equal to the declared one ignoring case, the FYI ends `; did you mean "…"?` naming all of them, joined with `or`; the wording before it is unchanged, and a code with no case variant keeps the original message byte for byte. Two spellings in one file colliding with each other is a separate FYI, [[O-58]].
 
 ### O-44 [VARIANCE] Structural validation of a file-level DICT group is a laterite-originated WARNING (Related to Rule 18); python-ags4 only consumes DICT, never validates it
 - **Observed**: Rule 18 requires a DICT group for non-standard names but says nothing about the DICT's OWN well-formedness. A file can declare custom groups/headings through a MALFORMED DICT (a missing `DICT_TYPE`/`DICT_GRP`/`DICT_HDNG` column, a blank `DICT_GRP`, a `HEADING`-row with a blank `DICT_HDNG`). The engine only *consumes* DICT, so a malformed one degrades every downstream check with zero feedback.
@@ -785,6 +786,41 @@ O-N below is an internal decision or behavioural note, not for external circulat
   A trim that would give two rows of any group the same KEY values (by the
   effective dictionary) is withheld whole, since the padding is then the only
   thing telling those rows apart; those cells keep their finding and FYI.
+
+### O-58 [VARIANCE] ABBR codes under one heading that differ only by letter case get a laterite-originated FYI (Related to Rule 16); python-ags4 has no such check
+- **Observed** (#1009): a file can declare `"Undisturbed"` and
+  `"UNDISTURBED"` as two ABBR rows under `TRIG_COND`. Both engines look
+  codes up exactly, so each row defines its own spelling, every `PA` value
+  resolves, and neither reports anything. An importer that keys ABBR
+  case-insensitively reads the second row as a duplicate key and rejects
+  the file. The pair typically appears when deliveries from different
+  sources, each consistent on its own, are combined.
+- **Spec** (`spec:AGS4-4.2-2025.pdf §3.3`, `§6.2`): the ABBR list is
+  stated not to be case sensitive, unlike the TYPE and UNIT lists, and a
+  file is asked to apply its abbreviations consistently. Two spellings of
+  one code under one heading are the inconsistency that guidance warns
+  against. Rule 16 (§4.1.1) itself only requires the codes to be defined.
+  The bundled standard list carries such pairs of its own (`PTST_TYPE`
+  `"CONSTANT HEAD"` and `"Constant Head"` in the editions that list both).
+- **python-ags4** (`check.py::rule_16`, `fyi_16_1`): no check compares the
+  file's ABBR codes with each other.
+- **Assessment**: no rule is broken, so it is not an error; the risk is
+  downstream interoperability, which is what the FYI tier is for. The
+  exact Rule 16 lookup is unchanged and out of scope here: an undefined
+  value stays an error whatever its case.
+- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
+  python-ags4 defect or a spec ambiguity.
+- **Our decision** (#1009): with FYIs on, emit one `FYI (Related to Rule
+  16)` per `ABBR_HDNG` and case-folded `ABBR_CODE` that has two or more
+  distinct spellings among the file's own ABBR rows, on the ABBR group,
+  naming the heading and every spelling in row order. It fires whatever
+  the codes' standard status, including when every spelling is standard,
+  since the importer risk is the same; an exact repeat is one spelling.
+  Only the file's rows are compared, never the standard list with itself.
+  The label is the existing one, so compat's severity classifier and the
+  parity label set see nothing new, and the verdict never changes. A
+  non-standard spelling also keeps its [[O-43]] FYI, which now names the
+  standard case variant. Collapsing the variants is not done here.
 
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 

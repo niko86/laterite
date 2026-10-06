@@ -7,14 +7,14 @@ rule_number: 16
 rule_sub: ""
 rule_family: groups
 varies_between_editions: false
-divergences: [O-43, O-57]
+divergences: [O-43, O-57, O-58]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs"
   fixtures: ""
   regression: ""
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 16"
-related: [rule-families, traceability-chain, parity-model, O-43, O-57]
+related: [rule-families, traceability-chain, parity-model, O-43, O-57, O-58]
 sources: [spec-4.2]
 ---
 # Rule 16 — abbr group
@@ -61,8 +61,9 @@ timeline
 ```
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
-- Divergence (Rust↔python): [[O-43]] — laterite adds an FYI for a self-declared but **non-standard** PA abbreviation (a typo'd / invented code that is in the file's ABBR but not the standard picklist); python-ags4 has no equivalent.
+- Divergence (Rust↔python): [[O-43]] — laterite adds an FYI for a self-declared but **non-standard** PA abbreviation (a typo'd / invented code that is in the file's ABBR but not the standard picklist), and names the standard code when one matches it ignoring case; python-ags4 has no equivalent.
 - Divergence (Rust↔python): [[O-57]] — laterite adds an FYI when a PA value fails only because of whitespace around a defined code, and `fix` trims it; python-ags4 has no equivalent.
+- Divergence (Rust↔python): [[O-58]] — laterite adds an FYI when the file's ABBR declares codes under one heading that differ only by letter case; python-ags4 has no equivalent.
 
 ## Related
-[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-43]] · [[O-57]]
+[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-43]] · [[O-57]] · [[O-58]]
