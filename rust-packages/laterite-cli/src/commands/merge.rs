@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::process::exit;
 
-use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, merge_parsed};
+use laterite_ags4_merge::{MergeError, MergeOpts, Recode, TranStamp, merge_parsed};
 use laterite_ags4_parse::parse_bytes;
 use laterite_ags4_validator::dict::FALLBACK;
 use laterite_ags4_validator::{CheckOptions, ValidatorError, resolve_dict_version, tran_ags_of};
@@ -19,6 +19,32 @@ use crate::commands::common::apply_dict_args;
 /// bytes always go to `--out`, so stdout stays clean.
 pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
     let opts = apply_dict_args(CheckOptions::default(), &args.dict);
+
+    // `--recode` is a JSON file, as `--dict` is: codes may hold any character,
+    // so a file beats a flag syntax that would need escaping of its own.
+    let recode: Recode = match &args.recode {
+        None => Recode::new(),
+        Some(p) => {
+            let text = match std::fs::read_to_string(p) {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("error: {}: {e}", p.display());
+                    exit(3);
+                }
+            };
+            match serde_json::from_str(&text) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!(
+                        "error: --recode {}: expected a JSON object {{heading: {{from_code: \
+                         to_code}}}}: {e}",
+                        p.display()
+                    );
+                    exit(5);
+                }
+            }
+        }
+    };
 
     let spinner = Spinner::start("merging...", quiet);
     let read = |p: &Path| match std::fs::read(p) {
@@ -79,6 +105,8 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         tran,
         dict_rows: args.dict_rows,
         row_order: args.row_order,
+        on_code_case: args.on_code_case,
+        recode,
         ..Default::default()
     };
 
@@ -175,6 +203,16 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
                 "hint: --on-missing-tran reconcile  merge TRAN like any other group and warn — \
                  each delivery's TRAN row survives, which is more than Rule 14 permits"
             );
+            exit(6);
+        }
+        Err(e @ MergeError::Recode(_)) => {
+            // The caller's argument, not the files: the usage-class code an
+            // unknown mode token gets on the bindings.
+            eprintln!("error: {e}");
+            exit(5);
+        }
+        Err(e @ MergeError::KeyCollision { .. }) => {
+            eprintln!("error: {e}");
             exit(6);
         }
         Err(MergeError::Emit(e)) => {

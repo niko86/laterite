@@ -579,6 +579,209 @@ impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::OwnedGroupM
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::OwnedGroupMeta
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::OwnedGroupMeta
 pub fn laterite_ags4_reference::overlay::parse_dict(&[u8], laterite_ags4_reference::overlay::DictFormat, &'static encoding_rs::Encoding, laterite_ags4_reference::overlay::BaseSpec, &str) -> core::result::Result<laterite_ags4_reference::overlay::CustomDict, laterite_ags4_reference::overlay::DictError>
+pub mod laterite_ags4_reference::recode
+pub enum laterite_ags4_reference::recode::CodeCaseMode
+pub laterite_ags4_reference::recode::CodeCaseMode::Keep
+pub laterite_ags4_reference::recode::CodeCaseMode::Standard
+impl laterite_ags4_reference::recode::CodeCaseMode
+pub const laterite_ags4_reference::recode::CodeCaseMode::ALL: [laterite_ags4_reference::recode::CodeCaseMode; 2]
+pub fn laterite_ags4_reference::recode::CodeCaseMode::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_reference::recode::CodeCaseMode
+pub fn laterite_ags4_reference::recode::CodeCaseMode::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::CodeCaseMode
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::CodeCaseMode
+pub fn laterite_ags4_reference::recode::CodeCaseMode::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_reference::recode::CodeCaseMode
+pub fn laterite_ags4_reference::recode::CodeCaseMode::default() -> Self
+impl core::fmt::Debug for laterite_ags4_reference::recode::CodeCaseMode
+pub fn laterite_ags4_reference::recode::CodeCaseMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::recode::CodeCaseMode
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::CodeCaseMode
+impl core::str::traits::FromStr for laterite_ags4_reference::recode::CodeCaseMode
+pub type laterite_ags4_reference::recode::CodeCaseMode::Err = alloc::string::String
+pub fn laterite_ags4_reference::recode::CodeCaseMode::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for laterite_ags4_reference::recode::CodeCaseMode
+impl core::marker::Send for laterite_ags4_reference::recode::CodeCaseMode
+impl core::marker::Sync for laterite_ags4_reference::recode::CodeCaseMode
+impl core::marker::Unpin for laterite_ags4_reference::recode::CodeCaseMode
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::CodeCaseMode
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::CodeCaseMode
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::CodeCaseMode
+pub enum laterite_ags4_reference::recode::RecodeError
+pub laterite_ags4_reference::recode::RecodeError::AbsentCode
+pub laterite_ags4_reference::recode::RecodeError::AbsentCode::code: alloc::string::String
+pub laterite_ags4_reference::recode::RecodeError::AbsentCode::heading: alloc::string::String
+pub laterite_ags4_reference::recode::RecodeError::EmptyTarget
+pub laterite_ags4_reference::recode::RecodeError::EmptyTarget::code: alloc::string::String
+pub laterite_ags4_reference::recode::RecodeError::EmptyTarget::heading: alloc::string::String
+pub laterite_ags4_reference::recode::RecodeError::NotPaHeading(alloc::string::String)
+impl core::clone::Clone for laterite_ags4_reference::recode::RecodeError
+pub fn laterite_ags4_reference::recode::RecodeError::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::RecodeError
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::RecodeError
+pub fn laterite_ags4_reference::recode::RecodeError::eq(&self, &Self) -> bool
+impl core::error::Error for laterite_ags4_reference::recode::RecodeError
+impl core::fmt::Debug for laterite_ags4_reference::recode::RecodeError
+pub fn laterite_ags4_reference::recode::RecodeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_reference::recode::RecodeError
+pub fn laterite_ags4_reference::recode::RecodeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::RecodeError
+impl core::marker::Freeze for laterite_ags4_reference::recode::RecodeError
+impl core::marker::Send for laterite_ags4_reference::recode::RecodeError
+impl core::marker::Sync for laterite_ags4_reference::recode::RecodeError
+impl core::marker::Unpin for laterite_ags4_reference::recode::RecodeError
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::RecodeError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::RecodeError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::RecodeError
+pub struct laterite_ags4_reference::recode::CaseSet
+pub laterite_ags4_reference::recode::CaseSet::heading: alloc::string::String
+pub laterite_ags4_reference::recode::CaseSet::resolved: core::option::Option<alloc::string::String>
+pub laterite_ags4_reference::recode::CaseSet::spellings: alloc::vec::Vec<laterite_ags4_reference::recode::Spelling>
+pub laterite_ags4_reference::recode::CaseSet::suggested: core::option::Option<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_reference::recode::CaseSet
+pub fn laterite_ags4_reference::recode::CaseSet::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::CaseSet
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::CaseSet
+pub fn laterite_ags4_reference::recode::CaseSet::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::recode::CaseSet
+pub fn laterite_ags4_reference::recode::CaseSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::CaseSet
+impl serde_core::ser::Serialize for laterite_ags4_reference::recode::CaseSet
+pub fn laterite_ags4_reference::recode::CaseSet::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::recode::CaseSet
+impl core::marker::Send for laterite_ags4_reference::recode::CaseSet
+impl core::marker::Sync for laterite_ags4_reference::recode::CaseSet
+impl core::marker::Unpin for laterite_ags4_reference::recode::CaseSet
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::CaseSet
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::CaseSet
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::CaseSet
+pub struct laterite_ags4_reference::recode::CellEdit
+pub laterite_ags4_reference::recode::CellEdit::col: usize
+pub laterite_ags4_reference::recode::CellEdit::group: alloc::string::String
+pub laterite_ags4_reference::recode::CellEdit::input: usize
+pub laterite_ags4_reference::recode::CellEdit::row: usize
+pub laterite_ags4_reference::recode::CellEdit::value: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::recode::CellEdit
+pub fn laterite_ags4_reference::recode::CellEdit::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::CellEdit
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::CellEdit
+pub fn laterite_ags4_reference::recode::CellEdit::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::recode::CellEdit
+pub fn laterite_ags4_reference::recode::CellEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::CellEdit
+impl core::marker::Freeze for laterite_ags4_reference::recode::CellEdit
+impl core::marker::Send for laterite_ags4_reference::recode::CellEdit
+impl core::marker::Sync for laterite_ags4_reference::recode::CellEdit
+impl core::marker::Unpin for laterite_ags4_reference::recode::CellEdit
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::CellEdit
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::CellEdit
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::CellEdit
+pub struct laterite_ags4_reference::recode::KeyCollision
+pub laterite_ags4_reference::recode::KeyCollision::codes: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub laterite_ags4_reference::recode::KeyCollision::group: alloc::string::String
+pub laterite_ags4_reference::recode::KeyCollision::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_reference::recode::KeyCollision::rows: alloc::vec::Vec<(usize, usize, alloc::vec::Vec<alloc::string::String>)>
+impl core::clone::Clone for laterite_ags4_reference::recode::KeyCollision
+pub fn laterite_ags4_reference::recode::KeyCollision::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::KeyCollision
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::KeyCollision
+pub fn laterite_ags4_reference::recode::KeyCollision::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::recode::KeyCollision
+pub fn laterite_ags4_reference::recode::KeyCollision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::KeyCollision
+impl core::marker::Freeze for laterite_ags4_reference::recode::KeyCollision
+impl core::marker::Send for laterite_ags4_reference::recode::KeyCollision
+impl core::marker::Sync for laterite_ags4_reference::recode::KeyCollision
+impl core::marker::Unpin for laterite_ags4_reference::recode::KeyCollision
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::KeyCollision
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::KeyCollision
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::KeyCollision
+pub struct laterite_ags4_reference::recode::Resolution
+pub laterite_ags4_reference::recode::Resolution::case_sets: alloc::vec::Vec<laterite_ags4_reference::recode::CaseSet>
+pub laterite_ags4_reference::recode::Resolution::mapping: laterite_ags4_reference::recode::Mapping
+impl core::clone::Clone for laterite_ags4_reference::recode::Resolution
+pub fn laterite_ags4_reference::recode::Resolution::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::Resolution
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::Resolution
+pub fn laterite_ags4_reference::recode::Resolution::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_reference::recode::Resolution
+pub fn laterite_ags4_reference::recode::Resolution::default() -> Self
+impl core::fmt::Debug for laterite_ags4_reference::recode::Resolution
+pub fn laterite_ags4_reference::recode::Resolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::Resolution
+impl core::marker::Freeze for laterite_ags4_reference::recode::Resolution
+impl core::marker::Send for laterite_ags4_reference::recode::Resolution
+impl core::marker::Sync for laterite_ags4_reference::recode::Resolution
+impl core::marker::Unpin for laterite_ags4_reference::recode::Resolution
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::Resolution
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::Resolution
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::Resolution
+pub struct laterite_ags4_reference::recode::Rewrite
+pub laterite_ags4_reference::recode::Rewrite::collisions: alloc::vec::Vec<laterite_ags4_reference::recode::KeyCollision>
+pub laterite_ags4_reference::recode::Rewrite::dropped: alloc::vec::Vec<laterite_ags4_reference::recode::RowRef>
+pub laterite_ags4_reference::recode::Rewrite::edits: alloc::vec::Vec<laterite_ags4_reference::recode::CellEdit>
+impl core::clone::Clone for laterite_ags4_reference::recode::Rewrite
+pub fn laterite_ags4_reference::recode::Rewrite::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::Rewrite
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::Rewrite
+pub fn laterite_ags4_reference::recode::Rewrite::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_reference::recode::Rewrite
+pub fn laterite_ags4_reference::recode::Rewrite::default() -> Self
+impl core::fmt::Debug for laterite_ags4_reference::recode::Rewrite
+pub fn laterite_ags4_reference::recode::Rewrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::Rewrite
+impl core::marker::Freeze for laterite_ags4_reference::recode::Rewrite
+impl core::marker::Send for laterite_ags4_reference::recode::Rewrite
+impl core::marker::Sync for laterite_ags4_reference::recode::Rewrite
+impl core::marker::Unpin for laterite_ags4_reference::recode::Rewrite
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::Rewrite
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::Rewrite
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::Rewrite
+pub struct laterite_ags4_reference::recode::RowRef
+pub laterite_ags4_reference::recode::RowRef::group: alloc::string::String
+pub laterite_ags4_reference::recode::RowRef::input: usize
+pub laterite_ags4_reference::recode::RowRef::row: usize
+impl core::clone::Clone for laterite_ags4_reference::recode::RowRef
+pub fn laterite_ags4_reference::recode::RowRef::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::RowRef
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::RowRef
+pub fn laterite_ags4_reference::recode::RowRef::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::recode::RowRef
+pub fn laterite_ags4_reference::recode::RowRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for laterite_ags4_reference::recode::RowRef
+pub fn laterite_ags4_reference::recode::RowRef::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::RowRef
+impl core::marker::Freeze for laterite_ags4_reference::recode::RowRef
+impl core::marker::Send for laterite_ags4_reference::recode::RowRef
+impl core::marker::Sync for laterite_ags4_reference::recode::RowRef
+impl core::marker::Unpin for laterite_ags4_reference::recode::RowRef
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::RowRef
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::RowRef
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::RowRef
+pub struct laterite_ags4_reference::recode::Spelling
+pub laterite_ags4_reference::recode::Spelling::code: alloc::string::String
+pub laterite_ags4_reference::recode::Spelling::inputs: alloc::vec::Vec<usize>
+impl core::clone::Clone for laterite_ags4_reference::recode::Spelling
+pub fn laterite_ags4_reference::recode::Spelling::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::recode::Spelling
+impl core::cmp::PartialEq for laterite_ags4_reference::recode::Spelling
+pub fn laterite_ags4_reference::recode::Spelling::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::recode::Spelling
+pub fn laterite_ags4_reference::recode::Spelling::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::recode::Spelling
+impl serde_core::ser::Serialize for laterite_ags4_reference::recode::Spelling
+pub fn laterite_ags4_reference::recode::Spelling::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::recode::Spelling
+impl core::marker::Send for laterite_ags4_reference::recode::Spelling
+impl core::marker::Sync for laterite_ags4_reference::recode::Spelling
+impl core::marker::Unpin for laterite_ags4_reference::recode::Spelling
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::recode::Spelling
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::recode::Spelling
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::recode::Spelling
+pub fn laterite_ags4_reference::recode::plan_rewrite(&[laterite_ags4_parse::ParsedFile], &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_reference::recode::Mapping) -> laterite_ags4_reference::recode::Rewrite
+pub fn laterite_ags4_reference::recode::resolve_mapping(&[laterite_ags4_parse::ParsedFile], &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_reference::recode::Recode, laterite_ags4_reference::recode::CodeCaseMode) -> core::result::Result<laterite_ags4_reference::recode::Resolution, laterite_ags4_reference::recode::RecodeError>
+pub type laterite_ags4_reference::recode::Mapping = alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String>>
+pub type laterite_ags4_reference::recode::Recode = alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String>>
 pub mod laterite_ags4_reference::union
 pub struct laterite_ags4_reference::union::GroupDescriptor
 pub laterite_ags4_reference::union::GroupDescriptor::code: alloc::string::String

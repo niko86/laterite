@@ -426,6 +426,9 @@ impl<'a> Merge<'a> {
             dict_rows: laterite_ags4_merge::DictRows::Keep,
             // #1008 put row ordering on the bindings and `lat`; same stance.
             row_order: laterite_ags4_merge::RowOrder::Input,
+            // #1010 put code rewriting on the bindings and `lat`; same stance.
+            on_code_case: laterite_ags4_merge::CodeCaseMode::Keep,
+            recode: laterite_ags4_merge::Recode::new(),
         };
 
         let result = merge_parsed(&parsed, &opts).map_err(|e| {
@@ -437,6 +440,10 @@ impl<'a> Merge<'a> {
                 MergeError::TypeConflict { .. } => ErrorKind::TypeConflict,
                 MergeError::UnitConflict { .. } => ErrorKind::UnitConflict,
                 MergeError::MissingTran => ErrorKind::MissingTran,
+                // Neither is reachable while this facade never asks for a code
+                // rewrite (above); they get kinds of their own if it does.
+                MergeError::Recode(_) => ErrorKind::InvalidArgument,
+                MergeError::KeyCollision { .. } => ErrorKind::Other,
                 MergeError::Emit(_) => ErrorKind::Emit,
             };
             // The engine's own message carries the remedy — which mode settles a

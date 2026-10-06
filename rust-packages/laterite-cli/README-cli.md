@@ -136,6 +136,22 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                                  TRAN/TYPE/UNIT/ABBR/DICT stay as given.
                                  Applied after reconciliation, so it never
                                  changes which row wins
+    --on-code-case <MODE> ABBR codes under one heading that differ only by
+                          letter case ("Undisturbed" / "UNDISTURBED") are
+                          always warned (abbr_code_case); this decides
+                          whether they are rewritten:
+                          keep      leave every spelling as written (default)
+                          standard  rewrite a set to the edition's standard
+                                    code when exactly one matches it ignoring
+                                    case, in ABBR and every PA cell under that
+                                    heading; none or several leaves it as
+                                    written. Runs before reconciliation, so a
+                                    settled case difference is not a revision
+    --recode <PATH>       a JSON file of rewrites you name,
+                          {"HEADING": {"FROM": "TO"}}; applied like
+                          --on-code-case standard and before it. A heading no
+                          delivery types PA, or a code none uses, is refused.
+                          A rewrite giving two rows one KEY is refused (exit 6)
     --tran-issue <ISNO>   stamp a synthesised merge-TRAN (needs all five --tran-*
                           below; records the inputs' ISNOs/dates in TRAN_REM for
                           provenance)

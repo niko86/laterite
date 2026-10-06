@@ -55,6 +55,8 @@ _MISSING_TRAN_CHOICES = tuple(_native.registry_missing_tran_modes())
 _DICT_ROWS_CHOICES = tuple(_native.registry_dict_rows_modes())
 #: The `--row-order` values, from `RowOrder::ALL` in laterite-ags4-emit (#1008).
 _ROW_ORDER_CHOICES = tuple(_native.registry_row_order_modes())
+#: The `--on-code-case` modes, from `CodeCaseMode::ALL` in laterite-ags4-reference (#1010).
+_CODE_CASE_CHOICES = tuple(_native.registry_code_case_modes())
 
 #: Encoding labels the surface census resolves on every launcher. Mirrors
 #: `ENCODING_PROBES` in `commands/census.rs`; `test_census_probe_lists_agree` pins
@@ -568,6 +570,34 @@ def _run_merge(args: argparse.Namespace) -> int:
             print(f"error: {f}: not found", file=sys.stderr)
             return 3
 
+    recode = None
+    if args.recode is not None:
+        # A JSON file, as `--dict` is: `{heading: {from_code: to_code}}`. Codes
+        # may hold any character, so a file beats a flag syntax that would need
+        # its own escaping.
+        try:
+            recode = json.loads(Path(args.recode).read_text(encoding="utf-8"))
+        except OSError as e:
+            print(f"error: {args.recode}: {e}", file=sys.stderr)
+            return 3
+        except ValueError as e:
+            print(f"error: --recode {args.recode}: {e}", file=sys.stderr)
+            return 5
+        if not (
+            isinstance(recode, dict)
+            and all(
+                isinstance(m, dict)
+                and all(isinstance(k, str) and isinstance(v, str) for k, v in m.items())
+                for m in recode.values()
+            )
+        ):
+            print(
+                f"error: --recode {args.recode}: expected a JSON object "
+                "{heading: {from_code: to_code}}",
+                file=sys.stderr,
+            )
+            return 5
+
     dv = None if args.dict_version == "auto" else args.dict_version
     try:
         res = laterite.merge(
@@ -579,6 +609,8 @@ def _run_merge(args: argparse.Namespace) -> int:
             tran=_tran_from_args(args),
             dict_rows=args.dict_rows,
             row_order=args.row_order,
+            on_code_case=args.on_code_case,
+            recode=recode,
         )
     except laterite.MergeConflictError as e:
         # The library message already carries the full guidance (which modes settle
@@ -595,6 +627,11 @@ def _run_merge(args: argparse.Namespace) -> int:
         # here by re-deriving a second error taxonomy from string matching.
         print(f"error: {e}", file=sys.stderr)
         return 6
+    except laterite.BadDictError as e:
+        # A recode entry the inputs cannot honour: the caller's argument, so the
+        # usage-class code the binary gives it.
+        print(f"error: {e}", file=sys.stderr)
+        return 5
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 4
@@ -1044,6 +1081,13 @@ def _build_parser() -> argparse.ArgumentParser:
     pm.add_argument(
         "--row-order", dest="row_order", choices=_ROW_ORDER_CHOICES, default="input"
     )
+    pm.add_argument(
+        "--on-code-case",
+        dest="on_code_case",
+        choices=_CODE_CASE_CHOICES,
+        default="keep",
+    )
+    pm.add_argument("--recode", dest="recode")
     pm.add_argument("--tran-issue", dest="tran_issue")
     pm.add_argument("--tran-date", dest="tran_date")
     pm.add_argument("--tran-producer", dest="tran_producer")

@@ -108,6 +108,7 @@
     "src/keychain.rs",
     "src/lib.rs",
     "src/overlay.rs",
+    "src/recode.rs",
     "src/union.rs"
   ],
   "laterite-ags4-trust": [

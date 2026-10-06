@@ -154,6 +154,13 @@ export interface AppliedFix {
 export declare function canonicalType(agsType: string): string | null
 
 /**
+ * The `--on-code-case` values merge accepts, in declaration order —
+ * `["keep", "standard"]` (#1010). Generated from `CodeCaseMode::ALL`, as
+ * `rowOrderModes` is, so the launcher's check and the census read one set.
+ */
+export declare function codeCaseModes(): Array<string>
+
+/**
  * The `--dict-rows` values build and merge accept, in declaration order —
  * `["keep", "prune"]` (#1011). Generated from `DictRows::ALL`, as the two
  * mode lists above are, so the launcher's check and the census read one set.
@@ -356,7 +363,7 @@ export declare function listRules(): string
  * merge is refused before any bytes are produced. The edition is the newest file's `TRAN_AGS`
  * unless `dictVersion` forces it. Parse failure throws the mapped error.
  */
-export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, onMissingTran?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null, dictRows?: string | undefined | null, rowOrder?: string | undefined | null): MergeOutput
+export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, onMissingTran?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null, dictRows?: string | undefined | null, rowOrder?: string | undefined | null, onCodeCase?: string | undefined | null, recode?: Record<string, Record<string, string>> | undefined | null): MergeOutput
 
 export interface MergeOutput {
   bytes: Buffer

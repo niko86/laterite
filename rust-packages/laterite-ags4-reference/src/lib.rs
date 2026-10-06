@@ -21,6 +21,11 @@ pub mod effective_dict;
 // Runtime-owned custom-dictionary overlay (laterite-dev#568): the sparse delta a `--dict`
 // override contributes over a bundled base. `dict::Dictionary::Layered` borrows it.
 pub mod overlay;
+// Rewriting ABBR codes on request — `recode=` and `on_code_case` (#1010). Here
+// because merge and the validator's `fix` (#1024) both depend on this leaf, and
+// it already owns the case-insensitive picklist lookup and the row identity
+// the rewrite's KEY-collision guard keys on.
+pub mod recode;
 // The runtime `.ags` DICT-group reader `overlay::parse_dict` dispatches to for the
 // `.ags` custom-dict format (the JSON format reuses `union`'s serde). Crate-private:
 // its one entry point is `pub(crate)`, reached only through `overlay`.

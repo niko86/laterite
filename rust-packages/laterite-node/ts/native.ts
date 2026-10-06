@@ -18,6 +18,7 @@ export {
   missingTranModes,
   dictRowsModes,
   rowOrderModes,
+  codeCaseModes,
   fallbackEdition,
   resolveEncodingLabel,
   registryDictionaryJson,

@@ -700,6 +700,8 @@ fn merge_core(
     on_missing_tran: &str,
     dict_rows: &str,
     row_order: &str,
+    on_code_case: &str,
+    recode: laterite_ags4_merge::Recode,
     dvr: Option<&str>,
     encoding: Option<&str>,
     tran: (
@@ -713,8 +715,8 @@ fn merge_core(
     ),
 ) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
     use laterite_ags4_merge::{
-        DictRows, MergeError, MergeOpts, MissingTranMode, RowOrder, TranStamp, TypeClashMode,
-        merge_parsed,
+        CodeCaseMode, DictRows, MergeError, MergeOpts, MissingTranMode, RowOrder, TranStamp,
+        TypeClashMode, merge_parsed,
     };
 
     if files.len() < 2 {
@@ -738,6 +740,11 @@ fn merge_core(
         .parse()
         .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let row_order: RowOrder = row_order
+        .parse()
+        .map_err(|m: String| (5, "bad_args".to_string(), m))?;
+    // Parsed like `on_type_clash`, so an unknown token is refused in the
+    // merge crate's own words (#1010).
+    let on_code_case: CodeCaseMode = on_code_case
         .parse()
         .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
@@ -789,6 +796,8 @@ fn merge_core(
         tran,
         dict_rows,
         row_order,
+        on_code_case,
+        recode,
         ..Default::default()
     };
 
@@ -818,6 +827,14 @@ fn merge_core(
         // merge refusals a caller may want to route on separately, because the three
         // need different fixes (settle the type, reconcile the UNIT, supply a stamp).
         Err(e @ MergeError::MissingTran) => Err((6, "missing_tran".to_string(), e.to_string())),
+        // A requested code rewrite that would merge two distinct rows: a merge
+        // refusal like the three above, with its own token for the same reason.
+        Err(e @ MergeError::KeyCollision { .. }) => {
+            Err((6, "key_collision".to_string(), e.to_string()))
+        }
+        // A recode naming what the inputs do not have is the caller's argument,
+        // not the files' fault — the class an unknown mode token is in.
+        Err(e @ MergeError::Recode(_)) => Err((5, "bad_args".to_string(), e.to_string())),
         Err(e @ MergeError::Emit(_)) => Err((6, "emit_error".to_string(), e.to_string())),
     }
 }
@@ -826,7 +843,7 @@ fn merge_core(
 /// warnings_json, revisions_json}` — the Python layer parses the two JSON
 /// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
-#[pyo3(signature = (files, on_type_clash="error", on_missing_tran="reconcile", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None, dict_rows="keep", row_order="input"))]
+#[pyo3(signature = (files, on_type_clash="error", on_missing_tran="reconcile", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None, dict_rows="keep", row_order="input", on_code_case="keep", recode=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -846,6 +863,8 @@ fn merge_files<'py>(
     tran_remarks: Option<String>,
     dict_rows: &str,
     row_order: &str,
+    on_code_case: &str,
+    recode: Option<laterite_ags4_merge::Recode>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let tran = (
         tran_issue.as_deref(),
@@ -862,6 +881,8 @@ fn merge_files<'py>(
         on_missing_tran,
         dict_rows,
         row_order,
+        on_code_case,
+        recode.unwrap_or_default(),
         dict_version.as_deref(),
         encoding.as_deref(),
         tran,
