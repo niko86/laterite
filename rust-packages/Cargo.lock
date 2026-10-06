@@ -2197,6 +2197,7 @@ dependencies = [
  "dhat",
  "encoding_rs",
  "laterite-ags4-parse",
+ "laterite-ags4-reference",
  "laterite-ags4-types",
  "laterite-ags4-validator",
  "proptest",

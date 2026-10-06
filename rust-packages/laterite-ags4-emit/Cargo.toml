@@ -50,6 +50,11 @@ laterite-ags4-validator = { workspace = true }
 # its own output (dec-emit-streamed-verdict). Already a transitive dep via
 # the validator; direct because this crate names the leaf's types itself.
 laterite-ags4-parse = { workspace = true }
+# `row_order = Key` (#1008) sorts by the one shared row-identity definition
+# (`keychain::key_heading_names` over the union registry) that merge and diff
+# already key on. Already a transitive dep via the validator, which does not
+# re-export those two modules.
+laterite-ags4-reference = { workspace = true }
 # NO serde_json here, and that is load-bearing (#790): cells arrive as the
 # laterite-ags4-types `Cell` — a scalar enum immune to the `preserve_order`
 # feature-unification that swells `Value` workspace-wide. The absence is the

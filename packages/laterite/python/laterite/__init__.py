@@ -159,6 +159,23 @@ def _dict_rows_arg(dict_rows: str) -> str:
     return dict_rows
 
 
+#: The order [`build_ags4`][laterite.build_ags4] and [`merge`][laterite.merge]
+#: write each group's rows in: ``"input"`` (the default — as given) or ``"key"``
+#: (sorted by the group's KEY headings). Matches the engine's `RowOrder`.
+RowOrderMode = Literal["input", "key"]
+
+
+def _row_order_arg(row_order: str) -> str:
+    """Refuse an unknown ``row_order`` as a ``ValueError`` before any work — the
+    accepted set is the engine's ``RowOrder::ALL``, read through the bridge."""
+    allowed = list(_native.registry_row_order_modes())
+    if row_order not in allowed:
+        raise ValueError(
+            f"unknown row_order {row_order!r}; expected one of {', '.join(allowed)}"
+        )
+    return row_order
+
+
 def _looks_like_ags_text(s: str) -> bool:
     """Does this str look like AGS4 *content* rather than a path? A real AGS4
     file's first non-blank line is always a quoted GROUP record (Rule 3), and a
@@ -2341,6 +2358,7 @@ def build_ags4(
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
     dict_rows: DictRowsMode = "keep",
+    row_order: RowOrderMode = "input",
     out: None = None,
 ) -> BuildResult: ...
 @overload
@@ -2354,6 +2372,7 @@ def build_ags4(
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
     dict_rows: DictRowsMode = "keep",
+    row_order: RowOrderMode = "input",
     out: str | os.PathLike[str],
 ) -> BuildSaved: ...
 def build_ags4(
@@ -2366,6 +2385,7 @@ def build_ags4(
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
     dict_rows: DictRowsMode = "keep",
+    row_order: RowOrderMode = "input",
     out: str | os.PathLike[str] | None = None,
 ) -> BuildResult | BuildSaved:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
@@ -2490,6 +2510,19 @@ def build_ags4(
             unless a non-standard heading still needs one (Rule 18), when it is
             written as given. Pruning never adds a finding. Raises
             ``ValueError`` for any other value.
+        row_order: The order each group's rows are written in. ``"input"``
+            (default) keeps the order of your frames. ``"key"`` sorts them by
+            the group's KEY headings, inherited parent keys first (``SAMP``:
+            ``LOCA_ID``, ``SAMP_TOP``, ``SAMP_REF``, ``SAMP_TYPE``,
+            ``SAMP_ID``). A key whose TYPE in the output is ``nDP``, ``nSF``,
+            ``nSCI`` or ``U`` compares by exact value (``1.0`` equals ``1.00``,
+            and an unparsable value follows every number); any other compares
+            in natural order — digit runs as numbers, so ``BH2`` precedes
+            ``BH10``, and letters ignoring case. Blank keys sort last, and rows
+            that tie on every key keep their order. ``TRAN``, ``TYPE``,
+            ``UNIT``, ``ABBR``, ``DICT`` and groups without KEY headings are
+            left as given; a group your ``DICT`` defines sorts by the KEYs it
+            declares. Raises ``ValueError`` for any other value.
         out: Destination path — the ``fix(out=)`` idiom for the build door.
             Given, the judged document is written there and the result is a
             [`BuildSaved`][laterite.BuildSaved] carrying ``path`` and the
@@ -2516,7 +2549,8 @@ def build_ags4(
         RuntimeError: In ``mode="strict"``, if the emitted output violates an
             error-severity rule ("strict mode rejected …"); also for an unknown
             ``dict_version`` or ``mode``.
-        ValueError: If ``dict_rows`` is not ``"keep"`` or ``"prune"``.
+        ValueError: If ``dict_rows`` is not ``"keep"`` or ``"prune"``, or
+            ``row_order`` is not ``"input"`` or ``"key"``.
     """
     # `dict_version=None` passes through: the native side resolves it to the
     # dictionary's own generated fallback (`hostopts`, #923). A literal here
@@ -2524,6 +2558,7 @@ def build_ags4(
     import json
 
     _dict_rows_arg(dict_rows)
+    _row_order_arg(row_order)
     # `_bridge` (the DuckDB fallback connection, usually None) must outlive
     # the native call — its registered relations stream lazily.
     tables, _bridge = _frames_to_tables(groups, units, types, caller="build_ags4")
@@ -2542,6 +2577,7 @@ def build_ags4(
         tran.description if tran else None,
         tran.remarks if tran else None,
         dict_rows=dict_rows,
+        row_order=row_order,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
@@ -3066,6 +3102,7 @@ def merge(
     encoding: str | None = None,
     tran: TranStamp | None = None,
     dict_rows: DictRowsMode = "keep",
+    row_order: RowOrderMode = "input",
 ) -> MergeResult:
     """Reconcile two or more AGS4 deliveries of one project into a single file.
 
@@ -3148,6 +3185,13 @@ def merge(
             not contain. ``DICT`` is written after the other groups, and is left
             out when no row remains and no non-standard heading needs it
             (Rule 18). Pruning never adds a finding.
+        row_order: The order the merged rows are written in. ``"input"``
+            (default) is first-seen order across the sources, which interleaves
+            the deliveries. ``"key"`` sorts each group by its KEY headings, as
+            [`build_ags4`][laterite.build_ags4]'s ``row_order`` describes.
+            Sorting happens after reconciliation, so it never changes which row
+            wins, nor ``revisions`` or ``warnings`` — only the order rows are
+            written in.
 
     Returns:
         A [`MergeResult`][laterite.MergeResult]: the merged ``bytes`` and the
@@ -3159,12 +3203,14 @@ def merge(
             declared conflicting UNITs (fatal in every mode); no ``tran`` was given
             and ``on_missing_tran="error"`` refused rather than warned; or the merged
             output failed to emit.
-        ValueError: Fewer than two sources were given, or ``dict_rows`` is not
-            ``"keep"`` or ``"prune"``.
+        ValueError: Fewer than two sources were given, ``dict_rows`` is not
+            ``"keep"`` or ``"prune"``, or ``row_order`` is not ``"input"`` or
+            ``"key"``.
     """
     if len(sources) < 2:
         raise ValueError("merge needs at least two source documents")
     _dict_rows_arg(dict_rows)
+    _row_order_arg(row_order)
     import json
 
     r = _native.merge_files(
@@ -3181,6 +3227,7 @@ def merge(
         tran_description=tran.description if tran else None,
         tran_remarks=tran.remarks if tran else None,
         dict_rows=dict_rows,
+        row_order=row_order,
     )
     r = raise_for(r)
     return MergeResult(

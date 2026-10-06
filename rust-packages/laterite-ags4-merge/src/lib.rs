@@ -214,12 +214,22 @@ pub struct MergeOpts {
     /// the case #1011 came from, where each delivery's exporter restated the
     /// dictionary and the union piled the restatements up. See [`DictRows`].
     pub dict_rows: DictRows,
+    /// The order the merged rows are written in. `Input` (the default) is
+    /// first-seen order across the inputs; `Key` sorts each group by its KEY
+    /// headings (#1008), which un-interleaves the deliveries. Applied by the
+    /// emit, after reconciliation, so it never changes which row wins, nor
+    /// `revisions` or `warnings`. See [`RowOrder`].
+    pub row_order: RowOrder,
 }
 
 /// Re-exported from [`laterite_ags4_emit`], where the pruning happens: merge
 /// hands the option straight to the emit it ends in, so build and merge prune
 /// by one rule.
 pub use laterite_ags4_emit::DictRows;
+
+/// Re-exported from [`laterite_ags4_emit`], where the sort happens: build and
+/// merge order rows by one rule.
+pub use laterite_ags4_emit::RowOrder;
 
 impl Default for MergeOpts {
     fn default() -> Self {
@@ -230,6 +240,7 @@ impl Default for MergeOpts {
             tran: None,
             on_missing_tran: MissingTranMode::Reconcile,
             dict_rows: DictRows::Keep,
+            row_order: RowOrder::Input,
         }
     }
 }
@@ -454,6 +465,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
         // A merge combines files the caller already has; inventing catalogs on
         // top of that is exactly the surprise the opt-in exists to prevent.
         dict_rows: opts.dict_rows,
+        row_order: opts.row_order,
         ..EmitOpts::default()
     };
     let out = emit_ags4(&inputs, &emit_opts).map_err(|e| MergeError::Emit(e.to_string()))?;

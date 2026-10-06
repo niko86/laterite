@@ -906,6 +906,8 @@ fn emit_groups(
         // #1011 put DICT pruning on the bindings and `lat`; the facade keeps
         // the default until it is asked for here.
         dict_rows: laterite_ags4_emit::DictRows::Keep,
+        // #1008 put row ordering on the bindings and `lat`; same stance.
+        row_order: laterite_ags4_emit::RowOrder::Input,
     };
     let result = emit_ags4(groups, &opts)
         .map_err(|e| Error::with_source(ErrorKind::Emit, "cannot write as AGS4", e))?;

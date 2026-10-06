@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use clap::builder::TypedValueParser; // for `.map()` on PossibleValuesParser
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use laterite_ags4_merge::{DictRows, MissingTranMode, TypeClashMode};
+use laterite_ags4_merge::{DictRows, MissingTranMode, RowOrder, TypeClashMode};
 
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
@@ -357,6 +357,24 @@ pub struct MergeArgs {
             .map(|s| s.parse::<DictRows>().expect("clap restricted the value")),
     )]
     pub dict_rows: DictRows,
+    /// The order the merged rows are written in:
+    ///
+    ///   input — first-seen order across the deliveries (default)
+    ///   key   — each group sorted by its KEY headings: numeric TYPEs by
+    ///           value, others in natural order (BH2 before BH10), blanks
+    ///           last. TRAN/TYPE/UNIT/ABBR/DICT stay as given. Applied after
+    ///           reconciliation, so it never changes which row wins.
+    ///
+    /// The allowed values are projected from `RowOrder::ALL`, as `--dict-rows`'
+    /// are from `DictRows::ALL`.
+    #[arg(
+        long,
+        value_name = "ORDER",
+        default_value = "input",
+        value_parser = clap::builder::PossibleValuesParser::new(RowOrder::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<RowOrder>().expect("clap restricted the value")),
+    )]
+    pub row_order: RowOrder,
     /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
     /// With the other four --tran-* flags, a fresh merge-transmission TRAN is
     /// written (recording the inputs' ISNOs/dates in `TRAN_REM`); with none of

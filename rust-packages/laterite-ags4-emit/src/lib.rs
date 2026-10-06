@@ -14,6 +14,7 @@ mod arrow_in;
 pub mod catalog;
 mod emit;
 mod error;
+mod row_order;
 mod writer;
 
 #[cfg(feature = "arrow")]
@@ -25,6 +26,7 @@ pub use emit::{
     emit_ags4_owned, emit_ags4_unchecked,
 };
 pub use error::EmitError;
+pub use row_order::RowOrder;
 pub use writer::{EmitGroup, MatrixStream, canonical_matrix_blocks, write_ags4, write_ags4_matrix};
 
 // Re-export the edition enum so callers configure emit without taking a

@@ -31,6 +31,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::error::EmitError;
+use crate::row_order::{DictSeen, RowOrder, sort_by_keys};
 use crate::writer::{EmitGroup, write_section_recorded};
 
 /// One group's data to emit. `units` / `types` are optional per-heading
@@ -283,6 +284,9 @@ pub struct EmitOpts {
     /// What happens to the caller's DICT rows — see [`DictRows`]. `Keep`
     /// (the default) writes them exactly as given.
     pub dict_rows: DictRows,
+    /// The order each group's DATA rows are written in — see [`RowOrder`].
+    /// `Input` (the default) writes them as given.
+    pub row_order: RowOrder,
 }
 
 /// What a build or merge does with the DICT rows it is given (#1011).
@@ -364,6 +368,7 @@ impl Default for EmitOpts {
             tran: None,
             synthesise_metadata: false,
             dict_rows: DictRows::Keep,
+            row_order: RowOrder::Input,
         }
     }
 }
@@ -383,6 +388,7 @@ pub struct EmitResult {
 pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
     let mut stream = EmitStream::new(opts, &dict);
+    look_ahead_cells(&mut stream, groups, &dict);
     for g in groups {
         // Per-group: the formatted copy is written and dropped before the
         // next group formats — no whole-file OwnedGroup slab exists
@@ -405,6 +411,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
 pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
     let mut stream = EmitStream::new(opts, &dict);
+    look_ahead_cells(&mut stream, &groups, &dict);
     for g in groups {
         // `g` is consumed per iteration: its cell rows free here, not at
         // return — and the formatted copy drops inside `push`, so input,
@@ -412,6 +419,17 @@ pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitR
         stream.push(owned_group_consuming(g, &dict))?;
     }
     stream.finish()
+}
+
+/// The cell doors' DICT lookahead for [`RowOrder::Key`]: a formatted copy of
+/// each DICT group (a few rows, so the copy is cheap) recorded before the
+/// stream writes anything.
+fn look_ahead_cells(stream: &mut EmitStream, groups: &[GroupInput], dict: &Dictionary) {
+    if stream.wants_dict_lookahead() {
+        for g in groups.iter().filter(|g| g.code == "DICT") {
+            stream.look_ahead(&owned_group(g, dict));
+        }
+    }
 }
 
 /// Steps 1–2 for one group: resolve UNIT/TYPE (hybrid) + format every cell.
@@ -504,6 +522,9 @@ pub(crate) struct EmitStream<'a> {
     /// `Some` only under [`DictRows::Prune`]: the held DICT and what the
     /// output contains, which its rows are judged against at assembly.
     prune: Option<DictPrune>,
+    /// `Some` only under [`RowOrder::Key`]: the DICT rows pushed so far, the
+    /// key declarations of any group the standard registry does not know.
+    row_keys: Option<DictSeen>,
     wrote_any: bool,
 }
 
@@ -611,6 +632,7 @@ impl<'a> EmitStream<'a> {
             dict,
             synth,
             prune: (opts.dict_rows == DictRows::Prune).then(DictPrune::default),
+            row_keys: (opts.row_order == RowOrder::Key).then(DictSeen::default),
             wrote_any: false,
         }
     }
@@ -638,7 +660,17 @@ impl<'a> EmitStream<'a> {
     /// caller keep the formatted slab alive across the stream.
     #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
-        let og = in_dictionary_order(og, self.dict);
+        let mut og = in_dictionary_order(og, self.dict);
+        if let Some(seen) = &mut self.row_keys {
+            // Sorted here, per group, because every door's rows meet here
+            // and are already the strings the TYPE line describes; a merge
+            // has finished reconciling by the time its groups arrive, so
+            // ordering can never change which row won.
+            if og.code == "DICT" && !seen.looked_ahead {
+                seen.record(&og.headings, &og.rows);
+            }
+            sort_by_keys(&og.code, &og.headings, &og.types, &mut og.rows, seen);
+        }
         if let Some(prune) = &mut self.prune {
             if og.code == "DICT" {
                 // Folded into the catalogues only once pruned, at assembly:
@@ -649,6 +681,22 @@ impl<'a> EmitStream<'a> {
             prune.record(&og);
         }
         self.write_group_folded(&og)
+    }
+
+    /// Whether a one-call door should hand its DICT groups to
+    /// [`EmitStream::look_ahead`] before streaming — only under
+    /// [`RowOrder::Key`], so the default path does no extra work.
+    pub(crate) fn wants_dict_lookahead(&self) -> bool {
+        self.row_keys.is_some()
+    }
+
+    /// Record a DICT group's key declarations before any group is written.
+    /// Called for every DICT up front, or for none.
+    pub(crate) fn look_ahead(&mut self, dict_group: &OwnedGroup) {
+        if let Some(seen) = &mut self.row_keys {
+            seen.record(&dict_group.headings, &dict_group.rows);
+            seen.looked_ahead = true;
+        }
     }
 
     fn write_group_folded(&mut self, og: &OwnedGroup) -> Result<(), EmitError> {
@@ -716,6 +764,9 @@ pub(crate) fn unchecked_opts(edition: DictVersion) -> EmitOpts {
         // on the judged build and merge, where its no-new-finding promise can
         // be seen to hold.
         dict_rows: DictRows::Keep,
+        // Likewise taken by the judged doors only, so the unchecked doors'
+        // signatures stay an edition alone.
+        row_order: RowOrder::Input,
     }
 }
 
@@ -2632,5 +2683,293 @@ mod tests {
             rows: vec![vec!["  ".into()]],
         };
         assert_eq!(tran_rcon(&blank), None);
+    }
+
+    // --- row_order (#1008) -------------------------------------------------
+
+    fn rows_of(code: &str, headings: &[&str], rows: &[&[&str]]) -> GroupInput {
+        GroupInput {
+            code: code.into(),
+            headings: strings(headings),
+            units: None,
+            types: None,
+            rows: rows
+                .iter()
+                .map(|r| r.iter().map(|v| c(*v)).collect())
+                .collect(),
+        }
+    }
+
+    const SAMP_KEYS: [&str; 6] = [
+        "LOCA_ID",
+        "SAMP_TOP",
+        "SAMP_REF",
+        "SAMP_TYPE",
+        "SAMP_ID",
+        "SAMP_REM",
+    ];
+
+    fn ordered(groups: &[GroupInput], row_order: RowOrder) -> Vec<u8> {
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            row_order,
+            ..EmitOpts::default()
+        };
+        emit_ags4(groups, &opts).unwrap().bytes
+    }
+
+    /// One column of a group as written, in written order.
+    fn column(bytes: &[u8], code: &str, heading: &str) -> Vec<String> {
+        let (headings, _, rows) = emitted_group(bytes, code);
+        let i = headings.iter().position(|h| h == heading).unwrap();
+        rows.into_iter().map(|mut r| r.swap_remove(i)).collect()
+    }
+
+    #[test]
+    fn key_order_sorts_by_the_key_chain_parent_first() {
+        // The issue's merge, already reconciled: deliveries interleaved.
+        let samp = rows_of(
+            "SAMP",
+            &SAMP_KEYS,
+            &[
+                &["BH10", "2.00", "2", "D", "", ""],
+                &["BH2", "1.00", "1", "B", "", ""],
+                &["BH2", "0.50", "1", "ES", "", ""],
+                &["BH1", "3.00", "3", "B", "", ""],
+            ],
+        );
+        let bytes = ordered(&[proj(), samp], RowOrder::Key);
+        assert_eq!(
+            emitted_group(&bytes, "SAMP").2,
+            vec![
+                strings(&["BH1", "3.00", "3", "B", "", ""]),
+                strings(&["BH2", "0.50", "1", "ES", "", ""]),
+                strings(&["BH2", "1.00", "1", "B", "", ""]),
+                strings(&["BH10", "2.00", "2", "D", "", ""]),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_numeric_key_compares_by_exact_value() {
+        let samp = rows_of(
+            "SAMP",
+            &SAMP_KEYS,
+            &[
+                &["BH1", "n/a", "1", "B", "", "unparsable"],
+                &["BH1", "10.00", "1", "B", "", "ten"],
+                &["BH1", "", "1", "B", "", "blank"],
+                &["BH1", "1.0", "2", "B", "", "one, ref 2"],
+                &["BH1", "9.50", "1", "B", "", "nine and a half"],
+                &["BH1", "0.5", "1", "B", "", "half"],
+                &["BH1", "1.00", "1", "B", "", "one, ref 1"],
+                &["BH1", "0.25", "1", "B", "", "quarter"],
+            ],
+        );
+        let bytes = ordered(&[proj(), samp], RowOrder::Key);
+        // 10.00 > 9.50 (as text it would sort first) and 0.25 < 0.5 (natural
+        // order would read 25 > 5); 1.0 == 1.00, so SAMP_REF decides rather
+        // than the raw strings; the unparsable value follows every parsed
+        // one; blank last.
+        assert_eq!(
+            column(&bytes, "SAMP", "SAMP_REM"),
+            strings(&[
+                "quarter",
+                "half",
+                "one, ref 1",
+                "one, ref 2",
+                "nine and a half",
+                "ten",
+                "unparsable",
+                "blank"
+            ])
+        );
+    }
+
+    #[test]
+    fn a_key_declared_x_sorts_in_natural_order_not_by_value() {
+        // The TYPE line, not the dictionary, decides: SAMP_TOP declared X.
+        let mut samp = rows_of(
+            "SAMP",
+            &SAMP_KEYS,
+            &[
+                &["BH1", "1.10", "1", "B", "", ""],
+                &["BH1", "1.9", "1", "B", "", ""],
+            ],
+        );
+        samp.types = Some(strings(&["ID", "X", "X", "PA", "ID", "X"]));
+        let bytes = ordered(&[proj(), samp], RowOrder::Key);
+        // Natural order reads "1.10" as the runs 1 . 10, so it follows "1.9" —
+        // the reverse of their values.
+        assert_eq!(
+            column(&bytes, "SAMP", "SAMP_TOP"),
+            strings(&["1.9", "1.10"])
+        );
+    }
+
+    #[test]
+    fn rows_that_tie_on_every_key_keep_their_input_order() {
+        let samp = rows_of(
+            "SAMP",
+            &SAMP_KEYS,
+            &[
+                &["BH2", "1.00", "1", "B", "", "first"],
+                &["BH1", "1.00", "1", "B", "", "other"],
+                &["BH2", "1.0", "1", "B", "", "second"],
+                &["BH2", "1.00", "1", "B", "", "third"],
+            ],
+        );
+        let bytes = ordered(&[proj(), samp], RowOrder::Key);
+        assert_eq!(
+            column(&bytes, "SAMP", "SAMP_REM"),
+            strings(&["other", "first", "second", "third"])
+        );
+    }
+
+    #[test]
+    fn metadata_and_keyless_groups_keep_their_input_order() {
+        let groups = vec![
+            proj(),
+            rows_of(
+                "TRAN",
+                &["TRAN_ISNO", "TRAN_DATE"],
+                &[&["2", "2026-01-02"], &["1", "2026-01-01"]],
+            ),
+            rows_of(
+                "ABBR",
+                &["ABBR_HDNG", "ABBR_CODE", "ABBR_DESC"],
+                &[
+                    &["SAMP_TYPE", "U", "Undisturbed"],
+                    &["SAMP_TYPE", "B", "Bulk"],
+                ],
+            ),
+            rows_of(
+                "TYPE",
+                &["TYPE_TYPE", "TYPE_DESC"],
+                &[&["X", "Text"], &["ID", "Id"]],
+            ),
+            rows_of(
+                "UNIT",
+                &["UNIT_UNIT", "UNIT_DESC"],
+                &[&["m", "metre"], &["%", "percent"]],
+            ),
+            dict_of(&[
+                ["HEADING", "ZZZZ", "ZZZZ_B", "OTHER"],
+                ["HEADING", "ZZZZ", "ZZZZ_A", "OTHER"],
+            ]),
+            // A user group its DICT gives no KEY: nothing to sort by.
+            rows_of("ZZZZ", &["ZZZZ_B", "ZZZZ_A"], &[&["2", "b"], &["1", "a"]]),
+        ];
+        let key = ordered(&groups, RowOrder::Key);
+        assert_eq!(key, ordered(&groups, RowOrder::Input));
+        assert_eq!(column(&key, "TRAN", "TRAN_ISNO"), strings(&["2", "1"]));
+        assert_eq!(column(&key, "UNIT", "UNIT_UNIT"), strings(&["m", "%"]));
+    }
+
+    #[test]
+    fn a_dict_defined_group_sorts_by_its_declared_keys() {
+        let dict = || GroupInput {
+            code: "DICT".into(),
+            headings: strings(&[
+                "DICT_TYPE",
+                "DICT_GRP",
+                "DICT_HDNG",
+                "DICT_STAT",
+                "DICT_PGRP",
+            ]),
+            units: None,
+            types: None,
+            rows: [
+                ["GROUP", "XMON", "", "", "LOCA"],
+                ["HEADING", "XMON", "XMON_ID", "KEY", ""],
+                ["HEADING", "XMON", "LOCA_ID", "KEY", ""],
+                ["HEADING", "XMON", "XMON_REM", "OTHER", ""],
+            ]
+            .iter()
+            .map(|r| r.iter().map(|v| c(*v)).collect())
+            .collect(),
+        };
+        let xmon = || {
+            rows_of(
+                "XMON",
+                &["LOCA_ID", "XMON_ID", "XMON_REM"],
+                &[
+                    &["BH2", "A", "3"],
+                    &["BH10", "A", "4"],
+                    &["BH1", "B", "2"],
+                    &["BH1", "A", "1"],
+                ],
+            )
+        };
+        // The parent's key (LOCA_ID) leads, though DICT declares it second.
+        let bytes = ordered(&[proj(), dict(), xmon()], RowOrder::Key);
+        assert_eq!(
+            column(&bytes, "XMON", "XMON_REM"),
+            strings(&["1", "2", "3", "4"])
+        );
+        // The one-call doors read the DICT ahead, so where it sits does not
+        // matter (merge writes it alphabetically, after any `A`–`C` group).
+        for late in [
+            ordered(&[proj(), xmon(), dict()], RowOrder::Key),
+            emit_ags4_owned(
+                vec![proj(), xmon(), dict()],
+                &EmitOpts {
+                    mode: EmitMode::Report,
+                    row_order: RowOrder::Key,
+                    ..EmitOpts::default()
+                },
+            )
+            .unwrap()
+            .bytes,
+        ] {
+            assert_eq!(
+                column(&late, "XMON", "XMON_REM"),
+                strings(&["1", "2", "3", "4"])
+            );
+        }
+        // Without the option, nothing moves.
+        assert_eq!(
+            column(
+                &ordered(&[proj(), dict(), xmon()], RowOrder::Input),
+                "XMON",
+                "XMON_REM"
+            ),
+            strings(&["3", "4", "2", "1"])
+        );
+    }
+
+    #[test]
+    fn input_is_the_default_and_writes_rows_as_given() {
+        let groups = || {
+            vec![
+                proj(),
+                rows_of(
+                    "SAMP",
+                    &SAMP_KEYS,
+                    &[
+                        &["BH2", "1.00", "1", "B", "", ""],
+                        &["BH1", "1.00", "1", "B", "", ""],
+                    ],
+                ),
+            ]
+        };
+        let default = emit_ags4(
+            &groups(),
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..EmitOpts::default()
+            },
+        )
+        .unwrap()
+        .bytes;
+        assert_eq!(ordered(&groups(), RowOrder::Input), default);
+        assert_eq!(
+            column(&default, "SAMP", "LOCA_ID"),
+            strings(&["BH2", "BH1"])
+        );
+        assert_eq!(
+            column(&ordered(&groups(), RowOrder::Key), "SAMP", "LOCA_ID"),
+            strings(&["BH1", "BH2"])
+        );
     }
 }

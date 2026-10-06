@@ -5,7 +5,7 @@
 //! and run the shared `laterite-ags4-emit` orchestrator, so the browser cannot
 //! write a file the native surfaces would have written differently.
 use crate::boundary::{TranInput, WasmOptions, decode_opts, to_js};
-use laterite_ags4_emit::DictRows;
+use laterite_ags4_emit::{DictRows, RowOrder};
 #[cfg(feature = "arrow")]
 use laterite_ags4_validator::Dictionary;
 use laterite_ags4_validator::{DictVersion, findings, fixes};
@@ -160,6 +160,7 @@ pub(crate) struct BuildOptions {
     synthesise_metadata: Option<bool>,
     tran: Option<TranInput>,
     dict_rows: Option<String>,
+    row_order: Option<String>,
 }
 
 impl WasmOptions for BuildOptions {
@@ -169,6 +170,7 @@ impl WasmOptions for BuildOptions {
         "synthesiseMetadata",
         "tran",
         "dictRows",
+        "rowOrder",
     ];
     const WHAT: &'static str = "build options";
 }
@@ -219,6 +221,12 @@ export interface BuildOptions {
    *  `DICT` after your last group; with no row left it is omitted. Pruning
    *  never adds a finding. */
   dictRows?: "keep" | "prune";
+  /** `"input"` (default) writes each group's rows in the order given.
+   *  `"key"` sorts them by the group's KEY headings, parent keys first:
+   *  numeric TYPEs (`nDP`, `nSF`, `nSCI`, `U`) by exact value, anything else
+   *  in natural order (`BH2` before `BH10`), blanks last, ties in input
+   *  order. TRAN, TYPE, UNIT, ABBR, DICT and KEY-less groups stay as given. */
+  rowOrder?: "input" | "key";
 }
 "#;
 
@@ -291,6 +299,7 @@ fn build_ags4_from_json(
     synthesise_metadata: bool,
     tran: Option<laterite_ags4_emit::TranStamp>,
     dict_rows: DictRows,
+    row_order: RowOrder,
 ) -> Result<BuildAgs4Report, String> {
     emit_report(
         groups_from_json(groups_json)?,
@@ -299,6 +308,7 @@ fn build_ags4_from_json(
         synthesise_metadata,
         tran,
         dict_rows,
+        row_order,
     )
 }
 
@@ -327,8 +337,16 @@ fn emit_report(
     synthesise_metadata: bool,
     tran: Option<laterite_ags4_emit::TranStamp>,
     dict_rows: DictRows,
+    row_order: RowOrder,
 ) -> Result<BuildAgs4Report, String> {
-    let opts = emit_opts(edition, mode, synthesise_metadata, tran, dict_rows)?;
+    let opts = emit_opts(
+        edition,
+        mode,
+        synthesise_metadata,
+        tran,
+        dict_rows,
+        row_order,
+    )?;
     let res = laterite_ags4_emit::emit_ags4(&groups, &opts).map_err(|e| e.to_string())?;
     Ok(shape_report(&res))
 }
@@ -340,6 +358,7 @@ fn emit_opts(
     synthesise_metadata: bool,
     tran: Option<laterite_ags4_emit::TranStamp>,
     dict_rows: DictRows,
+    row_order: RowOrder,
 ) -> Result<laterite_ags4_emit::EmitOpts, String> {
     Ok(laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
@@ -358,6 +377,8 @@ fn emit_opts(
         // `{ dictRows }` — the browser's twin of Python's `dict_rows=` and
         // Node's `{ dictRows }` (#1011). See DictRows.
         dict_rows,
+        // `{ rowOrder }` — Python's `row_order=` (#1008). See RowOrder.
+        row_order,
         // Every field listed explicitly, with NO `..default()` tail — on
         // purpose. Inheriting defaults is what made this surface silently lose
         // `synthesise_metadata` when it went opt-in: the option existed, wasm
@@ -453,7 +474,7 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Arro
     })
 }
 
-/// `(edition, mode, synthesise_metadata, tran, dict_rows)` — what
+/// `(edition, mode, synthesise_metadata, tran, dict_rows, row_order)` — what
 /// [`emit_report`] takes, once the options object has been folded down to it.
 type BuildParts = (
     Option<String>,
@@ -461,6 +482,7 @@ type BuildParts = (
     bool,
     Option<laterite_ags4_emit::TranStamp>,
     DictRows,
+    RowOrder,
 );
 
 /// The parts of a [`BuildOptions`] the emit path takes, with the completeness
@@ -477,12 +499,17 @@ fn build_parts(o: BuildOptions) -> Result<BuildParts, String> {
         .dict_rows
         .as_deref()
         .map_or(Ok(DictRows::Keep), str::parse::<DictRows>)?;
+    let row_order = o
+        .row_order
+        .as_deref()
+        .map_or(Ok(RowOrder::Input), str::parse::<RowOrder>)?;
     Ok((
         o.dict_version,
         o.mode,
         o.synthesise_metadata.unwrap_or(false),
         tran,
         dict_rows,
+        row_order,
     ))
 }
 
@@ -492,7 +519,7 @@ pub(crate) fn build_ags4_core(
     groups_json: &str,
     o: BuildOptions,
 ) -> Result<BuildAgs4Report, String> {
-    let (edition, mode, synth, tran, dict_rows) = build_parts(o)?;
+    let (edition, mode, synth, tran, dict_rows, row_order) = build_parts(o)?;
     build_ags4_from_json(
         groups_json,
         edition.as_deref(),
@@ -500,6 +527,7 @@ pub(crate) fn build_ags4_core(
         synth,
         tran,
         dict_rows,
+        row_order,
     )
 }
 
@@ -512,8 +540,15 @@ fn build_ipc_core(
     inputs: Vec<laterite_ags4_emit::ArrowGroup>,
     o: BuildOptions,
 ) -> Result<BuildAgs4Report, String> {
-    let (edition, mode, synth, tran, dict_rows) = build_parts(o)?;
-    let opts = emit_opts(edition.as_deref(), mode.as_deref(), synth, tran, dict_rows)?;
+    let (edition, mode, synth, tran, dict_rows, row_order) = build_parts(o)?;
+    let opts = emit_opts(
+        edition.as_deref(),
+        mode.as_deref(),
+        synth,
+        tran,
+        dict_rows,
+        row_order,
+    )?;
     let res = laterite_ags4_emit::emit_ags4_from_arrow(inputs, &opts).map_err(|e| e.to_string())?;
     Ok(shape_report(&res))
 }
@@ -616,9 +651,17 @@ pub fn build_ags4_ipc(
     // gate rung — one group's IPC copy, batches and formatted cells are live
     // at a time, and they drop inside `push`. The one-call `build_ipc_core`
     // stays as the differential tests' reference for this loop.
-    let (edition, mode, synth, tran, dict_rows) = build_parts(o).map_err(|e| JsError::new(&e))?;
-    let eopts = emit_opts(edition.as_deref(), mode.as_deref(), synth, tran, dict_rows)
-        .map_err(|e| JsError::new(&e))?;
+    let (edition, mode, synth, tran, dict_rows, row_order) =
+        build_parts(o).map_err(|e| JsError::new(&e))?;
+    let eopts = emit_opts(
+        edition.as_deref(),
+        mode.as_deref(),
+        synth,
+        tran,
+        dict_rows,
+        row_order,
+    )
+    .map_err(|e| JsError::new(&e))?;
     let dict = Dictionary::bundled(eopts.edition);
     let mut session = laterite_ags4_emit::ArrowEmitSession::new(&eopts, &dict);
     let arr = js_sys::Array::from(&groups);
@@ -662,6 +705,7 @@ mod tests {
             false,
             None,
             DictRows::Keep,
+            RowOrder::Input,
         )
         .unwrap();
         assert!(
@@ -705,8 +749,16 @@ mod tests {
         };
 
         // Default (and explicit false): the catalogs are NOT minted.
-        let off =
-            build_ags4_from_json(json, None, Some("autofix"), false, None, DictRows::Keep).unwrap();
+        let off = build_ags4_from_json(
+            json,
+            None,
+            Some("autofix"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         assert!(
             !metadata_rules(&off).is_empty(),
             "a data-only build should report the missing metadata catalogs:\n{}",
@@ -720,8 +772,16 @@ mod tests {
 
         // Opt in WITHOUT a stamp: the derivable catalogs are minted and their
         // findings clear, but no TRAN is invented — Rule 14 keeps reporting.
-        let on =
-            build_ags4_from_json(json, None, Some("autofix"), true, None, DictRows::Keep).unwrap();
+        let on = build_ags4_from_json(
+            json,
+            None,
+            Some("autofix"),
+            true,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         assert!(
             !on.text.contains("\"GROUP\",\"TRAN\""),
             "an unstamped build must not invent a TRAN:\n{}",
@@ -748,6 +808,7 @@ mod tests {
                 "FINAL",
             )),
             DictRows::Keep,
+            RowOrder::Input,
         )
         .unwrap();
         assert!(
@@ -768,8 +829,16 @@ mod tests {
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r =
-            build_ags4_from_json(json, None, Some("autofix"), false, None, DictRows::Keep).unwrap();
+        let r = build_ags4_from_json(
+            json,
+            None,
+            Some("autofix"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
         assert!(r.text.contains("\"12.30\""), "{}", r.text);
     }
@@ -793,6 +862,7 @@ mod tests {
             false,
             None,
             DictRows::Keep,
+            RowOrder::Input,
         )
         .unwrap();
         assert_eq!(
@@ -812,6 +882,7 @@ mod tests {
             false,
             None,
             DictRows::Keep,
+            RowOrder::Input,
         )
         .unwrap();
         assert!(
@@ -831,9 +902,15 @@ mod tests {
     /// not drift between them on this surface either.
     #[test]
     fn unchecked_zero_group_refusal_matches_the_judged_door() {
-        let Err(judged) =
-            build_ags4_from_json("[]", None, Some("report"), false, None, DictRows::Keep)
-        else {
+        let Err(judged) = build_ags4_from_json(
+            "[]",
+            None,
+            Some("report"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        ) else {
             panic!("a zero-group judged build must refuse");
         };
         let Err(unchecked) = build_ags4_unchecked_core("[]", None) else {
@@ -845,8 +922,16 @@ mod tests {
     #[test]
     fn report_keeps_strings_verbatim() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}]"#;
-        let r =
-            build_ags4_from_json(json, None, Some("report"), false, None, DictRows::Keep).unwrap();
+        let r = build_ags4_from_json(
+            json,
+            None,
+            Some("report"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         assert!(r.text.contains("\"12.3\""));
         assert_eq!(r.fixes_applied, 0);
         assert!(r.applied.is_empty(), "report mode rewrites nothing");
@@ -863,8 +948,16 @@ mod tests {
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r =
-            build_ags4_from_json(json, None, Some("autofix"), false, None, DictRows::Keep).unwrap();
+        let r = build_ags4_from_json(
+            json,
+            None,
+            Some("autofix"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         assert_eq!(
             r.applied.len(),
             r.fixes_applied,
@@ -883,10 +976,28 @@ mod tests {
     fn rejects_unknown_mode_and_edition() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}]"#;
         assert!(
-            build_ags4_from_json(json, None, Some("banana"), false, None, DictRows::Keep).is_err()
+            build_ags4_from_json(
+                json,
+                None,
+                Some("banana"),
+                false,
+                None,
+                DictRows::Keep,
+                RowOrder::Input
+            )
+            .is_err()
         );
         assert!(
-            build_ags4_from_json(json, Some("9.9"), None, false, None, DictRows::Keep).is_err()
+            build_ags4_from_json(
+                json,
+                Some("9.9"),
+                None,
+                false,
+                None,
+                DictRows::Keep,
+                RowOrder::Input
+            )
+            .is_err()
         );
     }
 
@@ -934,7 +1045,15 @@ mod tests {
         // Decode each IPC stream into ArrowGroups, then run the Arrow door.
         let proj = group_from_ipc("PROJ".into(), &ipc_bytes(&proj_schema, &proj_batch)).unwrap();
         let loca = group_from_ipc("LOCA".into(), &ipc_bytes(&loca_schema, &loca_batch)).unwrap();
-        let opts = emit_opts(Some("4.1.1"), Some("autofix"), false, None, DictRows::Keep).unwrap();
+        let opts = emit_opts(
+            Some("4.1.1"),
+            Some("autofix"),
+            false,
+            None,
+            DictRows::Keep,
+            RowOrder::Input,
+        )
+        .unwrap();
         let r = shape_report(
             &laterite_ags4_emit::emit_ags4_from_arrow(vec![proj, loca], &opts).unwrap(),
         );
@@ -955,7 +1074,7 @@ mod tests {
         // Opt-in since 2026-07-24: no surface mints GROUPs the caller never
         // wrote unless told to. The browser lost this once already by inheriting
         // a default, so the default is asserted rather than assumed.
-        let (_, _, synth, _, _) = build_parts(BuildOptions::default()).expect("defaults fold");
+        let (_, _, synth, _, _, _) = build_parts(BuildOptions::default()).expect("defaults fold");
         assert!(!synth, "synthesis must be off unless asked for");
     }
 
@@ -986,6 +1105,36 @@ mod tests {
         assert!(!prune.text.contains("\"GROUP\",\"DICT\""), "{}", prune.text);
         let msg = err(build_ags4_core(json, opts(Some("trim"))));
         assert!(msg.contains("keep, prune"), "{msg}");
+    }
+
+    #[test]
+    fn row_order_reaches_the_emit_and_input_is_the_default() {
+        // #1008: `key` sorts LOCA naturally (BH2 before BH10); the default
+        // and an explicit `input` write the rows as given.
+        let json = r#"[
+          {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
+          {"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH10"],["BH2"],["BH1"]]}
+        ]"#;
+        let opts = |v: Option<&str>| BuildOptions {
+            mode: Some("report".into()),
+            row_order: v.map(str::to_string),
+            ..Default::default()
+        };
+        let ids = |text: &str| -> Vec<String> {
+            text.lines()
+                .skip_while(|l| *l != "\"GROUP\",\"LOCA\"")
+                .filter_map(|l| l.strip_prefix("\"DATA\","))
+                .map(str::to_string)
+                .collect()
+        };
+        let default = build_ags4_core(json, opts(None)).expect("builds");
+        assert_eq!(ids(&default.text), ["\"BH10\"", "\"BH2\"", "\"BH1\""]);
+        let input = build_ags4_core(json, opts(Some("input"))).expect("builds");
+        assert_eq!(input.text, default.text);
+        let key = build_ags4_core(json, opts(Some("key"))).expect("builds");
+        assert_eq!(ids(&key.text), ["\"BH1\"", "\"BH2\"", "\"BH10\""]);
+        let msg = err(build_ags4_core(json, opts(Some("sorted"))));
+        assert!(msg.contains("input, key"), "{msg}");
     }
 
     #[test]

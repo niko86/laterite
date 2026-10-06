@@ -55,6 +55,7 @@
     "src/emit.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/row_order.rs",
     "src/writer.rs"
   ],
   "laterite-ags4-excel": [

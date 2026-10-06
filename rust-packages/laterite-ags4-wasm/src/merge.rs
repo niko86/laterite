@@ -68,6 +68,8 @@ pub(crate) struct MergeOptions {
     /// `"keep"` (default) | `"prune"` — the unioned DICT rows' fate (#1011),
     /// parsed by the engine's `FromStr` like the two modes above.
     dict_rows: Option<String>,
+    /// `"input"` (default) | `"key"` — the merged rows' order (#1008).
+    row_order: Option<String>,
 }
 
 #[cfg(feature = "merge")]
@@ -79,6 +81,7 @@ impl WasmOptions for MergeOptions {
         "onMissingTran",
         "tran",
         "dictRows",
+        "rowOrder",
     ];
     const WHAT: &'static str = "merge options";
 }
@@ -118,6 +121,12 @@ export interface MergeOptions {
    *  writes the `DICT` after the other groups; with no row left it is omitted.
    *  Pruning never adds a finding. */
   dictRows?: "keep" | "prune";
+  /** `"input"` (default) writes rows in first-seen order across the inputs.
+   *  `"key"` sorts each group by its KEY headings — numeric TYPEs by exact
+   *  value, anything else in natural order (`BH2` before `BH10`), blanks
+   *  last, ties in input order — after reconciliation, so it never changes
+   *  which row wins, `revisions` or `warnings`. */
+  rowOrder?: "input" | "key";
 }
 "#;
 
@@ -163,7 +172,9 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 /// differently.
 #[cfg(feature = "merge")]
 fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
-    use laterite_ags4_merge::{DictRows, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{
+        DictRows, MergeOpts, MissingTranMode, RowOrder, TypeClashMode, merge_parsed,
+    };
 
     let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
     let encoding = resolve_encoding(o.encoding.as_deref())?;
@@ -185,6 +196,7 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         .unwrap_or("reconcile")
         .parse()?;
     let dict_rows: DictRows = o.dict_rows.as_deref().unwrap_or("keep").parse()?;
+    let row_order: RowOrder = o.row_order.as_deref().unwrap_or("input").parse()?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -192,6 +204,7 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         edition: dv,
         tran,
         dict_rows,
+        row_order,
         ..Default::default()
     };
 
@@ -599,5 +612,44 @@ mod tests {
             },
         ));
         assert!(msg.contains("keep, prune"), "{msg}");
+    }
+
+    #[cfg(feature = "merge")]
+    #[test]
+    fn row_order_key_sorts_the_merged_rows() {
+        // #1008: first-seen order is BH10, BH2; `key` writes BH2 first.
+        let loca = |id: &str| {
+            format!(
+                "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                 \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"LOCA\"\r\n\
+                 \"HEADING\",\"LOCA_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\
+                 \"DATA\",\"{id}\"\r\n"
+            )
+            .into_bytes()
+        };
+        let (a, b) = (loca("BH10"), loca("BH2"));
+        let text = |o: MergeOptions| {
+            String::from_utf8(merge_core(&a, &b, o).expect("merges").bytes()).expect("utf-8")
+        };
+        let first = |t: &str, id: &str| t.find(&format!("\"DATA\",\"{id}\"")).expect(id);
+        let default = text(MergeOptions::default());
+        assert!(
+            first(&default, "BH10") < first(&default, "BH2"),
+            "{default}"
+        );
+        let sorted = text(MergeOptions {
+            row_order: Some("key".into()),
+            ..Default::default()
+        });
+        assert!(first(&sorted, "BH2") < first(&sorted, "BH10"), "{sorted}");
+        let msg = err(merge_core(
+            &a,
+            &b,
+            MergeOptions {
+                row_order: Some("sorted".into()),
+                ..Default::default()
+            },
+        ));
+        assert!(msg.contains("input, key"), "{msg}");
     }
 }

@@ -859,9 +859,11 @@ pub fn merge(
     tran: Option<TranInput>,
     // `"keep"` (default) | `"prune"` — the unioned DICT rows' fate (#1011).
     dict_rows: Option<String>,
+    // `"input"` (default) | `"key"` — the merged rows' order (#1008).
+    row_order: Option<String>,
 ) -> Result<MergeOutput> {
     use laterite_ags4_merge::{
-        DictRows, MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed,
+        DictRows, MergeError, MergeOpts, MissingTranMode, RowOrder, TypeClashMode, merge_parsed,
     };
 
     if files.len() < 2 {
@@ -918,6 +920,11 @@ pub fn merge(
         .unwrap_or("keep")
         .parse()
         .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+    let row_order: RowOrder = row_order
+        .as_deref()
+        .unwrap_or("input")
+        .parse()
+        .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -925,6 +932,7 @@ pub fn merge(
         edition: dv,
         tran,
         dict_rows,
+        row_order,
         ..Default::default()
     };
 
@@ -1462,6 +1470,9 @@ pub fn emit_ags4_from_ipc(
     // `"keep"` (default) | `"prune"` — the DICT rows' fate (#1011); the
     // engine's `DictRows` owns the tokens and the refusal.
     dict_rows: Option<String>,
+    // `"input"` (default) | `"key"` — the rows' order (#1008), parsed by the
+    // engine's `RowOrder` likewise.
+    row_order: Option<String>,
 ) -> Result<EmitResult> {
     let opts = laterite_ags4_emit::EmitOpts {
         tran: tran.map(TranInput::fold).transpose()?.flatten(),
@@ -1475,6 +1486,11 @@ pub fn emit_ags4_from_ipc(
         dict_rows: dict_rows
             .as_deref()
             .unwrap_or("keep")
+            .parse()
+            .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?,
+        row_order: row_order
+            .as_deref()
+            .unwrap_or("input")
             .parse()
             .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?,
     };
@@ -1797,6 +1813,18 @@ pub fn missing_tran_modes() -> Vec<String> {
 #[must_use]
 pub fn dict_rows_modes() -> Vec<String> {
     laterite_ags4_merge::DictRows::ALL
+        .iter()
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
+/// The `--row-order` values build and merge accept, in declaration order —
+/// `["input", "key"]` (#1008). Generated from `RowOrder::ALL`, as `dictRowsModes`
+/// is, so the launcher's check and the census read one set.
+#[napi]
+#[must_use]
+pub fn row_order_modes() -> Vec<String> {
+    laterite_ags4_merge::RowOrder::ALL
         .iter()
         .map(|m| m.as_str().to_string())
         .collect()

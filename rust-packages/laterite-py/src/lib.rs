@@ -699,6 +699,7 @@ fn merge_core(
     on_type_clash: &str,
     on_missing_tran: &str,
     dict_rows: &str,
+    row_order: &str,
     dvr: Option<&str>,
     encoding: Option<&str>,
     tran: (
@@ -712,7 +713,8 @@ fn merge_core(
     ),
 ) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
     use laterite_ags4_merge::{
-        DictRows, MergeError, MergeOpts, MissingTranMode, TranStamp, TypeClashMode, merge_parsed,
+        DictRows, MergeError, MergeOpts, MissingTranMode, RowOrder, TranStamp, TypeClashMode,
+        merge_parsed,
     };
 
     if files.len() < 2 {
@@ -733,6 +735,9 @@ fn merge_core(
         .parse()
         .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let dict_rows: DictRows = dict_rows
+        .parse()
+        .map_err(|m: String| (5, "bad_args".to_string(), m))?;
+    let row_order: RowOrder = row_order
         .parse()
         .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
@@ -783,6 +788,7 @@ fn merge_core(
         edition: dv,
         tran,
         dict_rows,
+        row_order,
         ..Default::default()
     };
 
@@ -820,7 +826,7 @@ fn merge_core(
 /// warnings_json, revisions_json}` — the Python layer parses the two JSON
 /// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
-#[pyo3(signature = (files, on_type_clash="error", on_missing_tran="reconcile", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None, dict_rows="keep"))]
+#[pyo3(signature = (files, on_type_clash="error", on_missing_tran="reconcile", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None, dict_rows="keep", row_order="input"))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -839,6 +845,7 @@ fn merge_files<'py>(
     tran_description: Option<String>,
     tran_remarks: Option<String>,
     dict_rows: &str,
+    row_order: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
     let tran = (
         tran_issue.as_deref(),
@@ -854,6 +861,7 @@ fn merge_files<'py>(
         on_type_clash,
         on_missing_tran,
         dict_rows,
+        row_order,
         dict_version.as_deref(),
         encoding.as_deref(),
         tran,

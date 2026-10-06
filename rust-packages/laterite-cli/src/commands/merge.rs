@@ -78,6 +78,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         edition: dv,
         tran,
         dict_rows: args.dict_rows,
+        row_order: args.row_order,
         ..Default::default()
     };
 

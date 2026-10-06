@@ -74,6 +74,7 @@
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
           "--tran-issue": true,
@@ -140,6 +141,10 @@
           "error",
           "promote",
           "widen"
+        ],
+        "merge --row-order": [
+          "input",
+          "key"
         ]
       },
       "editions": [
@@ -234,6 +239,7 @@
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
           "--tran-issue": true,
@@ -302,6 +308,10 @@
           "error",
           "promote",
           "widen"
+        ],
+        "merge --row-order": [
+          "input",
+          "key"
         ]
       },
       "editions": [
@@ -396,6 +406,7 @@
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
           "--tran-issue": true,
@@ -464,6 +475,10 @@
           "error",
           "promote",
           "widen"
+        ],
+        "merge --row-order": [
+          "input",
+          "key"
         ]
       },
       "editions": [
