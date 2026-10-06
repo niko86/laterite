@@ -66,10 +66,14 @@ fn compute_fixes_core(
     };
     // Through the door, so the fixes offered in the browser are computed against the
     // same dictionary `lat fix` would use on the same bytes (the O-42 guard included).
-    let Ok((found, _dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
+    let Ok((found, dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
         return Vec::new();
     };
-    laterite_ags4_validator::fixes::compute_fixes(&parsed, &found)
+    laterite_ags4_validator::fixes::compute_fixes(
+        &parsed,
+        &found,
+        laterite_ags4_validator::dict::Dictionary::bundled(dv),
+    )
 }
 
 /// Apply a user-selected subset of fixes to AGS4 bytes, returning the new
@@ -146,7 +150,7 @@ export interface Fix {
   kind: "normalize_crlf" | "strip_bom" | "strip_embedded_cr"
       | "rename_duplicate_heading" | "insert_tran_dlim" | "insert_tran_rcon"
       | "reformat_numeric" | "canonicalize_datetime" | "normalize_typography"
-      | "pad_short_row" | "quote_unquoted_row";
+      | "pad_short_row" | "quote_unquoted_row" | "trim_abbreviation";
   label: string;
   /** The exact rule label (`"AGS Format Rule 8"`, …), for cross-linking back to
    *  the finding it resolves. */

@@ -74,6 +74,14 @@ CASES: dict[str, dict] = {
         "text": '"GROUP","TRAN"\r\n"HEADING","TRAN_DLIM","TRAN_RCON"\r\n"UNIT","",""\r\n'
         '"TYPE","X","X"\r\n"DATA","|",""\r\n'
     },
+    # PA value padded around a defined code -> Rule 16 (TrimAbbreviation, safe;
+    # the delivery-shaped round-trip is test_rule16_padding.py)
+    "16": {
+        "text": '"GROUP","SAMP"\r\n"HEADING","SAMP_ID","SAMP_TYPE"\r\n"UNIT","",""\r\n'
+        '"TYPE","ID","PA"\r\n"DATA","S1"," D"\r\n\r\n'
+        '"GROUP","ABBR"\r\n"HEADING","ABBR_HDNG","ABBR_CODE","ABBR_DESC"\r\n'
+        '"UNIT","","",""\r\n"TYPE","X","X","X"\r\n"DATA","SAMP_TYPE","D","Disturbed"\r\n'
+    },
 }
 
 # Rule 7's rename resolves the duplicate but introduces a non-dictionary heading,

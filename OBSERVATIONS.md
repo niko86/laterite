@@ -749,6 +749,43 @@ O-N below is an internal decision or behavioural note, not for external circulat
   does, and so does `laterite.compat` — and `classify` reconciles it to this
   record rather than filing it as an action.
 
+### O-57 [VARIANCE] A PA value that fails Rule 16 only because of surrounding whitespace gets a laterite-originated FYI (Related to Rule 16), and a safe trim fix; python-ags4 has no such check
+- **Observed** (#1012): Rule 16 looks each `PA` value up as it stands — the
+  whole value, or each part after the `TRAN_RCON` split — against the
+  `(ABBR_HDNG, ABBR_CODE)` pairs the file defines, and trims nothing. So `" D"`
+  fails where `"D"` is defined, and `"B + D"` fails twice, for `"B "` and
+  `" D"`. A padded KEY value is repeated in every child group, so one padding
+  mistake reads as the same missing code once per group, and nothing in the
+  finding says the cause is whitespace.
+- **Spec** (`spec:AGS4-4.2-2025.pdf §4.1.1 Rule 16`): requires the codes used
+  in a `PA` field to be defined in ABBR, and says nothing about whitespace
+  around a code. A padded value is therefore a different string from the
+  defined code, and the finding is correct.
+- **python-ags4** (`check.py::rule_16`): the same untrimmed lookup and the same
+  finding. It has no check whose subject is padding.
+- **Assessment**: both engines are right to report it. The gap is diagnosis:
+  the reader is told a code is missing when the code is present and the value
+  around it is not. Appending the hint to the error was considered and
+  rejected — `laterite.compat` rewrites that error into python-ags4's wording
+  with a pattern anchored at the end of the string, so a suffix would silently
+  drop the rewrite.
+- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
+  python-ags4 defect or a spec ambiguity.
+- **Our decision** (#1012): for each failing value or part whose trimmed form
+  is defined under the same heading, also emit `FYI (Related to Rule 16)`
+  naming the heading, the padded value and the defined code. No FYI when the
+  trimmed form is undefined too, or when the part is all whitespace; with no
+  usable `TRAN_RCON` ([[O-54]]) the whole value is trimmed. The error text is
+  unchanged, and the label is the existing one, so compat's severity
+  classifier and the parity label set see nothing new. `fix` gains the
+  matching repair in the safe tier: a cell is rewritten only when every
+  failing part becomes a defined code once trimmed, the failing parts are
+  trimmed and rejoined with the bare concatenator, and every copy of the value
+  under that heading is rewritten together so a KEY chain stays consistent.
+  A trim that would give two rows of any group the same KEY values (by the
+  effective dictionary) is withheld whole, since the padding is then the only
+  thing telling those rows apart; those cells keep their finding and FYI.
+
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 
 ### O-47 [NOTE] Quote-aware universal-newline parsing (#422): a lone-CR terminator now splits into rows + Rule 2a (converging with python), an embedded CR/LF stays in-field + Rule 6 (diverging)

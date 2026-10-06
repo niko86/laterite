@@ -90,7 +90,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
     single_row_group(parsed, "PROJ", RULE_13, found);
     single_row_group(parsed, "TRAN", RULE_14, found);
     rule_15(parsed, found);
-    rule_16(parsed, found);
+    rule_16(parsed, opts.include_fyi, found);
     rule_17(parsed, found);
     rule_18(parsed, found);
     if opts.include_warnings {
@@ -349,9 +349,92 @@ fn rule_15(parsed: &ParsedFile, found: &mut Findings) {
     }
 }
 
+/// Rule 16's lookup, shared with the fix engine so the trim repair can only
+/// ever rewrite what this rule would flag, judged by the same split and the
+/// same `(ABBR_HDNG, ABBR_CODE)` pairs — two copies of either could disagree
+/// about which cells are padded.
+pub(crate) struct AbbrLookup<'a> {
+    /// `(ABBR_HDNG, ABBR_CODE)` pairs the file defines.
+    defined: BTreeSet<(&'a str, &'a str)>,
+    /// `TRAN_RCON` (Rule 16a). `None` when absent or empty — then a value is
+    /// never split (O-54).
+    concat: Option<&'a str>,
+}
+
+impl<'a> AbbrLookup<'a> {
+    /// `None` when the file has no ABBR group, or one without the two key
+    /// headings — Rule 16 itself, or Rule 10a/4, reports those.
+    pub(crate) fn of(parsed: &'a ParsedFile) -> Option<Self> {
+        let abbr = parsed.groups.get("ABBR")?;
+        let (hi, ci) = (col(abbr, "ABBR_HDNG")?, col(abbr, "ABBR_CODE")?);
+        let defined = abbr
+            .rows
+            .iter()
+            .filter_map(|r| Some((abbr.value_at(r, hi)?, abbr.value_at(r, ci)?)))
+            .collect();
+        let concat = parsed
+            .groups
+            .get("TRAN")
+            .and_then(|t| col(t, "TRAN_RCON").map(|ci| (t, ci)))
+            .and_then(|(t, ci)| t.rows.first().and_then(|r| t.value_at(r, ci)))
+            .filter(|s| !s.is_empty());
+        Some(Self { defined, concat })
+    }
+
+    /// The parts Rule 16 looks up for one value.
+    pub(crate) fn parts<'v>(&self, v: &'v str) -> Vec<&'v str> {
+        match self.concat {
+            Some(sep) => v.split(sep).collect(),
+            None => vec![v],
+        }
+    }
+
+    /// Whether `p` breaches Rule 16 under `hd`. An empty part is not an
+    /// abbreviation (`"A++B"`), so it is never one.
+    pub(crate) fn fails(&self, hd: &str, p: &str) -> bool {
+        !p.is_empty() && !self.defined.contains(&(hd, p))
+    }
+
+    /// The defined code a failing part becomes once its surrounding whitespace
+    /// is trimmed, or `None` when trimming does not rescue it. An all-whitespace
+    /// part trims to nothing, and nothing is not a code, so it stays `None`:
+    /// the plain Rule 16 finding is then the whole story.
+    pub(crate) fn trimmed_match<'p>(&self, hd: &str, p: &'p str) -> Option<&'p str> {
+        let t = p.trim();
+        (self.fails(hd, p) && !t.is_empty() && self.defined.contains(&(hd, t))).then_some(t)
+    }
+
+    /// The repaired value for a cell whose every failing part is rescued by
+    /// trimming, or `None` when the cell passes or any failing part stays
+    /// undefined. Only the failing parts are trimmed: a part that passes as it
+    /// stands is already the code the file defines, and trimming it could turn
+    /// it into one that isn't.
+    pub(crate) fn trim_repair(&self, hd: &str, v: &str) -> Option<String> {
+        let parts = self.parts(v);
+        let mut any_failing = false;
+        let mut repaired = Vec::with_capacity(parts.len());
+        for p in parts {
+            if self.fails(hd, p) {
+                any_failing = true;
+                repaired.push(self.trimmed_match(hd, p)?);
+            } else {
+                repaired.push(p);
+            }
+        }
+        any_failing.then(|| repaired.join(self.concat.unwrap_or("")))
+    }
+}
+
 /// Rule 16/16a — every abbreviation in a `PA`-typed FIELD (split on the
 /// `TRAN_RCON` concatenator) must be defined in ABBR for that heading.
-fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
+///
+/// With `include_fyi`, a failing part that only its surrounding whitespace
+/// keeps from matching a defined code also gets a `FYI (Related to Rule 16)`
+/// saying so (O-57). That is a separate finding rather than more words on the
+/// error: compat rewrites the error into python-ags4's wording with a regex
+/// anchored at the end of the string, so any suffix would silently drop it
+/// back to ours.
+fn rule_16(parsed: &ParsedFile, include_fyi: bool, found: &mut Findings) {
     // Does the file use any PA column at all?
     let has_pa = parsed
         .group_order
@@ -361,28 +444,13 @@ fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
         return; // ABBR not required
     }
 
-    let Some(abbr) = parsed.groups.get("ABBR") else {
+    if !parsed.groups.contains_key("ABBR") {
         add(found, RULE_16, None, "ABBR", "ABBR group not found.");
         return;
+    }
+    let Some(lookup) = AbbrLookup::of(parsed) else {
+        return; // malformed ABBR — Rule 10a/4 reports it
     };
-
-    // (ABBR_HDNG, ABBR_CODE) pairs that are defined.
-    let defined: BTreeSet<(&str, &str)> = match (col(abbr, "ABBR_HDNG"), col(abbr, "ABBR_CODE")) {
-        (Some(hi), Some(ci)) => abbr
-            .rows
-            .iter()
-            .filter_map(|r| Some((abbr.value_at(r, hi)?, abbr.value_at(r, ci)?)))
-            .collect(),
-        _ => return, // malformed ABBR — Rule 10a/4 reports it
-    };
-
-    // Concatenator from TRAN_RCON (Rule 16a). Absent/empty → no split.
-    let concat = parsed
-        .groups
-        .get("TRAN")
-        .and_then(|t| col(t, "TRAN_RCON").map(|ci| (t, ci)))
-        .and_then(|(t, ci)| t.rows.first().and_then(|r| t.value_at(r, ci)))
-        .filter(|s| !s.is_empty());
 
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
@@ -392,20 +460,32 @@ fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
             }
             let hd = g.headings.get(ci).map_or("", String::as_str);
             for v in column_values(g, ci) {
-                let parts: Vec<&str> = match concat {
-                    Some(sep) => v.split(sep).collect(),
-                    None => vec![v],
-                };
-                for p in parts {
-                    if !p.is_empty() && !defined.contains(&(hd, p)) {
-                        add(
+                for p in lookup.parts(v) {
+                    if !lookup.fails(hd, p) {
+                        continue;
+                    }
+                    add(
+                        found,
+                        RULE_16,
+                        None,
+                        code,
+                        format!("Abbreviation {p:?} under {hd} is not defined in the ABBR group."),
+                    );
+                    if !include_fyi {
+                        continue;
+                    }
+                    if let Some(t) = lookup.trimmed_match(hd, p) {
+                        add_at(
                             found,
-                            RULE_16,
+                            RULE_16_FYI,
                             None,
                             code,
                             format!(
-                                "Abbreviation {p:?} under {hd} is not defined in the ABBR group."
+                                "{hd}: abbreviation {p:?} is not defined in the ABBR group, \
+                                 but {t:?} is; they differ only by surrounding whitespace."
                             ),
+                            Location::default(),
+                            Severity::Fyi,
                         );
                     }
                 }
@@ -984,6 +1064,124 @@ mod tests {
             !r16.iter().any(|x| x.desc.contains("\"TP\"")),
             "defined split-part TP must not flag: {r16:?}"
         );
+    }
+
+    /// A `SAMP_TYPE` `PA` cell holding `value`, with ABBR defining `B` and `D`
+    /// under `SAMP_TYPE`, and a `TRAN_RCON` of `rcon` when given (absent otherwise).
+    fn padded_fixture(rcon: Option<&str>, value: &str) -> String {
+        let tran = rcon.map_or(String::new(), |r| {
+            format!(
+                "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_RCON\"\r\n\
+                 \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",{r:?}\r\n\r\n"
+            )
+        });
+        format!(
+            "{tran}\"GROUP\",\"SAMP\"\r\n\"HEADING\",\"SAMP_ID\",\"SAMP_TYPE\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+             \"DATA\",\"S1\",{value:?}\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"SAMP_TYPE\",\"B\",\"Bulk\"\r\n\
+             \"DATA\",\"SAMP_TYPE\",\"D\",\"Disturbed\"\r\n"
+        )
+    }
+
+    /// The padding FYIs only — the bucket is shared with O-43's and the
+    /// description-drift FYI, which these fixtures may also raise.
+    fn padding_fyis(f: &Findings) -> Vec<String> {
+        f.get(RULE_16_FYI)
+            .map(|v| {
+                v.iter()
+                    .filter(|x| x.desc.contains("surrounding whitespace"))
+                    .map(|x| x.desc.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn rule_16_fyi_names_the_trimmed_code_for_a_padded_value() {
+        let f = run_fyi(&padded_fixture(None, " D"));
+        let r16: Vec<&str> = f[RULE_16].iter().map(|x| x.desc.as_str()).collect();
+        assert_eq!(
+            r16,
+            vec!["Abbreviation \" D\" under SAMP_TYPE is not defined in the ABBR group."],
+            "the error must stay word-for-word: compat's regex is anchored on it"
+        );
+        let fyi = padding_fyis(&f);
+        assert_eq!(fyi.len(), 1, "{fyi:?}");
+        assert!(
+            fyi[0].contains("SAMP_TYPE") && fyi[0].contains("\" D\"") && fyi[0].contains("\"D\""),
+            "the FYI names the heading, the padded value and the defined code: {fyi:?}"
+        );
+        assert!(
+            f[RULE_16_FYI].iter().all(|x| x.severity == Severity::Fyi),
+            "an FYI never changes validity"
+        );
+    }
+
+    #[test]
+    fn rule_16_padding_fyi_off_without_include_fyi() {
+        let quiet = run(&padded_fixture(None, " D"));
+        assert!(padding_fyis(&quiet).is_empty());
+        // And the error bucket is the same whether or not FYIs are asked for.
+        let loud = run_fyi(&padded_fixture(None, " D"));
+        let descs =
+            |f: &Findings| -> Vec<String> { f[RULE_16].iter().map(|x| x.desc.clone()).collect() };
+        assert_eq!(descs(&quiet), descs(&loud));
+    }
+
+    #[test]
+    fn rule_16_padding_fyi_per_concatenated_part() {
+        let fyi = padding_fyis(&run_fyi(&padded_fixture(Some("+"), "B + D")));
+        assert_eq!(fyi.len(), 2, "one per padded part: {fyi:?}");
+        assert!(
+            fyi.iter()
+                .any(|d| d.contains("\"B \"") && d.contains("\"B\""))
+        );
+        assert!(
+            fyi.iter()
+                .any(|d| d.contains("\" D\"") && d.contains("\"D\""))
+        );
+    }
+
+    #[test]
+    fn rule_16_padding_fyi_silent_when_trimming_does_not_rescue() {
+        // Trimmed but still undefined: the plain error is the whole story.
+        let f = run_fyi(&padded_fixture(None, " X"));
+        assert!(f.contains_key(RULE_16));
+        assert!(padding_fyis(&f).is_empty());
+        // All-whitespace trims to nothing, and nothing is not a code.
+        let f = run_fyi(&padded_fixture(Some("+"), "B+ "));
+        assert!(f.contains_key(RULE_16));
+        assert!(padding_fyis(&f).is_empty());
+    }
+
+    #[test]
+    fn rule_16_padding_fyi_trims_the_whole_value_without_tran_rcon() {
+        // No TRAN_RCON → no split (O-54): " D" trims whole to a defined code,
+        // "B + D" trims whole to "B + D", which nothing defines.
+        assert_eq!(
+            padding_fyis(&run_fyi(&padded_fixture(None, " D "))).len(),
+            1
+        );
+        assert!(padding_fyis(&run_fyi(&padded_fixture(None, "B + D"))).is_empty());
+    }
+
+    #[test]
+    fn trim_repair_only_when_every_failing_part_is_rescued() {
+        let src = padded_fixture(Some("+"), "B");
+        let pf = parse_str(&src).expect("fixture parses");
+        let l = AbbrLookup::of(&pf).expect("ABBR present");
+        assert_eq!(l.trim_repair("SAMP_TYPE", " D").as_deref(), Some("D"));
+        assert_eq!(l.trim_repair("SAMP_TYPE", "B + D").as_deref(), Some("B+D"));
+        // One rescuable part and one undefined one: the cell stays whole.
+        assert_eq!(l.trim_repair("SAMP_TYPE", " D+ X"), None);
+        // A cell that passes is never rewritten.
+        assert_eq!(l.trim_repair("SAMP_TYPE", "B+D"), None);
+        // The heading matters: D is defined under SAMP_TYPE only.
+        assert_eq!(l.trim_repair("LOCA_TYPE", " D"), None);
     }
 
     #[test]

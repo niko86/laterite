@@ -597,6 +597,21 @@
             "spec": "silent",
             "converged": false
           }
+        },
+        {
+          "id": "O-57",
+          "kind": "VARIANCE",
+          "title": "A PA value that fails Rule 16 only because of surrounding whitespace gets a laterite-originated FYI (Related to Rule 16), and a safe trim fix; python-ags4 has no such check",
+          "upstream": false,
+          "body": "- **Observed** (#1012): Rule 16 looks each `PA` value up as it stands — the\n  whole value, or each part after the `TRAN_RCON` split — against the\n  `(ABBR_HDNG, ABBR_CODE)` pairs the file defines, and trims nothing. So `\" D\"`\n  fails where `\"D\"` is defined, and `\"B + D\"` fails twice, for `\"B \"` and\n  `\" D\"`. A padded KEY value is repeated in every child group, so one padding\n  mistake reads as the same missing code once per group, and nothing in the\n  finding says the cause is whitespace.\n- **Spec** (`spec:AGS4-4.2-2025.pdf §4.1.1 Rule 16`): requires the codes used\n  in a `PA` field to be defined in ABBR, and says nothing about whitespace\n  around a code. A padded value is therefore a different string from the\n  defined code, and the finding is correct.\n- **python-ags4** (`check.py::rule_16`): the same untrimmed lookup and the same\n  finding. It has no check whose subject is padding.\n- **Assessment**: both engines are right to report it. The gap is diagnosis:\n  the reader is told a code is missing when the code is present and the value\n  around it is not. Appending the hint to the error was considered and\n  rejected — `laterite.compat` rewrites that error into python-ags4's wording\n  with a pattern anchored at the end of the string, so a suffix would silently\n  drop the rewrite.\n- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a\n  python-ags4 defect or a spec ambiguity.\n- **Our decision** (#1012): for each failing value or part whose trimmed form\n  is defined under the same heading, also emit `FYI (Related to Rule 16)`\n  naming the heading, the padded value and the defined code. No FYI when the\n  trimmed form is undefined too, or when the part is all whitespace; with no\n  usable `TRAN_RCON` ([[O-54]]) the whole value is trimmed. The error text is\n  unchanged, and the label is the existing one, so compat's severity\n  classifier and the parity label set see nothing new. `fix` gains the\n  matching repair in the safe tier: a cell is rewritten only when every\n  failing part becomes a defined code once trimmed, the failing parts are\n  trimmed and rejoined with the bare concatenator, and every copy of the value\n  under that heading is rewritten together so a KEY chain stays consistent.\n  A trim that would give two rows of any group the same KEY values (by the\n  effective dictionary) is withheld whole, since the padding is then the only\n  thing telling those rows apart; those cells keep their finding and FYI.\n\n",
+          "user_facing": {
+            "summary": "A `PA` value that fails Rule 16 only because of whitespace around a defined code (`\" D\"` where `\"D\"` is defined) → a laterite **FYI** (Related to Rule 16) naming the code, and `fix` trims it."
+          },
+          "relation": {
+            "python": "has-no-such-check",
+            "spec": "silent",
+            "converged": false
+          }
         }
       ]
     },

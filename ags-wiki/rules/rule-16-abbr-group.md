@@ -7,14 +7,14 @@ rule_number: 16
 rule_sub: ""
 rule_family: groups
 varies_between_editions: false
-divergences: [O-43]
+divergences: [O-43, O-57]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs"
   fixtures: ""
   regression: ""
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 16"
-related: [rule-families, traceability-chain, parity-model, O-43]
+related: [rule-families, traceability-chain, parity-model, O-43, O-57]
 sources: [spec-4.2]
 ---
 # Rule 16 — abbr group
@@ -32,6 +32,8 @@ Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by
 > [!quote] Implemented in `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs`
 
 [[ABBR]] group defines all PA-typed (and abbreviation-bearing) values; PA is NOT case-sensitive (§3.3) — see [[pa-not-case-sensitive-pt-pu-are]].
+
+The lookup is exact: nothing is trimmed, so `" D"` fails where `"D"` is defined. With FYIs on, such a value (or concatenated part) also gets an `FYI (Related to Rule 16)` naming the code it matches once trimmed, and `fix` trims it in the safe tier when every failing part of the cell is rescued that way ([[O-57]]). The error text itself never changes — `laterite.compat` rewrites it into python-ags4's wording by an end-anchored pattern.
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
@@ -60,6 +62,7 @@ timeline
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
 - Divergence (Rust↔python): [[O-43]] — laterite adds an FYI for a self-declared but **non-standard** PA abbreviation (a typo'd / invented code that is in the file's ABBR but not the standard picklist); python-ags4 has no equivalent.
+- Divergence (Rust↔python): [[O-57]] — laterite adds an FYI when a PA value fails only because of whitespace around a defined code, and `fix` trims it; python-ags4 has no equivalent.
 
 ## Related
-[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-43]]
+[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-43]] · [[O-57]]
