@@ -257,6 +257,23 @@ finding. The judged doors on every surface take it (Python `dict_rows=`,
 Node and wasm `{ dictRows }`); merge passes `MergeOpts::dict_rows` straight
 through. The unchecked doors stay `Keep`.
 
+## Update (2026-10-06): `row_order` — rows as given, or sorted by KEY (#1008)
+
+`EmitOpts::row_order` (`RowOrder`, `repo:rust-packages/laterite-ags4-emit/src/row_order.rs`)
+is `Input` by default, and then the build is byte-identical to one without
+it. `Key` sorts each group's rows as the stream receives it, by the group's
+KEY headings from the shared keychain (`key_heading_names`), parent keys
+first; a group only the file's DICT defines uses the KEYs that DICT declares.
+A key whose emitted TYPE is `nDP`/`nSF`/`nSCI`/`U` compares as an exact
+decimal, never an `f64`; any other in natural order with a raw-string
+tiebreak. Blanks go last, ties keep input order, and TRAN, TYPE, UNIT, ABBR,
+DICT and KEY-less groups are not touched. The one-call doors read every DICT
+ahead of streaming, because merge writes groups alphabetically and so can put
+DICT after a user group it defines; a session door (`ArrowEmitSession`) sees
+no group ahead, so there only an earlier DICT can key one. The judged doors
+take it (Python `row_order=`, Node and wasm `{ rowOrder }`); merge passes
+`MergeOpts::row_order` through. The unchecked doors stay `Input`.
+
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
 The typed-graph walk used to emit *every declared heading* of each class (null →

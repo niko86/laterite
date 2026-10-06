@@ -98,6 +98,7 @@ flowchart TD
   laterite_ags4_diff --> laterite_ags4_reference
   laterite_ags4_diff --> laterite_ags4_types
   laterite_ags4_emit --> laterite_ags4_parse
+  laterite_ags4_emit --> laterite_ags4_reference
   laterite_ags4_emit --> laterite_ags4_types
   laterite_ags4_emit --> laterite_ags4_validator
   laterite_ags4_excel --> laterite_ags4_core
@@ -186,12 +187,12 @@ flowchart TD
 |---|---|--:|--:|--:|
 | `laterite-ags4-parse` | L0 | 0 | 17 | 0 |
 | `laterite-ags4-types` | L0 | 0 | 13 | 0 |
-| `laterite-ags4-reference` | L0 | 2 | 7 | 2 |
+| `laterite-ags4-reference` | L0 | 2 | 8 | 2 |
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 14 | 3 |
-| `laterite-ags4-emit` | L2 | 3 | 10 | 4 |
+| `laterite-ags4-emit` | L2 | 4 | 10 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-excel` | L2 | 2 | 5 | 7 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
@@ -221,7 +222,7 @@ flowchart TD
   - `laterite-ags4-types` (in-degree 13)
   - `laterite-ags4-emit` (in-degree 10)
   - `laterite-ags4-core` (in-degree 9)
-  - `laterite-ags4-reference` (in-degree 7)
+  - `laterite-ags4-reference` (in-degree 8)
   - `laterite-ags4-hostopts` (in-degree 6)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**
   - `laterite`

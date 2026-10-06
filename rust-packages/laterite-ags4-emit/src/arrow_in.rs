@@ -194,6 +194,21 @@ pub fn emit_ags4_from_arrow(
 ) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
     let mut stream = EmitStream::new(opts, &dict);
+    if stream.wants_dict_lookahead() {
+        // `RowOrder::Key` keys a DICT-defined group from the DICT, wherever it
+        // sits in `groups`. Converting a shallow copy (the batches are
+        // refcounted) leaves the group itself to stream in its place.
+        for g in groups.iter().filter(|g| g.code == "DICT") {
+            let copy = ArrowGroup {
+                code: g.code.clone(),
+                schema: g.schema.clone(),
+                batches: g.batches.clone(),
+                units: g.units.clone(),
+                types: g.types.clone(),
+            };
+            stream.look_ahead(&owned_group_from_arrow(copy, &dict));
+        }
+    }
     for g in groups {
         // Consumed per iteration: a group's batches (our refs to them) drop
         // here, not at return — and the formatted `OwnedGroup` drops inside
@@ -210,7 +225,10 @@ pub fn emit_ags4_from_arrow(
 /// the wasm write door's whole prize at its gate rung). A group's batches
 /// and its formatted cells drop inside `push`, exactly as the one-call
 /// door's loop drops them; [`emit_ags4_from_arrow`] IS this session driven
-/// over a `Vec`, and a test pins the two byte-identical.
+/// over a `Vec`, and a test pins the two byte-identical — with one exception
+/// by construction: under [`crate::RowOrder::Key`] the one-call door reads
+/// the DICT ahead, while a session keys a DICT-defined group only from a
+/// DICT pushed before it.
 ///
 /// The caller owns `opts` and the bundled dictionary for `opts.edition`
 /// (the same pairing the one-call door constructs internally) and lends
@@ -893,6 +911,7 @@ mod tests {
             tran: None,
             synthesise_metadata: false,
             dict_rows: crate::DictRows::Keep,
+            row_order: crate::RowOrder::Input,
         };
         let one_call = emit_ags4_from_arrow(groups(), &opts).expect("the one-call door emits");
 
@@ -913,5 +932,70 @@ mod tests {
             sessioned.findings.len(),
             "the verdicts must match finding for finding"
         );
+    }
+
+    /// `RowOrder::Key` through the Arrow door (#1008), including a DICT-defined
+    /// group whose DICT arrives after it: the one-call door reads the DICT
+    /// ahead, a session cannot.
+    #[test]
+    fn key_order_sorts_on_the_arrow_door_and_reads_the_dict_ahead() {
+        use arrow::array::StringArray;
+        let text_group = |code: &str, cols: &[(&str, &[&str])]| {
+            let schema = Schema::new(
+                cols.iter()
+                    .map(|(h, _)| Field::new(*h, DataType::Utf8, true))
+                    .collect::<Vec<_>>(),
+            );
+            let arrays: Vec<ArrayRef> = cols
+                .iter()
+                .map(|(_, v)| Arc::new(StringArray::from(v.to_vec())) as ArrayRef)
+                .collect();
+            let batch = RecordBatch::try_new(Arc::new(schema.clone()), arrays).unwrap();
+            arrow_group(code, schema, vec![batch])
+        };
+        let groups = || {
+            vec![
+                text_group("PROJ", &[("PROJ_ID", &["P1"])]),
+                text_group("LOCA", &[("LOCA_ID", &["BH10", "BH2", "BH1"])]),
+                text_group(
+                    "XMON",
+                    &[("LOCA_ID", &["BH2", "BH1"]), ("XMON_ID", &["A", "A"])],
+                ),
+                text_group(
+                    "DICT",
+                    &[
+                        ("DICT_TYPE", &["HEADING", "HEADING"]),
+                        ("DICT_GRP", &["XMON", "XMON"]),
+                        ("DICT_HDNG", &["LOCA_ID", "XMON_ID"]),
+                        ("DICT_STAT", &["KEY", "KEY"]),
+                    ],
+                ),
+            ]
+        };
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            row_order: crate::RowOrder::Key,
+            ..EmitOpts::default()
+        };
+        let column = |bytes: &[u8], code: &str| -> Vec<String> {
+            let p = laterite_ags4_validator::parse::parse_bytes(bytes, encoding_rs::UTF_8).unwrap();
+            let g = &p.groups[code];
+            g.rows
+                .iter()
+                .map(|r| g.value_at(r, 0).unwrap().to_string())
+                .collect()
+        };
+        let one_call = emit_ags4_from_arrow(groups(), &opts).unwrap().bytes;
+        assert_eq!(column(&one_call, "LOCA"), ["BH1", "BH2", "BH10"]);
+        assert_eq!(column(&one_call, "XMON"), ["BH1", "BH2"]);
+
+        let dict = Dictionary::bundled(opts.edition);
+        let mut session = ArrowEmitSession::new(&opts, &dict);
+        for g in groups() {
+            session.push(g).unwrap();
+        }
+        let sessioned = session.finish().unwrap().bytes;
+        assert_eq!(column(&sessioned, "LOCA"), ["BH1", "BH2", "BH10"]);
+        assert_eq!(column(&sessioned, "XMON"), ["BH2", "BH1"]);
     }
 }

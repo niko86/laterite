@@ -261,6 +261,15 @@ default) is handed to the emit merge ends in; `prune` drops the restating
 rows and those for user-defined names the merged file lacks, and never adds
 a finding (`lat merge --dict-rows prune`).
 
+**Row order is first-seen by default, and may be sorted on request (#1008).**
+Rows are written in the order reconciliation first met their KEY, which
+interleaves the deliveries. `row_order` (`RowOrder`, `input` by default) is
+handed to the emit like `dict_rows`; `key` sorts each group by the same
+`key_heading_names` row identity this page keys on. The sort runs in the emit,
+after every group is reconciled, so it never changes which row wins, nor
+`revisions`, `warnings` or a conflict — only the order the rows are written in
+(`lat merge --row-order key`).
+
 ## Why
 
 - **Silence ≠ deletion is the only safe default for a *reconciliation* tool**

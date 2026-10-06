@@ -222,8 +222,9 @@ as stable):
   `laterite-ags4-core` naming/scope smell.
 - `laterite-ags4-emit` — the wasm-safe AGS4 *producer* leaf: `write_ags4` (lifted out of `laterite-ags4-core`)
   + the `emit_ags4(groups, opts)` orchestrator (typed cells → valid AGS4 via `ags4_str` +
-  per-edition dict UNIT/TYPE fill + Strict/Report/AutoFix). Deps: `laterite-ags4-types` + `laterite-ags4-validator`
-  only — both already wasm-safe, so `laterite-ags4-wasm` can reach it without `laterite-ags4-core`'s wasm-hostile
+  per-edition dict UNIT/TYPE fill + Strict/Report/AutoFix). Deps: `laterite-ags4-types`, `laterite-ags4-parse`,
+  `laterite-ags4-validator` and `laterite-ags4-reference` (the keychain `row_order` sorts by, #1008)
+  only — all already wasm-safe, so `laterite-ags4-wasm` can reach it without `laterite-ags4-core`'s wasm-hostile
   deps. First step relieving the `laterite-ags4-core` naming/scope smell. See [[ags4-output]]. Its
   byte-faithful `writer.rs::write_row` no longer carries its own quote-doubling logic — it streams each
   cell through `laterite_ags4_types::write_quoted_field` (laterite-dev#533), the same quoter the browser now reaches via

@@ -77,6 +77,33 @@ impl core::marker::Unpin for laterite_ags4_emit::EmitMode
 impl core::marker::UnsafeUnpin for laterite_ags4_emit::EmitMode
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::EmitMode
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::EmitMode
+pub enum laterite_ags4_emit::RowOrder
+pub laterite_ags4_emit::RowOrder::Input
+pub laterite_ags4_emit::RowOrder::Key
+impl laterite_ags4_emit::RowOrder
+pub const laterite_ags4_emit::RowOrder::ALL: [laterite_ags4_emit::RowOrder; 2]
+pub fn laterite_ags4_emit::RowOrder::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_emit::RowOrder
+pub fn laterite_ags4_emit::RowOrder::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_emit::RowOrder
+impl core::cmp::PartialEq for laterite_ags4_emit::RowOrder
+pub fn laterite_ags4_emit::RowOrder::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_emit::RowOrder
+pub fn laterite_ags4_emit::RowOrder::default() -> Self
+impl core::fmt::Debug for laterite_ags4_emit::RowOrder
+pub fn laterite_ags4_emit::RowOrder::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_emit::RowOrder
+impl core::marker::StructuralPartialEq for laterite_ags4_emit::RowOrder
+impl core::str::traits::FromStr for laterite_ags4_emit::RowOrder
+pub type laterite_ags4_emit::RowOrder::Err = alloc::string::String
+pub fn laterite_ags4_emit::RowOrder::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for laterite_ags4_emit::RowOrder
+impl core::marker::Send for laterite_ags4_emit::RowOrder
+impl core::marker::Sync for laterite_ags4_emit::RowOrder
+impl core::marker::Unpin for laterite_ags4_emit::RowOrder
+impl core::marker::UnsafeUnpin for laterite_ags4_emit::RowOrder
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::RowOrder
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::RowOrder
 pub struct laterite_ags4_emit::ArrowEmitSession<'a>
 impl<'a> laterite_ags4_emit::ArrowEmitSession<'a>
 pub fn laterite_ags4_emit::ArrowEmitSession<'a>::finish(self) -> core::result::Result<laterite_ags4_emit::EmitResult, laterite_ags4_emit::EmitError>
@@ -119,6 +146,7 @@ pub struct laterite_ags4_emit::EmitOpts
 pub laterite_ags4_emit::EmitOpts::dict_rows: laterite_ags4_emit::DictRows
 pub laterite_ags4_emit::EmitOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
 pub laterite_ags4_emit::EmitOpts::mode: laterite_ags4_emit::EmitMode
+pub laterite_ags4_emit::EmitOpts::row_order: laterite_ags4_emit::RowOrder
 pub laterite_ags4_emit::EmitOpts::synthesise_metadata: bool
 pub laterite_ags4_emit::EmitOpts::tran: core::option::Option<laterite_ags4_emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_emit::EmitOpts

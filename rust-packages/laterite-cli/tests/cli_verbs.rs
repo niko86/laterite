@@ -680,6 +680,63 @@ fn merge_json_reports_the_revision_and_the_tran_warning() {
 }
 
 #[test]
+fn merge_row_order_key_sorts_the_merged_rows() {
+    // #1008: two deliveries whose LOCA arrive BH10 then BH2. `input` (the
+    // default) keeps arrival order; `key` writes them naturally sorted.
+    let dir = scratch();
+    let delivery = |name: &str, id: &str| {
+        let p = dir.join(name);
+        std::fs::write(
+            &p,
+            format!(
+                "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                 \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"LOCA\"\r\n\
+                 \"HEADING\",\"LOCA_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\
+                 \"DATA\",\"{id}\"\r\n"
+            ),
+        )
+        .unwrap();
+        p
+    };
+    let (a, b) = (delivery("a.ags", "BH10"), delivery("b.ags", "BH2"));
+    let run = |mode: Option<&str>, name: &str| {
+        let out = dir.join(name);
+        let mut args = vec![
+            "merge".to_string(),
+            a.to_str().unwrap().to_string(),
+            b.to_str().unwrap().to_string(),
+            "--out".to_string(),
+            out.to_str().unwrap().to_string(),
+        ];
+        if let Some(m) = mode {
+            args.extend(["--row-order".to_string(), m.to_string()]);
+        }
+        let o = lat(args);
+        assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+        std::fs::read_to_string(out).unwrap()
+    };
+    let at = |t: &str, id: &str| t.find(&format!("\"DATA\",\"{id}\"")).expect(id);
+    let default = run(None, "default.ags");
+    assert!(at(&default, "BH10") < at(&default, "BH2"), "{default}");
+    assert_eq!(run(Some("input"), "input.ags"), default);
+    let sorted = run(Some("key"), "key.ags");
+    assert!(at(&sorted, "BH2") < at(&sorted, "BH10"), "{sorted}");
+
+    let o = lat([
+        "merge",
+        a.to_str().unwrap(),
+        b.to_str().unwrap(),
+        "--out",
+        dir.join("bogus.ags").to_str().unwrap(),
+        "--row-order",
+        "sorted",
+    ]);
+    // A bad flag value is a usage error (lat's exit 5), named by clap.
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("--row-order"), "{}", stderr(&o));
+}
+
+#[test]
 fn merge_dict_rows_prune_drops_the_restating_rows() {
     // Both deliveries restate a standard heading in DICT and declare one the
     // merged file never carries — the #1011 shape. `keep` (the default) writes

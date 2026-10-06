@@ -127,6 +127,15 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                                  lacks; DICT moves after the other groups and
                                  is left out if no row remains. Never adds a
                                  finding
+    --row-order <ORDER>   the order the merged rows are written in:
+                          input  first-seen order across the deliveries
+                                 (default)
+                          key    each group sorted by its KEY headings:
+                                 numeric TYPEs by value, others in natural
+                                 order (BH2 before BH10), blanks last.
+                                 TRAN/TYPE/UNIT/ABBR/DICT stay as given.
+                                 Applied after reconciliation, so it never
+                                 changes which row wins
     --tran-issue <ISNO>   stamp a synthesised merge-TRAN (needs all five --tran-*
                           below; records the inputs' ISNOs/dates in TRAN_REM for
                           provenance)

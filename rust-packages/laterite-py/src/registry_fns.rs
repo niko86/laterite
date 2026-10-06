@@ -11,7 +11,7 @@
 //! side as an overlay merged with this base — see D4a in the plan.
 
 use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
-use laterite_ags4_merge::{DictRows, MissingTranMode, TypeClashMode};
+use laterite_ags4_merge::{DictRows, MissingTranMode, RowOrder, TypeClashMode};
 use laterite_ags4_validator::dict::DictVersion;
 
 use pyo3::exceptions::PyValueError;
@@ -188,6 +188,13 @@ fn registry_dict_rows_modes() -> Vec<String> {
     DictRows::ALL.iter().map(|m| m.as_str().into()).collect()
 }
 
+/// The `row_order` values build and merge accept, in declaration order —
+/// `["input", "key"]` (#1008), from `RowOrder::ALL` for the same reason.
+#[pyfunction]
+fn registry_row_order_modes() -> Vec<String> {
+    RowOrder::ALL.iter().map(|m| m.as_str().into()).collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
@@ -200,5 +207,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_type_clash_modes, m)?)?;
     m.add_function(wrap_pyfunction!(registry_missing_tran_modes, m)?)?;
     m.add_function(wrap_pyfunction!(registry_dict_rows_modes, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_row_order_modes, m)?)?;
     Ok(())
 }

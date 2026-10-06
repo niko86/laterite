@@ -34,6 +34,7 @@ import {
   typeClashModes,
   missingTranModes,
   dictRowsModes,
+  rowOrderModes,
 } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
@@ -91,6 +92,7 @@ function flagValueSets(): Record<string, readonly string[]> {
     "on-type-clash": typeClashModes(),
     "on-missing-tran": missingTranModes(),
     "dict-rows": dictRowsModes(),
+    "row-order": rowOrderModes(),
   };
 }
 
@@ -159,6 +161,7 @@ const SPECS: Record<string, Spec> = {
       "on-missing-tran",
       "on-type-clash",
       "out",
+      "row-order",
       "tran-date",
       "tran-description",
       "tran-issue",
@@ -175,6 +178,7 @@ const SPECS: Record<string, Spec> = {
       "on-missing-tran",
       "on-type-clash",
       "out",
+      "row-order",
       "tran-date",
       "tran-description",
       "tran-issue",
@@ -857,12 +861,21 @@ function runMerge(p: Parsed, json: boolean): number {
   }
   const dictRows = rows as NonNullable<MergeOptions["dictRows"]>;
 
+  // And for `--row-order` (#1008).
+  const order = str(p.flags["row-order"]) ?? "input";
+  const orderModes = rowOrderModes();
+  if (!orderModes.includes(order)) {
+    fail(`--row-order: unknown mode '${order}' (${orderModes.join(", ")})`, 5);
+  }
+  const rowOrder = order as NonNullable<MergeOptions["rowOrder"]>;
+
   let res;
   try {
     res = merge(files, {
       onTypeClash,
       onMissingTran,
       dictRows,
+      rowOrder,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
       tran: tranFromFlags(p.flags),

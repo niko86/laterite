@@ -319,6 +319,14 @@ export interface EmitOptions {
    *  remains unless a non-standard heading still needs it (Rule 18). Pruning
    *  never adds a finding. */
   dictRows?: "keep" | "prune";
+  /** The order each group's rows are written in. `"input"` (default) keeps
+   *  the order you gave. `"key"` sorts them by the group's KEY headings,
+   *  parent keys first: a key whose declared TYPE is `nDP`, `nSF`, `nSCI` or
+   *  `U` by exact value, any other in natural order (`BH2` before `BH10`,
+   *  case-insensitive), blanks last, and rows that tie keep their order.
+   *  `TRAN`, `TYPE`, `UNIT`, `ABBR`, `DICT` and groups without KEY headings
+   *  stay as given. */
+  rowOrder?: "input" | "key";
   /** Destination path — the to-disk rider (mirrors laterite-py's
    *  `build_ags4(out=)`). Given, the judged document is written there and the
    *  result is a {@link BuildSaved} carrying `path` and the verdict but **no**
@@ -531,6 +539,7 @@ export function buildAgs4(
     opts.synthesiseMetadata,
     opts.tran,
     opts.dictRows,
+    opts.rowOrder,
   );
   const byRule = JSON.parse(res.findingsJson) as Record<
     string,
@@ -996,6 +1005,13 @@ export interface MergeOptions {
    *  after the other groups, and left out when no row remains and no
    *  non-standard heading needs it (Rule 18). Pruning never adds a finding. */
   dictRows?: "keep" | "prune";
+  /** The order the merged rows are written in. `"input"` (default) is
+   *  first-seen order across the sources, which interleaves deliveries.
+   *  `"key"` sorts each group by its KEY headings, as
+   *  {@link EmitOptions.rowOrder} describes. It is applied after
+   *  reconciliation, so it never changes which row wins, `revisions` or
+   *  `warnings` — only the order rows are written in. */
+  rowOrder?: "input" | "key";
 }
 
 /** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
@@ -1041,6 +1057,7 @@ export function merge(
       opts.encoding,
       opts.tran,
       opts.dictRows,
+      opts.rowOrder,
     );
     const bytes = new Uint8Array(out.bytes);
     return {

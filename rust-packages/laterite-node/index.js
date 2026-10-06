@@ -729,6 +729,7 @@ module.exports.registryInheritedKeyNames = nativeBinding.registryInheritedKeyNam
 module.exports.renderReadCsv = nativeBinding.renderReadCsv
 module.exports.renderReadJson = nativeBinding.renderReadJson
 module.exports.resolveEncodingLabel = nativeBinding.resolveEncodingLabel
+module.exports.rowOrderModes = nativeBinding.rowOrderModes
 module.exports.runCheck = nativeBinding.runCheck
 module.exports.transportLock = nativeBinding.transportLock
 module.exports.transportLockBytes = nativeBinding.transportLockBytes

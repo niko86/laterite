@@ -1,5 +1,6 @@
 pub mod laterite_ags4_merge
 pub use laterite_ags4_merge::DictRows
+pub use laterite_ags4_merge::RowOrder
 pub use laterite_ags4_merge::TranStamp
 pub enum laterite_ags4_merge::MergeError
 pub laterite_ags4_merge::MergeError::Emit(alloc::string::String)
@@ -85,6 +86,7 @@ pub laterite_ags4_merge::MergeOpts::edition: laterite_ags4_reference::dict::dict
 pub laterite_ags4_merge::MergeOpts::emit_mode: laterite_ags4_emit::emit::EmitMode
 pub laterite_ags4_merge::MergeOpts::on_missing_tran: laterite_ags4_merge::MissingTranMode
 pub laterite_ags4_merge::MergeOpts::on_type_clash: laterite_ags4_merge::TypeClashMode
+pub laterite_ags4_merge::MergeOpts::row_order: laterite_ags4_emit::row_order::RowOrder
 pub laterite_ags4_merge::MergeOpts::tran: core::option::Option<laterite_ags4_emit::emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_merge::MergeOpts
 pub fn laterite_ags4_merge::MergeOpts::clone(&self) -> Self
