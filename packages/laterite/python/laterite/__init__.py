@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 #: fixable set by ``test_fix_selection`` (which gates it against
 #: [`fixable_rules`][laterite.fixable_rules], itself gated against the Rust
 #: ``FIXABLE_RULE_LABELS``).
-FixableRule = Literal["1", "2a", "4", "5", "6", "7", "8", "11a", "11b"]
+FixableRule = Literal["1", "2a", "4", "5", "6", "7", "8", "11a", "11b", "16"]
 
 __all__ = [
     "Ags4Error",
@@ -1190,7 +1190,8 @@ class Ags4File:
         """Repair this file and return a new, repaired [`Ags4File`][laterite.Ags4File] — the fluent
         transform, so ``read(path).fix().validate().save(out)`` reads as one chain.
         The **safe** mechanical fixes (CRLF / BOM / embedded-CR / short-row pad /
-        numeric reformat / TRAN delimiter+concatenator rows) are applied; ``risky=True``
+        numeric reformat / TRAN delimiter+concatenator rows / whitespace trimmed off
+        an otherwise-defined abbreviation) are applied; ``risky=True``
         also applies the intent-guessing ones (duplicate-heading rename, datetime
         canonicalisation, typography). ``only`` / ``exclude`` restrict which rules'
         fixes are applied — rule labels from [`fixable_rules`][laterite.fixable_rules]
@@ -2812,7 +2813,8 @@ def fix(
     [`read`][laterite.read] accepts (path / file-like / bytes / AGS4 text), or name the input
     explicitly with one of the ``path`` / ``text`` / ``data`` doors. The **safe**
     fixes (CRLF / BOM / embedded-CR / short-row pad / numeric reformat / the TRAN
-    delimiter+concatenator rows) are always applied; ``risky=True`` also applies the
+    delimiter+concatenator rows / whitespace trimmed off an otherwise-defined
+    abbreviation) are always applied; ``risky=True`` also applies the
     intent-guessing ones (duplicate-heading rename, ``dd/mm`` datetime
     canonicalisation, smart-quote→ASCII typography). The repaired bytes are
     re-validated, so [`FixResult.findings`][laterite.FixResult.findings] is what could **not** be

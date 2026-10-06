@@ -672,6 +672,7 @@ _FIXABLE_RULES = {
     "8",
     "11a",
     "11b",
+    "16",
 }  # fixes.rs FIXABLE_RULE_LABELS
 
 

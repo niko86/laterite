@@ -162,6 +162,7 @@ pub laterite_ags4_validator::fixes::FixKind::ReformatNumeric
 pub laterite_ags4_validator::fixes::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::fixes::FixKind::StripBom
 pub laterite_ags4_validator::fixes::FixKind::StripEmbeddedCr
+pub laterite_ags4_validator::fixes::FixKind::TrimAbbreviation
 impl laterite_ags4_validator::fixes::FixKind
 pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind
@@ -370,6 +371,7 @@ pub laterite_ags4_validator::FixKind::ReformatNumeric
 pub laterite_ags4_validator::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::FixKind::StripBom
 pub laterite_ags4_validator::FixKind::StripEmbeddedCr
+pub laterite_ags4_validator::FixKind::TrimAbbreviation
 impl laterite_ags4_validator::fixes::FixKind
 pub const fn laterite_ags4_validator::fixes::FixKind::as_str(self) -> &'static str
 impl core::clone::Clone for laterite_ags4_validator::fixes::FixKind

@@ -353,9 +353,9 @@
     {
       "rule": "16",
       "title": "Abbreviation Definitions",
-      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the concatenator declared in TRAN_RCON and each part must be defined separately; with no TRAN_RCON declared the field is not split at all. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group.",
+      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the concatenator declared in TRAN_RCON and each part must be defined separately; with no TRAN_RCON declared the field is not split at all. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group. One case is fixed automatically: when every undefined part of a value is a defined code with whitespace around it (\" D\" where \"D\" is defined, or \"B + D\" split on +), the padding is trimmed and the parts are rejoined with the bare concatenator (\"D\", \"B+D\"), in every group that repeats the value. A value with any part that stays undefined after trimming is left untouched, and so is a value that already passes.",
       "severity": "mixed",
-      "fixable": false,
+      "fixable": true,
       "observations": [
         {
           "id": "O-43",
@@ -364,6 +364,10 @@
         {
           "id": "O-54",
           "note": "If your file concatenates abbreviations in one field (a PA cell such as \"CP+RC\") and has no TRAN_RCON heading, the cell is checked whole instead of being split — you get one finding naming an abbreviation your file never used, and nothing reports the missing TRAN_RCON itself. The specification names \"+\" as the default separator when TRAN_RCON is absent; neither this validator nor python-ags4 applies it. Declare your separator in TRAN_RCON and each part is checked on its own."
+        },
+        {
+          "id": "O-57",
+          "note": "When a PA value fails only because of whitespace around a defined code, laterite adds an FYI naming the code it matches once trimmed; the Rule 16 finding itself is unchanged. python-ags4 has no equivalent check."
         }
       ]
     },

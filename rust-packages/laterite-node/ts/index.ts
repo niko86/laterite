@@ -660,7 +660,7 @@ export function listRules(): RuleMeta[] {
  * the engine's `fixable_rules()` by a cross-surface drift gate
  * (`test_typed_choices.py`). Use {@link listRules} (`fixable: true`) at runtime. */
 export type FixableRule =
-  "1" | "2a" | "4" | "5" | "6" | "7" | "8" | "11a" | "11b";
+  "1" | "2a" | "4" | "5" | "6" | "7" | "8" | "11a" | "11b" | "16";
 
 export interface FixOptions {
   /** Repair in-memory `text` instead of a file path. */
@@ -688,8 +688,9 @@ export interface FixOptions {
 /** Mechanically repair AGS4 — the headless twin of the browser's Fix engine.
  * `source` is a file path, raw `Uint8Array`/`Buffer` bytes, or (via `opts.text`)
  * in-memory text. The *safe* fixes — CRLF / BOM / embedded-CR normalisation,
- * short-row padding, numeric reformatting, and the TRAN delimiter+concatenator
- * rows — are always applied; pass `risky` to also run the intent-guessing set
+ * short-row padding, numeric reformatting, the TRAN delimiter+concatenator
+ * rows, and whitespace trimmed off an otherwise-defined abbreviation — are
+ * always applied; pass `risky` to also run the intent-guessing set
  * (duplicate-heading rename, ambiguous `dd/mm` datetime canonicalisation, smart-quote→ASCII
  * typography). The repaired bytes are re-validated, so `FixResult.findings` is
  * what could NOT be mechanically fixed.

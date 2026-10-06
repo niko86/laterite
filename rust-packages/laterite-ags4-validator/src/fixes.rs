@@ -37,17 +37,23 @@
 //!    day-first reading is unambiguous (day > 12, day == month, ISO/year-first,
 //!    or a spelled month) and **Risky/opt-in** only when a numeric day-month
 //!    value is genuinely mm/dd-ambiguous (day ≤ 12 and day ≠ month — a guess).
+//!  * **Rule 16** — trim the surrounding whitespace off a `PA` value whose
+//!    every failing part is, once trimmed, a code ABBR already defines under
+//!    that heading (`" D"` → `"D"`, `"B + D"` → `"B+D"`). Safe: it picks no
+//!    code, it only removes padding from one the file already names. A cell
+//!    with any part that stays undefined is left whole.
 //!
 //! Apply ordering + the expected-value guard live in [`apply_fixes`]: a
 //! span carries the text it *expects* to find, so a stale/over-applied
 //! edit is skipped rather than corrupting the file.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 
 use crate::findings::{Findings, Target};
 use crate::parse::{ParsedFile, field_span, split_ags_line};
+use crate::rules::groups::AbbrLookup;
 use crate::rules::typed_values::{format_ndp, format_nsci, format_nsf};
 
 /// One in-line text edit: replace the char range `[start, end)` on a
@@ -82,6 +88,7 @@ pub enum FixKind {
     NormalizeTypography,
     PadShortRow,
     QuoteUnquotedRow,
+    TrimAbbreviation,
 }
 
 /// How confident the fix is. `Safe` rewrites are unambiguous from the file
@@ -118,6 +125,7 @@ impl FixKind {
             Self::NormalizeTypography => "normalize_typography",
             Self::PadShortRow => "pad_short_row",
             Self::QuoteUnquotedRow => "quote_unquoted_row",
+            Self::TrimAbbreviation => "trim_abbreviation",
         }
     }
 }
@@ -162,13 +170,14 @@ const RULE_7: &str = "AGS Format Rule 7";
 const RULE_8: &str = "AGS Format Rule 8";
 const RULE_11A: &str = "AGS Format Rule 11a";
 const RULE_11B: &str = "AGS Format Rule 11b";
+const RULE_16: &str = "AGS Format Rule 16";
 
 /// The rule suffixes the fix engine can repair (the `RULE_*` consts above, sans
 /// the `"AGS Format Rule "` prefix) — the single source for the catalogue's
 /// `fixable` flag (`crate::catalogue`). The `fixable_labels_match_rule_consts`
 /// test keeps it in lock-step with the consts, so a new fix can't leave the
 /// catalogue's `fixable` stale.
-pub const FIXABLE_RULE_LABELS: &[&str] = &["1", "2a", "4", "5", "6", "7", "8", "11a", "11b"];
+pub const FIXABLE_RULE_LABELS: &[&str] = &["1", "2a", "4", "5", "6", "7", "8", "11a", "11b", "16"];
 
 /// Rule 5's `NotEnclosed` desc, string-identical to `rules::line_format`'s (the
 /// compute test drives the real validator, so drift is caught). The
@@ -677,6 +686,97 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     expected: raw.to_string(),
                 }],
             });
+        }
+    }
+
+    // -- Rule 16: trim padding off a PA value. Rule 16's findings carry no
+    //    line or cell, so the cells are re-derived from the parsed file with
+    //    the rule's own lookup — the repair can then only touch what the rule
+    //    flags. One fix per (heading, value), carrying an edit for EVERY cell
+    //    under that heading that holds the value, in every group and whatever
+    //    its declared TYPE: a padded KEY value is repeated down the parent/child
+    //    chain, and rewriting only some copies would trade Rule 16 for Rule 10c.
+    //    Trimming can still make two rows that differed only by the padding
+    //    share a KEY tuple; Rule 10a then names a duplicate the padding hid,
+    //    which is the file's defect, not one the fix invents.
+    if found.contains_key(RULE_16) {
+        if let Some(lookup) = AbbrLookup::of(parsed) {
+            let mut repairs: BTreeMap<(&str, &str), String> = BTreeMap::new();
+            for code in &parsed.group_order {
+                let g = &parsed.groups[code];
+                for (ci, ty) in g.types.iter().enumerate() {
+                    if ty.trim() != "PA" {
+                        continue;
+                    }
+                    let Some(hd) = g.headings.get(ci) else {
+                        continue;
+                    };
+                    for row in &g.rows {
+                        let Some(v) = g.value_at(row, ci) else {
+                            continue;
+                        };
+                        if repairs.contains_key(&(hd.as_str(), v)) {
+                            continue;
+                        }
+                        if let Some(r) = lookup.trim_repair(hd, v) {
+                            repairs.insert((hd.as_str(), v), r);
+                        }
+                    }
+                }
+            }
+            for ((hd, v), repaired) in repairs {
+                let mut edits = Vec::new();
+                for code in &parsed.group_order {
+                    let g = &parsed.groups[code];
+                    let Some(ci) = g.headings.iter().position(|h| h == hd) else {
+                        continue;
+                    };
+                    for row in &g.rows {
+                        if g.value_at(row, ci) != Some(v) {
+                            continue;
+                        }
+                        let Some(raw) = line_text.get(&row.line) else {
+                            continue;
+                        };
+                        // `ci` is a heading's column index within one AGS4
+                        // group — dictionary-bounded, nowhere near u32::MAX.
+                        #[allow(clippy::cast_possible_truncation)]
+                        let Some((s, e)) = field_span(raw, ci as u32) else {
+                            continue;
+                        };
+                        // The on-disk slice, not `v`: a quote inside a quoted
+                        // field is doubled there, and the guard compares bytes.
+                        let expected: String = raw
+                            .chars()
+                            .skip(s as usize)
+                            .take((e - s) as usize)
+                            .collect();
+                        edits.push(SpanEdit {
+                            line: row.line,
+                            start: s,
+                            end: e,
+                            replacement: repaired.replace('"', "\"\""),
+                            expected,
+                        });
+                    }
+                }
+                let Some(line) = edits.first().map(|ed| ed.line) else {
+                    continue;
+                };
+                let n = edits.len();
+                fixes.push(Fix {
+                    kind: FixKind::TrimAbbreviation,
+                    label: format!(
+                        "Trim the whitespace around abbreviation {v:?} → {repaired:?} under {hd} \
+                         ({n} cell{}, Rule 16)",
+                        if n == 1 { "" } else { "s" }
+                    ),
+                    rule: RULE_16.to_string(),
+                    line: Some(line),
+                    risk: FixRisk::Safe,
+                    edits,
+                });
+            }
         }
     }
 
@@ -1220,6 +1320,7 @@ mod tests {
             NormalizeTypography,
             PadShortRow,
             QuoteUnquotedRow,
+            TrimAbbreviation,
         ] {
             let wire = serde_json::to_value(k).expect("serialises");
             assert_eq!(wire.as_str(), Some(k.as_str()), "{k:?}");
@@ -2020,7 +2121,7 @@ mod tests {
         // be exactly the rule labels the fix engine attaches — keep it in
         // lock-step with the RULE_* consts compute_fixes uses.
         let from_consts: std::collections::BTreeSet<String> = [
-            RULE_1, RULE_2A, RULE_4, RULE_5, RULE_6, RULE_7, RULE_8, RULE_11A, RULE_11B,
+            RULE_1, RULE_2A, RULE_4, RULE_5, RULE_6, RULE_7, RULE_8, RULE_11A, RULE_11B, RULE_16,
         ]
         .iter()
         .map(|l| l.trim_start_matches("AGS Format Rule ").to_string())
@@ -2030,6 +2131,95 @@ mod tests {
             .map(std::string::ToString::to_string)
             .collect();
         assert_eq!(exported, from_consts);
+    }
+
+    /// SAMP keyed on a `PA` `SAMP_TYPE`, repeated in a TRIG child, with ABBR
+    /// defining `B` and `D` and `TRAN_RCON` `+`. `a`/`b` are the two samples'
+    /// `SAMP_TYPE` cells; the child repeats them verbatim.
+    fn padded_key_file(a: &str, b: &str) -> String {
+        format!(
+            "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_RCON\"\r\n\
+             \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"+\"\r\n\r\n\
+             \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"SAMP_ID\",\"SAMP_TYPE\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+             \"DATA\",\"S1\",{a:?}\r\n\"DATA\",\"S2\",{b:?}\r\n\r\n\
+             \"GROUP\",\"TRIG\"\r\n\"HEADING\",\"SAMP_ID\",\"SAMP_TYPE\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+             \"DATA\",\"S1\",{a:?}\r\n\"DATA\",\"S2\",{b:?}\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"SAMP_TYPE\",\"B\",\"Bulk\"\r\n\
+             \"DATA\",\"SAMP_TYPE\",\"D\",\"Disturbed\"\r\n"
+        )
+    }
+
+    #[test]
+    fn rule_16_trims_every_copy_of_a_padded_value() {
+        let src = padded_key_file(" D", "B + D");
+        let (parsed, found) = check(&src);
+        assert!(found.contains_key(RULE_16));
+        let fixes = compute_fixes(&parsed, &found);
+        let trims: Vec<&Fix> = fixes
+            .iter()
+            .filter(|f| f.kind == FixKind::TrimAbbreviation)
+            .collect();
+        // One fix per (heading, value), each covering the parent AND the child
+        // copy, so a selection can never split a KEY chain.
+        assert_eq!(trims.len(), 2, "{trims:?}");
+        for f in &trims {
+            assert_eq!(f.edits.len(), 2, "both groups' copies: {f:?}");
+            assert_eq!(f.risk, FixRisk::Safe);
+            assert_eq!(f.rule, RULE_16);
+        }
+        let out = apply_fixes(&src, parsed.has_bom, &fixes);
+        assert_eq!(out.matches("\"S1\",\"D\"").count(), 2, "got: {out:?}");
+        assert_eq!(out.matches("\"S2\",\"B+D\"").count(), 2, "got: {out:?}");
+        let (_, after) = check(&out);
+        assert!(!after.contains_key(RULE_16), "{after:?}");
+    }
+
+    #[test]
+    fn rule_16_leaves_a_cell_with_a_truly_undefined_part_whole() {
+        // " D" alone would be rescued; "X" never is, so the cell is not touched.
+        let src = padded_key_file(" D+ X", "B");
+        let (parsed, found) = check(&src);
+        assert!(found.contains_key(RULE_16));
+        let fixes = compute_fixes(&parsed, &found);
+        assert!(
+            !kinds(&fixes).contains(&FixKind::TrimAbbreviation),
+            "{fixes:?}"
+        );
+    }
+
+    #[test]
+    fn rule_16_never_rewrites_a_cell_that_passes() {
+        // "B" passes; " D" is the only padded value, so nothing else moves.
+        let src = padded_key_file(" D", "B");
+        let (parsed, found) = check(&src);
+        let fixes = compute_fixes(&parsed, &found);
+        let trims: Vec<&Fix> = fixes
+            .iter()
+            .filter(|f| f.kind == FixKind::TrimAbbreviation)
+            .collect();
+        assert_eq!(trims.len(), 1);
+        assert!(trims[0].edits.iter().all(|e| e.expected == " D"));
+    }
+
+    #[test]
+    fn rule_16_trim_is_in_the_safe_tier() {
+        // Applied by a plain run, and never counted as withheld-risky.
+        let src = padded_key_file(" D", "B + D");
+        let out = fix_document(src.as_bytes(), &CheckOptions::default(), false).expect("fixes");
+        assert_eq!(
+            kinds(&out.applied)
+                .iter()
+                .filter(|k| **k == FixKind::TrimAbbreviation)
+                .count(),
+            2
+        );
+        assert_eq!(out.risky_available, 0);
+        assert!(!out.residual.contains_key(RULE_16), "{:?}", out.residual);
     }
 
     #[test]

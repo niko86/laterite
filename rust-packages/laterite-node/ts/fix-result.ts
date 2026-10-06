@@ -8,7 +8,8 @@ export type { AppliedFix };
  *
  * `fix()` mechanically repairs an AGS4 document — always the *safe* set (CRLF /
  * BOM / embedded-CR normalisation, short-row padding, numeric reformatting, the
- * TRAN delimiter+concatenator rows), plus the intent-guessing *risky* set when
+ * TRAN delimiter+concatenator rows, whitespace trimmed off an otherwise-defined
+ * abbreviation), plus the intent-guessing *risky* set when
  * asked — then re-validates the repaired bytes. This object is what that pass
  * hands back: the fixed document, an account of what was changed, and an honest
  * record of what it could not touch. Construction is internal; you receive one
