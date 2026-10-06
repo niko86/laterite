@@ -278,6 +278,34 @@ pub struct FixArgs {
     /// Write the repaired file to <path>.
     #[arg(long, value_name = "PATH")]
     pub fix_out: Option<PathBuf>,
+    /// ABBR codes under one heading that differ only by letter case
+    /// ("Undisturbed" / "UNDISTURBED"):
+    ///
+    ///   keep     — leave every spelling as written (default)
+    ///   standard — rewrite a set to the edition's standard code when exactly
+    ///              one matches it ignoring case, in ABBR and every PA cell
+    ///              under that heading; a set with none, or several, is left
+    ///              as written.
+    ///
+    /// A rewrite that would give two rows the same KEY is never made: that
+    /// set is left as written and named in a "left … as written" line (and in
+    /// --json under "skipped", present only when something was skipped), not
+    /// counted as a residual finding. The allowed values are projected from
+    /// `CodeCaseMode::ALL`, as `lat merge --on-code-case` is.
+    #[arg(
+        long,
+        value_name = "MODE",
+        default_value = "keep",
+        value_parser = clap::builder::PossibleValuesParser::new(CodeCaseMode::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<CodeCaseMode>().expect("clap restricted the value")),
+    )]
+    pub on_code_case: CodeCaseMode,
+    /// A JSON file naming code rewrites, `{"HEADING": {"FROM": "TO"}}` — e.g.
+    /// `{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}`. Applied like
+    /// --on-code-case standard and before it. A heading the file does not
+    /// type PA, or a code it does not use, is refused.
+    #[arg(long, value_name = "PATH")]
+    pub recode: Option<PathBuf>,
 }
 
 #[derive(Args)]

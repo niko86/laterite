@@ -37,6 +37,7 @@ import {
   rowOrderModes,
   codeCaseModes,
 } from "./native";
+import type { SkippedRewrite } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
 // beside a `switch` that did the real work — two lists that could disagree, and a
@@ -144,8 +145,23 @@ const SPECS: Record<string, Spec> = {
   },
   fix: {
     run: (p, json) => runFix(p, json),
-    flags: [...DICT_FLAGS, "fix-out", "in-place", "json", "risky"],
-    valued: ["dict", "dict-version", "encoding", "fix-out"],
+    flags: [
+      ...DICT_FLAGS,
+      "fix-out",
+      "in-place",
+      "json",
+      "on-code-case",
+      "recode",
+      "risky",
+    ],
+    valued: [
+      "dict",
+      "dict-version",
+      "encoding",
+      "fix-out",
+      "on-code-case",
+      "recode",
+    ],
     positionals: ["<file>"],
   },
   diff: {
@@ -672,11 +688,71 @@ function siblingFixedPath(file: string): string {
   return join(dirname(file), ext ? `${stem}.fixed${ext}` : `${stem}.fixed`);
 }
 
+// `--on-code-case`, checked against the engine's own modes (#1010). Shared by
+// `merge` and `fix` (#1024), so the two refuse a bad mode in the same words.
+function codeCaseFlag(p: Parsed): NonNullable<MergeOptions["onCodeCase"]> {
+  const caseMode = str(p.flags["on-code-case"]) ?? "keep";
+  const caseModes = codeCaseModes();
+  if (!caseModes.includes(caseMode)) {
+    fail(
+      `--on-code-case: unknown mode '${caseMode}' (${caseModes.join(", ")})`,
+      5,
+    );
+  }
+  return caseMode as NonNullable<MergeOptions["onCodeCase"]>;
+}
+
+// `--recode` is a JSON file, as `--dict` is: codes may hold any character,
+// so a file beats a flag syntax that would need escaping of its own. Shared by
+// `merge` and `fix`, so the two read and refuse it the same way.
+function readRecode(p: Parsed): MergeOptions["recode"] {
+  const recodePath = str(p.flags["recode"]);
+  if (recodePath === undefined) return undefined;
+  let text = "";
+  try {
+    text = readFileSync(recodePath, "utf8");
+  } catch (e) {
+    fail(`${recodePath}: ${(e as Error).message}`, 3);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    fail(`--recode ${recodePath}: ${(e as Error).message}`, 5);
+  }
+  const isMap = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  if (
+    !isMap(parsed) ||
+    !Object.values(parsed).every(
+      (m) => isMap(m) && Object.values(m).every((t) => typeof t === "string"),
+    )
+  ) {
+    fail(
+      `--recode ${recodePath}: expected a JSON object {heading: {from_code: to_code}}`,
+      5,
+    );
+  }
+  return parsed as NonNullable<MergeOptions["recode"]>;
+}
+
+// One requested rewrite `fix` left undone, as the three launchers print it.
+function skippedLine(s: SkippedRewrite): string {
+  const codes = s.codes.map((c) => JSON.stringify(c)).join(", ");
+  return (
+    `left ${codes} under ${s.heading} as written: rewriting to ` +
+    `${JSON.stringify(s.target)} would give two ${s.group} rows the KEY ` +
+    JSON.stringify(s.key.join("|"))
+  );
+}
+
 // ---- fix -------------------------------------------------------------
 function runFix(p: Parsed, json: boolean): number {
   const file = p.positionals[0];
   if (!file) fail("fix needs a file", 5);
   if (!existsSync(file)) fail(`${file}: not found`, 3);
+  const onCodeCase = codeCaseFlag(p);
+  const recode = readRecode(p);
   // Native `fixFile` directly (not the library `fix()`): the `--dict` custom overlay
   // (laterite-dev#568) is a CLI flag, not a public `FixOptions` knob — mirrors the uvx launcher,
   // which likewise reaches `_native.fix_file(dict_path=…)` past the library `fix()`.
@@ -692,10 +768,18 @@ function runFix(p: Parsed, json: boolean): number {
     str(p.flags["dict"]),
     undefined,
     !!p.flags["dict-replace"],
+    onCodeCase,
+    recode,
   );
   if (!r.ok) fail(r.error ?? "unknown error", r.exitCode);
   // Reuse `FixResult` so the one-line note is byte-identical to the library path.
-  const result = new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
+  const result = new FixResult(
+    r.fixed,
+    r.residual,
+    r.applied,
+    r.dictVersion,
+    r.skipped,
+  );
   const dest = p.flags["in-place"]
     ? file
     : (str(p.flags["fix-out"]) ?? siblingFixedPath(file));
@@ -717,7 +801,11 @@ function runFix(p: Parsed, json: boolean): number {
       line: f.line ?? null,
       risk: f.risk,
     }));
-    const report = { file, dest, applied, residual };
+    // `skipped` only when a requested rewrite was left undone, as the binary
+    // does, so a run that asked for none reports exactly what it always did.
+    const report = result.skipped.length
+      ? { file, dest, applied, residual, skipped: result.skipped }
+      : { file, dest, applied, residual };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return residual === 0 ? 0 : 1;
   }
@@ -730,6 +818,7 @@ function runFix(p: Parsed, json: boolean): number {
   const kinds = [...new Set(result.applied.map((a) => a.kind))].sort();
   const kindNote = kinds.length ? ` [${kinds.join(", ")}]` : "";
   process.stdout.write(`${result.toString()}${kindNote} → ${dest}\n`);
+  for (const s of result.skipped) process.stdout.write(`${skippedLine(s)}\n`);
   return residual === 0 ? 0 : 1;
 }
 
@@ -876,48 +965,8 @@ function runMerge(p: Parsed, json: boolean): number {
   const rowOrder = order as NonNullable<MergeOptions["rowOrder"]>;
 
   // And for `--on-code-case` (#1010).
-  const caseMode = str(p.flags["on-code-case"]) ?? "keep";
-  const caseModes = codeCaseModes();
-  if (!caseModes.includes(caseMode)) {
-    fail(
-      `--on-code-case: unknown mode '${caseMode}' (${caseModes.join(", ")})`,
-      5,
-    );
-  }
-  const onCodeCase = caseMode as NonNullable<MergeOptions["onCodeCase"]>;
-
-  // `--recode` is a JSON file, as `--dict` is: codes may hold any character,
-  // so a file beats a flag syntax that would need escaping of its own.
-  let recode: MergeOptions["recode"];
-  const recodePath = str(p.flags["recode"]);
-  if (recodePath !== undefined) {
-    let text = "";
-    try {
-      text = readFileSync(recodePath, "utf8");
-    } catch (e) {
-      fail(`${recodePath}: ${(e as Error).message}`, 3);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      fail(`--recode ${recodePath}: ${(e as Error).message}`, 5);
-    }
-    const isMap = (v: unknown): v is Record<string, unknown> =>
-      typeof v === "object" && v !== null && !Array.isArray(v);
-    if (
-      !isMap(parsed) ||
-      !Object.values(parsed).every(
-        (m) => isMap(m) && Object.values(m).every((t) => typeof t === "string"),
-      )
-    ) {
-      fail(
-        `--recode ${recodePath}: expected a JSON object {heading: {from_code: to_code}}`,
-        5,
-      );
-    }
-    recode = parsed as NonNullable<MergeOptions["recode"]>;
-  }
+  const onCodeCase = codeCaseFlag(p);
+  const recode = readRecode(p);
 
   let res;
   try {

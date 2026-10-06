@@ -83,7 +83,23 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                          (default: a sibling <file>.fixed.ags)
                          (also honours --dict-version / --dict / --encoding)
     --json               machine-readable {file, dest, applied, residual} report
-                         (the file is written either way; exit 0 clean / 1 residual)
+                         (the file is written either way; exit 0 clean / 1 residual),
+                         plus "skipped" when a requested rewrite was left undone
+    --on-code-case <MODE> ABBR codes under one heading that differ only by
+                          letter case ("Undisturbed" / "UNDISTURBED"):
+                          keep      leave every spelling as written (default)
+                          standard  rewrite a set to the edition's standard
+                                    code when exactly one matches it ignoring
+                                    case, in ABBR and every PA cell under that
+                                    heading; none or several leaves it as
+                                    written. Applies without --risky
+    --recode <PATH>       a JSON file of rewrites you name,
+                          {"HEADING": {"FROM": "TO"}}; applied like
+                          --on-code-case standard and before it. A heading the
+                          file does not type PA, or a code it does not use, is
+                          refused (exit 5). A rewrite giving two rows one KEY is
+                          not made: that set is left as written and named in a
+                          "left ... as written" line, not counted as residual
 
 ## diff <a> <b>
 

@@ -230,6 +230,7 @@ mod tests {
         assert_keys_match::<ValidateOptions>();
         assert_keys_match::<BuildOptions>();
         assert_keys_match::<crate::build::UncheckedBuildOptions>();
+        assert_keys_match::<crate::fixes::FixOptions>();
         #[cfg(feature = "certify")]
         assert_keys_match::<CertifyOptions>();
         #[cfg(feature = "merge")]

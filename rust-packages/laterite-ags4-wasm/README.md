@@ -294,8 +294,8 @@ are listed too — the convention travels with the export, not with the build):
 
 | Export | Shape |
 |---|---|
-| `validate` · `certify` · `build_ags4` · `build_ags4_ipc` · `merge` | `(inputs…, opts?)` — **named options**, unknown keys refused |
-| `compute_fixes` · `apply_fixes` · `diff` · `censor` · `read` · `ags4_to_xlsx` · `xlsx_to_ags4` | still **positional** |
+| `validate` · `certify` · `build_ags4` · `build_ags4_ipc` · `merge` · `compute_fixes` | `(inputs…, opts?)` — **named options**, unknown keys refused |
+| `apply_fixes` · `diff` · `censor` · `read` · `ags4_to_xlsx` · `xlsx_to_ags4` | still **positional** |
 
 The migrated exports call the text-encoding option `encoding`, matching Python,
 Node and the CLI. The positional ones still name it `encoding_label` — the

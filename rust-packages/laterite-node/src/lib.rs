@@ -28,8 +28,8 @@ use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
 use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective, overlay,
-    rule_metadata_json, tran_ags_of,
+    CheckOptions, CodeRewrite, DictVersion, FixError, ValidatorError, WorldScope,
+    fix_document_recoding, overlay, rule_metadata_json, tran_ags_of,
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -1306,6 +1306,22 @@ pub struct FixReport {
     pub fixes_applied: u32,
     pub applied: Vec<AppliedFix>,
     pub residual: Vec<Finding>,
+    /// The requested ABBR code rewrites left undone because they would have
+    /// given two rows one KEY (#1024); empty when none were requested.
+    pub skipped: Vec<SkippedRewrite>,
+}
+
+/// One requested ABBR code rewrite `fix` left undone — the Node mirror of the
+/// engine's `SkippedRewrite`: the spellings under `heading` left as written,
+/// the `target` they would have become, and the `group` / `key` they would
+/// have collided on.
+#[napi(object)]
+pub struct SkippedRewrite {
+    pub heading: String,
+    pub codes: Vec<String>,
+    pub target: String,
+    pub group: String,
+    pub key: Vec<String>,
 }
 
 impl FixReport {
@@ -1321,6 +1337,7 @@ impl FixReport {
             fixes_applied: 0,
             applied: Vec::new(),
             residual: Vec::new(),
+            skipped: Vec::new(),
         }
     }
 }
@@ -1334,7 +1351,11 @@ impl FixReport {
 /// write-back on top.
 #[napi]
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+// napi boundary: owns the deserialized input
+// napi deserialises `recode` into the default-hasher HashMap; no caller can
+// supply another, as at `merge`.
+#[allow(clippy::implicit_hasher)]
 pub fn fix_file(
     path: Option<String>,
     text: Option<String>,
@@ -1352,7 +1373,24 @@ pub fn fix_file(
     dict_path: Option<String>,
     dict_bytes: Option<Uint8Array>,
     dict_replace: Option<bool>,
+    // `"keep"` (default) | `"standard"` and `{heading: {fromCode: toCode}}` —
+    // the ABBR code rewrite, as on `merge` (#1024).
+    on_code_case: Option<String>,
+    recode: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 ) -> Result<FixReport> {
+    let rewrite = CodeRewrite {
+        on_code_case: match on_code_case.as_deref().unwrap_or("keep").parse() {
+            Ok(m) => m,
+            Err(msg) => return Ok(FixReport::failure("bad_args", 5, msg)),
+        },
+        // Ordered, so the plan (and any message naming an entry) does not
+        // depend on JS object iteration order.
+        recode: recode
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(h, m)| (h, m.into_iter().collect()))
+            .collect(),
+    };
     let raw: Vec<u8> = if let Some(t) = text {
         t.into_bytes()
     } else if let Some(d) = data {
@@ -1399,18 +1437,22 @@ pub fn fix_file(
         ..CheckOptions::default()
     };
     let exclude = exclude.unwrap_or_default();
-    let outcome = match fix_document_selective(
+    let outcome = match fix_document_recoding(
         &raw,
         &opts,
         include_risky.unwrap_or(false),
         only.as_deref(),
         &exclude,
+        &rewrite,
     ) {
         Ok(o) => o,
-        Err(e) => {
+        Err(FixError::Validator(e)) => {
             let (code, kind) = classify(&e);
             return Ok(FixReport::failure(kind, code, e.to_string()));
         }
+        // A recode naming what the file does not have is the caller's
+        // argument — `bad_args`, as merge's is.
+        Err(FixError::Recode(e)) => return Ok(FixReport::failure("bad_args", 5, e.to_string())),
     };
     let applied = to_applied_fixes(&outcome.applied);
     let residual: Vec<Finding> = outcome
@@ -1444,6 +1486,17 @@ pub fn fix_file(
         fixes_applied,
         applied,
         residual,
+        skipped: outcome
+            .skipped
+            .into_iter()
+            .map(|s| SkippedRewrite {
+                heading: s.heading,
+                codes: s.codes,
+                target: s.target,
+                group: s.group,
+                key: s.key,
+            })
+            .collect(),
     })
 }
 

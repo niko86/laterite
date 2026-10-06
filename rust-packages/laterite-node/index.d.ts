@@ -298,7 +298,7 @@ export interface Finding {
  * a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
  * write-back on top.
  */
-export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null, only?: Array<string> | undefined | null, exclude?: Array<string> | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null): FixReport
+export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null, only?: Array<string> | undefined | null, exclude?: Array<string> | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, onCodeCase?: string | undefined | null, recode?: Record<string, Record<string, string>> | undefined | null): FixReport
 
 /**
  * The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
@@ -317,6 +317,11 @@ export interface FixReport {
   fixesApplied: number
   applied: Array<AppliedFix>
   residual: Array<Finding>
+  /**
+   * The requested ABBR code rewrites left undone because they would have
+   * given two rows one KEY (#1024); empty when none were requested.
+   */
+  skipped: Array<SkippedRewrite>
 }
 
 /**
@@ -514,6 +519,20 @@ export declare function rowOrderModes(): Array<string>
  * makes warnings fatal too, the compiler's `-Werror`. FYIs never fail.
  */
 export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null, strictCert?: boolean | undefined | null): ValidationReport
+
+/**
+ * One requested ABBR code rewrite `fix` left undone — the Node mirror of the
+ * engine's `SkippedRewrite`: the spellings under `heading` left as written,
+ * the `target` they would have become, and the `group` / `key` they would
+ * have collided on.
+ */
+export interface SkippedRewrite {
+  heading: string
+  codes: Array<string>
+  target: string
+  group: string
+  key: Array<string>
+}
 
 /**
  * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and

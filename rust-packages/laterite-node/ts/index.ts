@@ -701,6 +701,25 @@ export interface FixOptions {
   inPlace?: boolean;
   /** Write the repaired bytes to this path. Mutually exclusive with `inPlace`. */
   out?: string;
+  /** ABBR code rewrites you name, `{heading: {fromCode: toCode}}` — e.g.
+   *  `{ TRIG_COND: { Undisturbed: "UNDISTURBED" } }` — with {@link merge}'s
+   *  meaning: the ABBR rows and every `PA` cell under the heading are
+   *  rewritten (part by part on `TRAN_RCON`), and an ABBR row whose code
+   *  collapses into one the file already declares is removed. A heading the
+   *  file does not type `PA`, or a code it does not use, throws
+   *  {@link BadDictError}. */
+  recode?: Record<string, Record<string, string>>;
+  /** `"keep"` (default) leaves ABBR codes that differ only by letter case as
+   *  written; `"standard"` rewrites such a set to the edition's standard code
+   *  when exactly one matches it ignoring case. Applied after `recode`.
+   *
+   *  `recode` and `"standard"` are explicit instructions, so they apply
+   *  without `risky`; they are rule `"16"` repairs, so `only` / `exclude`
+   *  select them, and asking for one while leaving rule 16 out throws
+   *  `TypeError`. A rewrite that would give two rows of one group the same
+   *  KEY is not made: that whole set is left as written and listed in
+   *  `FixResult.skipped`. `fix` never chooses a spelling itself. */
+  onCodeCase?: "keep" | "standard";
 }
 
 /** Mechanically repair AGS4 — the headless twin of the browser's Fix engine.
@@ -724,11 +743,14 @@ export interface FixOptions {
  *   (`Uint8Array`/`Buffer`). Omit to repair `opts.text` instead.
  * @param opts - {@link FixOptions} — `text` source, `risky` fixes, `only` /
  *   `exclude` rule selection, `inPlace` / `out` write-back, `dictVersion`
- *   override, and source `encoding`.
- * @throws {TypeError} If both `inPlace` and `out` are given.
+ *   override, source `encoding`, and the `recode` / `onCodeCase` ABBR code
+ *   rewrite.
+ * @throws {TypeError} If both `inPlace` and `out` are given, or a code rewrite
+ *   is asked for while `only` / `exclude` leave rule `"16"` out.
  * @returns A {@link FixResult} carrying the repaired `bytes` (and `.text` /
  *   `.save`), the `applied` fixes (with `fixesApplied` count), the residual
- *   `findings` left after re-validation, and the resolved `dictVersion`.
+ *   `findings` left after re-validation, the resolved `dictVersion`, and any
+ *   requested code rewrites it `skipped`.
  * @throws {Ags4Error} (or a subclass — {@link FileNotFoundError},
  *   {@link NotAgs4Error}, {@link UnsupportedEditionError}, {@link BadDictError})
  *   for un-fixable input, carrying the matching `lat-check` exit code.
@@ -763,6 +785,19 @@ export function fix(
       }
     }
   }
+  // A rewrite is a rule-16 repair; asking for one while `only`/`exclude` leave
+  // rule 16 out is a contradiction, refused rather than silently dropped.
+  const rewriting =
+    Object.keys(opts.recode ?? {}).length > 0 || opts.onCodeCase === "standard";
+  if (
+    rewriting &&
+    ((opts.only !== undefined && !opts.only.includes("16")) ||
+      (opts.exclude ?? []).includes("16"))
+  ) {
+    throw new TypeError(
+      'fix(): `recode` / `onCodeCase: "standard"` ask for an ABBR code rewrite, which is a rule "16" repair, but `only` / `exclude` leave rule "16" out',
+    );
+  }
   const path = typeof source === "string" ? source : undefined;
   const data =
     typeof source === "string" || source == null ? undefined : source;
@@ -783,10 +818,21 @@ export function fix(
     opts.risky,
     opts.only,
     opts.exclude,
+    undefined,
+    undefined,
+    undefined,
+    opts.onCodeCase,
+    opts.recode,
   );
   if (!r.ok)
     throw makeError(r.errorKind ?? "", r.exitCode, r.error ?? "unknown error");
-  const result = new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
+  const result = new FixResult(
+    r.fixed,
+    r.residual,
+    r.applied,
+    r.dictVersion,
+    r.skipped,
+  );
   // Write-back (opt-in, non-destructive by default): `inPlace` overwrites the
   // source path, `out` writes elsewhere — the repaired bytes are always UTF-8
   // with no BOM. Mirrors laterite-py's free `fix(in_place=, out=)`.
@@ -1244,7 +1290,7 @@ export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
 export type { DuckdbStats, QueryOptions, Row } from "./duckdb";
 export { BuildResult, BuildSaved, type BuildFinding } from "./build-result";
-export { FixResult, type AppliedFix } from "./fix-result";
+export { FixResult, type AppliedFix, type SkippedRewrite } from "./fix-result";
 export {
   Ags4Error,
   BadDictError,

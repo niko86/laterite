@@ -40,8 +40,8 @@ use laterite_ags4_core::error::CliError;
 use laterite_ags4_core::index::{Sidecar as CoreSidecar, TierCoverage};
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, WorldScope,
-    fix_document_selective, overlay,
+    CheckOptions, CodeRewrite, DictVersion, Dictionary, Findings, Fix, FixError, SkippedRewrite,
+    ValidatorError, WorldScope, fix_document_recoding, overlay,
 };
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -493,7 +493,17 @@ fn fix_core(
     dict_path: Option<&str>,
     dict_bytes: Option<&[u8]>,
     dict_replace: bool,
-) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String, usize), (i32, String, String)> {
+    rewrite: (&str, laterite_ags4_validator::fixes::Recode),
+) -> Result<FixCoreOut, (i32, String, String)> {
+    // Parsed like merge's `on_code_case`, so an unknown token is refused in
+    // the same words on both verbs (#1024).
+    let rewrite = CodeRewrite {
+        on_code_case: rewrite
+            .0
+            .parse()
+            .map_err(|m: String| (5, "bad_args".to_string(), m))?,
+        recode: rewrite.1,
+    };
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
         (
@@ -540,8 +550,14 @@ fn fix_core(
         check_files: false,
         encoding: enc,
     };
-    let out = fix_document_selective(&raw, &opts, include_risky, only, exclude)
-        .map_err(|e| map_err(&e))?;
+    let out = fix_document_recoding(&raw, &opts, include_risky, only, exclude, &rewrite).map_err(
+        |e| match e {
+            FixError::Validator(e) => map_err(&e),
+            // A recode naming what the file does not have is the caller's
+            // argument — `bad_args`, as merge's is.
+            FixError::Recode(e) => (5, "bad_args".to_string(), e.to_string()),
+        },
+    )?;
     Ok((
         out.fixed,
         out.residual,
@@ -549,8 +565,21 @@ fn fix_core(
         out.dict_version.as_str().to_string(),
         out.resolution.as_str().to_string(),
         out.risky_available,
+        out.skipped,
     ))
 }
+
+/// `fix_core`'s success: the fixed bytes, residual, applied fixes, edition,
+/// resolution, withheld-risky count and the requested rewrites left undone.
+type FixCoreOut = (
+    Vec<u8>,
+    Findings,
+    Vec<Fix>,
+    String,
+    String,
+    usize,
+    Vec<SkippedRewrite>,
+);
 
 /// Headless mechanical fix of `path`/`text`/`data`. Returns a dict the Python
 /// `fix()` turns into a `FixResult` (`fixed` bytes, `findings_json` residual
@@ -558,12 +587,12 @@ fn fix_core(
 /// un-fixable input returns the same `{ok:false, …}` shape as `run_check`, so
 /// the Python layer raises the mapped exception.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false, only=None, exclude=None, dict_path=None, dict_bytes=None, dict_replace=false))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false, only=None, exclude=None, dict_path=None, dict_bytes=None, dict_replace=false, on_code_case="keep", recode=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
-fn fix_file(
-    py: Python<'_>,
+fn fix_file<'py>(
+    py: Python<'py>,
     path: Option<String>,
     text: Option<String>,
     data: Option<Vec<u8>>,
@@ -575,7 +604,9 @@ fn fix_file(
     dict_path: Option<String>,
     dict_bytes: Option<Vec<u8>>,
     dict_replace: bool,
-) -> PyResult<Bound<'_, PyDict>> {
+    on_code_case: &str,
+    recode: Option<laterite_ags4_validator::fixes::Recode>,
+) -> PyResult<Bound<'py, PyDict>> {
     let exclude = exclude.unwrap_or_default();
     match fix_core(
         path.as_deref(),
@@ -589,9 +620,10 @@ fn fix_file(
         dict_path.as_deref(),
         dict_bytes.as_deref(),
         dict_replace,
+        (on_code_case, recode.unwrap_or_default()),
     ) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
-        Ok((bytes, residual, applied, dv, res, risky_available)) => {
+        Ok((bytes, residual, applied, dv, res, risky_available, skipped)) => {
             let d = PyDict::new(py);
             d.set_item("ok", true)?;
             d.set_item("fixed", PyBytes::new(py, &bytes))?;
@@ -604,6 +636,12 @@ fn fix_file(
             )?;
             d.set_item("fixes_applied", applied.len())?;
             d.set_item("applied", fixes_to_pylist(py, &applied)?)?;
+            // Straight off the engine struct's derive, so the shape is the
+            // one every surface reports.
+            d.set_item(
+                "skipped_json",
+                serde_json::to_string(&skipped).unwrap_or_else(|_| "[]".into()),
+            )?;
             Ok(d)
         }
     }

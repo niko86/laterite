@@ -824,6 +824,90 @@ fn merge_on_code_case_and_recode_settle_abbr_case_variants() {
 }
 
 #[test]
+fn fix_on_code_case_and_recode_rewrite_and_skip_what_would_collide() {
+    // #1024: one file carries both spellings of TRIG_COND, and two SAMP rows
+    // whose KEYs differ only in SAMP_TYPE's case. `standard` settles TRIG_COND
+    // and leaves SAMP_TYPE as written, saying so; the default rewrites nothing.
+    let dir = scratch();
+    let src = dir.join("case.ags");
+    std::fs::write(
+        &src,
+        "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+         \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"ABBR\"\r\n\
+         \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+         \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+         \"DATA\",\"SAMP_TYPE\",\"U\",\"d\"\r\n\"DATA\",\"SAMP_TYPE\",\"u\",\"d\"\r\n\
+         \"DATA\",\"TRIG_COND\",\"UNDISTURBED\",\"d\"\r\n\
+         \"DATA\",\"TRIG_COND\",\"Undisturbed\",\"d\"\r\n\r\n\"GROUP\",\"SAMP\"\r\n\
+         \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\r\n\
+         \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\r\n\
+         \"DATA\",\"BH1\",\"1.00\",\"1\",\"U\",\"S1\"\r\n\
+         \"DATA\",\"BH1\",\"1.00\",\"1\",\"u\",\"S1\"\r\n\r\n\"GROUP\",\"TRIG\"\r\n\
+         \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\
+         \"SPEC_REF\",\"SPEC_DPTH\",\"TRIG_COND\"\r\n\
+         \"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"\"\r\n\
+         \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"PA\"\r\n\
+         \"DATA\",\"BH1\",\"1.00\",\"1\",\"U\",\"S1\",\"1\",\"1.00\",\"UNDISTURBED\"\r\n\
+         \"DATA\",\"BH1\",\"1.00\",\"1\",\"U\",\"S1\",\"2\",\"1.00\",\"Undisturbed\"\r\n",
+    )
+    .unwrap();
+    let run = |extra: &[&str], name: &str| {
+        let out = dir.join(name);
+        let mut args = vec![
+            "fix",
+            src.to_str().unwrap(),
+            "--fix-out",
+            out.to_str().unwrap(),
+        ];
+        args.extend(extra);
+        let o = lat(&args);
+        let written = std::fs::read_to_string(&out).unwrap_or_default();
+        (o, written)
+    };
+
+    let (o, keep) = run(&["--json"], "keep.ags");
+    let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+    assert!(v.get("skipped").is_none(), "{v}");
+    assert!(keep.contains("\"Undisturbed\""), "{keep}");
+
+    let (o, standard) = run(&["--json", "--on-code-case", "standard"], "standard.ags");
+    let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+    assert!(
+        v["applied"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["kind"] == "recode_abbreviation"),
+        "{v}"
+    );
+    assert_eq!(v["skipped"][0]["heading"], "SAMP_TYPE", "{v}");
+    assert_eq!(v["skipped"][0]["codes"][0], "u", "{v}");
+    assert!(!standard.contains("\"Undisturbed\""), "{standard}");
+    assert!(standard.contains("\"u\",\"S1\""), "{standard}");
+
+    let (o, _) = run(&["--on-code-case", "standard"], "human.ags");
+    assert!(
+        stdout(&o).contains("left \"u\" under SAMP_TYPE as written"),
+        "{}",
+        stdout(&o)
+    );
+
+    let recode = dir.join("recode.json");
+    std::fs::write(&recode, r#"{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}"#).unwrap();
+    let (_, named) = run(&["--recode", recode.to_str().unwrap()], "recode.ags");
+    assert!(!named.contains("\"Undisturbed\""), "{named}");
+    assert!(named.contains("\"u\",\"S1\""), "{named}");
+
+    // Usage errors are lat's exit 5, as on merge.
+    let (o, _) = run(&["--on-code-case", "first"], "bad.ags");
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    std::fs::write(&recode, r#"{"SAMP_REF": {"1": "2"}}"#).unwrap();
+    let (o, _) = run(&["--recode", recode.to_str().unwrap()], "bad.ags");
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("SAMP_REF"), "{}", stderr(&o));
+}
+
+#[test]
 fn merge_dict_rows_prune_drops_the_restating_rows() {
     // Both deliveries restate a standard heading in DICT and declare one the
     // merged file never carries — the #1011 shape. `keep` (the default) writes

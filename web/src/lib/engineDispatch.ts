@@ -336,11 +336,10 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
 
   return async function dispatch(req: WorkerReq): Promise<void> {
     if (req.kind === "computeFixes") {
-      const fixes = compute_fixes(
-        new Uint8Array(req.bytes),
-        req.dict,
-        req.encoding,
-      );
+      const fixes = compute_fixes(new Uint8Array(req.bytes), {
+        dictVersion: req.dict ?? undefined,
+        encoding: req.encoding,
+      });
       reply({ id: req.id, ok: true, kind: "fixes", fixes });
       return;
     }

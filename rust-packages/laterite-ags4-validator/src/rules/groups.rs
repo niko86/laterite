@@ -58,6 +58,7 @@ use crate::CheckOptions;
 use crate::dict::Dictionary;
 use crate::findings::{Findings, Location, Severity, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
+use laterite_ags4_reference::closeness::{MAX_SUGGESTIONS, nearest};
 
 const RULE_13: &str = "AGS Format Rule 13";
 const RULE_14: &str = "AGS Format Rule 14";
@@ -101,7 +102,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
     single_row_group(parsed, "PROJ", RULE_13, found);
     single_row_group(parsed, "TRAN", RULE_14, found);
     rule_15(parsed, found);
-    rule_16(parsed, opts.include_fyi, found);
+    rule_16(parsed, dict, opts.include_fyi, found);
     rule_17(parsed, found);
     rule_18(parsed, found);
     // Both tiers decided in one walk, so a row is reported once at the tier
@@ -240,11 +241,13 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
         if dict.abbr_desc(hdng, code).is_some() {
             continue;
         }
-        // A non-standard code is often a standard one in the wrong case, which
-        // an importer keying ABBR case-insensitively treats as the same code, so
-        // name the standard spelling (O-43). Appended, never reworded: a code
-        // with no case variant keeps the exact message it always had.
-        let ending = match or_list(&dict.abbr_codes_ignoring_case(hdng, code)) {
+        // A non-standard code is often a standard one in the wrong case, with
+        // stray separators, or mistyped, so name the nearest standard codes
+        // (O-43; the closeness levels are `laterite_ags4_reference::closeness`,
+        // whose first is #1009's case-insensitive lookup). Appended, never
+        // reworded: a code with nothing close keeps the exact message it
+        // always had. A hint only — nothing is rewritten on its strength.
+        let ending = match or_list(&dict.abbr_codes_near(hdng, code)) {
             Some(m) => format!("; did you mean {m}?"),
             None => ".".to_string(),
         };
@@ -523,6 +526,19 @@ impl<'a> AbbrLookup<'a> {
         }
     }
 
+    /// The codes the file defines under `hd`, in sorted order.
+    pub(crate) fn codes_under<'s>(&'s self, hd: &'s str) -> impl Iterator<Item = &'a str> + 's {
+        self.defined
+            .iter()
+            .filter(move |(h, _)| *h == hd)
+            .map(|(_, c)| *c)
+    }
+
+    /// Whether the file defines `code` under `hd`.
+    pub(crate) fn declares(&self, hd: &str, code: &str) -> bool {
+        self.defined.contains(&(hd, code))
+    }
+
     /// Whether `p` breaches Rule 16 under `hd`. An empty part is not an
     /// abbreviation (`"A++B"`), so it is never one.
     pub(crate) fn fails(&self, hd: &str, p: &str) -> bool {
@@ -564,11 +580,13 @@ impl<'a> AbbrLookup<'a> {
 ///
 /// With `include_fyi`, a failing part that only its surrounding whitespace
 /// keeps from matching a defined code also gets a `FYI (Related to Rule 16)`
-/// saying so (O-57). That is a separate finding rather than more words on the
-/// error: compat rewrites the error into python-ags4's wording with a regex
-/// anchored at the end of the string, so any suffix would silently drop it
-/// back to ours.
-fn rule_16(parsed: &ParsedFile, include_fyi: bool, found: &mut Findings) {
+/// saying so (O-57). Any other failing part gets one naming the codes close to
+/// it, when there are any (O-61): the file's own ABBR codes for that heading
+/// first, then the edition's standard ones. Each is a separate finding rather
+/// than more words on the error: compat rewrites the error into python-ags4's
+/// wording with a regex anchored at the end of the string, so any suffix would
+/// silently drop it back to ours.
+fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mut Findings) {
     // Does the file use any PA column at all?
     let has_pa = parsed
         .group_order
@@ -608,24 +626,56 @@ fn rule_16(parsed: &ParsedFile, include_fyi: bool, found: &mut Findings) {
                     if !include_fyi {
                         continue;
                     }
-                    if let Some(t) = lookup.trimmed_match(hd, p) {
-                        add_at(
-                            found,
-                            RULE_16_FYI,
-                            None,
-                            code,
-                            format!(
-                                "{hd}: abbreviation {p:?} is not defined in the ABBR group, \
-                                 but {t:?} is; they differ only by surrounding whitespace."
-                            ),
-                            Location::default(),
-                            Severity::Fyi,
-                        );
-                    }
+                    let desc = if let Some(t) = lookup.trimmed_match(hd, p) {
+                        format!(
+                            "{hd}: abbreviation {p:?} is not defined in the ABBR group, \
+                             but {t:?} is; they differ only by surrounding whitespace."
+                        )
+                    } else if let Some(m) = suggestions(&lookup, dict, hd, p) {
+                        // The padding FYI above already names the fix, so this
+                        // one is only for a value it does not cover.
+                        format!("{p:?} under {hd} is not defined; did you mean {m}?")
+                    } else {
+                        continue;
+                    };
+                    add_at(
+                        found,
+                        RULE_16_FYI,
+                        None,
+                        code,
+                        desc,
+                        Location::default(),
+                        Severity::Fyi,
+                    );
                 }
             }
         }
     }
+}
+
+/// The codes close to an undefined part `p` under `hd`, as the "did you mean"
+/// list of the O-61 FYI: the file's own ABBR codes for the heading first, then
+/// the edition's standard ones it does not declare, at most
+/// [`MAX_SUGGESTIONS`] in all, each saying where it comes from. `None` when
+/// nothing is close. Suggestions only — `fix` never acts on them.
+#[inline(never)]
+fn suggestions(lookup: &AbbrLookup, dict: &Dictionary, hd: &str, p: &str) -> Option<String> {
+    let own: Vec<&str> = lookup.codes_under(hd).collect();
+    let mut named: Vec<String> = Vec::new();
+    for c in nearest(p, &own) {
+        named.push(format!("{c:?} (declared in ABBR)"));
+    }
+    for c in dict.abbr_codes_near(hd, p) {
+        if named.len() < MAX_SUGGESTIONS && !lookup.declares(hd, c) {
+            named.push(format!("{c:?} (standard abbreviation)"));
+        }
+    }
+    let (last, rest) = named.split_last()?;
+    Some(if rest.is_empty() {
+        last.clone()
+    } else {
+        format!("{} or {last}", rest.join(", "))
+    })
 }
 
 /// Rule 17 — every TYPE code used in any group's TYPE row must be
@@ -1706,6 +1756,100 @@ mod tests {
             1
         );
         assert!(padding_fyis(&run_fyi(&padded_fixture(None, "B + D"))).is_empty());
+    }
+
+    /// A `TRIG_COND` `PA` cell holding `value`, with ABBR declaring each of
+    /// `declared` under `TRIG_COND`.
+    fn trig_cond_fixture(declared: &[&str], value: &str) -> String {
+        use std::fmt::Write as _;
+        let mut s = format!(
+            "\"GROUP\",\"TRIG\"\r\n\"HEADING\",\"SPEC_REF\",\"TRIG_COND\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"PA\"\r\n\
+             \"DATA\",\"1\",{value:?}\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n"
+        );
+        for c in declared {
+            write!(s, "\"DATA\",\"TRIG_COND\",{c:?},\"d\"\r\n").expect("String write");
+        }
+        s
+    }
+
+    /// The O-61 suggestion FYIs only.
+    fn suggestion_fyis(f: &Findings) -> Vec<String> {
+        f.get(RULE_16_FYI)
+            .map(|v| {
+                v.iter()
+                    .filter(|x| {
+                        x.desc.contains("did you mean") && x.desc.contains("is not defined")
+                    })
+                    .map(|x| x.desc.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn rule_16_fyi_suggests_a_declared_code_for_an_undefined_value() {
+        let f = run_fyi(&trig_cond_fixture(&["UNDISTURBED"], "UNDISTRUBED"));
+        let r16: Vec<&str> = f[RULE_16].iter().map(|x| x.desc.as_str()).collect();
+        assert_eq!(
+            r16,
+            vec!["Abbreviation \"UNDISTRUBED\" under TRIG_COND is not defined in the ABBR group."],
+            "the error must stay word-for-word: compat's regex is anchored on it"
+        );
+        assert_eq!(
+            suggestion_fyis(&f),
+            vec![
+                "\"UNDISTRUBED\" under TRIG_COND is not defined; did you mean \
+                 \"UNDISTURBED\" (declared in ABBR)?"
+            ]
+        );
+        assert!(f[RULE_16_FYI].iter().all(|x| x.severity == Severity::Fyi));
+    }
+
+    #[test]
+    fn rule_16_fyi_suggests_declared_codes_before_standard_ones() {
+        // Declared: a level-2 match. Standard and undeclared: a level-3 one,
+        // which would rank first on closeness alone if it were not standard.
+        let f = run_fyi(&trig_cond_fixture(&["UN-DISTURBED"], "UNDISTRUBED"));
+        assert_eq!(
+            suggestion_fyis(&f),
+            vec![
+                "\"UNDISTRUBED\" under TRIG_COND is not defined; did you mean \
+                 \"UN-DISTURBED\" (declared in ABBR) or \"UNDISTURBED\" (standard \
+                 abbreviation)?"
+            ]
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_no_suggestion_when_padding_covers_it_or_nothing_is_close() {
+        // #1012's padding FYI already names the fix for " D".
+        let f = run_fyi(&padded_fixture(None, " D"));
+        assert_eq!(padding_fyis(&f).len(), 1);
+        assert!(suggestion_fyis(&f).is_empty(), "{:?}", f[RULE_16_FYI]);
+        // One-letter codes are never suggested for each other.
+        assert!(suggestion_fyis(&run_fyi(&padded_fixture(None, "U"))).is_empty());
+        // And none without FYIs asked for.
+        assert!(
+            suggestion_fyis(&run(&trig_cond_fixture(&["UNDISTURBED"], "UNDISTRUBED"))).is_empty()
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_nonstandard_hint_reaches_separators_and_typos() {
+        for code in ["Un-disturbed", "UNDISTRUBED"] {
+            assert_eq!(
+                rule_16_fyis(&abbr_fixture("TRIG_COND", code)),
+                vec![nonstandard_fyi(
+                    "TRIG_COND",
+                    code,
+                    "; did you mean \"UNDISTURBED\"?"
+                )]
+            );
+        }
     }
 
     #[test]

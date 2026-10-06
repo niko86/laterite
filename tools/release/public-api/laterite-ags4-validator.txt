@@ -28,6 +28,8 @@ pub fn laterite_ags4_validator::error::ValidatorError::exit_code(&self) -> i32
 pub fn laterite_ags4_validator::error::ValidatorError::kind(&self) -> &'static str
 impl core::convert::From<laterite_ags4_parse::ParseError> for laterite_ags4_validator::error::ValidatorError
 pub fn laterite_ags4_validator::error::ValidatorError::from(laterite_ags4_parse::ParseError) -> Self
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::from(laterite_ags4_validator::error::ValidatorError) -> Self
 impl core::error::Error for laterite_ags4_validator::error::ValidatorError
 pub fn laterite_ags4_validator::error::ValidatorError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Debug for laterite_ags4_validator::error::ValidatorError
@@ -150,6 +152,26 @@ pub fn laterite_ags4_validator::findings::findings_json_value(&str, &laterite_ag
 pub fn laterite_ags4_validator::findings::findings_ndjson(&laterite_ags4_validator::findings::Findings) -> alloc::string::String
 pub type laterite_ags4_validator::findings::Findings = alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_validator::findings::Finding>>
 pub mod laterite_ags4_validator::fixes
+pub use laterite_ags4_validator::fixes::CodeCaseMode
+pub use laterite_ags4_validator::fixes::Recode
+pub use laterite_ags4_validator::fixes::RecodeError
+pub enum laterite_ags4_validator::fixes::FixError
+pub laterite_ags4_validator::fixes::FixError::Recode(laterite_ags4_reference::recode::RecodeError)
+pub laterite_ags4_validator::fixes::FixError::Validator(laterite_ags4_validator::error::ValidatorError)
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::from(laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::error::Error for laterite_ags4_validator::fixes::FixError
+impl core::fmt::Debug for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_validator::fixes::FixError
+impl core::marker::Send for laterite_ags4_validator::fixes::FixError
+impl core::marker::Sync for laterite_ags4_validator::fixes::FixError
+impl core::marker::Unpin for laterite_ags4_validator::fixes::FixError
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::FixError
+impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::FixError
+impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::FixError
 pub enum laterite_ags4_validator::fixes::FixKind
 pub laterite_ags4_validator::fixes::FixKind::CanonicalizeDatetime
 pub laterite_ags4_validator::fixes::FixKind::InsertTranDlim
@@ -158,6 +180,7 @@ pub laterite_ags4_validator::fixes::FixKind::NormalizeCrlf
 pub laterite_ags4_validator::fixes::FixKind::NormalizeTypography
 pub laterite_ags4_validator::fixes::FixKind::PadShortRow
 pub laterite_ags4_validator::fixes::FixKind::QuoteUnquotedRow
+pub laterite_ags4_validator::fixes::FixKind::RecodeAbbreviation
 pub laterite_ags4_validator::fixes::FixKind::ReformatNumeric
 pub laterite_ags4_validator::fixes::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::fixes::FixKind::StripBom
@@ -210,6 +233,28 @@ impl core::marker::Unpin for laterite_ags4_validator::fixes::FixRisk
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::FixRisk
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::FixRisk
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::FixRisk
+pub struct laterite_ags4_validator::fixes::CodeRewrite
+pub laterite_ags4_validator::fixes::CodeRewrite::on_code_case: laterite_ags4_reference::recode::CodeCaseMode
+pub laterite_ags4_validator::fixes::CodeRewrite::recode: laterite_ags4_reference::recode::Recode
+impl laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::is_requested(&self) -> bool
+impl core::clone::Clone for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::fixes::CodeRewrite
+impl core::cmp::PartialEq for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::default() -> Self
+impl core::fmt::Debug for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Freeze for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Send for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Sync for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Unpin for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::CodeRewrite
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::CodeRewrite
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::CodeRewrite
 pub struct laterite_ags4_validator::fixes::Fix
 pub laterite_ags4_validator::fixes::Fix::edits: alloc::vec::Vec<laterite_ags4_validator::fixes::SpanEdit>
 pub laterite_ags4_validator::fixes::Fix::kind: laterite_ags4_validator::fixes::FixKind
@@ -242,6 +287,7 @@ pub laterite_ags4_validator::fixes::FixOutcome::fixed: alloc::vec::Vec<u8>
 pub laterite_ags4_validator::fixes::FixOutcome::residual: laterite_ags4_validator::findings::Findings
 pub laterite_ags4_validator::fixes::FixOutcome::resolution: laterite_ags4_reference::dict::DictResolution
 pub laterite_ags4_validator::fixes::FixOutcome::risky_available: usize
+pub laterite_ags4_validator::fixes::FixOutcome::skipped: alloc::vec::Vec<laterite_ags4_validator::fixes::SkippedRewrite>
 impl core::marker::Freeze for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::Send for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::Sync for laterite_ags4_validator::fixes::FixOutcome
@@ -249,6 +295,48 @@ impl core::marker::Unpin for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::FixOutcome
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::FixOutcome
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::FixOutcome
+pub struct laterite_ags4_validator::fixes::RecodeFix
+pub laterite_ags4_validator::fixes::RecodeFix::fix: core::option::Option<laterite_ags4_validator::fixes::Fix>
+pub laterite_ags4_validator::fixes::RecodeFix::skipped: alloc::vec::Vec<laterite_ags4_validator::fixes::SkippedRewrite>
+impl core::clone::Clone for laterite_ags4_validator::fixes::RecodeFix
+pub fn laterite_ags4_validator::fixes::RecodeFix::clone(&self) -> Self
+impl core::cmp::PartialEq for laterite_ags4_validator::fixes::RecodeFix
+pub fn laterite_ags4_validator::fixes::RecodeFix::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_validator::fixes::RecodeFix
+pub fn laterite_ags4_validator::fixes::RecodeFix::default() -> Self
+impl core::fmt::Debug for laterite_ags4_validator::fixes::RecodeFix
+pub fn laterite_ags4_validator::fixes::RecodeFix::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::RecodeFix
+impl core::marker::Freeze for laterite_ags4_validator::fixes::RecodeFix
+impl core::marker::Send for laterite_ags4_validator::fixes::RecodeFix
+impl core::marker::Sync for laterite_ags4_validator::fixes::RecodeFix
+impl core::marker::Unpin for laterite_ags4_validator::fixes::RecodeFix
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::RecodeFix
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::RecodeFix
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::RecodeFix
+pub struct laterite_ags4_validator::fixes::SkippedRewrite
+pub laterite_ags4_validator::fixes::SkippedRewrite::codes: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_validator::fixes::SkippedRewrite::group: alloc::string::String
+pub laterite_ags4_validator::fixes::SkippedRewrite::heading: alloc::string::String
+pub laterite_ags4_validator::fixes::SkippedRewrite::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_validator::fixes::SkippedRewrite::target: alloc::string::String
+impl core::clone::Clone for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::cmp::PartialEq for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::SkippedRewrite
+impl serde_core::ser::Serialize for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Send for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Sync for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Unpin for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::SkippedRewrite
 pub struct laterite_ags4_validator::fixes::SpanEdit
 pub laterite_ags4_validator::fixes::SpanEdit::end: u32
 pub laterite_ags4_validator::fixes::SpanEdit::expected: alloc::string::String
@@ -276,7 +364,9 @@ impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::Sp
 pub const laterite_ags4_validator::fixes::FIXABLE_RULE_LABELS: &[&str]
 pub fn laterite_ags4_validator::fixes::apply_fixes(&str, bool, &[laterite_ags4_validator::fixes::Fix]) -> alloc::string::String
 pub fn laterite_ags4_validator::fixes::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::Dictionary<'_>) -> laterite_ags4_validator::fixes::Fixes
+pub fn laterite_ags4_validator::fixes::compute_recode_fix(&laterite_ags4_parse::ParsedFile, laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::fixes::CodeRewrite) -> core::result::Result<laterite_ags4_validator::fixes::RecodeFix, laterite_ags4_reference::recode::RecodeError>
 pub fn laterite_ags4_validator::fixes::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::fixes::fix_document_recoding(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String], &laterite_ags4_validator::fixes::CodeRewrite) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::fixes::FixError>
 pub fn laterite_ags4_validator::fixes::fix_document_selective(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String]) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub type laterite_ags4_validator::fixes::Fixes = alloc::vec::Vec<laterite_ags4_validator::fixes::Fix>
 pub mod laterite_ags4_validator::parse
@@ -359,6 +449,23 @@ impl core::marker::UnsafeUnpin for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::world::WorldScope
 pub fn laterite_ags4_validator::world::run(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::world::WorldScope, &mut laterite_ags4_validator::findings::Findings)
+pub enum laterite_ags4_validator::FixError
+pub laterite_ags4_validator::FixError::Recode(laterite_ags4_reference::recode::RecodeError)
+pub laterite_ags4_validator::FixError::Validator(laterite_ags4_validator::error::ValidatorError)
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::from(laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::error::Error for laterite_ags4_validator::fixes::FixError
+impl core::fmt::Debug for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_validator::fixes::FixError
+impl core::marker::Send for laterite_ags4_validator::fixes::FixError
+impl core::marker::Sync for laterite_ags4_validator::fixes::FixError
+impl core::marker::Unpin for laterite_ags4_validator::fixes::FixError
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::FixError
+impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::FixError
+impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::FixError
 pub enum laterite_ags4_validator::FixKind
 pub laterite_ags4_validator::FixKind::CanonicalizeDatetime
 pub laterite_ags4_validator::FixKind::InsertTranDlim
@@ -367,6 +474,7 @@ pub laterite_ags4_validator::FixKind::NormalizeCrlf
 pub laterite_ags4_validator::FixKind::NormalizeTypography
 pub laterite_ags4_validator::FixKind::PadShortRow
 pub laterite_ags4_validator::FixKind::QuoteUnquotedRow
+pub laterite_ags4_validator::FixKind::RecodeAbbreviation
 pub laterite_ags4_validator::FixKind::ReformatNumeric
 pub laterite_ags4_validator::FixKind::RenameDuplicateHeading
 pub laterite_ags4_validator::FixKind::StripBom
@@ -411,6 +519,8 @@ pub fn laterite_ags4_validator::error::ValidatorError::exit_code(&self) -> i32
 pub fn laterite_ags4_validator::error::ValidatorError::kind(&self) -> &'static str
 impl core::convert::From<laterite_ags4_parse::ParseError> for laterite_ags4_validator::error::ValidatorError
 pub fn laterite_ags4_validator::error::ValidatorError::from(laterite_ags4_parse::ParseError) -> Self
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_validator::fixes::FixError
+pub fn laterite_ags4_validator::fixes::FixError::from(laterite_ags4_validator::error::ValidatorError) -> Self
 impl core::error::Error for laterite_ags4_validator::error::ValidatorError
 pub fn laterite_ags4_validator::error::ValidatorError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Debug for laterite_ags4_validator::error::ValidatorError
@@ -462,6 +572,28 @@ impl core::marker::Unpin for laterite_ags4_validator::CheckOptions
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::CheckOptions
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::CheckOptions
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::CheckOptions
+pub struct laterite_ags4_validator::CodeRewrite
+pub laterite_ags4_validator::CodeRewrite::on_code_case: laterite_ags4_reference::recode::CodeCaseMode
+pub laterite_ags4_validator::CodeRewrite::recode: laterite_ags4_reference::recode::Recode
+impl laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::is_requested(&self) -> bool
+impl core::clone::Clone for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::fixes::CodeRewrite
+impl core::cmp::PartialEq for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::default() -> Self
+impl core::fmt::Debug for laterite_ags4_validator::fixes::CodeRewrite
+pub fn laterite_ags4_validator::fixes::CodeRewrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Freeze for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Send for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Sync for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::Unpin for laterite_ags4_validator::fixes::CodeRewrite
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::CodeRewrite
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::CodeRewrite
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::CodeRewrite
 pub struct laterite_ags4_validator::Finding
 pub laterite_ags4_validator::Finding::desc: alloc::string::String
 pub laterite_ags4_validator::Finding::group: alloc::string::String
@@ -517,6 +649,7 @@ pub laterite_ags4_validator::FixOutcome::fixed: alloc::vec::Vec<u8>
 pub laterite_ags4_validator::FixOutcome::residual: laterite_ags4_validator::findings::Findings
 pub laterite_ags4_validator::FixOutcome::resolution: laterite_ags4_reference::dict::DictResolution
 pub laterite_ags4_validator::FixOutcome::risky_available: usize
+pub laterite_ags4_validator::FixOutcome::skipped: alloc::vec::Vec<laterite_ags4_validator::fixes::SkippedRewrite>
 impl core::marker::Freeze for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::Send for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::Sync for laterite_ags4_validator::fixes::FixOutcome
@@ -524,6 +657,29 @@ impl core::marker::Unpin for laterite_ags4_validator::fixes::FixOutcome
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::FixOutcome
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::FixOutcome
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::FixOutcome
+pub struct laterite_ags4_validator::SkippedRewrite
+pub laterite_ags4_validator::SkippedRewrite::codes: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_validator::SkippedRewrite::group: alloc::string::String
+pub laterite_ags4_validator::SkippedRewrite::heading: alloc::string::String
+pub laterite_ags4_validator::SkippedRewrite::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_validator::SkippedRewrite::target: alloc::string::String
+impl core::clone::Clone for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::cmp::PartialEq for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::fixes::SkippedRewrite
+impl serde_core::ser::Serialize for laterite_ags4_validator::fixes::SkippedRewrite
+pub fn laterite_ags4_validator::fixes::SkippedRewrite::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Send for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Sync for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::Unpin for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::fixes::SkippedRewrite
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::fixes::SkippedRewrite
 pub struct laterite_ags4_validator::SpanEdit
 pub laterite_ags4_validator::SpanEdit::end: u32
 pub laterite_ags4_validator::SpanEdit::expected: alloc::string::String
@@ -558,6 +714,7 @@ pub fn laterite_ags4_validator::check_parsed_with_dict(&laterite_ags4_parse::Par
 pub fn laterite_ags4_validator::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::Dictionary<'_>) -> laterite_ags4_validator::fixes::Fixes
 pub fn laterite_ags4_validator::editions_joined(&str) -> alloc::string::String
 pub fn laterite_ags4_validator::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::fix_document_recoding(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String], &laterite_ags4_validator::fixes::CodeRewrite) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::fixes::FixError>
 pub fn laterite_ags4_validator::fix_document_selective(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String]) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::is_clean(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<bool, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::is_valid(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<bool, laterite_ags4_validator::error::ValidatorError>

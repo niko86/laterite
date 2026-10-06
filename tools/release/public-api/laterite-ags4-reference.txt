@@ -2,6 +2,34 @@ pub mod laterite_ags4_reference
 pub mod laterite_ags4_reference::catalogue
 pub const laterite_ags4_reference::catalogue::RULE_LABELS: &[&str]
 pub fn laterite_ags4_reference::catalogue::rule_metadata_json() -> &'static str
+pub mod laterite_ags4_reference::closeness
+pub struct laterite_ags4_reference::closeness::Closeness
+pub laterite_ags4_reference::closeness::Closeness::distance: usize
+pub laterite_ags4_reference::closeness::Closeness::level: u8
+impl core::clone::Clone for laterite_ags4_reference::closeness::Closeness
+pub fn laterite_ags4_reference::closeness::Closeness::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::closeness::Closeness
+impl core::cmp::Ord for laterite_ags4_reference::closeness::Closeness
+pub fn laterite_ags4_reference::closeness::Closeness::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for laterite_ags4_reference::closeness::Closeness
+pub fn laterite_ags4_reference::closeness::Closeness::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for laterite_ags4_reference::closeness::Closeness
+pub fn laterite_ags4_reference::closeness::Closeness::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for laterite_ags4_reference::closeness::Closeness
+pub fn laterite_ags4_reference::closeness::Closeness::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::closeness::Closeness
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::closeness::Closeness
+impl core::marker::Freeze for laterite_ags4_reference::closeness::Closeness
+impl core::marker::Send for laterite_ags4_reference::closeness::Closeness
+impl core::marker::Sync for laterite_ags4_reference::closeness::Closeness
+impl core::marker::Unpin for laterite_ags4_reference::closeness::Closeness
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::closeness::Closeness
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::closeness::Closeness
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::closeness::Closeness
+pub const laterite_ags4_reference::closeness::MAX_SUGGESTIONS: usize
+pub fn laterite_ags4_reference::closeness::closeness(&str, &str) -> core::option::Option<laterite_ags4_reference::closeness::Closeness>
+pub fn laterite_ags4_reference::closeness::nearest<'c>(&str, &[&'c str]) -> alloc::vec::Vec<&'c str>
+pub fn laterite_ags4_reference::closeness::same_ignoring_case(&str, &str) -> bool
 pub mod laterite_ags4_reference::dict
 pub enum laterite_ags4_reference::dict::AbbreviationShape
 pub laterite_ags4_reference::dict::AbbreviationShape::Flat
@@ -111,6 +139,7 @@ pub laterite_ags4_reference::dict::Dictionary::Layered::delta: &'a laterite_ags4
 impl<'a> laterite_ags4_reference::dict::Dictionary<'a>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes(&self, &str) -> alloc::vec::Vec<&'a str>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes_ignoring_case(&self, &str, &str) -> alloc::vec::Vec<&'a str>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes_near(&self, &str, &str) -> alloc::vec::Vec<&'a str>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_desc(&self, &str, &str) -> core::option::Option<&'a str>
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::all_heading_names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &'a str> + 'a
 pub fn laterite_ags4_reference::dict::Dictionary<'a>::bundled(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::Dictionary<'static>

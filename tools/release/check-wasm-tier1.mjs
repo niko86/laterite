@@ -17,8 +17,8 @@
 //   something did, and the ceilings did not move to accommodate it.
 //
 //   Its raw ceiling is now load-bearing twice over: `web/vite.config.ts`'s
-//   `maximumFileSizeToCacheInBytes` sits at 3 MiB, ABOVE this gate's 2350 KiB and
-//   BELOW the full engine, so it can refuse a leaked tier 2. Raise this ceiling
+//   `maximumFileSizeToCacheInBytes` sits at 3 MiB, ABOVE this gate's raw ceiling
+//   and BELOW the full engine, so it can refuse a leaked tier 2. Raise this ceiling
 //   past that cap and the engine stops being precached at all — a build warning,
 //   not a failure, and offline validate goes with it.
 //
@@ -129,8 +129,14 @@ const EXPECTED_CLASSES = {
 // without admitting a dependency. A breach means a heavy dependency reached an
 // UNGATED path, because a flipped feature is the surface check's job and it
 // runs first.
-const MAX_GZIP_BYTES = 940 * 1024; // tier 1 839.2
-const MAX_RAW_BYTES = 2350 * 1024; // tier 1 2093.9
+//
+// Raised once, on purpose, in #1024 (an owner decision, not a leak): the Rule 16
+// near-miss suggestions and the fix-side ABBR code rewrite are validator code
+// every surface ships, so they sit on the ungated path by design. The raise is
+// the smallest round step that clears the artifact that change produced; the
+// ceilings stay below the precache cap above.
+const MAX_GZIP_BYTES = 950 * 1024; // tier 1 839.2 (2026-08-16)
+const MAX_RAW_BYTES = 2400 * 1024; // tier 1 2093.9 (2026-08-16)
 
 checkWasmArtifact({
   label: "wasm-tier1",

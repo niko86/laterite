@@ -535,14 +535,23 @@ impl<'a> Dictionary<'a> {
     /// Case is folded with Unicode lowercasing. v1: base only.
     #[must_use]
     pub fn abbr_codes_ignoring_case(&self, heading: &str, code: &str) -> Vec<&'a str> {
-        let folded = code.to_lowercase();
         let mut hits: Vec<&'a str> = self
             .abbr_codes(heading)
             .into_iter()
-            .filter(|c| c.to_lowercase() == folded)
+            .filter(|c| crate::closeness::same_ignoring_case(c, code))
             .collect();
         hits.sort_unstable();
         hits
+    }
+
+    /// The standard `ABBR_CODE`s for `heading` close to `code`, nearest first
+    /// and at most [`crate::closeness::MAX_SUGGESTIONS`] — see
+    /// [`crate::closeness`] for the three levels. `code` itself is never
+    /// among them. For a "did you mean" hint only: the codes are suggestions,
+    /// and nothing rewrites a value on the strength of them. v1: base only.
+    #[must_use]
+    pub fn abbr_codes_near(&self, heading: &str, code: &str) -> Vec<&'a str> {
+        crate::closeness::nearest(code, &self.abbr_codes(heading))
     }
 
     #[must_use]
@@ -1036,6 +1045,22 @@ mod tests {
         );
         assert!(d.abbr_codes_ignoring_case("TRIG_COND", "ZZ").is_empty());
         assert!(d.abbr_codes_ignoring_case("NOPE_HDNG", "ZZ").is_empty());
+    }
+
+    #[test]
+    fn abbr_codes_near_reaches_all_three_levels_and_never_the_code_itself() {
+        let d = Dictionary::bundled(DictVersion::V4_1_1);
+        for code in ["Undisturbed", "Un-disturbed", "UNDISTRUBED"] {
+            assert_eq!(d.abbr_codes_near("TRIG_COND", code), vec!["UNDISTURBED"]);
+        }
+        assert!(d.abbr_codes_near("TRIG_COND", "UNDISTURBED").is_empty());
+        // Level 1 is the case-insensitive lookup's own answer.
+        assert_eq!(
+            d.abbr_codes_near("PTST_TYPE", "constant head"),
+            d.abbr_codes_ignoring_case("PTST_TYPE", "constant head")
+        );
+        // One-letter codes are never offered for each other.
+        assert!(!d.abbr_codes_near("SAMP_TYPE", "X").contains(&"U"));
     }
 
     // ---- layered (custom-dict overlay) paths ----

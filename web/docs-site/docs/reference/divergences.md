@@ -5,7 +5,7 @@ laterite is an **independent** implementation of the AGS4 rules, calibrated agai
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
 
-**26 of them change what you see.** They are not all the same kind of thing, which is why this
+**27 of them change what you see.** They are not all the same kind of thing, which is why this
 page is grouped by what actually happened rather than filed under one heading: some are deliberate
 differences from python-ags4, some are places the two agree and the *spec* is the outlier, and some are
 laterite's own false negatives that the comparison caught and closed.
@@ -59,6 +59,7 @@ same source, so a record cannot be resolved there and stay live here.
 | **O-58** | Two ABBR codes under one heading that differ only by letter case (`"Undisturbed"` / `"UNDISTURBED"`) → a laterite **FYI** (Related to Rule 16) naming both, since some importers treat them as one code; under 4.2, whose spec makes ABBR codes case-insensitive, a **WARNING** (Related to Rule 16) instead. |
 | **O-59** | A standard heading whose TYPE row differs from the dictionary edition's type (`LNMC_MC` declared `1DP` where 4.1.1 says `X`) → a laterite **FYI** (Related to Rule 8), since files typed differently clash once combined. Native surfaces only: `laterite.compat` does not emit it. |
 | **O-60** | A DICT row for a group or heading the dictionary edition already defines → a laterite **FYI** (Related to Rule 18) listing what it changes, or a **WARNING** (Related to Rule 18) when it drops KEY from a standard KEY heading or re-parents a standard group. The standard definition applies either way. `build_ags4` and `merge` drop such rows with `dict_rows="prune"`. |
+| **O-61** | An undefined `PA` value close to a code the file declares or the dictionary lists (`"UNDISTURBD"` for `"UNDISTURBED"`) → a laterite **FYI** (Related to Rule 16) naming up to three likely codes. A suggestion only; nothing is rewritten. |
 
 !!! tip "Reading the tiers"
     Whether a difference surfaces as an **error**, **warning** or **FYI** follows

@@ -363,6 +363,58 @@ def _run_validate(args: argparse.Namespace) -> int:
     return code
 
 
+def _read_recode(path: str | None) -> tuple[dict | None, int | None]:
+    """Read a `--recode` file, `{heading: {from_code: to_code}}`: the mapping, or
+    the exit code to stop with (3 unreadable, 5 not that shape) after saying why.
+    A JSON file, as `--dict` is: codes may hold any character, so a file beats a
+    flag syntax that would need its own escaping. Shared by `merge` and `fix`."""
+    import json
+    from pathlib import Path
+
+    if path is None:
+        return None, None
+    try:
+        recode = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as e:
+        print(f"error: {path}: {e}", file=sys.stderr)
+        return None, 3
+    except ValueError as e:
+        print(f"error: --recode {path}: {e}", file=sys.stderr)
+        return None, 5
+    if not (
+        isinstance(recode, dict)
+        and all(
+            isinstance(m, dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in m.items())
+            for m in recode.values()
+        )
+    ):
+        print(
+            f"error: --recode {path}: expected a JSON object "
+            "{heading: {from_code: to_code}}",
+            file=sys.stderr,
+        )
+        return None, 5
+    return recode, None
+
+
+def _skipped_line(s: dict) -> str:
+    """One requested rewrite `fix` left undone, as the three launchers print it."""
+    codes = ", ".join(_json_quote(c) for c in s["codes"])
+    return (
+        f"left {codes} under {s['heading']} as written: rewriting to "
+        f"{_json_quote(s['target'])} would give two {s['group']} rows the KEY "
+        f"{_json_quote('|'.join(s['key']))}"
+    )
+
+
+def _json_quote(v: str) -> str:
+    """A string quoted as Rust's `{:?}` and JSON both quote a plain code."""
+    import json
+
+    return json.dumps(v, ensure_ascii=False)
+
+
 def _run_fix(args: argparse.Namespace) -> int:
     """`lat fix`: mechanically repair the file. Faithful to the Rust `fix`
     (sibling `<file>.fixed.ags` by default; `--in-place` / `--fix-out` redirect).
@@ -374,6 +426,9 @@ def _run_fix(args: argparse.Namespace) -> int:
         print("error: --in-place and --fix-out are mutually exclusive", file=sys.stderr)
         return 5
 
+    recode, code = _read_recode(args.recode)
+    if code is not None:
+        return code
     r = _native.fix_file(
         path=args.file,
         dict_version=args.dict_version,
@@ -381,6 +436,8 @@ def _run_fix(args: argparse.Namespace) -> int:
         encoding=args.encoding,
         dict_path=args.dict,
         dict_replace=args.dict_replace,
+        on_code_case=args.on_code_case,
+        recode=recode,
     )
     if not r.get("ok"):
         print(f"error: {r.get('error')}", file=sys.stderr)
@@ -403,6 +460,7 @@ def _run_fix(args: argparse.Namespace) -> int:
 
     by_rule = json.loads(r["findings_json"])
     n_residual = sum(len(v) for v in by_rule.values())
+    skipped = json.loads(r.get("skipped_json", "[]"))
 
     # --json: the machine-readable report replaces the human summary (laterite-dev#545). Same
     # shape as the native `lat fix --json` — `applied` is the native `fix_file`'s
@@ -416,6 +474,9 @@ def _run_fix(args: argparse.Namespace) -> int:
             "applied": r["applied"],
             "residual": n_residual,
         }
+        # Only when a requested rewrite was left undone, as the binary does.
+        if skipped:
+            report["skipped"] = skipped
         # ensure_ascii=False: a fix label carries the reformat arrow (`"10.5" → "10.50"`,
         # Rule 8), and Python's json.dumps ASCII-escapes it to `→` while the native
         # serde_json and npx JSON.stringify emit the raw UTF-8 char. Without this the
@@ -429,6 +490,8 @@ def _run_fix(args: argparse.Namespace) -> int:
         print(f"no fixes applicable → {dest}")
     else:
         print(f"applied {n_applied} fix(es) [{', '.join(kinds)}] → {dest}")
+    for s in skipped:
+        print(_skipped_line(s))
 
     if n_residual == 0:
         print(f"{dest}: clean (0 findings)")
@@ -570,33 +633,9 @@ def _run_merge(args: argparse.Namespace) -> int:
             print(f"error: {f}: not found", file=sys.stderr)
             return 3
 
-    recode = None
-    if args.recode is not None:
-        # A JSON file, as `--dict` is: `{heading: {from_code: to_code}}`. Codes
-        # may hold any character, so a file beats a flag syntax that would need
-        # its own escaping.
-        try:
-            recode = json.loads(Path(args.recode).read_text(encoding="utf-8"))
-        except OSError as e:
-            print(f"error: {args.recode}: {e}", file=sys.stderr)
-            return 3
-        except ValueError as e:
-            print(f"error: --recode {args.recode}: {e}", file=sys.stderr)
-            return 5
-        if not (
-            isinstance(recode, dict)
-            and all(
-                isinstance(m, dict)
-                and all(isinstance(k, str) and isinstance(v, str) for k, v in m.items())
-                for m in recode.values()
-            )
-        ):
-            print(
-                f"error: --recode {args.recode}: expected a JSON object "
-                "{heading: {from_code: to_code}}",
-                file=sys.stderr,
-            )
-            return 5
+    recode, code = _read_recode(args.recode)
+    if code is not None:
+        return code
 
     dv = None if args.dict_version == "auto" else args.dict_version
     try:
@@ -1056,6 +1095,13 @@ def _build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--risky", action="store_true")
     pf.add_argument("--in-place", action="store_true")
     pf.add_argument("--fix-out")
+    pf.add_argument(
+        "--on-code-case",
+        dest="on_code_case",
+        choices=_CODE_CASE_CHOICES,
+        default="keep",
+    )
+    pf.add_argument("--recode", dest="recode")
 
     pdf = sub.add_parser("diff", add_help=False, parents=[gp, dp])
     pdf.add_argument("file")

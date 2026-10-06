@@ -52,6 +52,8 @@
           "--fix-out": true,
           "--in-place": false,
           "--json": false,
+          "--on-code-case": true,
+          "--recode": true,
           "--risky": false,
           "<file>": true
         },
@@ -131,6 +133,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "fix --on-code-case": [
+          "keep",
+          "standard"
+        ],
         "merge --dict-rows": [
           "keep",
           "prune"
@@ -225,6 +231,8 @@
           "--fix-out": true,
           "--in-place": false,
           "--json": false,
+          "--on-code-case": true,
+          "--recode": true,
           "--risky": false,
           "<file>": true
         },
@@ -304,6 +312,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "fix --on-code-case": [
+          "keep",
+          "standard"
+        ],
         "merge --dict-rows": [
           "keep",
           "prune"
@@ -398,6 +410,8 @@
           "--fix-out": true,
           "--in-place": false,
           "--json": false,
+          "--on-code-case": true,
+          "--recode": true,
           "--risky": false,
           "<file>": true
         },
@@ -477,6 +491,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "fix --on-code-case": [
+          "keep",
+          "standard"
+        ],
         "merge --dict-rows": [
           "keep",
           "prune"
