@@ -57,7 +57,7 @@ same source, so a record cannot be resolved there and stay live here.
 | **O-56** | A group that keys on a heading owned outside its declared parent chain gets an **FYI** naming the group that could have been its parent. Rule 10c is structurally unable to check that link, so a reference through it can be an orphan on a file that validates clean. |
 | **O-57** | A `PA` value that fails Rule 16 only because of whitespace around a defined code (`" D"` where `"D"` is defined) → a laterite **FYI** (Related to Rule 16) naming the code, and `fix` trims it. |
 | **O-58** | Two ABBR codes under one heading that differ only by letter case (`"Undisturbed"` / `"UNDISTURBED"`) → a laterite **FYI** (Related to Rule 16) naming both, since some importers treat them as one code. |
-| **O-59** | A standard heading whose TYPE row differs from the dictionary edition's type (`LNMC_MC` declared `1DP` where 4.1.1 says `X`) → a laterite **FYI** (Related to Rule 8), since files typed differently clash once combined. |
+| **O-59** | A standard heading whose TYPE row differs from the dictionary edition's type (`LNMC_MC` declared `1DP` where 4.1.1 says `X`) → a laterite **FYI** (Related to Rule 8), since files typed differently clash once combined. Native surfaces only: `laterite.compat` does not emit it. |
 
 !!! tip "Reading the tiers"
     Whether a difference surfaces as an **error**, **warning** or **FYI** follows

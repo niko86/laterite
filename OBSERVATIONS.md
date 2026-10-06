@@ -859,8 +859,15 @@ O-N below is an internal decision or behavioural note, not for external circulat
   not mention merging. Rule 8 itself is unchanged, values are still judged
   against the declared type, and the verdict never moves. It is a new
   laterite-only label, so it shows as a rust-only label wherever dual
-  validation runs with FYI on — forge does, and so does `laterite.compat`
-  — and `classify` reconciles it to this record.
+  validation runs the native engine with FYI on — forge does — and
+  `classify` reconciles it to this record.
+- **Native surfaces only** (#1013, owner decision): `laterite.validate()`,
+  `lat`, Node and wasm emit it; `laterite.compat` withholds this one label
+  while every other FYI passes through. Real files depart from the
+  dictionary's types often, so in the drop-in it would be noise
+  python-ags4 users never asked for, and its key trips python-ags4's own
+  test that a clean file yields no key naming a Rule. The python-ags4 key
+  set, and so the parity known-failures set, is unchanged.
 
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 

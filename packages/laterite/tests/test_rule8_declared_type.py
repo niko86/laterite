@@ -125,3 +125,20 @@ def test_without_fyi_nothing_changes():
     assert retyped.findings.to_dicts() == plain.findings.to_dicts()
     assert retyped.is_valid == plain.is_valid
     assert laterite.validate(_mc_as_1dp(), fyi=True).is_valid == retyped.is_valid
+
+
+def test_native_only_not_through_compat():
+    """O-59: the drop-in withholds this one FYI and nothing else."""
+    import io
+
+    from laterite import compat as AGS4
+
+    # The repro plus a drifted ABBR description, so a Rule 16 FYI rides along
+    # to show the filter is this label alone, not the FYI tier.
+    drifted = _mc_as_1dp().replace(b"Small disturbed sample", b"Small bag")
+    assert _fyi8(laterite.validate(drifted, fyi=True)) == [
+        "LNMC.LNMC_MC is declared 1DP; the 4.1.1 dictionary type is X."
+    ]
+    errors = AGS4.check_file(io.StringIO(drifted.decode()))
+    assert FYI8 not in errors
+    assert "FYI (Related to Rule 16)" in errors
