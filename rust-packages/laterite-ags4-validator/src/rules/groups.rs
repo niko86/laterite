@@ -109,6 +109,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
         }
         rule_16_fyi(parsed, dict, found);
         rule_16_fyi_nonstandard_abbr(parsed, dict, found);
+        rule_16_fyi_case_collision(parsed, found);
     }
 }
 
@@ -203,6 +204,14 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
         if dict.abbr_desc(hdng, code).is_some() {
             continue;
         }
+        // A non-standard code is often a standard one in the wrong case, which
+        // an importer keying ABBR case-insensitively treats as the same code, so
+        // name the standard spelling (O-43). Appended, never reworded: a code
+        // with no case variant keeps the exact message it always had.
+        let ending = match or_list(&dict.abbr_codes_ignoring_case(hdng, code)) {
+            Some(m) => format!("; did you mean {m}?"),
+            None => ".".to_string(),
+        };
         add_at(
             found,
             RULE_16_FYI,
@@ -210,7 +219,82 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
             "ABBR",
             format!(
                 "{hdng}: abbreviation {code:?} is declared in the ABBR group but is \
-                 not a recognised standard abbreviation for {hdng}."
+                 not a recognised standard abbreviation for {hdng}{ending}"
+            ),
+            Location::default(),
+            Severity::Fyi,
+        );
+    }
+}
+
+/// `"A"`, `"A" or "B"`, `"A", "B" or "C"`; `None` for no codes.
+fn or_list(codes: &[&str]) -> Option<String> {
+    let quoted: Vec<String> = codes.iter().map(|c| format!("{c:?}")).collect();
+    let (last, rest) = quoted.split_last()?;
+    Some(if rest.is_empty() {
+        last.clone()
+    } else {
+        format!("{} or {last}", rest.join(", "))
+    })
+}
+
+/// FYI emit: two or more of the file's own ABBR rows under one `ABBR_HDNG`
+/// whose codes are equal ignoring case but differ as written (`"Undisturbed"`
+/// and `"UNDISTURBED"`). Rule 16 looks codes up exactly, so each row defines
+/// its own spelling and no rule fires; but an importer that keys ABBR
+/// case-insensitively sees a duplicate key and rejects the file, and the spec
+/// itself calls the ABBR list not case sensitive and asks for consistent use.
+/// One finding per heading and folded code, on the line of its first row,
+/// naming every spelling in file order.
+///
+/// Fires whatever the codes' standard status, even when every spelling is
+/// standard: the standard list carries case-only pairs of its own, and the
+/// importer risk is the same. Only the file's ABBR rows are compared; the
+/// standard list is never checked against itself. laterite-originated, see
+/// OBSERVATIONS O-58.
+fn rule_16_fyi_case_collision(parsed: &ParsedFile, found: &mut Findings) {
+    let Some(abbr) = parsed.groups.get("ABBR") else {
+        return;
+    };
+    let (Some(hi), Some(ci)) = (col(abbr, "ABBR_HDNG"), col(abbr, "ABBR_CODE")) else {
+        return; // malformed ABBR — main Rule 16 / Rule 9 report it
+    };
+    // Grouped by (heading, folded code), but emitted in the order each group
+    // first appears so the findings follow the file.
+    let mut order: Vec<(&str, String)> = Vec::new();
+    let mut spellings: BTreeMap<(&str, String), (u32, Vec<&str>)> = BTreeMap::new();
+    for row in &abbr.rows {
+        let hdng = abbr.value_at(row, hi).unwrap_or("");
+        let code = abbr.value_at(row, ci).unwrap_or("");
+        if hdng.is_empty() || code.is_empty() {
+            continue;
+        }
+        let key = (hdng, code.to_lowercase());
+        let entry = spellings.entry(key.clone()).or_insert_with(|| {
+            order.push(key);
+            (row.line, Vec::new())
+        });
+        // An exact repeat is one spelling, not a case collision.
+        if !entry.1.contains(&code) {
+            entry.1.push(code);
+        }
+    }
+    for key in order {
+        let (line, codes) = &spellings[&key];
+        let quoted: Vec<String> = codes.iter().map(|c| format!("{c:?}")).collect();
+        let Some((last, rest)) = quoted.split_last().filter(|(_, rest)| !rest.is_empty()) else {
+            continue; // one spelling: nothing collides
+        };
+        add_at(
+            found,
+            RULE_16_FYI,
+            Some(*line),
+            "ABBR",
+            format!(
+                "{}: codes {} and {last} differ only by letter case; some importers \
+                 treat them as the same code.",
+                key.0,
+                rest.join(", ")
             ),
             Location::default(),
             Severity::Fyi,
@@ -895,6 +979,157 @@ mod tests {
         // Default opts (include_fyi = false) → the FYI never fires.
         let f = run(&abbr_fixture("SAMP_TYPE", "ZZ"));
         assert!(!f.contains_key(RULE_16_FYI));
+    }
+
+    /// `abbr_fixture` with one ABBR row per `(heading, code)`.
+    fn abbr_rows_fixture(rows: &[(&str, &str)]) -> String {
+        use std::fmt::Write as _;
+        let mut s = abbr_fixture(rows[0].0, rows[0].1);
+        for (h, c) in &rows[1..] {
+            write!(s, "\"DATA\",{h:?},{c:?},\"Self-declared\"\r\n").expect("String write");
+        }
+        s
+    }
+
+    /// The Rule 16 FYIs for `src` under 4.1.1, the edition whose standard
+    /// carries the `PTST_TYPE` "CONSTANT HEAD" / "Constant Head" pair. The
+    /// description-drift FYI is left out: the fixture's placeholder
+    /// description trips it on every standard code, and it is not under test.
+    fn rule_16_fyis(src: &str) -> Vec<String> {
+        let pf = parse_str(src).expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(DictVersion::V4_1_1),
+            &CheckOptions {
+                include_fyi: true,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        f.get(RULE_16_FYI)
+            .map(|v| {
+                v.iter()
+                    .map(|x| x.desc.clone())
+                    .filter(|d| !d.contains("Description of abbreviation"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn nonstandard_fyi(hdng: &str, code: &str, ending: &str) -> String {
+        format!(
+            "{hdng}: abbreviation {code:?} is declared in the ABBR group but is \
+             not a recognised standard abbreviation for {hdng}{ending}"
+        )
+    }
+
+    #[test]
+    fn rule_16_fyi_nonstandard_names_the_standard_case_variant() {
+        assert_eq!(
+            rule_16_fyis(&abbr_fixture("TRIG_COND", "Undisturbed")),
+            vec![nonstandard_fyi(
+                "TRIG_COND",
+                "Undisturbed",
+                "; did you mean \"UNDISTURBED\"?"
+            )]
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_nonstandard_lists_every_standard_case_variant() {
+        assert_eq!(
+            rule_16_fyis(&abbr_fixture("PTST_TYPE", "constant head")),
+            vec![nonstandard_fyi(
+                "PTST_TYPE",
+                "constant head",
+                "; did you mean \"CONSTANT HEAD\" or \"Constant Head\"?"
+            )]
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_nonstandard_without_a_case_variant_is_unchanged() {
+        assert_eq!(
+            rule_16_fyis(&abbr_fixture("SAMP_TYPE", "ZZ")),
+            vec![nonstandard_fyi("SAMP_TYPE", "ZZ", ".")]
+        );
+    }
+
+    #[test]
+    fn or_list_joins_with_commas_and_a_final_or() {
+        assert_eq!(or_list(&[]), None);
+        assert_eq!(or_list(&["A"]).as_deref(), Some("\"A\""));
+        assert_eq!(
+            or_list(&["A", "B", "C"]).as_deref(),
+            Some("\"A\", \"B\" or \"C\"")
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_case_collision_names_every_spelling() {
+        let fyis = rule_16_fyis(&abbr_rows_fixture(&[
+            ("TRIG_COND", "Undisturbed"),
+            ("TRIG_COND", "UNDISTURBED"),
+        ]));
+        assert!(
+            fyis.contains(
+                &"TRIG_COND: codes \"Undisturbed\" and \"UNDISTURBED\" differ only by \
+                  letter case; some importers treat them as the same code."
+                    .to_string()
+            ),
+            "{fyis:?}"
+        );
+        // The non-standard spelling still gets its O-43 FYI, with the hint.
+        assert!(fyis.contains(&nonstandard_fyi(
+            "TRIG_COND",
+            "Undisturbed",
+            "; did you mean \"UNDISTURBED\"?"
+        )));
+        assert_eq!(fyis.len(), 2, "{fyis:?}");
+    }
+
+    #[test]
+    fn rule_16_fyi_case_collision_fires_when_both_spellings_are_standard() {
+        assert_eq!(
+            rule_16_fyis(&abbr_rows_fixture(&[
+                ("PTST_TYPE", "CONSTANT HEAD"),
+                ("PTST_TYPE", "Constant Head"),
+            ])),
+            vec![
+                "PTST_TYPE: codes \"CONSTANT HEAD\" and \"Constant Head\" differ only \
+                 by letter case; some importers treat them as the same code."
+                    .to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_case_collision_scope() {
+        // Three spellings → one finding listing all three; an exact repeat is
+        // one spelling; the same code under another heading does not collide.
+        assert_eq!(
+            rule_16_fyis(&abbr_rows_fixture(&[
+                ("XXXX_TYPE", "ab"),
+                ("XXXX_TYPE", "AB"),
+                ("XXXX_TYPE", "ab"),
+                ("XXXX_TYPE", "Ab"),
+                ("YYYY_TYPE", "AB"),
+                ("YYYY_TYPE", "cd"),
+                ("YYYY_TYPE", "cd"),
+            ])),
+            vec![
+                "XXXX_TYPE: codes \"ab\", \"AB\" and \"Ab\" differ only by letter case; \
+                 some importers treat them as the same code."
+                    .to_string()
+            ]
+        );
+        // FYI-only: off by default.
+        let off = run(&abbr_rows_fixture(&[
+            ("TRIG_COND", "Undisturbed"),
+            ("TRIG_COND", "UNDISTURBED"),
+        ]));
+        assert!(!off.contains_key(RULE_16_FYI));
     }
 
     #[test]

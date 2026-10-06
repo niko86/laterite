@@ -359,7 +359,7 @@
       "observations": [
         {
           "id": "O-43",
-          "note": "laterite adds an FYI when a PA value is self-declared in the ABBR group but is not a standard abbreviation for its heading (a typo or invented code); python-ags4 has no equivalent check."
+          "note": "laterite adds an FYI when a PA value is self-declared in the ABBR group but is not a standard abbreviation for its heading (a typo or invented code), and names the standard code when one matches it ignoring case; python-ags4 has no equivalent check."
         },
         {
           "id": "O-54",
@@ -368,6 +368,10 @@
         {
           "id": "O-57",
           "note": "When a PA value fails only because of whitespace around a defined code, laterite adds an FYI naming the code it matches once trimmed; the Rule 16 finding itself is unchanged. python-ags4 has no equivalent check."
+        },
+        {
+          "id": "O-58",
+          "note": "When your ABBR group declares codes under one heading that differ only by letter case (\"Undisturbed\" and \"UNDISTURBED\"), laterite adds an FYI naming them: some importers treat them as the same code and reject the file. python-ags4 has no equivalent check."
         }
       ]
     },

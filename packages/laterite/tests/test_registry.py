@@ -156,7 +156,9 @@ def test_every_listed_abbreviation_is_accepted_by_the_o43_fyi(edition: str) -> N
     # The API and the validator must share one data source: declaring every
     # listed code in ABBR raises no "not a recognised standard abbreviation"
     # FYI (O-43) — and no description-drift FYI either, since each row carries
-    # the standard description for this edition.
+    # the standard description for this edition. The case-collision FYI (O-58)
+    # is left out: it judges the file's rows against each other, not against
+    # the standard, and rightly fires on the standard's own case-only pairs.
     import laterite
 
     def q(v: str) -> str:
@@ -180,7 +182,7 @@ def test_every_listed_abbreviation_is_accepted_by_the_o43_fyi(edition: str) -> N
         for rule, items in rep.by_rule().items()
         if "Rule 16" in rule
         for f in items
-        if f.get("severity") == "fyi"
+        if f.get("severity") == "fyi" and "differ only by letter case" not in f["desc"]
     ]
     assert fyi16 == []
 

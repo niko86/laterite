@@ -157,7 +157,9 @@ Out: the `dict` module (`Dictionary`, and the closed edition enum itself —
 re-list; see [[edition-resolution]]; and the serialisable per-edition views the
 PyO3 and Node `registry` accessors share, `dictionary_dto` for groups and headings and
 `abbreviations_dto` for the ABBR picklists, the latter reading the same masked table
-the Rule 16 FYIs judge a file against), the `catalogue` module (`RULE_LABELS`,
+the Rule 16 FYIs judge a file against; beside the exact `abbr_desc`/`abbr_codes`
+lookups, `abbr_codes_ignoring_case` returns every standard spelling of a code
+ignoring case, which the [[O-43]] hint names), the `catalogue` module (`RULE_LABELS`,
 `rule_metadata_json()`), the `union` module (the AGS4 parent/child
 registry — `union_groups`, `ancestor_chain`, `inherited_key_names`), and the
 `keychain` module (`key_heading_names`, the content-addressed `_id`/
