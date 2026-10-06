@@ -13,7 +13,11 @@
     "changed": [],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**`laterite.registry.dictionary` is listed in the module's `__all__`.** The accessor was public but missing from `__all__`, so `from laterite.registry import *` skipped it and the API reference, which follows `__all__`, did not render it beside its new sibling `abbreviations`."
+      }
+    ],
     "security": []
   },
   "releases": [
