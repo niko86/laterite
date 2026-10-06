@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from . import _laterite_native as _native
 
@@ -206,6 +206,49 @@ def dictionary(edition: Edition | None = None) -> dict[str, Any]:
     return json.loads(_native.registry_dictionary_json(edition))
 
 
+@overload
+def abbreviations(
+    edition: Edition | None = None, *, shape: Literal["flat"] = "flat"
+) -> list[dict[str, str]]: ...
+@overload
+def abbreviations(
+    edition: Edition | None = None, *, shape: Literal["nested"]
+) -> dict[str, list[dict[str, str]]]: ...
+def abbreviations(
+    edition: Edition | None = None, *, shape: Literal["flat", "nested"] = "flat"
+) -> list[dict[str, str]] | dict[str, list[dict[str, str]]]:
+    """The bundled STANDARD abbreviation list for one AGS **edition** — the
+    picklist codes the standard defines for each ``PA`` heading.
+
+    The counterpart of :func:`dictionary` for abbreviations, and the same data
+    the validator's Rule 16 FYIs judge an ABBR group against: a code listed here
+    is one those FYIs accept as standard. Only codes that edition carries are
+    returned, each with that edition's description. Codes are exactly as
+    bundled — the standard has case-only pairs (``PTST_TYPE`` ``"CONSTANT
+    HEAD"`` and ``"Constant Head"``), and both are returned. Node's
+    ``registry.abbreviations()`` renders the same content, built from one shared
+    Rust builder (``dict::abbreviations_dto``).
+
+    The shape is, for ``shape="flat"`` (the default), ``[{heading, code,
+    description}]`` ordered by heading then code; for ``shape="nested"``,
+    ``{heading: [{code, description}]}`` with headings and each heading's codes
+    in that same order.
+
+    Args:
+        edition: One of ``"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"``. ``None``
+            (or ``"auto"``) uses the fallback edition.
+        shape: ``"flat"`` or ``"nested"``.
+
+    Returns:
+        The abbreviation list in the requested shape.
+
+    Raises:
+        ValueError: If ``edition`` is not a recognised edition, or ``shape`` is
+            not ``"flat"`` or ``"nested"``.
+    """
+    return json.loads(_native.registry_abbreviations_json(edition, shape))
+
+
 def ancestor_chain(code: str) -> list[str]:
     """Parent chain from ``code`` to root: ``[code, parent, ..., root]``.
 
@@ -244,6 +287,7 @@ __all__ = [
     "GroupDescriptor",
     "Heading",
     "HeadingStatus",
+    "abbreviations",
     "ancestor_chain",
     "child_groups",
     "get",

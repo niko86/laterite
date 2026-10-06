@@ -389,6 +389,19 @@ impl BundledDict {
         pick(ABBRS.get(key)?, self.bit).copied()
     }
 
+    /// Every standard abbreviation in this edition as `(heading, code, desc)`,
+    /// in `phf` order. Masked like every other read of the shared tables, so a
+    /// code only another edition carries never appears, and `desc` is THIS
+    /// edition's variant (build.rs already folded any per-edition override in).
+    fn abbr_entries(self) -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
+        let bit = self.bit;
+        ABBRS.entries().filter_map(move |(k, variants)| {
+            let desc = pick(variants, bit)?;
+            let (heading, code) = k.split_once('\u{1f}')?;
+            Some((heading, code, *desc))
+        })
+    }
+
     fn tran_ags(self) -> &'static str {
         TRAN_AGS[self.version.index()]
     }
@@ -718,6 +731,116 @@ pub fn dictionary_dto(version: DictVersion) -> DictionaryDto {
     }
 }
 
+// --- Serialisable abbreviation list (the `abbreviations(edition)` accessor) ---
+// The standard ABBR picklists of one edition, for PyO3 and Node to render from
+// this ONE builder — the same reason `dictionary_dto` is shared (#294 F#6). It
+// reads the masked table the Rule 16 FYIs read (`abbr_desc`/`abbr_codes`), so
+// the list a caller is handed and the set the validator accepts cannot differ.
+
+/// One standard abbreviation in the flat shape.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct AbbreviationDto {
+    pub heading: String,
+    pub code: String,
+    pub description: String,
+}
+
+/// One standard abbreviation under its heading, in the nested shape.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct AbbreviationCodeDto {
+    pub code: String,
+    pub description: String,
+}
+
+/// How [`abbreviations_dto`] lays the list out. A closed set so every surface
+/// accepts the same spellings and refuses the rest with the same message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbbreviationShape {
+    /// `[{heading, code, description}, …]`.
+    Flat,
+    /// `{heading: [{code, description}, …]}`.
+    Nested,
+}
+
+impl AbbreviationShape {
+    /// Every shape, default first.
+    pub const ALL: [AbbreviationShape; 2] = [AbbreviationShape::Flat, AbbreviationShape::Nested];
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AbbreviationShape::Flat => "flat",
+            AbbreviationShape::Nested => "nested",
+        }
+    }
+
+    /// Parse a caller's shape label. `None` is the default (`flat`). Exact
+    /// match only: a shape is an API token, not user prose to be forgiving of.
+    ///
+    /// # Errors
+    /// The caller-facing message naming the accepted values, for each host to
+    /// wrap in its own error type.
+    pub fn from_label(label: Option<&str>) -> Result<AbbreviationShape, String> {
+        let Some(label) = label else {
+            return Ok(AbbreviationShape::Flat);
+        };
+        Self::ALL
+            .into_iter()
+            .find(|s| s.as_str() == label)
+            .ok_or_else(|| {
+                let accepted: Vec<&str> = Self::ALL.iter().map(|s| s.as_str()).collect();
+                format!("unknown shape {label:?}; expected {}", accepted.join("|"))
+            })
+    }
+}
+
+/// The serialisable abbreviation list in the caller's chosen shape. Untagged,
+/// so each variant serialises as the bare list / map.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(untagged)]
+pub enum AbbreviationsDto {
+    Flat(Vec<AbbreviationDto>),
+    /// A `BTreeMap` so the heading order is deterministic without depending on
+    /// a JSON library's key-order feature.
+    Nested(std::collections::BTreeMap<String, Vec<AbbreviationCodeDto>>),
+}
+
+/// Build the standard abbreviation list of one bundled edition: only the codes
+/// that edition carries, each with that edition's description, sorted by
+/// heading then code (byte order). Codes are kept exactly as bundled — the
+/// standard has case-only pairs (`PTST_TYPE` "CONSTANT HEAD" / "Constant
+/// Head") and both are real entries, so nothing is folded or deduplicated.
+#[must_use]
+pub fn abbreviations_dto(version: DictVersion, shape: AbbreviationShape) -> AbbreviationsDto {
+    let mut rows: Vec<(&str, &str, &str)> = BundledDict::bundled(version).abbr_entries().collect();
+    rows.sort_unstable_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    match shape {
+        AbbreviationShape::Flat => AbbreviationsDto::Flat(
+            rows.into_iter()
+                .map(|(heading, code, desc)| AbbreviationDto {
+                    heading: heading.to_string(),
+                    code: code.to_string(),
+                    description: desc.to_string(),
+                })
+                .collect(),
+        ),
+        AbbreviationShape::Nested => {
+            let mut by_heading: std::collections::BTreeMap<String, Vec<AbbreviationCodeDto>> =
+                std::collections::BTreeMap::new();
+            for (heading, code, desc) in rows {
+                by_heading
+                    .entry(heading.to_string())
+                    .or_default()
+                    .push(AbbreviationCodeDto {
+                        code: code.to_string(),
+                        description: desc.to_string(),
+                    });
+            }
+            AbbreviationsDto::Nested(by_heading)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -991,5 +1114,113 @@ mod tests {
                 .any(|h| h.unit.as_deref().is_some_and(|u| !u.is_empty())),
             "no LOCA heading kept its unit"
         );
+    }
+
+    fn flat(version: DictVersion) -> Vec<AbbreviationDto> {
+        match abbreviations_dto(version, AbbreviationShape::Flat) {
+            AbbreviationsDto::Flat(rows) => rows,
+            AbbreviationsDto::Nested(_) => panic!("asked for flat"),
+        }
+    }
+
+    fn desc_of<'r>(rows: &'r [AbbreviationDto], heading: &str, code: &str) -> Option<&'r str> {
+        rows.iter()
+            .find(|r| r.heading == heading && r.code == code)
+            .map(|r| r.description.as_str())
+    }
+
+    #[test]
+    fn abbreviations_agree_with_the_lookup_the_validator_uses() {
+        // Every listed code must resolve through `abbr_desc` to the SAME text —
+        // the Rule 16 FYIs judge a file against that lookup, so a row it would
+        // not resolve is a row the API promises and the validator refuses.
+        for &v in DictVersion::ALL {
+            let d = Dictionary::bundled(v);
+            let rows = flat(v);
+            assert!(!rows.is_empty(), "{v:?}: empty abbreviation list");
+            for r in &rows {
+                assert_eq!(
+                    d.abbr_desc(&r.heading, &r.code),
+                    Some(r.description.as_str()),
+                    "{v:?}: {}/{}",
+                    r.heading,
+                    r.code
+                );
+            }
+            // ...and nothing the lookup holds is missing from the list.
+            let picklist_total: usize = rows
+                .iter()
+                .map(|r| r.heading.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .map(|h| d.abbr_codes(h).len())
+                .sum();
+            assert_eq!(picklist_total, rows.len(), "{v:?}");
+        }
+    }
+
+    #[test]
+    fn abbreviations_are_sorted_and_keep_case_only_pairs() {
+        let rows = flat(DictVersion::V4_1_1);
+        let keys: Vec<(&str, &str)> = rows
+            .iter()
+            .map(|r| (r.heading.as_str(), r.code.as_str()))
+            .collect();
+        let mut sorted = keys.clone();
+        sorted.sort_unstable();
+        assert_eq!(keys, sorted, "not ordered by heading then code");
+        // A case-only pair in the standard data: both are real entries.
+        assert!(desc_of(&rows, "PTST_TYPE", "CONSTANT HEAD").is_some());
+        assert!(desc_of(&rows, "PTST_TYPE", "Constant Head").is_some());
+    }
+
+    #[test]
+    fn abbreviations_are_masked_per_edition() {
+        // CBRP_END "BASE" is bundled for 4.2 only.
+        assert!(desc_of(&flat(DictVersion::V4_2), "CBRP_END", "BASE").is_some());
+        assert!(desc_of(&flat(DictVersion::V4_1_1), "CBRP_END", "BASE").is_none());
+        // A per-edition description override: 4.1/4.1.1 spell this lower-case.
+        assert_eq!(
+            desc_of(&flat(DictVersion::V4_1_1), "ELRG_CODE", "100-75-4"),
+            Some("n-nitrosopiperidine")
+        );
+        assert_eq!(
+            desc_of(&flat(DictVersion::V4_2), "ELRG_CODE", "100-75-4"),
+            Some("n-Nitrosopiperidine")
+        );
+    }
+
+    #[test]
+    fn nested_abbreviations_regroup_the_flat_list() {
+        let rows = flat(DictVersion::V4_2);
+        let AbbreviationsDto::Nested(nested) =
+            abbreviations_dto(DictVersion::V4_2, AbbreviationShape::Nested)
+        else {
+            panic!("asked for nested");
+        };
+        let back: Vec<AbbreviationDto> = nested
+            .into_iter()
+            .flat_map(|(heading, codes)| {
+                codes.into_iter().map(move |c| AbbreviationDto {
+                    heading: heading.clone(),
+                    code: c.code,
+                    description: c.description,
+                })
+            })
+            .collect();
+        assert_eq!(back, rows);
+    }
+
+    #[test]
+    fn abbreviation_shape_labels() {
+        assert_eq!(
+            AbbreviationShape::from_label(None),
+            Ok(AbbreviationShape::Flat)
+        );
+        for s in AbbreviationShape::ALL {
+            assert_eq!(AbbreviationShape::from_label(Some(s.as_str())), Ok(s));
+        }
+        let err = AbbreviationShape::from_label(Some("Flat")).unwrap_err();
+        assert!(err.contains("flat|nested"), "{err}");
     }
 }

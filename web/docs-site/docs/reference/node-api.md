@@ -37,6 +37,21 @@ and takes `dictVersion` / `units` / `types` / `out` only; passing `mode`,
 choosing to ship unchecked bytes: see the
 [three-doors comparison](../learn/produce.md#three-write-doors-one-honest-difference).
 
+## `registry`
+
+The read-only AGS dictionary, as a namespace: `import { registry } from "laterite"`.
+
+| Member                                                         | Returns                                                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GROUPS`                                                       | every standard group across the bundled editions, by code     |
+| `get(code)` · `childGroups(code)`                              | a `GroupDescriptor` · its direct children                     |
+| `ancestorChain(code)` · `inheritedKeyNames(code)`              | the parent chain to the root · the KEYs taken from the parent |
+| `dictionary(edition?)`                                         | `DictionarySnapshot`: one edition's standard groups and headings |
+| `abbreviations(edition?, { shape? })`                          | `Abbreviation[]`: one edition's standard abbreviations as `{heading, code, description}` rows, ordered by heading then code. With `shape: "nested"`, a `Record<string, AbbreviationCode[]>` keyed by heading |
+
+`edition` takes the same edition labels as `dictVersion`; omit it, or pass
+`"auto"`, for the fallback edition. An unknown edition or shape throws.
+
 ## `Ags4File`
 
 Returned by `read()`. The read handle is **fluent**: the

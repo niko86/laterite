@@ -8,6 +8,7 @@
  */
 import { Ags4Error } from "./errors";
 import {
+  registryAbbreviationsJson,
   registryAncestorChain,
   registryDictionaryJson,
   registryInheritedKeyNames,
@@ -116,6 +117,59 @@ export interface DictionarySnapshot {
  */
 export function dictionary(edition?: string): DictionarySnapshot {
   return JSON.parse(registryDictionaryJson(edition)) as DictionarySnapshot;
+}
+
+/** One standard abbreviation in the flat {@link abbreviations} shape. */
+export interface Abbreviation {
+  heading: string;
+  code: string;
+  description: string;
+}
+/** One standard abbreviation under its heading, in the nested shape. */
+export interface AbbreviationCode {
+  code: string;
+  description: string;
+}
+/** The layout {@link abbreviations} returns: a flat list, or keyed by heading. */
+export type AbbreviationShape = "flat" | "nested";
+
+/**
+ * The bundled STANDARD abbreviation list for one AGS `edition` — the picklist
+ * codes the standard defines for each `PA` heading. The counterpart of
+ * {@link dictionary} for abbreviations, and the same data the validator's
+ * Rule 16 FYIs judge an ABBR group against. Only codes that edition carries
+ * are returned, each with that edition's description; codes are exactly as
+ * bundled, so case-only pairs (`PTST_TYPE` `"CONSTANT HEAD"` / `"Constant
+ * Head"`) both appear. The same content `laterite.registry.abbreviations()`
+ * renders, from one shared Rust builder.
+ *
+ * `shape: "flat"` (the default) is `[{heading, code, description}]` ordered by
+ * heading then code; `shape: "nested"` is `{heading: [{code, description}]}`
+ * in that same order.
+ *
+ * @param edition `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"`; omit (or
+ *   `"auto"`) for the fallback edition.
+ * @param opts.shape `"flat"` (default) or `"nested"`.
+ * @throws {Error} if `edition` or `shape` is not recognised.
+ */
+export function abbreviations(
+  edition?: string,
+  opts?: { shape?: "flat" },
+): Abbreviation[];
+export function abbreviations(
+  edition: string | undefined,
+  opts: { shape: "nested" },
+): Record<string, AbbreviationCode[]>;
+export function abbreviations(
+  edition?: string,
+  opts?: { shape?: AbbreviationShape },
+): Abbreviation[] | Record<string, AbbreviationCode[]>;
+export function abbreviations(
+  edition?: string,
+  opts?: { shape?: AbbreviationShape },
+): Abbreviation[] | Record<string, AbbreviationCode[]> {
+  return JSON.parse(registryAbbreviationsJson(edition, opts?.shape)) as
+    Abbreviation[] | Record<string, AbbreviationCode[]>;
 }
 
 /** Every direct child group of `parentCode`, alphabetically. */

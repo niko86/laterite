@@ -90,6 +90,101 @@ def test_dictionary_rejects_unknown_edition() -> None:
         latreg.dictionary("9.9")
 
 
+def test_abbreviations_flat_shape() -> None:
+    rows = latreg.abbreviations("4.1.1")
+    assert isinstance(rows, list) and rows
+    assert all(set(r) == {"heading", "code", "description"} for r in rows)
+    keys = [(r["heading"], r["code"]) for r in rows]
+    assert keys == sorted(keys), "not ordered by heading then code"
+    # The default shape is flat, and None/"auto" resolve like dictionary().
+    assert latreg.abbreviations("4.1.1", shape="flat") == rows
+    assert latreg.abbreviations() == latreg.abbreviations("auto")
+
+
+def test_abbreviations_nested_round_trips_to_flat() -> None:
+    flat = latreg.abbreviations("4.1.1")
+    nested = latreg.abbreviations("4.1.1", shape="nested")
+    assert isinstance(nested, dict)
+    back = [
+        {"heading": h, "code": c["code"], "description": c["description"]}
+        for h, codes in nested.items()
+        for c in codes
+    ]
+    assert back == flat
+
+
+def _desc(edition: str, heading: str, code: str) -> str | None:
+    return next(
+        (
+            r["description"]
+            for r in latreg.abbreviations(edition)
+            if r["heading"] == heading and r["code"] == code
+        ),
+        None,
+    )
+
+
+def test_abbreviations_are_per_edition() -> None:
+    # CBRP_END "BASE" is bundled for 4.2 only.
+    assert _desc("4.2", "CBRP_END", "BASE") is not None
+    assert _desc("4.1.1", "CBRP_END", "BASE") is None
+    # A per-edition description override: 4.1.1 spells this lower-case.
+    assert _desc("4.1.1", "ELRG_CODE", "100-75-4") == "n-nitrosopiperidine"
+    assert _desc("4.2", "ELRG_CODE", "100-75-4") == "n-Nitrosopiperidine"
+
+
+def test_abbreviations_keep_case_only_pairs() -> None:
+    codes = {
+        r["code"] for r in latreg.abbreviations("4.1.1") if r["heading"] == "PTST_TYPE"
+    }
+    assert {"CONSTANT HEAD", "Constant Head"} <= codes
+
+
+def test_abbreviations_reject_bad_edition_and_shape() -> None:
+    # The same error type dictionary() raises for the same edition.
+    with pytest.raises(ValueError, match="unknown edition"):
+        latreg.dictionary("9.9")
+    with pytest.raises(ValueError, match="unknown edition"):
+        latreg.abbreviations("9.9")
+    for bad in ("Flat", "tree", None, 1):
+        with pytest.raises(ValueError, match="flat\\|nested"):
+            latreg.abbreviations("4.2", shape=bad)  # type: ignore[call-overload]
+
+
+@pytest.mark.parametrize("edition", json.loads(_CORE_DICT.read_text())["editions"])
+def test_every_listed_abbreviation_is_accepted_by_the_o43_fyi(edition: str) -> None:
+    # The API and the validator must share one data source: declaring every
+    # listed code in ABBR raises no "not a recognised standard abbreviation"
+    # FYI (O-43) — and no description-drift FYI either, since each row carries
+    # the standard description for this edition.
+    import laterite
+
+    def q(v: str) -> str:
+        return '"' + v.replace('"', '""') + '"'
+
+    lines = [
+        '"GROUP","ABBR"',
+        '"HEADING","ABBR_HDNG","ABBR_CODE","ABBR_DESC"',
+        '"UNIT","","",""',
+        '"TYPE","X","X","X"',
+    ]
+    lines += [
+        f'"DATA",{q(r["heading"])},{q(r["code"])},{q(r["description"])}'
+        for r in latreg.abbreviations(edition)
+    ]
+    rep = laterite.validate(
+        text="\r\n".join(lines) + "\r\n", fyi=True, dict_version=edition
+    )
+    fyi16 = [
+        f
+        for rule, items in rep.by_rule().items()
+        if "Rule 16" in rule
+        for f in items
+        if f.get("severity") == "fyi"
+    ]
+    assert fyi16 == []
+
+
 def test_group_descriptor_shape() -> None:
     proj = latreg.GROUPS["PROJ"]
     assert isinstance(proj, latreg.GroupDescriptor)

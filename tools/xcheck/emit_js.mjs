@@ -69,6 +69,21 @@ async function runNode(cases, repoRoot) {
         return { err: (e?.name ?? "Error").replace(/Error$/, "") };
       }
     }
+    if (op === "registry_abbreviations") {
+      // Only the knobs the case sets are passed, so an absent one exercises
+      // this surface's own default rather than one restated here.
+      const shape = aCase.input?.shape;
+      try {
+        return {
+          ok: mod.registry.abbreviations(
+            aCase.input?.edition ?? undefined,
+            shape == null ? undefined : { shape },
+          ),
+        };
+      } catch (e) {
+        return { err: (e?.name ?? "Error").replace(/Error$/, "") };
+      }
+    }
     return null;
   };
   return collect("node", mod.engineFingerprint(), cases, observe);

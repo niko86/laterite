@@ -168,6 +168,29 @@ fn build_unchecked_typed(groups: &[BuildGroup]) -> Observation {
     }
 }
 
+/// The standard abbreviation list, straight from the shared reference builder
+/// both bindings render (#1014). A data accessor rather than an emit door, but
+/// it has the failure this gate exists for: two surfaces that each parse a JSON
+/// string and could each drift in what they hand back.
+fn registry_abbreviations(edition: Option<&str>, shape: Option<&str>) -> Observation {
+    use laterite_ags4_validator::dict::{AbbreviationShape, FALLBACK, abbreviations_dto};
+    let version = match edition {
+        None | Some("auto") => FALLBACK,
+        Some(e) => match laterite_ags4_validator::DictVersion::from_edition(e) {
+            Some(v) => v,
+            None => return Observation::Err(format!("unknown edition {e:?}")),
+        },
+    };
+    let shape = match AbbreviationShape::from_label(shape) {
+        Ok(s) => s,
+        Err(e) => return Observation::Err(e),
+    };
+    match serde_json::to_value(abbreviations_dto(version, shape)) {
+        Ok(v) => Observation::Ok(v),
+        Err(e) => Observation::Err(e.to_string()),
+    }
+}
+
 fn observe(case: &Case, repo_root: &std::path::Path) -> Option<Observation> {
     match case.op.as_str() {
         "reemit_canonical" => {
@@ -186,6 +209,10 @@ fn observe(case: &Case, repo_root: &std::path::Path) -> Option<Observation> {
             let groups = case.input.build.as_ref()?;
             Some(build_unchecked_typed(groups))
         }
+        "registry_abbreviations" => Some(registry_abbreviations(
+            case.input.edition.as_deref(),
+            case.input.shape.as_deref(),
+        )),
         // Unknown op: the leg records nothing; `xcheck --require-legs all` turns
         // a case the authority silently skipped into a hard failure, so a new op
         // cannot ship half-wired.

@@ -404,6 +404,16 @@ export declare function parseValue(raw: string | undefined | null, agsType: stri
 export declare function readGroupsRaw(path: string, recoverDuplicateHeadings?: boolean | undefined | null, truncateExcessFields?: boolean | undefined | null): string
 
 /**
+ * The bundled standard abbreviation list for `edition` as JSON, in the
+ * requested `shape` (`"flat"` default → `[{heading, code, description}]`,
+ * `"nested"` → `{heading: [{code, description}]}`), from the ONE shared
+ * `dict::abbreviations_dto` builder `laterite.registry.abbreviations()` also
+ * renders. `edition` resolves as `registry_dictionary_json`'s does; an
+ * unknown edition or shape throws. The TS `registry.abbreviations()` parses it.
+ */
+export declare function registryAbbreviationsJson(edition?: string | undefined | null, shape?: string | undefined | null): string
+
+/**
  * Parent chain from `code` up to the registry root — `[code, parent, …, root]`
  * (a root group returns `[code]`). Raises for an unknown code, so a root is
  * distinguishable from a miss.

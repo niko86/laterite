@@ -203,8 +203,9 @@
     ]
   },
   "xcheck_coverage": {
-    "note": "Which capabilities the cross-surface OUTPUT-VALUE gate (laterite-ags4-xcheck) holds, as an authored decision per row (#940). status: 'covered' rows name the case ops (cases/*.json is the case-list SSOT); 'excluded' rows carry the decided reason there is no byte agreement to compare; 'wanted' rows are uncovered with NO structural blocker recorded — honest backlog, not decisions. meta_ops holds the case ops that pin METADATA verbs (list_rules via rules_json) — the same class as wasm_exports' capability:null rows, outside the capability axis by construction. test_modality_parity.py reflects this table against the case manifest in both directions, so a verb cannot ship uncovered silently again (build_ags4_unchecked did, #882-#883 to #940).",
+    "note": "Which capabilities the cross-surface OUTPUT-VALUE gate (laterite-ags4-xcheck) holds, as an authored decision per row (#940). status: 'covered' rows name the case ops (cases/*.json is the case-list SSOT); 'excluded' rows carry the decided reason there is no byte agreement to compare; 'wanted' rows are uncovered with NO structural blocker recorded — honest backlog, not decisions. meta_ops holds the case ops that pin METADATA verbs (list_rules via rules_json, registry.abbreviations via registry_abbreviations) — the same class as wasm_exports' capability:null rows, outside the capability axis by construction. test_modality_parity.py reflects this table against the case manifest in both directions, so a verb cannot ship uncovered silently again (build_ags4_unchecked did, #882-#883 to #940).",
     "meta_ops": [
+      "registry_abbreviations",
       "rules_json"
     ],
     "rows": [

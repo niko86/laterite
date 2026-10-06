@@ -82,6 +82,37 @@ fn registry_dictionary_json(edition: Option<String>) -> PyResult<String> {
     Ok(serde_json::to_string(&dto).expect("dictionary serialises"))
 }
 
+/// The bundled standard abbreviation list for `edition`, serialised as JSON in
+/// the requested `shape` (`"flat"` → `[{heading, code, description}]`,
+/// `"nested"` → `{heading: [{code, description}]}`), from the ONE shared
+/// `dict::abbreviations_dto` builder Node's `registry.abbreviations()` also
+/// renders. `edition` resolves exactly as [`registry_dictionary_json`]'s does.
+/// Raises `ValueError` on an unknown edition or shape. `shape` is required here
+/// (the Python wrapper owns the `"flat"` default) and taken as any object, so
+/// `None` or a non-string is refused with the same `ValueError` as a misspelt
+/// shape rather than slipping through as the default or surfacing as a
+/// `TypeError` from argument extraction.
+#[pyfunction]
+#[pyo3(signature = (edition, shape))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn registry_abbreviations_json(
+    edition: Option<String>,
+    shape: &Bound<'_, PyAny>,
+) -> PyResult<String> {
+    use laterite_ags4_validator::dict::{AbbreviationShape, abbreviations_dto};
+    let version = crate::parse_dv(edition.as_deref())
+        .map_err(PyValueError::new_err)?
+        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    let label = match shape.extract::<String>() {
+        Ok(s) => s,
+        Err(_) => shape.repr()?.to_string(),
+    };
+    let shape = AbbreviationShape::from_label(Some(&label)).map_err(PyValueError::new_err)?;
+    let dto = abbreviations_dto(version, shape);
+    Ok(serde_json::to_string(&dto).expect("abbreviations serialise"))
+}
+
 /// What THIS SURFACE resolves an encoding label to — the canonical `encoding_rs`
 /// name (`"UTF-8"`, `"windows-1252"`, `"ISO-8859-15"`), or `None` if it refuses.
 ///
@@ -153,6 +184,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
     m.add_function(wrap_pyfunction!(registry_inherited_key_names, m)?)?;
     m.add_function(wrap_pyfunction!(registry_dictionary_json, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_abbreviations_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_editions, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_encoding_label, m)?)?;
     m.add_function(wrap_pyfunction!(registry_fallback_edition, m)?)?;
