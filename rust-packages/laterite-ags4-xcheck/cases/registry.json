@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "registry.abbreviations.default",
+      "op": "registry_abbreviations",
+      "input": {},
+      "legs": ["rust-leaf", "python", "node"],
+      "spec_ref": "`registry.abbreviations()` with no arguments: the fallback edition in the default (flat) shape. Each surface's own defaults are what is compared, so a surface that defaulted to a different edition or shape splits here (#1014)."
+    },
+    {
+      "id": "registry.abbreviations.4.1.1.flat",
+      "op": "registry_abbreviations",
+      "input": { "edition": "4.1.1", "shape": "flat" },
+      "legs": ["rust-leaf", "python", "node"],
+      "spec_ref": "The flat standard abbreviation list for 4.1.1 — `[{heading, code, description}]` ordered by heading then code, built by the shared `dict::abbreviations_dto`. Python and Node each parse that builder's JSON; this pins that what each hands back is the builder's value, row for row (#1014)."
+    },
+    {
+      "id": "registry.abbreviations.4.1.1.nested",
+      "op": "registry_abbreviations",
+      "input": { "edition": "4.1.1", "shape": "nested" },
+      "legs": ["rust-leaf", "python", "node"],
+      "spec_ref": "The nested shape — `{heading: [{code, description}]}` — of the same 4.1.1 list (#1014)."
+    },
+    {
+      "id": "registry.abbreviations.4.2.flat",
+      "op": "registry_abbreviations",
+      "input": { "edition": "4.2", "shape": "flat" },
+      "legs": ["rust-leaf", "python", "node"],
+      "spec_ref": "4.2 differs from 4.1.1 in which codes it carries and in some descriptions (per-edition overrides); the surfaces must agree on the 4.2 list too, not only on one edition (#1014)."
+    },
+    {
+      "id": "registry.abbreviations.4.0.3.nested",
+      "op": "registry_abbreviations",
+      "input": { "edition": "4.0.3", "shape": "nested" },
+      "legs": ["rust-leaf", "python", "node"],
+      "spec_ref": "The oldest bundled edition, nested (#1014)."
+    }
+  ]
+}

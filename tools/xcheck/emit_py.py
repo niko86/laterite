@@ -94,6 +94,15 @@ def observe_python(case: dict, repo_root: Path) -> dict | None:
             return build_unchecked_typed(build)
         except Exception as e:
             return {"err": type(e).__name__}
+    if op == "registry_abbreviations":
+        # Only the knobs the case sets are passed, so an absent one exercises
+        # this surface's own default rather than one restated here.
+        inp = case["input"]
+        kwargs = {"shape": inp["shape"]} if "shape" in inp else {}
+        try:
+            return {"ok": laterite.registry.abbreviations(inp.get("edition"), **kwargs)}
+        except Exception as e:
+            return {"err": type(e).__name__}
     return None
 
 

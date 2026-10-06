@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**`registry.abbreviations(edition)` — the standard abbreviation list, headless.** The bundled ABBR picklists were reachable only by validating a file with `fyi=True` and reading codes back out of finding text, which surfaced only the codes the file already held. `laterite.registry.abbreviations(edition=None, *, shape=\"flat\")` and Node's `registry.abbreviations(edition?, { shape? })` now return one edition's list: only the codes that edition carries, each with that edition's description, as `[{heading, code, description}]` ordered by heading then code, or with `shape=\"nested\"` as `{heading: [{code, description}]}`. Codes are exactly as bundled, so the standard's case-only pairs (`PTST_TYPE` \"CONSTANT HEAD\" and \"Constant Head\") both appear. `edition` resolves as `registry.dictionary()` resolves it, and an unknown edition or shape raises `ValueError` (throws on Node). Both surfaces render one shared builder in `laterite-ags4-reference` (`dict::abbreviations_dto`, beside `dictionary_dto`) that reads the same masked table the Rule 16 FYIs judge a file against, so every listed code is one the O-43 FYI accepts as standard; a new `registry_abbreviations` op holds the Python and Node output equal to that builder in the cross-surface value gate. (#1014)"
+      }
+    ],
     "changed": [],
     "deprecated": [],
     "removed": [],

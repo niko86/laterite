@@ -721,6 +721,7 @@ module.exports.missingTranModes = nativeBinding.missingTranModes
 module.exports.parseArrow = nativeBinding.parseArrow
 module.exports.parseValue = nativeBinding.parseValue
 module.exports.readGroupsRaw = nativeBinding.readGroupsRaw
+module.exports.registryAbbreviationsJson = nativeBinding.registryAbbreviationsJson
 module.exports.registryAncestorChain = nativeBinding.registryAncestorChain
 module.exports.registryDictionaryJson = nativeBinding.registryDictionaryJson
 module.exports.registryInheritedKeyNames = nativeBinding.registryInheritedKeyNames

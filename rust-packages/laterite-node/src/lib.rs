@@ -724,6 +724,27 @@ pub fn registry_dictionary_json(edition: Option<String>) -> Result<String> {
     serde_json::to_string(&dto).map_err(|e| Error::from_reason(e.to_string()))
 }
 
+/// The bundled standard abbreviation list for `edition` as JSON, in the
+/// requested `shape` (`"flat"` default → `[{heading, code, description}]`,
+/// `"nested"` → `{heading: [{code, description}]}`), from the ONE shared
+/// `dict::abbreviations_dto` builder `laterite.registry.abbreviations()` also
+/// renders. `edition` resolves as `registry_dictionary_json`'s does; an
+/// unknown edition or shape throws. The TS `registry.abbreviations()` parses it.
+#[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+pub fn registry_abbreviations_json(
+    edition: Option<String>,
+    shape: Option<String>,
+) -> Result<String> {
+    use laterite_ags4_validator::dict::{AbbreviationShape, abbreviations_dto};
+    let version = resolve_edition(edition.as_deref())
+        .map_err(Error::from_reason)?
+        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    let shape = AbbreviationShape::from_label(shape.as_deref()).map_err(Error::from_reason)?;
+    let dto = abbreviations_dto(version, shape);
+    serde_json::to_string(&dto).map_err(|e| Error::from_reason(e.to_string()))
+}
+
 /// Compare two AGS4 documents (raw `a` baseline / `b` revision bytes) — the
 /// revision diff, mirroring laterite-py's `diff()` and the wasm `diff()`.
 /// `dict_version` `None`/`"auto"` resolves the KEY-heading edition from the

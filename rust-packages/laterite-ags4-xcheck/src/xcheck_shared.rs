@@ -81,6 +81,14 @@ pub struct Input {
     /// file with different GROUPS, not merely different bytes.
     #[serde(default)]
     pub build_opts: Option<BuildOpts>,
+    /// The edition label for the `registry_abbreviations` op, spelt as every
+    /// surface accepts it (`"4.2"`, `"auto"`). Absent means the fallback.
+    #[serde(default)]
+    pub edition: Option<String>,
+    /// The shape label for the `registry_abbreviations` op (`"flat"` /
+    /// `"nested"`). Absent means each surface's default.
+    #[serde(default)]
+    pub shape: Option<String>,
 }
 
 /// The `build_typed` knobs, in the shared vocabulary every surface uses.

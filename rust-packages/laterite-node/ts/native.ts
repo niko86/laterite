@@ -19,6 +19,7 @@ export {
   fallbackEdition,
   resolveEncodingLabel,
   registryDictionaryJson,
+  registryAbbreviationsJson,
   registryAncestorChain,
   registryInheritedKeyNames,
   diff as nativeDiff,

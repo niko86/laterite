@@ -3,6 +3,49 @@ pub mod laterite_ags4_reference::catalogue
 pub const laterite_ags4_reference::catalogue::RULE_LABELS: &[&str]
 pub fn laterite_ags4_reference::catalogue::rule_metadata_json() -> &'static str
 pub mod laterite_ags4_reference::dict
+pub enum laterite_ags4_reference::dict::AbbreviationShape
+pub laterite_ags4_reference::dict::AbbreviationShape::Flat
+pub laterite_ags4_reference::dict::AbbreviationShape::Nested
+impl laterite_ags4_reference::dict::AbbreviationShape
+pub const laterite_ags4_reference::dict::AbbreviationShape::ALL: [laterite_ags4_reference::dict::AbbreviationShape; 2]
+pub fn laterite_ags4_reference::dict::AbbreviationShape::as_str(self) -> &'static str
+pub fn laterite_ags4_reference::dict::AbbreviationShape::from_label(core::option::Option<&str>) -> core::result::Result<laterite_ags4_reference::dict::AbbreviationShape, alloc::string::String>
+impl core::clone::Clone for laterite_ags4_reference::dict::AbbreviationShape
+pub fn laterite_ags4_reference::dict::AbbreviationShape::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::dict::AbbreviationShape
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::AbbreviationShape
+pub fn laterite_ags4_reference::dict::AbbreviationShape::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::AbbreviationShape
+pub fn laterite_ags4_reference::dict::AbbreviationShape::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::Freeze for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::Send for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::Sync for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::Unpin for laterite_ags4_reference::dict::AbbreviationShape
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::AbbreviationShape
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::AbbreviationShape
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::AbbreviationShape
+pub enum laterite_ags4_reference::dict::AbbreviationsDto
+pub laterite_ags4_reference::dict::AbbreviationsDto::Flat(alloc::vec::Vec<laterite_ags4_reference::dict::AbbreviationDto>)
+pub laterite_ags4_reference::dict::AbbreviationsDto::Nested(alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_reference::dict::AbbreviationCodeDto>>)
+impl core::clone::Clone for laterite_ags4_reference::dict::AbbreviationsDto
+pub fn laterite_ags4_reference::dict::AbbreviationsDto::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::AbbreviationsDto
+pub fn laterite_ags4_reference::dict::AbbreviationsDto::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::AbbreviationsDto
+pub fn laterite_ags4_reference::dict::AbbreviationsDto::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::AbbreviationsDto
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::AbbreviationsDto
+pub fn laterite_ags4_reference::dict::AbbreviationsDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::marker::Send for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::marker::Sync for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::AbbreviationsDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::AbbreviationsDto
 pub enum laterite_ags4_reference::dict::DictResolution
 pub laterite_ags4_reference::dict::DictResolution::ExactTranAgs
 pub laterite_ags4_reference::dict::DictResolution::Fallback
@@ -89,6 +132,47 @@ impl<'a> core::marker::Unpin for laterite_ags4_reference::dict::Dictionary<'a>
 impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::dict::Dictionary<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::Dictionary<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::Dictionary<'a>
+pub struct laterite_ags4_reference::dict::AbbreviationCodeDto
+pub laterite_ags4_reference::dict::AbbreviationCodeDto::code: alloc::string::String
+pub laterite_ags4_reference::dict::AbbreviationCodeDto::description: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::dict::AbbreviationCodeDto
+pub fn laterite_ags4_reference::dict::AbbreviationCodeDto::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::AbbreviationCodeDto
+pub fn laterite_ags4_reference::dict::AbbreviationCodeDto::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::AbbreviationCodeDto
+pub fn laterite_ags4_reference::dict::AbbreviationCodeDto::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::AbbreviationCodeDto
+pub fn laterite_ags4_reference::dict::AbbreviationCodeDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::marker::Send for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::marker::Sync for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::AbbreviationCodeDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::AbbreviationCodeDto
+pub struct laterite_ags4_reference::dict::AbbreviationDto
+pub laterite_ags4_reference::dict::AbbreviationDto::code: alloc::string::String
+pub laterite_ags4_reference::dict::AbbreviationDto::description: alloc::string::String
+pub laterite_ags4_reference::dict::AbbreviationDto::heading: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::dict::AbbreviationDto
+pub fn laterite_ags4_reference::dict::AbbreviationDto::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_reference::dict::AbbreviationDto
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::AbbreviationDto
+pub fn laterite_ags4_reference::dict::AbbreviationDto::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::AbbreviationDto
+pub fn laterite_ags4_reference::dict::AbbreviationDto::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::AbbreviationDto
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::AbbreviationDto
+pub fn laterite_ags4_reference::dict::AbbreviationDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::AbbreviationDto
+impl core::marker::Send for laterite_ags4_reference::dict::AbbreviationDto
+impl core::marker::Sync for laterite_ags4_reference::dict::AbbreviationDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::AbbreviationDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::AbbreviationDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::AbbreviationDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::AbbreviationDto
 pub struct laterite_ags4_reference::dict::BundledDict
 impl laterite_ags4_reference::dict::BundledDict
 pub fn laterite_ags4_reference::dict::BundledDict::bundled(laterite_ags4_reference::dict::DictVersion) -> Self
@@ -226,6 +310,7 @@ impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::dict::HeadingRef
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::HeadingRef<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::HeadingRef<'a>
 pub const laterite_ags4_reference::dict::FALLBACK: laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::abbreviations_dto(laterite_ags4_reference::dict::DictVersion, laterite_ags4_reference::dict::AbbreviationShape) -> laterite_ags4_reference::dict::AbbreviationsDto
 pub fn laterite_ags4_reference::dict::dictionary_dto(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::DictionaryDto
 pub fn laterite_ags4_reference::dict::heading_key(&str, &str) -> alloc::string::String
 pub mod laterite_ags4_reference::effective_dict

@@ -53,6 +53,62 @@ describe("registry.dictionary(edition) — the per-edition STANDARD dictionary (
   });
 });
 
+describe("registry.abbreviations(edition) — the per-edition standard abbreviation list (#1014)", () => {
+  const descOf = (edition: string, heading: string, code: string) =>
+    registry
+      .abbreviations(edition)
+      .find((r) => r.heading === heading && r.code === code)?.description;
+
+  it("flat rows carry exactly heading/code/description, ordered by heading then code", () => {
+    const rows = registry.abbreviations("4.1.1");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows)
+      expect(Object.keys(r).sort()).toEqual(["code", "description", "heading"]);
+    // Plain `<` (code-unit order), not localeCompare: the Rust builder sorts by
+    // byte, and a locale collation would fold the case-only pairs together.
+    const cmp = (
+      a: { heading: string; code: string },
+      b: { heading: string; code: string },
+    ) =>
+      a.heading === b.heading
+        ? Number(a.code > b.code) - Number(a.code < b.code)
+        : Number(a.heading > b.heading) - Number(a.heading < b.heading);
+    expect(rows).toEqual([...rows].sort(cmp));
+    expect(registry.abbreviations("4.1.1", { shape: "flat" })).toEqual(rows);
+    expect(registry.abbreviations()).toEqual(registry.abbreviations("auto"));
+  });
+
+  it("nested regroups the flat list by heading", () => {
+    const flat = registry.abbreviations("4.1.1");
+    const nested = registry.abbreviations("4.1.1", { shape: "nested" });
+    const back = Object.entries(nested).flatMap(([heading, codes]) =>
+      codes.map((c) => ({ heading, code: c.code, description: c.description })),
+    );
+    expect(back).toEqual(flat);
+  });
+
+  it("is masked per edition, with per-edition descriptions", () => {
+    expect(descOf("4.2", "CBRP_END", "BASE")).toBeDefined();
+    expect(descOf("4.1.1", "CBRP_END", "BASE")).toBeUndefined();
+    expect(descOf("4.1.1", "ELRG_CODE", "100-75-4")).toBe(
+      "n-nitrosopiperidine",
+    );
+    expect(descOf("4.2", "ELRG_CODE", "100-75-4")).toBe("n-Nitrosopiperidine");
+  });
+
+  it("keeps case-only code pairs", () => {
+    expect(descOf("4.1.1", "PTST_TYPE", "CONSTANT HEAD")).toBeDefined();
+    expect(descOf("4.1.1", "PTST_TYPE", "Constant Head")).toBeDefined();
+  });
+
+  it("throws on an unknown edition or shape", () => {
+    expect(() => registry.abbreviations("9.9")).toThrow(/unknown edition/);
+    expect(() =>
+      registry.abbreviations("4.2", { shape: "tree" as unknown as "flat" }),
+    ).toThrow(/flat\|nested/);
+  });
+});
+
 describe("registry traversal", () => {
   it("childGroups lists direct children alphabetically", () => {
     const children = registry.childGroups("PROJ").map((g) => g.code);
