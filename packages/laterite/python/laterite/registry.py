@@ -290,6 +290,7 @@ __all__ = [
     "abbreviations",
     "ancestor_chain",
     "child_groups",
+    "dictionary",
     "get",
     "inherited_key_names",
 ]
