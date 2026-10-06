@@ -7,14 +7,14 @@ rule_number: 17
 rule_sub: ""
 rule_family: groups
 varies_between_editions: false
-divergences: []
+divergences: [O-59]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs"
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule17_no_type.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule17_missing_type_group_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 17"
-related: [rule-families, traceability-chain, parity-model, dec-ags4-merge-semantics]
+related: [rule-families, traceability-chain, parity-model, dec-ags4-merge-semantics, O-59]
 sources: [spec-4.2]
 ---
 # Rule 17 — type group
@@ -33,7 +33,7 @@ Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by
 
 [[TYPE]] group defines all used field types. An empty TYPE cell is skipped by Rust; python would flag it (O-19).
 
-`laterite-ags4-merge`'s `promote` mode (the TYPE-clash lattice, [[dec-ags4-merge-semantics]]) is Rule 17-adjacent: a promoted code (e.g. `5DP`) is always one an input file already declared, so its `TYPE`-group row rides in free with merge's group union, and this rule is satisfied without merge doing anything extra for it. A declared-but-now-unused leftover code (the coarser `2DP` row, once every cell is promoted to `5DP`) validates clean too — this rule only requires every code *used* to be *declared*, never the reverse, and there is no separate rule requiring a heading's declared TYPE to equal the *dictionary's* TYPE for that heading.
+`laterite-ags4-merge`'s `promote` mode (the TYPE-clash lattice, [[dec-ags4-merge-semantics]]) is Rule 17-adjacent: a promoted code (e.g. `5DP`) is always one an input file already declared, so its `TYPE`-group row rides in free with merge's group union, and this rule is satisfied without merge doing anything extra for it. A declared-but-now-unused leftover code (the coarser `2DP` row, once every cell is promoted to `5DP`) validates clean too — this rule only requires every code *used* to be *declared*, never the reverse, and there is no separate rule requiring a heading's declared TYPE to equal the *dictionary's* TYPE for that heading. That still holds; with FYIs on, an opt-in `FYI (Related to Rule 8)` reports each standard heading whose declared TYPE differs from the resolved edition's dictionary type, without making it a rule breach — see [[O-59]].
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
@@ -61,7 +61,7 @@ timeline
 ```
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
-- Divergence (Rust↔python): wired in Phase B/C — `[[O-NN]]` or _none_.
+- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type; python-ags4 has no equivalent.
 
 ## Related
-[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]]
+[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]] · [[O-59]]

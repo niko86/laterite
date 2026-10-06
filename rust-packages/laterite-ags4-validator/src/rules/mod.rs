@@ -54,6 +54,12 @@ pub(crate) fn run_all(
     naming::check(parsed, found); //             Rules 19, 19a, 19b
     dictionary::check(parsed, dict, found); //   Rules 7, 9
     typed_values::check(parsed, found); //       Rule 8
+    if opts.include_fyi {
+        // Beside Rule 8, not inside it: Rule 8 judges values against the file's
+        // TYPE row and never sees the dictionary, and keeping it that way keeps
+        // its public signature unchanged.
+        typed_values::declared_type_fyi(parsed, dict, found);
+    }
     relational::check_with(parsed, dict, opts, found); // Rules 10a–10c, 11a–11c
     references::check(parsed, dict, found); //   Rules 19b_2/3, 20 (data level)
     // Rule 18 reads Rule 9's output — must run after dictionary::check.

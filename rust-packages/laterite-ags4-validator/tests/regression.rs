@@ -667,6 +667,7 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
     let known_non_numbered: BTreeSet<&str> = [
         "FYI",
         "FYI (Related to Rule 1)",
+        "FYI (Related to Rule 8)",
         "FYI (Related to Rule 16)",
         "FYI (Related to Rule 10c)",
         "Warning (Related to Rule 10c)",

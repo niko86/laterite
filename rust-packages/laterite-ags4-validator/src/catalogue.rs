@@ -23,11 +23,13 @@ pub use laterite_ags4_reference::catalogue::{RULE_LABELS, rule_metadata_json};
 
 /// The numbered rules that can also emit a related FYI (`"FYI (Related to Rule
 /// N)"`). Tied to the FYI emitters in `rules/line_format.rs` (Rule 1 — BOM /
-/// extended-ASCII), `rules/groups.rs` (Rule 16 — description drift /
-/// non-standard abbreviation) and `rules/relational.rs` (Rule 10c — a KEY
-/// heading owned off the declared parent chain, #759).
+/// extended-ASCII), `rules/typed_values.rs` (Rule 8 — a standard heading
+/// declared with a type other than the dictionary's, #1013), `rules/groups.rs`
+/// (Rule 16 — description drift / non-standard abbreviation) and
+/// `rules/relational.rs` (Rule 10c — a KEY heading owned off the declared
+/// parent chain, #759).
 #[cfg(test)]
-const FYI_BEARING_RULES: &[&str] = &["1", "10c", "16"];
+const FYI_BEARING_RULES: &[&str] = &["1", "8", "10c", "16"];
 
 /// The numbered rules that can also emit a related WARNING (`"Warning (Related
 /// to Rule N)"`). Tied to `rules/groups.rs::rule_18_structure` (Rule 18 —

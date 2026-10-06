@@ -822,6 +822,53 @@ O-N below is an internal decision or behavioural note, not for external circulat
   non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Collapsing the variants is not done here.
 
+### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8); python-ags4 has no such check
+- **Observed** (#1013): a file can declare a standard heading with a
+  different data type from the dictionary edition it is checked against —
+  `LNMC_MC` as `1DP` where 4.1.1 types it `X`, or `CONS_INCE` as `2DP` where
+  4.1 onwards type it `3DP`. Rule 8 judges every value against the file's
+  own TYPE row, and the TYPE group (Rule 17) only has to define the codes
+  the file uses, so the file validates clean in both engines. The
+  difference surfaces when deliveries are combined: a tool that keeps one
+  TYPE row per group makes every value from the other producer fail Rule 8,
+  and laterite's own merge stops on the clash between the inputs' TYPE rows
+  (it never consults the dictionary's type there).
+- **Spec** (`spec:AGS4-4.2-2025.pdf §3.3`, `§6.2`; the same guidance in
+  4.1): the dictionary's data types are the ones to use unless provider
+  and receiver agree otherwise under a project specification. A departure
+  is therefore legal and is not a rule breach; it is something the
+  receiver may need to know about. No numbered rule ties a heading's TYPE
+  row to the dictionary.
+- **python-ags4** (`check.py::rule_8`, `rule_17`): neither compares a
+  heading's declared TYPE with the dictionary's.
+- **Assessment**: an interoperability signal, not a defect, so the FYI tier
+  fits: the receiver of a combined file is the one who pays for it, and
+  naming it per input lets it be settled before anything is combined.
+- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
+  python-ags4 defect or a spec ambiguity.
+- **Our decision** (#1013): with FYIs on, emit one `FYI (Related to Rule
+  8)` per group and standard heading whose trimmed TYPE code differs from
+  the resolved edition's standard type, on that group, naming the heading,
+  the declared type, the edition and the dictionary's type. Any difference
+  counts, precision included, since `2DP` against `3DP` formats every value
+  differently. The edition is the one validation resolved (explicit option,
+  then `TRAN_AGS`, then the fallback). Headings the standard edition does
+  not define for that group are never compared, including those that exist
+  only through the file's DICT or a custom overlay, and a blank TYPE cell
+  is left to other rules. The message describes this file only; it does
+  not mention merging. Rule 8 itself is unchanged, values are still judged
+  against the declared type, and the verdict never moves. It is a new
+  laterite-only label, so it shows as a rust-only label wherever dual
+  validation runs the native engine with FYI on — forge does — and
+  `classify` reconciles it to this record.
+- **Native surfaces only** (#1013, owner decision): `laterite.validate()`,
+  `lat`, Node and wasm emit it; `laterite.compat` withholds this one label
+  while every other FYI passes through. Real files depart from the
+  dictionary's types often, so in the drop-in it would be noise
+  python-ags4 users never asked for, and its key trips python-ags4's own
+  test that a clean file yields no key naming a Rule. The python-ags4 key
+  set, and so the parity known-failures set, is unchanged.
+
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 
 ### O-47 [NOTE] Quote-aware universal-newline parsing (#422): a lone-CR terminator now splits into rows + Rule 2a (converging with python), an embedded CR/LF stays in-field + Rule 6 (diverging)

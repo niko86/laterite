@@ -7,14 +7,14 @@ rule_number: 8
 rule_sub: ""
 rule_family: typed
 varies_between_editions: false
-divergences: []
+divergences: [O-59]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs"
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dt_bad.ags repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dt_empty_unit.ags repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dt_out_of_range.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule8_wrong_decimal_precision_flagged repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule8_invalid_date_flagged repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule8_empty_unit_dt_flags_like_python repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule8_date_out_of_pandas_range_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8"
-related: [rule-families, traceability-chain, parity-model, dec-ags4-merge-semantics, O-49, O-50, numeric-type-count-uncapped-format-width, 0dp-integer-conversion-precision-loss]
+related: [rule-families, traceability-chain, parity-model, dec-ags4-merge-semantics, O-49, O-50, O-59, numeric-type-count-uncapped-format-width, 0dp-integer-conversion-precision-loss]
 sources: [spec-4.2]
 ---
 # Rule 8 — typed values
@@ -38,6 +38,8 @@ Value vs declared UNIT/TYPE. Structural per-char matcher + chrono semantic check
 The `n` in a parametric TYPE (`nDP`/`nSF`/`nSCI`) is read straight off the file's TYPE row with no upper bound and feeds a format width when this rule renders a value to its expected form — a crafted count was an OOM/DoS on both validators, hardened by a clamp; see [[O-49]] / [[numeric-type-count-uncapped-format-width]].
 
 A separate, narrower issue lives one step further along the same `0DP` path: Rule 8's strict grammar check (`is_ndp(s, 0)`) already flags an out-of-range/fractional integer cell on both validators, but the *conversion* of that cell to a number diverged — laterite's pre-#611 `f as i64` saturated to a fabricated `i64::MAX` where python-ags4's `int(float(s))` preserves full precision. laterite-dev#611 range-guards the conversion to Null instead; see [[O-50]] / [[0dp-integer-conversion-precision-loss]].
+
+The declared TYPE row is this rule's authority, and nothing here compares it with the dictionary. With FYIs on, `declared_type_fyi` (same module, run beside this rule) names each standard heading whose declared type differs from the resolved edition's dictionary type, as `FYI (Related to Rule 8)`: the file is valid, but values typed one way fail this rule once combined with a file typed the other. It never changes the verdict; see [[O-59]].
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
@@ -66,6 +68,7 @@ timeline
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
 - Divergence (Rust↔python): none on pandas-range dates — dogfood-confirmed by [[strat-rule8-pandas-range]] (both flag Rule 8 on pre-1678/post-2262 dates). A separate DT/`yyyy-mm` precision bug was tracked and fixed — see [[rule8-dt-yyyy-mm-false-positive]] (refuted/resolved).
+- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type; python-ags4 has no equivalent.
 
 ## Related
-[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]] · [[O-49]] · [[O-50]] · [[numeric-type-count-uncapped-format-width]] · [[0dp-integer-conversion-precision-loss]]
+[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]] · [[O-49]] · [[O-50]] · [[O-59]] · [[numeric-type-count-uncapped-format-width]] · [[0dp-integer-conversion-precision-loss]]
