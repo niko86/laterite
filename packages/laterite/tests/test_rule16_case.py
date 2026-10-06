@@ -8,20 +8,27 @@ Pinned on the issue's own delivery shape:
 * the collision FYI (O-58), whatever the codes' standard status;
 * the "did you mean" hint on the non-standard-code FYI (O-43);
 * both opt-in: without ``fyi=True`` the findings and the verdict are untouched.
+
+Under 4.2, whose specification makes ABBR codes case-insensitive, the collision
+is a WARNING instead (shown by default, never fatal) and the FYI is not raised.
+With warnings off but FYIs on (compat's mode) it falls back to the #1009 FYI.
 """
 
 from __future__ import annotations
 
 import laterite
 import polars as pl
+from laterite import compat
 
 STAMP = laterite.TranStamp(
     issue="1", date="2026-01-01", producer="A", recipient="B", status="Draft"
 )
 FYI16 = "FYI (Related to Rule 16)"
+WARN16 = "Warning (Related to Rule 16)"
+COLLISION = "differ only by letter case"
 
 
-def _build(trig_cond: tuple[str, str]) -> bytes:
+def _build(trig_cond: tuple[str, str], edition: str = "4.1.1") -> bytes:
     k = {
         "LOCA_ID": ["BH1", "BH1"],
         "SAMP_TOP": [1.0, 2.0],
@@ -40,12 +47,20 @@ def _build(trig_cond: tuple[str, str]) -> bytes:
         "LNMC": pl.DataFrame({**k, **spec, "LNMC_MC": [11.3, 14.1]}),
     }
     return laterite.build_ags4(
-        frames, dict_version="4.1.1", synthesise_metadata=True, tran=STAMP
+        frames, dict_version=edition, synthesise_metadata=True, tran=STAMP
     ).bytes
 
 
 def _fyi16(report) -> list[str]:
     return [d["desc"] for d in report.findings.to_dicts() if d["rule"] == FYI16]
+
+
+def _collisions(report) -> list[tuple[str, str]]:
+    return [
+        (d["rule"], d["desc"])
+        for d in report.findings.to_dicts()
+        if COLLISION in d["desc"]
+    ]
 
 
 def test_case_variants_raise_the_collision_and_the_hint():
@@ -70,3 +85,56 @@ def test_without_fyi_the_case_variants_change_nothing():
         variant.findings.select("rule").to_dicts()
         == plain.findings.select("rule").to_dicts()
     )
+
+
+def test_under_4_2_the_collision_is_a_warning_with_or_without_fyi():
+    data = _build(("Undisturbed", "UNDISTURBED"), edition="4.2")
+    plain = laterite.validate(_build(("UNDISTURBED", "UNDISTURBED"), edition="4.2"))
+    warning = [
+        (
+            WARN16,
+            'TRIG_COND: codes "UNDISTURBED" and "Undisturbed" differ only by '
+            "letter case; some importers treat them as the same code. AGS 4.2 "
+            "treats ABBR codes as case-insensitive.",
+        )
+    ]
+    for fyi in (False, True):
+        rep = laterite.validate(data, fyi=fyi)
+        # The WARNING replaces the FYI: never both for one collision.
+        assert _collisions(rep) == warning, fyi
+        # A warning is shown, not fatal.
+        assert rep.is_valid == plain.is_valid, fyi
+    # Warnings off, FYIs on: exactly one FYI in the #1009 wording, no WARNING.
+    assert _collisions(laterite.validate(data, warnings=False, fyi=True)) == [
+        (
+            FYI16,
+            'TRIG_COND: codes "UNDISTURBED" and "Undisturbed" differ only by '
+            "letter case; some importers treat them as the same code.",
+        )
+    ]
+    assert _collisions(laterite.validate(data, warnings=False)) == []
+
+
+def test_compat_still_reports_the_4_2_collision(tmp_path):
+    # compat runs the FYI tier and not the warning tier, so raising the 4.2
+    # tier must not take the collision out of the python-ags4-shaped dict.
+    p = tmp_path / "case.ags"
+    p.write_bytes(_build(("Undisturbed", "UNDISTURBED"), edition="4.2"))
+    found = compat.check_file(str(p))
+    assert not any("Warning" in k for k in found)
+    assert [e["desc"] for e in found.get(FYI16, []) if COLLISION in e["desc"]] == [
+        'TRIG_COND: codes "UNDISTURBED" and "Undisturbed" differ only by '
+        "letter case; some importers treat them as the same code."
+    ]
+
+
+def test_before_4_2_the_collision_stays_an_opt_in_fyi():
+    data = _build(("Undisturbed", "UNDISTURBED"), edition="4.1.1")
+    assert _collisions(laterite.validate(data)) == []
+    assert _collisions(laterite.validate(data, fyi=True)) == [
+        (
+            FYI16,
+            'TRIG_COND: codes "UNDISTURBED" and "Undisturbed" differ only by '
+            "letter case; some importers treat them as the same code.",
+        )
+    ]

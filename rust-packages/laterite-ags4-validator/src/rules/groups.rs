@@ -83,6 +83,11 @@ const RULE_18_WARN: &str = "Warning (Related to Rule 18)";
 // Same "Warning (...)" scheme as RULE_18_WARN so the compat severity classifier
 // never miscounts it as an error.
 const RULE_14_WARN: &str = "Warning (Related to Rule 14)";
+// WARNING-tier label for a case-only ABBR code collision in a file judged
+// against 4.2 or later (O-58). Same "Warning (...)" scheme as RULE_18_WARN, so
+// the compat severity classifier never counts it as an error and the error-tier
+// Rule 16 bucket is untouched.
+const RULE_16_WARN: &str = "Warning (Related to Rule 16)";
 
 const KNOWN_TRAN_AGS: &[&str] = &["4.0", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 
@@ -98,6 +103,9 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
         // Native (warnings-on) view: an unrecognised TRAN_AGS is a WARNING — the
         // schema-fallback risk should be visible by default (O-44).
         tran_ags_unrecognised(parsed, found, RULE_14_WARN, Severity::Warning);
+        if abbr_list_is_case_insensitive(dict.version()) {
+            rule_16_case_collision(parsed, found, RULE_16_WARN, Severity::Warning);
+        }
     }
     if opts.include_fyi {
         // FYI-only mode (i.e. `compat`, which runs include_fyi without
@@ -109,8 +117,27 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
         }
         rule_16_fyi(parsed, dict, found);
         rule_16_fyi_nonstandard_abbr(parsed, dict, found);
-        rule_16_fyi_case_collision(parsed, found);
+        // Under 4.2+ with warnings on, the collision is the WARNING above
+        // instead, never both. With warnings off (compat's mode) it falls back
+        // to this FYI, as the TRAN_AGS finding does, so raising the 4.2 tier
+        // never makes the finding vanish. The fallback keeps the #1009 wording
+        // word for word, which is what compat has always reported.
+        if !opts.include_warnings || !abbr_list_is_case_insensitive(dict.version()) {
+            rule_16_case_collision(parsed, found, RULE_16_FYI, Severity::Fyi);
+        }
     }
+}
+
+/// Whether the edition the file was judged against states that its ABBR list
+/// is not case sensitive. 4.2 is the first that does (§3.3, §6.2); 4.1 and
+/// 4.0.x say nothing about ABBR case. That statement is what lifts a case-only
+/// collision from an importer hazard to an inconsistency the spec itself names,
+/// so it decides the O-58 tier. Compared by position in `DictVersion::ALL`
+/// (oldest to newest) so a later 4.2.x edition counts without an edit here.
+fn abbr_list_is_case_insensitive(edition: crate::dict::DictVersion) -> bool {
+    use crate::dict::DictVersion;
+    let pos = |v: DictVersion| DictVersion::ALL.iter().position(|e| *e == v);
+    pos(edition) >= pos(DictVersion::V4_2)
 }
 
 /// FYI emit: for each abbreviation defined in the file's ABBR group,
@@ -238,21 +265,31 @@ fn or_list(codes: &[&str]) -> Option<String> {
     })
 }
 
-/// FYI emit: two or more of the file's own ABBR rows under one `ABBR_HDNG`
-/// whose codes are equal ignoring case but differ as written (`"Undisturbed"`
-/// and `"UNDISTURBED"`). Rule 16 looks codes up exactly, so each row defines
-/// its own spelling and no rule fires; but an importer that keys ABBR
-/// case-insensitively sees a duplicate key and rejects the file, and the spec
-/// itself calls the ABBR list not case sensitive and asks for consistent use.
-/// One finding per heading and folded code, on the line of its first row,
-/// naming every spelling in file order.
+/// Two or more of the file's own ABBR rows under one `ABBR_HDNG` whose codes
+/// are equal ignoring case but differ as written (`"Undisturbed"` and
+/// `"UNDISTURBED"`). Rule 16 looks codes up exactly, so each row defines its
+/// own spelling and no rule fires; but an importer that keys ABBR
+/// case-insensitively sees a duplicate key and rejects the file. One finding
+/// per heading and folded code, on the line of its first row, naming every
+/// spelling in file order.
+///
+/// The tier is the caller's, chosen by edition in `check`: a WARNING from
+/// 4.2, whose spec makes ABBR codes case-insensitive and asks for
+/// consistent use, and an FYI before it, where the spec is silent and only the
+/// importer risk remains. The WARNING message says which edition makes it one.
+/// A 4.2 file checked with warnings off but FYIs on still gets the FYI.
 ///
 /// Fires whatever the codes' standard status, even when every spelling is
 /// standard: the standard list carries case-only pairs of its own, and the
 /// importer risk is the same. Only the file's ABBR rows are compared; the
 /// standard list is never checked against itself. laterite-originated, see
 /// OBSERVATIONS O-58.
-fn rule_16_fyi_case_collision(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_16_case_collision(
+    parsed: &ParsedFile,
+    found: &mut Findings,
+    label: &'static str,
+    severity: Severity,
+) {
     let Some(abbr) = parsed.groups.get("ABBR") else {
         return;
     };
@@ -285,19 +322,23 @@ fn rule_16_fyi_case_collision(parsed: &ParsedFile, found: &mut Findings) {
         let Some((last, rest)) = quoted.split_last().filter(|(_, rest)| !rest.is_empty()) else {
             continue; // one spelling: nothing collides
         };
+        let mut desc = format!(
+            "{}: codes {} and {last} differ only by letter case; some importers \
+             treat them as the same code.",
+            key.0,
+            rest.join(", ")
+        );
+        if severity == Severity::Warning {
+            desc.push_str(" AGS 4.2 treats ABBR codes as case-insensitive.");
+        }
         add_at(
             found,
-            RULE_16_FYI,
+            label,
             Some(*line),
             "ABBR",
-            format!(
-                "{}: codes {} and {last} differ only by letter case; some importers \
-                 treat them as the same code.",
-                key.0,
-                rest.join(", ")
-            ),
+            desc,
             Location::default(),
-            Severity::Fyi,
+            severity,
         );
     }
 }
@@ -1130,6 +1171,94 @@ mod tests {
             ("TRIG_COND", "UNDISTURBED"),
         ]));
         assert!(!off.contains_key(RULE_16_FYI));
+    }
+
+    /// Every finding the case-collision check could own, as `(label, desc)`,
+    /// for the `TRIG_COND` "Undisturbed" / "UNDISTURBED" pair judged against
+    /// `edition` with the given tiers on.
+    fn case_collisions(edition: DictVersion, warnings: bool, fyi: bool) -> Vec<(String, String)> {
+        let pf = parse_str(&abbr_rows_fixture(&[
+            ("TRIG_COND", "Undisturbed"),
+            ("TRIG_COND", "UNDISTURBED"),
+        ]))
+        .expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(edition),
+            &CheckOptions {
+                include_warnings: warnings,
+                include_fyi: fyi,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        f.iter()
+            .flat_map(|(label, v)| v.iter().map(move |x| (label.clone(), x.desc.clone())))
+            .filter(|(_, d)| d.contains("differ only by letter case"))
+            .collect()
+    }
+
+    #[test]
+    fn rule_16_case_collision_is_a_warning_under_4_2() {
+        let warning = vec![(
+            RULE_16_WARN.to_string(),
+            "TRIG_COND: codes \"Undisturbed\" and \"UNDISTURBED\" differ only by \
+             letter case; some importers treat them as the same code. AGS 4.2 \
+             treats ABBR codes as case-insensitive."
+                .to_string(),
+        )];
+        // Warning, with or without FYIs, and never the FYI beside it.
+        assert_eq!(case_collisions(DictVersion::V4_2, true, false), warning);
+        assert_eq!(case_collisions(DictVersion::V4_2, true, true), warning);
+        // Warnings off, FYIs on (compat's mode): exactly the #1009 FYI, so
+        // raising the tier never makes the finding vanish.
+        assert_eq!(
+            case_collisions(DictVersion::V4_2, false, true),
+            vec![(
+                RULE_16_FYI.to_string(),
+                "TRIG_COND: codes \"Undisturbed\" and \"UNDISTURBED\" differ only by \
+                 letter case; some importers treat them as the same code."
+                    .to_string(),
+            )]
+        );
+        assert!(case_collisions(DictVersion::V4_2, false, false).is_empty());
+    }
+
+    #[test]
+    fn rule_16_case_collision_stays_an_fyi_before_4_2() {
+        let fyi = vec![(
+            RULE_16_FYI.to_string(),
+            "TRIG_COND: codes \"Undisturbed\" and \"UNDISTURBED\" differ only by \
+             letter case; some importers treat them as the same code."
+                .to_string(),
+        )];
+        for edition in [
+            DictVersion::V4_0_3,
+            DictVersion::V4_0_4,
+            DictVersion::V4_1,
+            DictVersion::V4_1_1,
+        ] {
+            assert_eq!(case_collisions(edition, true, true), fyi, "{edition:?}");
+            assert_eq!(case_collisions(edition, false, true), fyi, "{edition:?}");
+            assert!(
+                case_collisions(edition, true, false).is_empty(),
+                "{edition:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn abbr_list_is_case_insensitive_from_4_2() {
+        // Exhaustive over the bundled editions, so a new one is classified by
+        // its position rather than missed.
+        for &v in DictVersion::ALL {
+            assert_eq!(
+                abbr_list_is_case_insensitive(v),
+                v.as_str() >= "4.2",
+                "{v:?}"
+            );
+        }
     }
 
     #[test]
