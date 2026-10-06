@@ -243,6 +243,15 @@ fn reconcile(
     if ro.remove("FYI (Related to Rule 8)") {
         ids.push("O-59");
     }
+    // O-58: under 4.2 laterite reports ABBR codes that differ only by letter
+    // case as a WARNING. python-ags4 never compares a file's ABBR codes with
+    // each other, so the label is rust-only by construction, and forge's
+    // `include_warnings` run would otherwise file every such 4.2 file as an
+    // action. (Before 4.2 the same finding rides `FYI (Related to Rule 16)`,
+    // a label python-ags4 also emits, so it needs no arm.)
+    if ro.remove("Warning (Related to Rule 16)") {
+        ids.push("O-58");
+    }
     // O-26: python triple-reports Rule 19b for a malformed heading the
     // Rust validator reports once → python uniquely has extra 19b.
     if po.remove("AGS Format Rule 19b") {
@@ -516,6 +525,23 @@ mod tests {
         // Negative guard: it reconciles ITSELF, never a real Rule 8
         // difference standing beside it.
         let both = rules(&["FYI (Related to Rule 8)", "AGS Format Rule 8"]);
+        assert!(matches!(
+            classify(&both, &Ok(BTreeSet::new())),
+            Parity::RustOnlyRules { .. }
+        ));
+    }
+
+    #[test]
+    fn o58_rust_only_case_collision_warning_is_known_divergence() {
+        let r = rules(&["Warning (Related to Rule 16)"]);
+        let p = Ok(BTreeSet::new());
+        match classify(&r, &p) {
+            Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-58"),
+            other => panic!("expected KnownDivergence O-58, got {other:?}"),
+        }
+        // Negative guard: it reconciles ITSELF, never a real Rule 16
+        // difference standing beside it.
+        let both = rules(&["Warning (Related to Rule 16)", "AGS Format Rule 16"]);
         assert!(matches!(
             classify(&both, &Ok(BTreeSet::new())),
             Parity::RustOnlyRules { .. }

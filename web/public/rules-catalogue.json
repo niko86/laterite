@@ -375,7 +375,7 @@
         },
         {
           "id": "O-58",
-          "note": "When your ABBR group declares codes under one heading that differ only by letter case (\"Undisturbed\" and \"UNDISTURBED\"), laterite adds an FYI naming them: some importers treat them as the same code and reject the file. python-ags4 has no equivalent check."
+          "note": "When your ABBR group declares codes under one heading that differ only by letter case (\"Undisturbed\" and \"UNDISTURBED\"), laterite names them: some importers treat them as the same code and reject the file. Under AGS 4.2, which treats ABBR codes as case-insensitive, this is a warning shown by default; under earlier editions it is an opt-in FYI. Neither fails validation. python-ags4 has no equivalent check."
         }
       ]
     },

@@ -787,7 +787,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
   effective dictionary) is withheld whole, since the padding is then the only
   thing telling those rows apart; those cells keep their finding and FYI.
 
-### O-58 [VARIANCE] ABBR codes under one heading that differ only by letter case get a laterite-originated FYI (Related to Rule 16); python-ags4 has no such check
+### O-58 [VARIANCE] ABBR codes under one heading that differ only by letter case get a laterite-originated FYI (Related to Rule 16), a WARNING under 4.2; python-ags4 has no such check
 - **Observed** (#1009): a file can declare `"Undisturbed"` and
   `"UNDISTURBED"` as two ABBR rows under `TRIG_COND`. Both engines look
   codes up exactly, so each row defines its own spelling, every `PA` value
@@ -802,24 +802,35 @@ O-N below is an internal decision or behavioural note, not for external circulat
   against. Rule 16 (§4.1.1) itself only requires the codes to be defined.
   The bundled standard list carries such pairs of its own (`PTST_TYPE`
   `"CONSTANT HEAD"` and `"Constant Head"` in the editions that list both).
+  4.1 and 4.0.x say nothing about the case of ABBR codes.
 - **python-ags4** (`check.py::rule_16`, `fyi_16_1`): no check compares the
   file's ABBR codes with each other.
-- **Assessment**: no rule is broken, so it is not an error; the risk is
-  downstream interoperability, which is what the FYI tier is for. The
-  exact Rule 16 lookup is unchanged and out of scope here: an undefined
+- **Assessment**: no rule is broken, so it is not an error. Before 4.2
+  the risk is downstream interoperability alone, which is what the FYI
+  tier is for. Under 4.2 the spec's own guidance makes the pair an
+  inconsistency the standard names, and a consumer that keys ABBR the way
+  4.2 says to silently gets one definition where the author wrote two:
+  the #321 surprise test for a warning. The exact Rule 16 lookup is unchanged and out of scope here: an undefined
   value stays an error whatever its case.
 - **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
   python-ags4 defect or a spec ambiguity.
-- **Our decision** (#1009): with FYIs on, emit one `FYI (Related to Rule
-  16)` per `ABBR_HDNG` and case-folded `ABBR_CODE` that has two or more
-  distinct spellings among the file's own ABBR rows, on the ABBR group,
-  naming the heading and every spelling in row order. It fires whatever
-  the codes' standard status, including when every spelling is standard,
-  since the importer risk is the same; an exact repeat is one spelling.
-  Only the file's rows are compared, never the standard list with itself.
-  The label is the existing one, so compat's severity classifier and the
-  parity label set see nothing new, and the verdict never changes. A
-  non-standard spelling also keeps its [[O-43]] FYI, which now names the
+- **Our decision** (#1009; the edition tier is an owner decision of
+  2026-10-06): emit one finding per `ABBR_HDNG` and case-folded
+  `ABBR_CODE` that has two or more distinct spellings among the file's own
+  ABBR rows, on the ABBR group, naming the heading and every spelling in
+  row order. The tier follows the edition the file is judged against,
+  because only 4.2 states that ABBR codes are case-insensitive. From 4.2
+  it is a `Warning (Related to Rule 16)`, shown by default, whose message
+  adds that 4.2 treats ABBR codes as case-insensitive. Under 4.0.x and
+  4.1.x it stays an opt-in `FYI (Related to Rule 16)`. One file never
+  gets both. It fires whatever the codes' standard status, including when
+  every spelling is standard, since the importer risk is the same; an
+  exact repeat is one spelling. Only the file's rows are compared, never
+  the standard list with itself. Neither tier changes the verdict (#321);
+  `--warnings-as-errors` is how a caller fails on the 4.2 warning. The FYI
+  reuses the existing label; the WARNING's separate `Warning (...)` label
+  is what lets compat's severity classifier count it as a warning, and
+  the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Collapsing the variants is not done here.
 
 ### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8); python-ags4 has no such check
