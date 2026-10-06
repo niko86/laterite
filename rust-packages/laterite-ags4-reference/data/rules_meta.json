@@ -135,8 +135,8 @@
     {
       "rule": "8",
       "title": "Typed Values",
-      "checks": "Checks that every data value matches the format declared in its TYPE row and is consistent with its UNIT. Covers decimal places (nDP), scientific notation (nSCI), significant figures (nSF), dates/times (DT), elapsed time (T), numeric (U), yes/no (YN), degrees-minutes-seconds (DMS), and ID uniqueness. A finding means a value is malformed or wrongly precise for its declared type. To fix: numeric cells (nDP/nSCI/nSF) are reformatted automatically to the declared precision when the cell is a valid number; other type errors (bad dates, non-numeric text, etc.) must be corrected by hand.",
-      "severity": "error",
+      "checks": "Checks that every data value matches the format declared in its TYPE row and is consistent with its UNIT. Covers decimal places (nDP), scientific notation (nSCI), significant figures (nSF), dates/times (DT), elapsed time (T), numeric (U), yes/no (YN), degrees-minutes-seconds (DMS), and ID uniqueness. A finding means a value is malformed or wrongly precise for its declared type. To fix: numeric cells (nDP/nSCI/nSF) are reformatted automatically to the declared precision when the cell is a valid number; other type errors (bad dates, non-numeric text, etc.) must be corrected by hand. With --show-fyi, also names each standard heading whose TYPE row declares a different data type from the dictionary edition the file was checked against (LNMC_MC declared 1DP where the dictionary says X); the values are still judged against the declared type, and the advisory never fails the file.",
+      "severity": "mixed",
       "fixable": true,
       "observations": [
         {
@@ -174,6 +174,10 @@
         {
           "id": "O-50",
           "note": "Both validators flag an out-of-range or fractional 0DP cell here, identically — this rule is not where the two differ. They differ afterwards, when the string is CONVERTED to a number: a value too large for a 64-bit integer becomes Null here, where python-ags4's conversion keeps full precision. So a cell can be flagged by both and still read back differently."
+        },
+        {
+          "id": "O-59",
+          "note": "A standard heading declared with a different data type from the dictionary (LNMC_MC as 1DP where the dictionary says X, or CONS_INCE as 2DP where it says 3DP) breaks no rule, because this rule reads the TYPE row the file declares. It matters once files are combined: whichever TYPE row survives, the other producer's values fail. With --show-fyi laterite names each such heading once, with the dictionary edition and its type. python-ags4 has no equivalent check."
         }
       ]
     },

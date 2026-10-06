@@ -25,10 +25,15 @@
 //! its absence is a Rule 2b/4 finding from V2). See OBSERVATIONS
 //! O-11/O-12/O-13.
 
+use crate::dict::Dictionary;
 use crate::findings::{Findings, Location, Severity, Target, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_8: &str = "AGS Format Rule 8";
+// A laterite-only label (python-ags4 emits nothing under it), kept apart from
+// RULE_8 so the declared-vs-dictionary advisory can never be counted as a Rule 8
+// error — compat's severity classifier reads the label, not the Severity (O-59).
+const RULE_8_FYI: &str = "FYI (Related to Rule 8)";
 
 /// What a TYPE-row code asks us to check. Unknown / deliberately
 /// unvalidated codes (`X`, `XN`, `MC`, `RL`, `PA`, `PT`, `PU`, …) are
@@ -181,6 +186,68 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                     );
                 }
             }
+        }
+    }
+}
+
+/// FYI: a standard heading whose TYPE row declares a different data type from
+/// the resolved edition's standard dictionary (O-59, #1013).
+///
+/// Rule 8 judges values against the file's own TYPE row and no rule ties that
+/// row to the dictionary, so such a file is valid on its own. The difference
+/// only bites when it meets a file typed the dictionary's way: whichever TYPE
+/// row survives a combine, the other producer's values then fail Rule 8. Naming
+/// it per file lets that be caught before anyone combines.
+///
+/// Compared against the BUNDLED standard edition, not `dict`: `dict` may carry
+/// a custom overlay, and a heading only the overlay or the file's DICT defines
+/// has no standard type to differ from. Any difference counts, precision
+/// included (`2DP` against `3DP` formats every value differently). A blank
+/// TYPE cell is left to Rules 4 and 17. One finding per heading, never per row.
+// `ci` is a column index within one group, bounded far below u32::MAX.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn declared_type_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+    let edition = dict.version();
+    let standard = Dictionary::bundled(edition);
+    for code in &parsed.group_order {
+        let g = &parsed.groups[code];
+        if g.type_line.is_none() {
+            continue;
+        }
+        let mut seen = std::collections::HashSet::new();
+        for (ci, ty) in g.types.iter().enumerate() {
+            let declared = ty.trim();
+            let Some(heading) = g.headings.get(ci) else {
+                continue;
+            };
+            // A repeated heading is Rule 7/9's finding; report the first only.
+            if declared.is_empty() || !seen.insert(heading.as_str()) {
+                continue;
+            }
+            let Some(std_heading) = standard.heading(code, heading) else {
+                continue;
+            };
+            let expected = std_heading.ags_type.trim();
+            if expected.is_empty() || expected == declared {
+                continue;
+            }
+            add_at(
+                found,
+                RULE_8_FYI,
+                g.type_line,
+                code,
+                format!(
+                    "{code}.{heading} is declared {declared}; the {} dictionary type is {expected}.",
+                    edition.as_str()
+                ),
+                Location {
+                    target: Target::Heading,
+                    field_index: Some(ci as u32),
+                    heading: Some(heading.clone()),
+                    ..Default::default()
+                },
+                Severity::Fyi,
+            );
         }
     }
 }
@@ -948,6 +1015,83 @@ mod tests {
         assert!(!dt_semantic_ok("00:60", "hh:mm")); // minute 60 rejected
         assert!(dt_semantic_ok("00:00:60", "hh:mm:ss")); // leap second ok
         assert!(!dt_semantic_ok("00:00:61", "hh:mm:ss")); // second 61 rejected
+    }
+
+    /// One LNMC group declaring `mc_type` for `LNMC_MC` and `extra` as a
+    /// second (heading, type), so a test varies only what it compares.
+    fn lnmc(mc_type: &str, extra: (&str, &str)) -> String {
+        format!(
+            "\"GROUP\",\"LNMC\"\r\n\
+             \"HEADING\",\"LOCA_ID\",\"LNMC_MC\",\"{h}\"\r\n\
+             \"UNIT\",\"\",\"%\",\"\"\r\n\
+             \"TYPE\",\"ID\",\"{mc_type}\",\"{t}\"\r\n\
+             \"DATA\",\"BH1\",\"11.3\",\"\"\r\n\
+             \"DATA\",\"BH2\",\"14.1\",\"\"\r\n",
+            h = extra.0,
+            t = extra.1,
+        )
+    }
+
+    fn declared_fyis(src: &str, edition: &str) -> Vec<String> {
+        let version = crate::dict::DictVersion::from_edition(edition).expect("bundled edition");
+        let pf = parse_str(src).expect("fixture parses");
+        let mut f = Findings::new();
+        declared_type_fyi(&pf, &Dictionary::bundled(version), &mut f);
+        f.get(RULE_8_FYI)
+            .map(|v| v.iter().map(|x| x.desc.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn declared_type_differing_from_the_dictionary_is_named_once() {
+        // Two data rows, one finding: it is about the TYPE row, not the values.
+        assert_eq!(
+            declared_fyis(&lnmc("1DP", ("LNMC_TEMP", "0DP")), "4.1.1"),
+            vec!["LNMC.LNMC_MC is declared 1DP; the 4.1.1 dictionary type is X.".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_precision_difference_counts() {
+        assert_eq!(
+            declared_fyis(&lnmc("X", ("LNMC_TEMP", "1DP")), "4.1.1"),
+            vec!["LNMC.LNMC_TEMP is declared 1DP; the 4.1.1 dictionary type is 0DP.".to_string()]
+        );
+    }
+
+    #[test]
+    fn the_edition_compared_against_is_the_one_given() {
+        // CONS_INCE was 2DP up to 4.0.4 and 3DP from 4.1, so one declaration
+        // is silent against one edition and named against the other.
+        let src = "\"GROUP\",\"CONS\"\r\n\
+            \"HEADING\",\"CONS_INCE\"\r\n\
+            \"UNIT\",\"\"\r\n\
+            \"TYPE\",\"2DP\"\r\n\
+            \"DATA\",\"0.55\"\r\n";
+        assert!(declared_fyis(src, "4.0.4").is_empty());
+        assert_eq!(
+            declared_fyis(src, "4.2"),
+            vec!["CONS.CONS_INCE is declared 2DP; the 4.2 dictionary type is 3DP.".to_string()]
+        );
+    }
+
+    #[test]
+    fn matching_user_defined_and_blank_types_are_silent() {
+        // Every standard heading as the dictionary types it.
+        assert!(declared_fyis(&lnmc("X", ("LNMC_TEMP", "0DP")), "4.1.1").is_empty());
+        // A user-defined heading has no standard type, whatever it declares.
+        assert!(declared_fyis(&lnmc("X", ("LNMC_ZZZZ", "3SF")), "4.1.1").is_empty());
+        // A blank TYPE cell is Rule 4/17's concern, not a type to compare.
+        assert!(declared_fyis(&lnmc("", ("LNMC_TEMP", "")), "4.1.1").is_empty());
+        // Padding around the code is not a different type.
+        assert!(declared_fyis(&lnmc(" X ", ("LNMC_TEMP", "0DP")), "4.1.1").is_empty());
+    }
+
+    #[test]
+    fn a_repeated_heading_is_named_once() {
+        let got = declared_fyis(&lnmc("1DP", ("LNMC_MC", "2DP")), "4.1.1");
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert!(got[0].contains("declared 1DP"), "{got:?}");
     }
 }
 

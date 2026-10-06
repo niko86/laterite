@@ -236,6 +236,13 @@ fn reconcile(
     if ro.remove("FYI (Related to Rule 10c)") {
         ids.push("O-56");
     }
+    // O-59: laterite names a standard heading whose TYPE row differs from the
+    // dictionary edition's type (#1013). python-ags4 never compares the two, so
+    // the label is rust-only by construction on any such file, and forge's
+    // `include_fyi` run would otherwise file every one as an action.
+    if ro.remove("FYI (Related to Rule 8)") {
+        ids.push("O-59");
+    }
     // O-26: python triple-reports Rule 19b for a malformed heading the
     // Rust validator reports once → python uniquely has extra 19b.
     if po.remove("AGS Format Rule 19b") {
@@ -492,6 +499,23 @@ mod tests {
         // Negative guard: it reconciles ITSELF, never a real Rule 10c
         // difference standing beside it.
         let both = rules(&["FYI (Related to Rule 10c)", "AGS Format Rule 10c"]);
+        assert!(matches!(
+            classify(&both, &Ok(BTreeSet::new())),
+            Parity::RustOnlyRules { .. }
+        ));
+    }
+
+    #[test]
+    fn o59_rust_only_declared_type_fyi_is_known_divergence() {
+        let r = rules(&["FYI (Related to Rule 8)"]);
+        let p = Ok(BTreeSet::new());
+        match classify(&r, &p) {
+            Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-59"),
+            other => panic!("expected KnownDivergence O-59, got {other:?}"),
+        }
+        // Negative guard: it reconciles ITSELF, never a real Rule 8
+        // difference standing beside it.
+        let both = rules(&["FYI (Related to Rule 8)", "AGS Format Rule 8"]);
         assert!(matches!(
             classify(&both, &Ok(BTreeSet::new())),
             Parity::RustOnlyRules { .. }

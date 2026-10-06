@@ -6,7 +6,7 @@ tags: [design, decision, architecture, merge]
 decided: "2026-07-12"
 supersedes: []
 from_gap: []
-related: [crate-map, laterite-ags4-reference, laterite-ags4-types, rule-08-typed-values, rule-17-type-group, dec-duckdb-extension]
+related: [crate-map, laterite-ags4-reference, laterite-ags4-types, rule-08-typed-values, rule-17-type-group, dec-duckdb-extension, O-59]
 sources: []
 ---
 
@@ -142,6 +142,10 @@ validity proof):**
   to be *declared*, not the reverse, and there is no rule requiring a
   heading's TYPE to equal the *dictionary's* TYPE (promoting `LOCA_GL` from
   `2DP` to `5DP` is spec-legal even though the dictionary says `2DP`).
+  The validator's opt-in `FYI (Related to Rule 8)` does report such a
+  difference ([[O-59]]), so a promoted merge validated with FYIs on names
+  the promoted heading; it is never an error, and `on_type_clash` still
+  settles only clashes between the inputs' declared TYPE rows.
 
 **The composition payoff with `_content_hash` (#448/#499).** `content_hash`
 canonicalises a cell *through its declared TYPE*
