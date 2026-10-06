@@ -19,6 +19,9 @@
     "changed": [
       {
         "text": "**laterite-ags4-validator 0.18.0** — the Rule 16 trim fix adds the `FixKind::TrimAbbreviation` variant, a breaking change on the exhaustive public enum (the semver gate's verdict against the published 0.17.0), so the crate takes the 0.x minor. `fixes::compute_fixes` also takes the `Dictionary` its findings were checked against, which the trim's KEY guard reads. `laterite-ags4-emit` 0.19.2, `laterite-ags4-hostopts` 0.3.1 and `laterite-ags4-trust` 0.18.1 ride along: their published pins froze `^0.17.0`, and the coherence gate holds that a moved floor may not strand a published crate (#809's class)."
+      },
+      {
+        "text": "**laterite-ags4-reference 0.15.1** — `Dictionary::abbr_codes_ignoring_case` (#1009) is an addition, so the crate takes a patch rather than the 0.x minor that a break would need (the semver gate finds no break against the published 0.15.0). The validator's O-43 hint calls it, so the workspace floor every sibling publishes against moves to 0.15.1 with it: a validator built against the published 0.15.0 does not compile. A caret `0.15` requirement already admits 0.15.1, so no published dependent is stranded and the coherence gate asks for no cascade. The release also carries `dict::abbreviations_dto` (#1014), which landed after 0.15.0 was published."
       }
     ],
     "deprecated": [],

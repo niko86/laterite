@@ -160,7 +160,7 @@ encoding_rs = "0.8"
 # third independent reader of ags_dictionary.json (laterite-dev#475 follow-up). No direct
 # JSON parsing here any more, so serde_json is no longer a build-dependency.
 [build-dependencies]
-laterite-ags4-reference = { path = "../laterite-ags4-reference", version = "0.15.0" }
+laterite-ags4-reference = { path = "../laterite-ags4-reference", version = "0.15.1" }
 
 [lints]
 workspace = true
