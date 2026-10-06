@@ -705,6 +705,7 @@ module.exports.Sidecar = nativeBinding.Sidecar
 module.exports.ags4BytesToXlsx = nativeBinding.ags4BytesToXlsx
 module.exports.ags4ToExcel = nativeBinding.ags4ToExcel
 module.exports.canonicalType = nativeBinding.canonicalType
+module.exports.dictRowsModes = nativeBinding.dictRowsModes
 module.exports.diff = nativeBinding.diff
 module.exports.displayHint = nativeBinding.displayHint
 module.exports.editions = nativeBinding.editions

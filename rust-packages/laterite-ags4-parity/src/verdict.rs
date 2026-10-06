@@ -243,6 +243,14 @@ fn reconcile(
     if ro.remove("FYI (Related to Rule 8)") {
         ids.push("O-59");
     }
+    // O-60: laterite names a DICT row that redeclares a standard group or
+    // heading (#1011). python-ags4 only reads DICT for what the standard lacks
+    // and never compares the two, so the label is rust-only by construction on
+    // any such file — common in exported deliveries — and forge's
+    // `include_fyi` run would otherwise file every one as an action.
+    if ro.remove("FYI (Related to Rule 18)") {
+        ids.push("O-60");
+    }
     // O-58: under 4.2 laterite reports ABBR codes that differ only by letter
     // case as a WARNING. python-ags4 never compares a file's ABBR codes with
     // each other, so the label is rust-only by construction, and forge's
@@ -542,6 +550,23 @@ mod tests {
         // Negative guard: it reconciles ITSELF, never a real Rule 16
         // difference standing beside it.
         let both = rules(&["Warning (Related to Rule 16)", "AGS Format Rule 16"]);
+        assert!(matches!(
+            classify(&both, &Ok(BTreeSet::new())),
+            Parity::RustOnlyRules { .. }
+        ));
+    }
+
+    #[test]
+    fn o60_rust_only_dict_redeclaration_fyi_is_known_divergence() {
+        let r = rules(&["FYI (Related to Rule 18)"]);
+        let p = Ok(BTreeSet::new());
+        match classify(&r, &p) {
+            Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-60"),
+            other => panic!("expected KnownDivergence O-60, got {other:?}"),
+        }
+        // Negative guard: it reconciles ITSELF, never a real Rule 18
+        // difference standing beside it.
+        let both = rules(&["FYI (Related to Rule 18)", "AGS Format Rule 18"]);
         assert!(matches!(
             classify(&both, &Ok(BTreeSet::new())),
             Parity::RustOnlyRules { .. }

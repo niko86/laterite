@@ -421,6 +421,9 @@ impl<'a> Merge<'a> {
             edition: super::edition_or_fallback(self.edition.as_deref())?,
             emit_mode: super::emit_mode(self.mode),
             tran: self.tran,
+            // #1011 put DICT pruning on the bindings and `lat`; the facade
+            // keeps the default until it is asked for here.
+            dict_rows: laterite_ags4_merge::DictRows::Keep,
         };
 
         let result = merge_parsed(&parsed, &opts).map_err(|e| {

@@ -892,6 +892,7 @@ mod tests {
             edition: DictVersion::V4_2,
             tran: None,
             synthesise_metadata: false,
+            dict_rows: crate::DictRows::Keep,
         };
         let one_call = emit_ags4_from_arrow(groups(), &opts).expect("the one-call door emits");
 

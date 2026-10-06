@@ -11,7 +11,7 @@
 //! side as an overlay merged with this base — see D4a in the plan.
 
 use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
-use laterite_ags4_merge::{MissingTranMode, TypeClashMode};
+use laterite_ags4_merge::{DictRows, MissingTranMode, TypeClashMode};
 use laterite_ags4_validator::dict::DictVersion;
 
 use pyo3::exceptions::PyValueError;
@@ -179,6 +179,15 @@ fn registry_missing_tran_modes() -> Vec<String> {
         .collect()
 }
 
+/// The `dict_rows` values build and merge accept, in declaration order —
+/// `["keep", "prune"]` (#1011). Exposed so `_cli.py`'s `--dict-rows` choices
+/// derive from `DictRows::ALL` rather than copy it, as the two mode lists
+/// above do.
+#[pyfunction]
+fn registry_dict_rows_modes() -> Vec<String> {
+    DictRows::ALL.iter().map(|m| m.as_str().into()).collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
@@ -190,5 +199,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_fallback_edition, m)?)?;
     m.add_function(wrap_pyfunction!(registry_type_clash_modes, m)?)?;
     m.add_function(wrap_pyfunction!(registry_missing_tran_modes, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_dict_rows_modes, m)?)?;
     Ok(())
 }

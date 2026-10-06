@@ -311,6 +311,14 @@ export interface EmitOptions {
    *  Rule 14 reports the gap, rather than a placeholder that would *satisfy*
    *  Rule 14 while asserting a transmission that never happened. */
   tran?: TranStamp;
+  /** What to do with the `DICT` rows you pass. `"keep"` (default) writes them
+   *  exactly as given. `"prune"` drops each row that restates a group or
+   *  heading in the edition's standard dictionary (validation already ignores
+   *  those), and each row defining a group or heading your data does not
+   *  contain; `DICT` is written after your last group, and omitted when no row
+   *  remains unless a non-standard heading still needs it (Rule 18). Pruning
+   *  never adds a finding. */
+  dictRows?: "keep" | "prune";
   /** Destination path — the to-disk rider (mirrors laterite-py's
    *  `build_ags4(out=)`). Given, the judged document is written there and the
    *  result is a {@link BuildSaved} carrying `path` and the verdict but **no**
@@ -522,6 +530,7 @@ export function buildAgs4(
     opts.types,
     opts.synthesiseMetadata,
     opts.tran,
+    opts.dictRows,
   );
   const byRule = JSON.parse(res.findingsJson) as Record<
     string,
@@ -979,6 +988,14 @@ export interface MergeOptions {
    * Irrelevant when `tran` is supplied: a stamp synthesises the one `TRAN` row
    * the merged file needs, and this is never read. */
   onMissingTran?: "reconcile" | "error";
+  /** What to do with the sources' unioned `DICT` rows. `"keep"` (default)
+   *  writes them as reconciled. `"prune"` drops each row that restates a group
+   *  or heading in the edition's standard dictionary — exporters often write
+   *  one for every heading, so a merge piles them up — and each row defining
+   *  a group or heading the merged file does not contain. `DICT` is written
+   *  after the other groups, and left out when no row remains and no
+   *  non-standard heading needs it (Rule 18). Pruning never adds a finding. */
+  dictRows?: "keep" | "prune";
 }
 
 /** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
@@ -1023,6 +1040,7 @@ export function merge(
       opts.dictVersion,
       opts.encoding,
       opts.tran,
+      opts.dictRows,
     );
     const bytes = new Uint8Array(out.bytes);
     return {

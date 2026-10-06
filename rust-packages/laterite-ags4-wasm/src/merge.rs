@@ -65,6 +65,9 @@ pub(crate) struct MergeOptions {
     /// rejected with the same enumerated message every other surface gives.
     on_missing_tran: Option<String>,
     tran: Option<TranInput>,
+    /// `"keep"` (default) | `"prune"` — the unioned DICT rows' fate (#1011),
+    /// parsed by the engine's `FromStr` like the two modes above.
+    dict_rows: Option<String>,
 }
 
 #[cfg(feature = "merge")]
@@ -75,6 +78,7 @@ impl WasmOptions for MergeOptions {
         "onTypeClash",
         "onMissingTran",
         "tran",
+        "dictRows",
     ];
     const WHAT: &'static str = "merge options";
 }
@@ -108,6 +112,12 @@ export interface MergeOptions {
    *  `remarks` is APPENDED to merge's own provenance note ("Merged from N
    *  deliveries: …") rather than replacing it: both are true of the result. */
   tran?: TranStamp;
+  /** `"keep"` (default) writes the inputs' unioned `DICT` rows as reconciled.
+   *  `"prune"` drops each row that restates a group or heading in the edition's
+   *  standard dictionary, or defines one the merged file does not contain, and
+   *  writes the `DICT` after the other groups; with no row left it is omitted.
+   *  Pruning never adds a finding. */
+  dictRows?: "keep" | "prune";
 }
 "#;
 
@@ -153,7 +163,7 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 /// differently.
 #[cfg(feature = "merge")]
 fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
-    use laterite_ags4_merge::{MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{DictRows, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed};
 
     let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
     let encoding = resolve_encoding(o.encoding.as_deref())?;
@@ -174,12 +184,14 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         .as_deref()
         .unwrap_or("reconcile")
         .parse()?;
+    let dict_rows: DictRows = o.dict_rows.as_deref().unwrap_or("keep").parse()?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
         on_missing_tran: missing_tran,
         edition: dv,
         tran,
+        dict_rows,
         ..Default::default()
     };
 
@@ -550,5 +562,42 @@ mod tests {
         )
         .expect("merges against the forced edition");
         assert!(!forced.bytes().is_empty());
+    }
+
+    #[cfg(feature = "merge")]
+    #[test]
+    fn dict_rows_prune_drops_a_restated_standard_heading() {
+        // #1011: both inputs restate LOCA_ID in DICT. `keep` (the default)
+        // writes the union; `prune` leaves no row, so no DICT at all.
+        let with_dict = |src: &[u8]| {
+            let mut v = src.to_vec();
+            v.extend_from_slice(
+                b"\r\n\"GROUP\",\"DICT\"\r\n\
+                  \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\"\r\n\
+                  \"UNIT\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                  \"DATA\",\"HEADING\",\"LOCA\",\"LOCA_ID\",\"KEY\"\r\n",
+            );
+            v
+        };
+        let (a, b) = (with_dict(LOCA_A), with_dict(LOCA_B));
+        let text = |o: MergeOptions| {
+            String::from_utf8(merge_core(&a, &b, o).expect("merges").bytes()).expect("utf-8")
+        };
+        let keep = text(MergeOptions::default());
+        assert!(keep.contains("\"GROUP\",\"DICT\""), "{keep}");
+        let pruned = text(MergeOptions {
+            dict_rows: Some("prune".into()),
+            ..Default::default()
+        });
+        assert!(!pruned.contains("\"GROUP\",\"DICT\""), "{pruned}");
+        let msg = err(merge_core(
+            &a,
+            &b,
+            MergeOptions {
+                dict_rows: Some("trim".into()),
+                ..Default::default()
+            },
+        ));
+        assert!(msg.contains("keep, prune"), "{msg}");
     }
 }

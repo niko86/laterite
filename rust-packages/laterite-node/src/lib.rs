@@ -857,9 +857,11 @@ pub fn merge(
     dict_version: Option<String>,
     encoding: Option<String>,
     tran: Option<TranInput>,
+    // `"keep"` (default) | `"prune"` — the unioned DICT rows' fate (#1011).
+    dict_rows: Option<String>,
 ) -> Result<MergeOutput> {
     use laterite_ags4_merge::{
-        MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed,
+        DictRows, MergeError, MergeOpts, MissingTranMode, TypeClashMode, merge_parsed,
     };
 
     if files.len() < 2 {
@@ -911,12 +913,18 @@ pub fn merge(
             .unwrap_or("reconcile")
             .parse()
             .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+    let dict_rows: DictRows = dict_rows
+        .as_deref()
+        .unwrap_or("keep")
+        .parse()
+        .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
         on_missing_tran: missing_tran,
         edition: dv,
         tran,
+        dict_rows,
         ..Default::default()
     };
 
@@ -1451,6 +1459,9 @@ pub fn emit_ags4_from_ipc(
     // shared rule (`TranStamp::from_parts`): all five or none, since all five
     // are REQUIRED headings and a partial stamp fails Rule 10b.
     tran: Option<TranInput>,
+    // `"keep"` (default) | `"prune"` — the DICT rows' fate (#1011); the
+    // engine's `DictRows` owns the tokens and the refusal.
+    dict_rows: Option<String>,
 ) -> Result<EmitResult> {
     let opts = laterite_ags4_emit::EmitOpts {
         tran: tran.map(TranInput::fold).transpose()?.flatten(),
@@ -1461,6 +1472,11 @@ pub fn emit_ags4_from_ipc(
         edition: laterite_ags4_hostopts::edition_or_fallback(edition.as_deref())
             .map_err(|e| Error::from_reason(e.message))?,
         synthesise_metadata: synthesise_metadata.unwrap_or(false),
+        dict_rows: dict_rows
+            .as_deref()
+            .unwrap_or("keep")
+            .parse()
+            .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?,
     };
     // The streaming Arrow door (#790): each cell formats straight off its
     // array — no row-major input copy, and this surface stops holding every
@@ -1769,6 +1785,18 @@ pub fn type_clash_modes() -> Vec<String> {
 #[must_use]
 pub fn missing_tran_modes() -> Vec<String> {
     laterite_ags4_merge::MissingTranMode::ALL
+        .iter()
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
+/// The `--dict-rows` values build and merge accept, in declaration order —
+/// `["keep", "prune"]` (#1011). Generated from `DictRows::ALL`, as the two
+/// mode lists above are, so the launcher's check and the census read one set.
+#[napi]
+#[must_use]
+pub fn dict_rows_modes() -> Vec<String> {
+    laterite_ags4_merge::DictRows::ALL
         .iter()
         .map(|m| m.as_str().to_string())
         .collect()

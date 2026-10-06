@@ -77,6 +77,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         on_missing_tran: args.on_missing_tran,
         edition: dv,
         tran,
+        dict_rows: args.dict_rows,
         ..Default::default()
     };
 

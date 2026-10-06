@@ -7,14 +7,14 @@ rule_number: 18
 rule_sub: ""
 rule_family: groups
 varies_between_editions: false
-divergences: [O-17, O-44]
+divergences: [O-17, O-44, O-60]
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   impl: "repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs"
   fixtures: ""
   regression: ""
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 18"
-related: [rule-families, traceability-chain, parity-model, O-44]
+related: [rule-families, traceability-chain, parity-model, O-44, O-60]
 sources: [spec-4.2]
 ---
 # Rule 18 — dict group
@@ -32,6 +32,8 @@ Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by
 > [!quote] Implemented in `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs`
 
 [[DICT]] group present when non-standard GROUP/HEADING used. Rule 18 keys off heading membership only, not GROUP names (O-17).
+
+A DICT row that redeclares a group or heading the resolved edition's standard dictionary already defines changes nothing the rules check, because the effective dictionary reads the standard entry first. `rule_18_redeclaration` names each such row ([[O-60]]): a WARNING under `Warning (Related to Rule 18)` when it drops KEY from a standard KEY heading or gives a standard group a different parent, otherwise an FYI under `FYI (Related to Rule 18)` listing the fields that differ. `build_ags4` and `merge` take `dict_rows="prune"` to drop these rows, plus rows for user-defined names the output does not contain.
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
@@ -60,6 +62,7 @@ timeline
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
 - Divergence (Rust↔python): [[O-44]] — laterite adds opt-in WARNING-tier structural validation of the file's own DICT group (the first WARNING-tier producer); python-ags4 only consumes DICT. (See also [[O-17]] for the error-tier keying scope.)
+- Divergence (Rust↔python): [[O-60]] — laterite names DICT rows that redeclare a standard group or heading; python-ags4 has no such check.
 
 ## Related
-[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-17]] · [[O-44]]
+[[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[O-17]] · [[O-44]] · [[O-60]]

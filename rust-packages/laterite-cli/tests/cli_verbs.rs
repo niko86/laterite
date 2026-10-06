@@ -680,6 +680,58 @@ fn merge_json_reports_the_revision_and_the_tran_warning() {
 }
 
 #[test]
+fn merge_dict_rows_prune_drops_the_restating_rows() {
+    // Both deliveries restate a standard heading in DICT and declare one the
+    // merged file never carries — the #1011 shape. `keep` (the default) writes
+    // the union as given; `prune` leaves no row, so no DICT at all.
+    let (dir, base, rev) = write_merge_pair();
+    let dict = "\r\n\"GROUP\",\"DICT\"\r\n\
+                \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\"\r\n\
+                \"UNIT\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                \"DATA\",\"HEADING\",\"PROJ\",\"PROJ_NAME\",\"OTHER\"\r\n\
+                \"DATA\",\"HEADING\",\"PROJ\",\"PROJ_GONE\",\"OTHER\"\r\n";
+    for p in [&base, &rev] {
+        let mut s = std::fs::read_to_string(p).unwrap();
+        s.push_str(dict);
+        std::fs::write(p, s).unwrap();
+    }
+    let run = |mode: Option<&str>, name: &str| {
+        let out = dir.join(name);
+        let mut args = vec![
+            "merge".to_string(),
+            base.to_str().unwrap().to_string(),
+            rev.to_str().unwrap().to_string(),
+            "--out".to_string(),
+            out.to_str().unwrap().to_string(),
+        ];
+        if let Some(m) = mode {
+            args.extend(["--dict-rows".to_string(), m.to_string()]);
+        }
+        let o = lat(args);
+        assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+        std::fs::read_to_string(out).unwrap()
+    };
+    let default = run(None, "default.ags");
+    assert!(default.contains("\"GROUP\",\"DICT\""), "{default}");
+    assert_eq!(run(Some("keep"), "keep.ags"), default);
+    let pruned = run(Some("prune"), "prune.ags");
+    assert!(!pruned.contains("\"GROUP\",\"DICT\""), "{pruned}");
+
+    let o = lat([
+        "merge",
+        base.to_str().unwrap(),
+        rev.to_str().unwrap(),
+        "--out",
+        dir.join("bogus.ags").to_str().unwrap(),
+        "--dict-rows",
+        "trim",
+    ]);
+    // A bad flag value is a usage error (lat's exit 5), named by clap.
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("--dict-rows"), "{}", stderr(&o));
+}
+
+#[test]
 fn merge_missing_file_exits_3() {
     let (dir, base, _rev) = write_merge_pair();
     let out = dir.join("merged.ags");

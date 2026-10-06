@@ -67,6 +67,7 @@
         "merge": {
           "--dict": true,
           "--dict-replace": false,
+          "--dict-rows": true,
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
@@ -127,6 +128,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --dict-rows": [
+          "keep",
+          "prune"
+        ],
         "merge --on-missing-tran": [
           "error",
           "reconcile"
@@ -222,6 +227,7 @@
         "merge": {
           "--dict": true,
           "--dict-replace": false,
+          "--dict-rows": true,
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
@@ -284,6 +290,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --dict-rows": [
+          "keep",
+          "prune"
+        ],
         "merge --on-missing-tran": [
           "error",
           "reconcile"
@@ -379,6 +389,7 @@
         "merge": {
           "--dict": true,
           "--dict-replace": false,
+          "--dict-rows": true,
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
@@ -441,6 +452,10 @@
         "--quiet": false
       },
       "arg_values": {
+        "merge --dict-rows": [
+          "keep",
+          "prune"
+        ],
         "merge --on-missing-tran": [
           "error",
           "reconcile"

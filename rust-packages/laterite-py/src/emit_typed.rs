@@ -19,7 +19,8 @@ use arrow::array::{
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_emit::{
-    ArrowGroup, DictVersion, EmitMode, EmitOpts, emit_ags4_from_arrow as engine_emit_from_arrow,
+    ArrowGroup, DictRows, DictVersion, EmitMode, EmitOpts,
+    emit_ags4_from_arrow as engine_emit_from_arrow,
     emit_ags4_from_arrow_unchecked as engine_emit_from_arrow_unchecked,
 };
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -50,7 +51,7 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// returns) `AutoFix` made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None))]
+#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None, tran_description=None, tran_remarks=None, dict_rows=None))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 pub fn emit_ags4_from_arrow(
@@ -76,6 +77,9 @@ pub fn emit_ags4_from_arrow(
     tran_status: Option<String>,
     tran_description: Option<String>,
     tran_remarks: Option<String>,
+    // `"keep"` (also `None`) | `"prune"` — the DICT rows' fate (#1011);
+    // parsed by the engine's own `DictRows`, so the accepted set has one author.
+    dict_rows: Option<String>,
 ) -> PyResult<(Py<PyBytes>, String, Bound<'_, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
@@ -91,6 +95,10 @@ pub fn emit_ags4_from_arrow(
         )
         .map_err(|e| PyValueError::new_err(e.to_string()))?,
         synthesise_metadata,
+        dict_rows: dict_rows
+            .as_deref()
+            .map_or(Ok(DictRows::Keep), str::parse::<DictRows>)
+            .map_err(PyValueError::new_err)?,
     };
 
     let mut groups: Vec<ArrowGroup> = Vec::with_capacity(tables.len());

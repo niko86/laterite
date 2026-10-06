@@ -280,6 +280,67 @@ pub struct EmitOpts {
     /// AutoFix-without → AutoFix-with to price each stage; the stage costs
     /// ~0.3% of an export, so this flag is not a performance knob.
     pub synthesise_metadata: bool,
+    /// What happens to the caller's DICT rows — see [`DictRows`]. `Keep`
+    /// (the default) writes them exactly as given.
+    pub dict_rows: DictRows,
+}
+
+/// What a build or merge does with the DICT rows it is given (#1011).
+///
+/// Several exporters write a DICT row for every heading they emit, standard
+/// ones included, and a merge unions those rows, so a combined file can carry
+/// dozens of rows restating the dictionary — some describing a KEY heading
+/// as `OTHER` — beside the few that define something. Validation ignores the
+/// restatements (the standard definition applies, O-60), but a reader that
+/// takes DICT literally cannot tell which rows matter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DictRows {
+    /// Write DICT exactly as given. The default: the output is byte-identical
+    /// to a build that never heard of this option.
+    #[default]
+    Keep,
+    /// Drop each DICT row that redeclares a group or heading in the output
+    /// edition's standard dictionary, or declares a user-defined one the
+    /// output does not contain. The rows left keep their order, and the DICT
+    /// group moves to after the caller's last group — whether a row's heading
+    /// is in the output is only known once every group has been seen. With no
+    /// row left the group is omitted, unless the output still has a
+    /// non-standard heading (Rule 18 then requires a DICT), in which case it
+    /// is written unpruned: pruning never adds a finding.
+    Prune,
+}
+
+impl DictRows {
+    /// The wire name — the exact token every surface accepts and reports.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DictRows::Keep => "keep",
+            DictRows::Prune => "prune",
+        }
+    }
+
+    /// Every accepted token, default first — the one list the CLI's value
+    /// enum, the `.pyi` `Literal` and the TS unions derive from or are pinned
+    /// to, as `MissingTranMode::ALL` is for merge.
+    pub const ALL: [DictRows; 2] = [DictRows::Keep, DictRows::Prune];
+}
+
+impl std::str::FromStr for DictRows {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        DictRows::ALL
+            .into_iter()
+            .find(|m| m.as_str() == s.trim().to_ascii_lowercase())
+            .ok_or_else(|| {
+                let allowed: Vec<&str> = DictRows::ALL.iter().map(|m| m.as_str()).collect();
+                format!(
+                    "unknown dict_rows {s:?}; expected one of {}",
+                    allowed.join(", ")
+                )
+            })
+    }
 }
 
 impl Default for EmitOpts {
@@ -302,6 +363,7 @@ impl Default for EmitOpts {
             edition: DictVersion::V4_1_1,
             tran: None,
             synthesise_metadata: false,
+            dict_rows: DictRows::Keep,
         }
     }
 }
@@ -439,7 +501,98 @@ pub(crate) struct EmitStream<'a> {
     /// step 2.5's catalogues, filled as the groups stream — `Some` only when
     /// synthesis is on (`AutoFix` + opt-in), exactly the old batch condition.
     synth: Option<SynthAccumulator>,
+    /// `Some` only under [`DictRows::Prune`]: the held DICT and what the
+    /// output contains, which its rows are judged against at assembly.
+    prune: Option<DictPrune>,
     wrote_any: bool,
+}
+
+/// [`DictRows::Prune`]'s state across the stream. The DICT is held rather
+/// than written where it arrives because whether a user-defined row's heading
+/// is in the output is only known once the last group has been pushed — and
+/// a session door (`ArrowEmitSession`) never sees the groups ahead of time.
+#[derive(Default)]
+struct DictPrune {
+    held: Vec<OwnedGroup>,
+    groups: BTreeSet<String>,
+    /// `(group, heading)` for every heading written.
+    headings: BTreeSet<(String, String)>,
+}
+
+impl DictPrune {
+    fn record(&mut self, og: &OwnedGroup) {
+        self.groups.insert(og.code.clone());
+        for h in &og.headings {
+            self.headings.insert((og.code.clone(), h.clone()));
+        }
+    }
+
+    /// Whether a user-defined group is in the output: present as a group, or
+    /// the home of a heading another group borrows (Rule 19b looks the prefix
+    /// up in the DICT, so that group's rows still have a reader).
+    fn has_group(&self, code: &str) -> bool {
+        self.groups.contains(code)
+            || self
+                .headings
+                .iter()
+                .any(|(_, h)| h.split_once('_').is_some_and(|(p, _)| p == code))
+    }
+
+    /// Whether a user-defined heading is in the output: under its group, or
+    /// borrowed into another group from the group its DICT row names.
+    fn has_heading(&self, group: &str, heading: &str) -> bool {
+        self.headings
+            .contains(&(group.to_string(), heading.to_string()))
+            || self.headings.iter().any(|(_, h)| {
+                h == heading && heading.split_once('_').is_some_and(|(p, _)| p == group)
+            })
+    }
+
+    /// Any heading the standard edition does not define for its group — what
+    /// Rule 9 reports and Rule 18 then requires a DICT for.
+    fn has_non_standard_heading(&self, dict: &Dictionary) -> bool {
+        self.headings
+            .iter()
+            .any(|(g, h)| g != "DICT" && dict.heading(g, h).is_none())
+    }
+
+    /// The DICT as written under `Prune`, or `None` to omit it. Rows the main
+    /// Rule 18 checks cannot place (a blank `DICT_GRP`, a heading row with no
+    /// heading) are kept: they define nothing this could judge redundant.
+    fn pruned(&self, mut og: OwnedGroup, dict: &Dictionary) -> Option<OwnedGroup> {
+        let col = |name: &str| og.headings.iter().position(|h| h == name);
+        let Some(gi) = col("DICT_GRP") else {
+            return Some(og); // unreadable: nothing can be judged, so nothing goes
+        };
+        let (ti, hi) = (col("DICT_TYPE"), col("DICT_HDNG"));
+        let keep: Vec<bool> = og
+            .rows
+            .iter()
+            .map(|row| {
+                let grp = dict_cell(row, Some(gi));
+                if grp.is_empty() {
+                    return true;
+                }
+                if dict_cell(row, ti).eq_ignore_ascii_case("GROUP") {
+                    return dict.group(grp).is_none() && self.has_group(grp);
+                }
+                let hdng = dict_cell(row, hi);
+                hdng.is_empty()
+                    || (dict.heading(grp, hdng).is_none() && self.has_heading(grp, hdng))
+            })
+            .collect();
+        if !keep.contains(&true) {
+            return self.has_non_standard_heading(dict).then_some(og);
+        }
+        let mut verdicts = keep.into_iter();
+        og.rows.retain(|_| verdicts.next().unwrap_or(true));
+        Some(og)
+    }
+}
+
+/// One DICT cell, trimmed; `""` for a missing column or a short row.
+fn dict_cell(row: &[String], i: Option<usize>) -> &str {
+    i.and_then(|i| row.get(i)).map_or("", |v| v.trim())
 }
 
 impl<'a> EmitStream<'a> {
@@ -457,6 +610,7 @@ impl<'a> EmitStream<'a> {
             opts,
             dict,
             synth,
+            prune: (opts.dict_rows == DictRows::Prune).then(DictPrune::default),
             wrote_any: false,
         }
     }
@@ -485,16 +639,37 @@ impl<'a> EmitStream<'a> {
     #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
         let og = in_dictionary_order(og, self.dict);
-        if let Some(acc) = &mut self.synth {
-            acc.fold(&og);
+        if let Some(prune) = &mut self.prune {
+            if og.code == "DICT" {
+                // Folded into the catalogues only once pruned, at assembly:
+                // a dropped row's PA codes must not reach a synthesised ABBR.
+                prune.held.push(og);
+                return Ok(());
+            }
+            prune.record(&og);
         }
-        self.write_group(&og)
+        self.write_group_folded(&og)
     }
 
-    /// Write the synthesised groups (last, preserving the batch pipeline's
-    /// byte order) and assemble the writer-built verdict: the emitted bytes
-    /// adopted as the verdict's buffer, no `parse_bytes` run.
+    fn write_group_folded(&mut self, og: &OwnedGroup) -> Result<(), EmitError> {
+        if let Some(acc) = &mut self.synth {
+            acc.fold(og);
+        }
+        self.write_group(og)
+    }
+
+    /// Write the held DICT (pruned), then the synthesised groups (last,
+    /// preserving the batch pipeline's byte order), and assemble the
+    /// writer-built verdict: the emitted bytes adopted as the verdict's
+    /// buffer, no `parse_bytes` run.
     pub(crate) fn assemble(mut self) -> Result<(ParsedFile, usize), EmitError> {
+        if let Some(mut prune) = self.prune.take() {
+            for og in std::mem::take(&mut prune.held) {
+                if let Some(og) = prune.pruned(og, self.dict) {
+                    self.write_group_folded(&og)?;
+                }
+            }
+        }
         if let Some(acc) = self.synth.take() {
             for og in acc.synthesised(self.dict, self.opts.tran.as_ref()) {
                 self.write_group(&in_dictionary_order(og, self.dict))?;
@@ -537,6 +712,10 @@ pub(crate) fn unchecked_opts(edition: DictVersion) -> EmitOpts {
         edition,
         tran: None,
         synthesise_metadata: false,
+        // The unchecked doors take only an edition; #1011 asked for pruning
+        // on the judged build and merge, where its no-new-finding promise can
+        // be seen to hold.
+        dict_rows: DictRows::Keep,
     }
 }
 
@@ -1857,6 +2036,171 @@ mod tests {
             emitted_group(&r.bytes, "LOCA").0,
             strings(&["LOCA_ID", "LOCA_FDEP", "LOCA_TYPE"])
         );
+    }
+
+    /// A DICT of `(TYPE, GRP, HDNG, STAT)` rows.
+    fn dict_of(rows: &[[&str; 4]]) -> GroupInput {
+        GroupInput {
+            code: "DICT".into(),
+            headings: strings(&["DICT_TYPE", "DICT_GRP", "DICT_HDNG", "DICT_STAT"]),
+            units: None,
+            types: None,
+            rows: rows
+                .iter()
+                .map(|r| r.iter().map(|v| c(*v)).collect())
+                .collect(),
+        }
+    }
+
+    fn loca_with(headings: &[&str], row: &[&str]) -> GroupInput {
+        GroupInput {
+            code: "LOCA".into(),
+            headings: strings(headings),
+            units: None,
+            types: None,
+            rows: vec![row.iter().map(|v| c(*v)).collect()],
+        }
+    }
+
+    fn with_dict_rows(dict_rows: DictRows) -> EmitOpts {
+        EmitOpts {
+            mode: EmitMode::Report,
+            dict_rows,
+            ..EmitOpts::default()
+        }
+    }
+
+    /// Every finding as `(rule, line-free desc)` — line numbers move when
+    /// DICT does, so the promise is compared on what is reported.
+    fn reported(f: &Findings) -> BTreeSet<(String, String)> {
+        f.iter()
+            .flat_map(|(rule, items)| items.iter().map(move |x| (rule.clone(), x.desc.clone())))
+            .collect()
+    }
+
+    #[test]
+    fn prune_keeps_only_the_user_rows_the_output_uses() {
+        let inputs = || {
+            vec![
+                proj(),
+                dict_of(&[
+                    ["HEADING", "LOCA", "LOCA_ID", "OTHER"], // standard: dropped
+                    ["GROUP", "LOCA", "", ""],               // standard group: dropped
+                    ["HEADING", "LOCA", "LOCA_XTRA", "OTHER"], // used: kept
+                    ["HEADING", "LOCA", "LOCA_GONE", "OTHER"], // unused: dropped
+                    ["HEADING", "PROJ", "PROJ_NAME", "OTHER"], // standard: dropped
+                ]),
+                loca_with(&["LOCA_ID", "LOCA_XTRA"], &["BH1", "x"]),
+            ]
+        };
+        let keep = emit_ags4(&inputs(), &with_dict_rows(DictRows::Keep)).unwrap();
+        let prune = emit_ags4(&inputs(), &with_dict_rows(DictRows::Prune)).unwrap();
+        let (_, _, rows) = emitted_group(&prune.bytes, "DICT");
+        assert_eq!(
+            rows,
+            vec![strings(&["HEADING", "LOCA", "LOCA_XTRA", "OTHER"])]
+        );
+        // Pruning never adds a finding.
+        let added: Vec<_> = reported(&prune.findings)
+            .difference(&reported(&keep.findings))
+            .cloned()
+            .collect();
+        assert!(added.is_empty(), "prune added {added:?}");
+        // The DICT is written after the caller's last group.
+        let order = parse_bytes(&prune.bytes, encoding_rs::UTF_8)
+            .unwrap()
+            .group_order;
+        assert_eq!(order, strings(&["PROJ", "LOCA", "DICT"]));
+    }
+
+    #[test]
+    fn keep_is_the_default_and_writes_dict_as_given() {
+        let inputs = vec![
+            proj(),
+            dict_of(&[["HEADING", "PROJ", "PROJ_NAME", "OTHER"]]),
+        ];
+        let default = emit_ags4(
+            &inputs,
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..EmitOpts::default()
+            },
+        )
+        .unwrap();
+        let keep = emit_ags4(&inputs, &with_dict_rows(DictRows::Keep)).unwrap();
+        assert_eq!(default.bytes, keep.bytes);
+        assert_eq!(
+            emitted_group(&keep.bytes, "DICT").2,
+            vec![strings(&["HEADING", "PROJ", "PROJ_NAME", "OTHER"])]
+        );
+    }
+
+    #[test]
+    fn prune_omits_a_dict_left_empty_when_rule_18_does_not_need_it() {
+        let inputs = vec![
+            proj(),
+            dict_of(&[
+                ["HEADING", "PROJ", "PROJ_NAME", "OTHER"],
+                ["HEADING", "ZZZZ", "ZZZZ_ID", "KEY"], // a group the output lacks
+            ]),
+        ];
+        let r = emit_ags4(&inputs, &with_dict_rows(DictRows::Prune)).unwrap();
+        let order = parse_bytes(&r.bytes, encoding_rs::UTF_8)
+            .unwrap()
+            .group_order;
+        assert_eq!(order, strings(&["PROJ"]));
+    }
+
+    #[test]
+    fn prune_keeps_the_dict_whole_when_rule_18_still_needs_one() {
+        // LOCA_XTRA is non-standard and the DICT never declared it, so Rule 9
+        // fires either way; omitting the DICT would add a Rule 18 finding.
+        let inputs = || {
+            vec![
+                proj(),
+                dict_of(&[["HEADING", "LOCA", "LOCA_ID", "KEY"]]),
+                loca_with(&["LOCA_ID", "LOCA_XTRA"], &["BH1", "x"]),
+            ]
+        };
+        let keep = emit_ags4(&inputs(), &with_dict_rows(DictRows::Keep)).unwrap();
+        let prune = emit_ags4(&inputs(), &with_dict_rows(DictRows::Prune)).unwrap();
+        assert_eq!(
+            emitted_group(&prune.bytes, "DICT").2,
+            vec![strings(&["HEADING", "LOCA", "LOCA_ID", "KEY"])]
+        );
+        assert_eq!(reported(&prune.findings), reported(&keep.findings));
+    }
+
+    #[test]
+    fn prune_keeps_the_home_rows_of_a_borrowed_user_heading() {
+        // ZZZZ_REF is borrowed into LOCA from a user group the output does not
+        // carry; Rule 19b looks ZZZZ up in the DICT, so its rows stay.
+        let inputs = || {
+            vec![
+                proj(),
+                dict_of(&[
+                    ["GROUP", "ZZZZ", "", ""],
+                    ["HEADING", "ZZZZ", "ZZZZ_REF", "OTHER"],
+                    ["HEADING", "LOCA", "ZZZZ_REF", "OTHER"],
+                ]),
+                loca_with(&["LOCA_ID", "ZZZZ_REF"], &["BH1", "r"]),
+            ]
+        };
+        let keep = emit_ags4(&inputs(), &with_dict_rows(DictRows::Keep)).unwrap();
+        let prune = emit_ags4(&inputs(), &with_dict_rows(DictRows::Prune)).unwrap();
+        assert_eq!(emitted_group(&prune.bytes, "DICT").2.len(), 3);
+        assert_eq!(reported(&prune.findings), reported(&keep.findings));
+    }
+
+    #[test]
+    fn dict_rows_tokens_round_trip_and_refuse_the_unknown() {
+        for m in DictRows::ALL {
+            assert_eq!(m.as_str().parse::<DictRows>().unwrap(), m);
+        }
+        assert_eq!(" Prune ".parse::<DictRows>().unwrap(), DictRows::Prune);
+        let err = "trim".parse::<DictRows>().unwrap_err();
+        assert!(err.contains("keep, prune"), "{err}");
+        assert_eq!(DictRows::default(), DictRows::Keep);
     }
 
     fn stamp() -> TranStamp {
