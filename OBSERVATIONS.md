@@ -823,12 +823,16 @@ O-N below is an internal decision or behavioural note, not for external circulat
   it is a `Warning (Related to Rule 16)`, shown by default, whose message
   adds that 4.2 treats ABBR codes as case-insensitive. Under 4.0.x and
   4.1.x it stays an opt-in `FYI (Related to Rule 16)`. One file never
-  gets both. It fires whatever the codes' standard status, including when
+  gets both. A 4.2 file checked with warnings off but FYIs on still gets
+  the FYI, in the #1009 wording, as the unrecognised-`TRAN_AGS` finding
+  falls back: the tier is raised, never removed. That is the mode
+  `compat` runs, so compat reports the collision as it did before. It fires whatever the codes' standard status, including when
   every spelling is standard, since the importer risk is the same; an
   exact repeat is one spelling. Only the file's rows are compared, never
   the standard list with itself. Neither tier changes the verdict (#321);
   `--warnings-as-errors` is how a caller fails on the 4.2 warning. The FYI
-  reuses the existing label; the WARNING's separate `Warning (...)` label
+  reuses the existing label, which python-ags4 also emits; the WARNING's
+  separate `Warning (...)` label
   is what lets compat's severity classifier count it as a warning, and
   the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Collapsing the variants is not done here.

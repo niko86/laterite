@@ -117,8 +117,12 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
         }
         rule_16_fyi(parsed, dict, found);
         rule_16_fyi_nonstandard_abbr(parsed, dict, found);
-        // Under 4.2+ the collision is the WARNING above instead, never both.
-        if !abbr_list_is_case_insensitive(dict.version()) {
+        // Under 4.2+ with warnings on, the collision is the WARNING above
+        // instead, never both. With warnings off (compat's mode) it falls back
+        // to this FYI, as the TRAN_AGS finding does, so raising the 4.2 tier
+        // never makes the finding vanish. The fallback keeps the #1009 wording
+        // word for word, which is what compat has always reported.
+        if !opts.include_warnings || !abbr_list_is_case_insensitive(dict.version()) {
             rule_16_case_collision(parsed, found, RULE_16_FYI, Severity::Fyi);
         }
     }
@@ -273,6 +277,7 @@ fn or_list(codes: &[&str]) -> Option<String> {
 /// 4.2, whose spec makes ABBR codes case-insensitive and asks for
 /// consistent use, and an FYI before it, where the spec is silent and only the
 /// importer risk remains. The WARNING message says which edition makes it one.
+/// A 4.2 file checked with warnings off but FYIs on still gets the FYI.
 ///
 /// Fires whatever the codes' standard status, even when every spelling is
 /// standard: the standard list carries case-only pairs of its own, and the
@@ -1206,8 +1211,17 @@ mod tests {
         // Warning, with or without FYIs, and never the FYI beside it.
         assert_eq!(case_collisions(DictVersion::V4_2, true, false), warning);
         assert_eq!(case_collisions(DictVersion::V4_2, true, true), warning);
-        // Warnings off: nothing, not a fallback FYI.
-        assert!(case_collisions(DictVersion::V4_2, false, true).is_empty());
+        // Warnings off, FYIs on (compat's mode): exactly the #1009 FYI, so
+        // raising the tier never makes the finding vanish.
+        assert_eq!(
+            case_collisions(DictVersion::V4_2, false, true),
+            vec![(
+                RULE_16_FYI.to_string(),
+                "TRIG_COND: codes \"Undisturbed\" and \"UNDISTURBED\" differ only by \
+                 letter case; some importers treat them as the same code."
+                    .to_string(),
+            )]
+        );
         assert!(case_collisions(DictVersion::V4_2, false, false).is_empty());
     }
 
