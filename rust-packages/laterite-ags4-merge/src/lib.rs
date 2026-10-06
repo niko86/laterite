@@ -208,7 +208,18 @@ pub struct MergeOpts {
     /// Whether that no-stamp path warns (the default) or refuses. Read ONLY when
     /// `tran` is `None`; a supplied stamp makes it irrelevant.
     pub on_missing_tran: MissingTranMode,
+    /// What happens to the inputs' unioned DICT rows. `Keep` (the default)
+    /// writes them as reconciled; `Prune` drops the ones restating the
+    /// standard dictionary or defining something the merged file lacks —
+    /// the case #1011 came from, where each delivery's exporter restated the
+    /// dictionary and the union piled the restatements up. See [`DictRows`].
+    pub dict_rows: DictRows,
 }
+
+/// Re-exported from [`laterite_ags4_emit`], where the pruning happens: merge
+/// hands the option straight to the emit it ends in, so build and merge prune
+/// by one rule.
+pub use laterite_ags4_emit::DictRows;
 
 impl Default for MergeOpts {
     fn default() -> Self {
@@ -218,6 +229,7 @@ impl Default for MergeOpts {
             emit_mode: EmitMode::AutoFix,
             tran: None,
             on_missing_tran: MissingTranMode::Reconcile,
+            dict_rows: DictRows::Keep,
         }
     }
 }
@@ -441,6 +453,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
         // Metadata synthesis inherits the default, which is now OFF (2026-07-24).
         // A merge combines files the caller already has; inventing catalogs on
         // top of that is exactly the surprise the opt-in exists to prevent.
+        dict_rows: opts.dict_rows,
         ..EmitOpts::default()
     };
     let out = emit_ags4(&inputs, &emit_opts).map_err(|e| MergeError::Emit(e.to_string()))?;

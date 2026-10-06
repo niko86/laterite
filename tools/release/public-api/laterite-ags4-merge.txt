@@ -1,4 +1,5 @@
 pub mod laterite_ags4_merge
+pub use laterite_ags4_merge::DictRows
 pub use laterite_ags4_merge::TranStamp
 pub enum laterite_ags4_merge::MergeError
 pub laterite_ags4_merge::MergeError::Emit(alloc::string::String)
@@ -79,6 +80,7 @@ impl core::marker::UnsafeUnpin for laterite_ags4_merge::TypeClashMode
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::TypeClashMode
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::TypeClashMode
 pub struct laterite_ags4_merge::MergeOpts
+pub laterite_ags4_merge::MergeOpts::dict_rows: laterite_ags4_emit::emit::DictRows
 pub laterite_ags4_merge::MergeOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
 pub laterite_ags4_merge::MergeOpts::emit_mode: laterite_ags4_emit::emit::EmitMode
 pub laterite_ags4_merge::MergeOpts::on_missing_tran: laterite_ags4_merge::MissingTranMode

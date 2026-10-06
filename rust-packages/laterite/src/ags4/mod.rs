@@ -903,6 +903,9 @@ fn emit_groups(
         edition: edition_or_fallback(edition)?,
         tran,
         synthesise_metadata,
+        // #1011 put DICT pruning on the bindings and `lat`; the facade keeps
+        // the default until it is asked for here.
+        dict_rows: laterite_ags4_emit::DictRows::Keep,
     };
     let result = emit_ags4(groups, &opts)
         .map_err(|e| Error::with_source(ErrorKind::Emit, "cannot write as AGS4", e))?;

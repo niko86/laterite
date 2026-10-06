@@ -154,6 +154,13 @@ export interface AppliedFix {
 export declare function canonicalType(agsType: string): string | null
 
 /**
+ * The `--dict-rows` values build and merge accept, in declaration order —
+ * `["keep", "prune"]` (#1011). Generated from `DictRows::ALL`, as the two
+ * mode lists above are, so the launcher's check and the census read one set.
+ */
+export declare function dictRowsModes(): Array<string>
+
+/**
  * Compare two AGS4 documents (raw `a` baseline / `b` revision bytes) — the
  * revision diff, mirroring laterite-py's `diff()` and the wasm `diff()`.
  * `dict_version` `None`/`"auto"` resolves the KEY-heading edition from the
@@ -186,7 +193,7 @@ export declare function editions(): Array<string>
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
  * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
-export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tran?: TranInput | undefined | null): EmitResult
+export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tran?: TranInput | undefined | null, dictRows?: string | undefined | null): EmitResult
 
 /**
  * The unchecked door (#881): [`emit_ags4_from_ipc`]'s marshalling handed to
@@ -349,7 +356,7 @@ export declare function listRules(): string
  * merge is refused before any bytes are produced. The edition is the newest file's `TRAN_AGS`
  * unless `dictVersion` forces it. Parse failure throws the mapped error.
  */
-export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, onMissingTran?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null): MergeOutput
+export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, onMissingTran?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null, dictRows?: string | undefined | null): MergeOutput
 
 export interface MergeOutput {
   bytes: Buffer

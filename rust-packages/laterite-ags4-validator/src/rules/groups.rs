@@ -88,6 +88,12 @@ const RULE_14_WARN: &str = "Warning (Related to Rule 14)";
 // the compat severity classifier never counts it as an error and the error-tier
 // Rule 16 bucket is untouched.
 const RULE_16_WARN: &str = "Warning (Related to Rule 16)";
+// FYI-tier label for a DICT row that redeclares a standard group or heading
+// (O-60). Its own label, NOT "AGS Format Rule 18", so the compat severity
+// classifier counts it as an FYI and the error-tier Rule 18 bucket stays
+// byte-stable — the RULE_16_FYI scheme. The WARNING tier of the same check
+// reuses RULE_18_WARN.
+const RULE_18_FYI: &str = "FYI (Related to Rule 18)";
 
 const KNOWN_TRAN_AGS: &[&str] = &["4.0", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 
@@ -98,6 +104,9 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
     rule_16(parsed, opts.include_fyi, found);
     rule_17(parsed, found);
     rule_18(parsed, found);
+    // Both tiers decided in one walk, so a row is reported once at the tier
+    // the flags allow (O-60).
+    rule_18_redeclaration(parsed, dict, opts, found);
     if opts.include_warnings {
         rule_18_structure(parsed, found);
         // Native (warnings-on) view: an unrecognised TRAN_AGS is a WARNING — the
@@ -757,6 +766,172 @@ fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
             );
         }
     }
+}
+
+/// A DICT row that redeclares a group or heading the resolved edition's
+/// standard dictionary already defines (O-60, #1011).
+///
+/// The effective dictionary reads the standard entry first, so such a row
+/// changes nothing laterite checks, and no rule forbids it. It still misleads
+/// whoever reads DICT literally: several exporters write a row for every
+/// heading they emit, and after a merge the union restates the dictionary
+/// dozens of times, some rows with a status, type or unit the standard does
+/// not give. So each such row is named, one finding per row:
+///
+/// * a WARNING when the row would make a literal reader get row identity
+///   wrong — it drops KEY from a heading the standard keys, or gives a
+///   standard group a different `DICT_PGRP`. The #321 test, and the split the
+///   `--dict` overlay already makes (`emit_override_findings`);
+/// * an FYI otherwise, listing each field that differs from the standard.
+///
+/// With warnings off but FYIs on (compat's mode) a WARNING row falls back to
+/// the FYI, as the O-58 and `TRAN_AGS` findings do, so raising the tier never
+/// makes a finding vanish. Judged against the BUNDLED edition, not `dict`,
+/// for the reason `declared_type_fyi` gives: a heading only an overlay or the
+/// file's DICT defines has no standard definition to restate. A field is
+/// compared only when its DICT column exists; a row with a blank `DICT_GRP`
+/// or `DICT_HDNG` is `rule_18_structure`'s, not this.
+fn rule_18_redeclaration(
+    parsed: &ParsedFile,
+    dict: &Dictionary,
+    opts: &CheckOptions,
+    found: &mut Findings,
+) {
+    if !opts.include_warnings && !opts.include_fyi {
+        return; // nothing this emits is error-tier
+    }
+    let Some(dictg) = parsed.groups.get("DICT") else {
+        return;
+    };
+    let Some(gi) = col(dictg, "DICT_GRP") else {
+        return; // rule_18_structure reports the missing column
+    };
+    let [ti, hi, si, yi, ui, pi, di] = [
+        "DICT_TYPE",
+        "DICT_HDNG",
+        "DICT_STAT",
+        "DICT_DTYP",
+        "DICT_UNIT",
+        "DICT_PGRP",
+        "DICT_DESC",
+    ]
+    .map(|name| col(dictg, name));
+    let edition = dict.version();
+    let standard = Dictionary::bundled(edition);
+
+    for row in &dictg.rows {
+        // `None` when the column is absent: the row says nothing about that
+        // field, so there is nothing to compare.
+        let get = |i: Option<usize>| i.map(|i| dictg.value_at(row, i).unwrap_or("").trim());
+        let grp = get(Some(gi)).unwrap_or("");
+        if grp.is_empty() {
+            continue;
+        }
+        let is_group_row = get(ti).is_some_and(|t| t.eq_ignore_ascii_case("GROUP"));
+        let mut diffs: Vec<String> = Vec::new();
+        // A description differing only by case is the same text, as Rule 16's
+        // description FYI already reads it; codes and units are compared exactly.
+        let mut differ = |field: &str, theirs: Option<&str>, std: &str| {
+            if let Some(v) = theirs {
+                let same = if field == "DICT_DESC" {
+                    v.eq_ignore_ascii_case(std.trim())
+                } else {
+                    v == std.trim()
+                };
+                if !same {
+                    diffs.push(format!("{field} {v:?} vs standard {:?}", std.trim()));
+                }
+            }
+        };
+        let (subject, warning) = if is_group_row {
+            let Some(sg) = standard.group(grp) else {
+                continue; // a user-defined group: exactly what DICT is for
+            };
+            // The file side's conventional "-" means parentless, as the
+            // effective dictionary reads it.
+            let parent = get(pi).map(|p| if p == "-" { "" } else { p });
+            let reparented = parent.is_some_and(|p| p != sg.parent);
+            differ("DICT_PGRP", parent, sg.parent);
+            differ("DICT_DESC", get(di), sg.desc);
+            (
+                format!("group {grp}, a standard group"),
+                reparented.then_some(
+                    "it gives the group a different parent, so a reader that takes DICT \
+                     literally gets the group hierarchy wrong",
+                ),
+            )
+        } else {
+            let hdng = get(hi).unwrap_or("");
+            if hdng.is_empty() {
+                continue;
+            }
+            let Some(sh) = standard.heading(grp, hdng) else {
+                continue; // a user-defined heading
+            };
+            let stat = get(si);
+            let drops_key =
+                stat.is_some_and(|s| status_has(sh.status, "KEY") && !status_has(s, "KEY"));
+            if stat.is_some_and(|s| !same_status(s, sh.status)) {
+                differ("DICT_STAT", stat, sh.status);
+            }
+            differ("DICT_DTYP", get(yi), sh.ags_type);
+            differ("DICT_UNIT", get(ui), sh.unit);
+            differ("DICT_DESC", get(di), sh.desc);
+            (
+                format!("{grp}.{hdng}, a standard heading"),
+                drops_key.then_some(
+                    "it drops KEY, so a reader that takes DICT literally gets the row key \
+                     wrong",
+                ),
+            )
+        };
+        let listed = if diffs.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", diffs.join(", "))
+        };
+        let base = format!("DICT declares {subject} in {}{listed}", edition.as_str());
+        let (label, severity, desc) = match warning {
+            Some(why) if opts.include_warnings => (
+                RULE_18_WARN,
+                Severity::Warning,
+                format!("{base}; {why}. The standard definition applies."),
+            ),
+            _ if opts.include_fyi => (
+                RULE_18_FYI,
+                Severity::Fyi,
+                format!("{base}; the standard definition applies."),
+            ),
+            _ => continue,
+        };
+        add_at(
+            found,
+            label,
+            Some(row.line),
+            "DICT",
+            desc,
+            Location::default(),
+            severity,
+        );
+    }
+}
+
+/// `DICT_STAT` membership, case-insensitive, so `KEY+REQUIRED` and `key`
+/// both hold KEY — the reading the effective dictionary gives a file status.
+fn status_has(status: &str, want: &str) -> bool {
+    status.to_ascii_uppercase().contains(want)
+}
+
+/// Two statuses say the same thing when they name the same KEY / REQUIRED /
+/// OTHER parts, whatever the case, spacing or order of the `+` parts.
+fn same_status(a: &str, b: &str) -> bool {
+    let parts = |s: &str| -> BTreeSet<String> {
+        s.split('+')
+            .map(|p| p.trim().to_ascii_uppercase())
+            .filter(|p| !p.is_empty())
+            .collect()
+    };
+    parts(a) == parts(b)
 }
 
 #[cfg(test)]
@@ -1633,5 +1808,215 @@ mod tests {
                    \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
                    \"DATA\",\"ARTW_TYPE\",\"DRY\",\"DRY TEST\"\r\n";
         assert!(!run_fyi(src).contains_key(RULE_16_FYI));
+    }
+
+    /// A DICT group of full-width rows: (TYPE, GRP, HDNG, STAT, DTYP, DESC,
+    /// UNIT, PGRP), behind the PROJ scaffold.
+    fn redeclaring(rows: &[[&str; 8]]) -> String {
+        let mut block = String::from(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\
+             \"DICT_DTYP\",\"DICT_DESC\",\"DICT_UNIT\",\"DICT_PGRP\"\r\n\
+             \"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\r\n\
+             \"TYPE\",\"PA\",\"X\",\"X\",\"PA\",\"PA\",\"X\",\"PU\",\"X\"\r\n",
+        );
+        for r in rows {
+            let cells: Vec<String> = r.iter().map(|c| format!("\"{c}\"")).collect();
+            block.push_str("\"DATA\",");
+            block.push_str(&cells.join(","));
+            block.push_str("\r\n");
+        }
+        dict_fixture(&block)
+    }
+
+    /// The redeclaration findings, `(label, desc)`, for one edition and tier
+    /// pair.
+    fn redeclared(src: &str, edition: DictVersion, warn: bool, fyi: bool) -> Vec<(String, String)> {
+        let pf = parse_str(src).expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(edition),
+            &CheckOptions {
+                include_warnings: warn,
+                include_fyi: fyi,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        [RULE_18_FYI, RULE_18_WARN]
+            .iter()
+            .flat_map(|label| {
+                f.get(*label)
+                    .into_iter()
+                    .flatten()
+                    .filter(|x| x.desc.starts_with("DICT declares"))
+                    .map(|x| ((*label).to_string(), x.desc.clone()))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn rule_18_redeclared_standard_heading_is_an_fyi_listing_each_difference() {
+        let src = redeclaring(&[[
+            "HEADING",
+            "LNMC",
+            "LNMC_MC",
+            "OTHER",
+            "2DP",
+            "Water/moisture content",
+            "kg",
+            "",
+        ]]);
+        assert_eq!(
+            redeclared(&src, DictVersion::V4_1_1, true, true),
+            vec![(
+                RULE_18_FYI.to_string(),
+                "DICT declares LNMC.LNMC_MC, a standard heading in 4.1.1 (DICT_DTYP \"2DP\" \
+                 vs standard \"X\", DICT_UNIT \"kg\" vs standard \"%\"); the standard \
+                 definition applies."
+                    .to_string()
+            )]
+        );
+        // FYI-tier only: warnings alone never show it.
+        assert!(redeclared(&src, DictVersion::V4_1_1, true, false).is_empty());
+    }
+
+    #[test]
+    fn rule_18_redeclaration_agreeing_with_the_standard_is_still_named() {
+        // Case and `+` order in DICT_STAT, and case in DICT_DESC, are not
+        // differences; the row still restates the dictionary.
+        let src = redeclaring(&[[
+            "HEADING",
+            "SAMP",
+            "SAMP_ID",
+            "key",
+            "ID",
+            "SAMPLE UNIQUE IDENTIFIER",
+            "",
+            "",
+        ]]);
+        let got = redeclared(&src, DictVersion::V4_1_1, true, true);
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert_eq!(got[0].0, RULE_18_FYI);
+        assert_eq!(
+            got[0].1,
+            "DICT declares SAMP.SAMP_ID, a standard heading in 4.1.1; the standard \
+             definition applies."
+        );
+    }
+
+    #[test]
+    fn rule_18_dropping_a_standard_key_is_a_warning_and_not_an_fyi() {
+        let src = redeclaring(&[[
+            "HEADING",
+            "SAMP",
+            "SAMP_TOP",
+            "OTHER",
+            "2DP",
+            "Depth to TOP of sample",
+            "m",
+            "",
+        ]]);
+        let both = redeclared(&src, DictVersion::V4_1_1, true, true);
+        assert_eq!(both.len(), 1, "one finding per row: {both:?}");
+        assert_eq!(both[0].0, RULE_18_WARN);
+        assert!(
+            both[0]
+                .1
+                .contains("DICT_STAT \"OTHER\" vs standard \"KEY\"")
+                && both[0].1.contains("drops KEY")
+                && both[0].1.ends_with("The standard definition applies."),
+            "{both:?}"
+        );
+        // Warnings alone still show it; FYIs alone (compat's mode) fall back
+        // to the FYI rather than losing it; neither tier shows nothing.
+        assert_eq!(redeclared(&src, DictVersion::V4_1_1, true, false), both);
+        let fyi_only = redeclared(&src, DictVersion::V4_1_1, false, true);
+        assert_eq!(fyi_only.len(), 1);
+        assert_eq!(fyi_only[0].0, RULE_18_FYI);
+        assert!(!fyi_only[0].1.contains("drops KEY"), "{fyi_only:?}");
+        assert!(redeclared(&src, DictVersion::V4_1_1, false, false).is_empty());
+    }
+
+    #[test]
+    fn rule_18_reparenting_a_standard_group_is_a_warning() {
+        let src = redeclaring(&[
+            [
+                "GROUP",
+                "SAMP",
+                "",
+                "",
+                "",
+                "Sample Information",
+                "",
+                "PROJ",
+            ],
+            // "-" is the conventional parentless spelling, so PROJ is not
+            // re-parented — but it is still a redeclaration.
+            ["GROUP", "PROJ", "", "", "", "Project Information", "", "-"],
+        ]);
+        let got = redeclared(&src, DictVersion::V4_1_1, true, true);
+        assert_eq!(got.len(), 2, "{got:?}");
+        let samp = got.iter().find(|(_, d)| d.contains("group SAMP")).unwrap();
+        assert_eq!(samp.0, RULE_18_WARN);
+        assert!(
+            samp.1.contains("DICT_PGRP \"PROJ\" vs standard \"LOCA\"")
+                && samp.1.contains("different parent"),
+            "{samp:?}"
+        );
+        let proj = got.iter().find(|(_, d)| d.contains("group PROJ")).unwrap();
+        assert_eq!(proj.0, RULE_18_FYI);
+        assert_eq!(
+            proj.1,
+            "DICT declares group PROJ, a standard group in 4.1.1; the standard definition \
+             applies."
+        );
+    }
+
+    #[test]
+    fn rule_18_user_defined_rows_are_never_named() {
+        let src = redeclaring(&[
+            ["GROUP", "ZZZZ", "", "", "", "User group", "", "PROJ"],
+            ["HEADING", "ZZZZ", "ZZZZ_ID", "KEY", "ID", "Ident", "", ""],
+            // A user heading on a standard group.
+            [
+                "HEADING",
+                "LNMC",
+                "LNMC_XTRA",
+                "OTHER",
+                "X",
+                "Extra",
+                "",
+                "",
+            ],
+        ]);
+        assert!(redeclared(&src, DictVersion::V4_1_1, true, true).is_empty());
+    }
+
+    #[test]
+    fn rule_18_redeclaration_is_judged_against_the_resolved_edition() {
+        // LNMC_DEV is standard from 4.1; under 4.0.4 the same row declares a
+        // user-defined heading.
+        let src = redeclaring(&[[
+            "HEADING",
+            "LNMC",
+            "LNMC_DEV",
+            "OTHER",
+            "X",
+            "Deviation from the specified procedure",
+            "",
+            "",
+        ]]);
+        let v41 = redeclared(&src, DictVersion::V4_1, true, true);
+        assert_eq!(v41.len(), 1, "{v41:?}");
+        assert!(v41[0].1.contains("standard heading in 4.1"), "{v41:?}");
+        assert!(redeclared(&src, DictVersion::V4_0_4, true, true).is_empty());
+    }
+
+    #[test]
+    fn same_status_ignores_case_spacing_and_part_order() {
+        assert!(same_status("KEY+REQUIRED", "required + key"));
+        assert!(!same_status("KEY", "KEY+REQUIRED"));
+        assert!(!same_status("", "OTHER"));
     }
 }

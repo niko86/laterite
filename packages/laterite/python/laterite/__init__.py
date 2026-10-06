@@ -140,6 +140,24 @@ TypeClashMode = Literal["error", "widen", "promote"]
 #: given. Matches the engine's `MissingTranMode`.
 MissingTranMode = Literal["reconcile", "error"]
 
+#: What [`build_ags4`][laterite.build_ags4] and [`merge`][laterite.merge] do with
+#: the ``DICT`` rows they are given: ``"keep"`` (the default — write them as given)
+#: or ``"prune"`` (drop each row that restates a group or heading in the edition's
+#: standard dictionary, or defines one the output does not contain). Matches the
+#: engine's `DictRows`.
+DictRowsMode = Literal["keep", "prune"]
+
+
+def _dict_rows_arg(dict_rows: str) -> str:
+    """Refuse an unknown ``dict_rows`` as a ``ValueError`` before any work — the
+    accepted set is the engine's ``DictRows::ALL``, read through the bridge."""
+    allowed = list(_native.registry_dict_rows_modes())
+    if dict_rows not in allowed:
+        raise ValueError(
+            f"unknown dict_rows {dict_rows!r}; expected one of {', '.join(allowed)}"
+        )
+    return dict_rows
+
 
 def _looks_like_ags_text(s: str) -> bool:
     """Does this str look like AGS4 *content* rather than a path? A real AGS4
@@ -2322,6 +2340,7 @@ def build_ags4(
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
+    dict_rows: DictRowsMode = "keep",
     out: None = None,
 ) -> BuildResult: ...
 @overload
@@ -2334,6 +2353,7 @@ def build_ags4(
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
+    dict_rows: DictRowsMode = "keep",
     out: str | os.PathLike[str],
 ) -> BuildSaved: ...
 def build_ags4(
@@ -2345,6 +2365,7 @@ def build_ags4(
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
     tran: TranStamp | None = None,
+    dict_rows: DictRowsMode = "keep",
     out: str | os.PathLike[str] | None = None,
 ) -> BuildResult | BuildSaved:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
@@ -2459,6 +2480,16 @@ def build_ags4(
             recipient no way to tell it from a real transmission record. A missing
             TRAN that reports honestly is strictly better than a present one that
             lies. Same five arguments [`merge`][laterite.merge] takes.
+        dict_rows: What to do with the ``DICT`` rows you pass. ``"keep"``
+            (default) writes them exactly as given. ``"prune"`` drops each row
+            that restates a group or heading in the edition's standard
+            dictionary (validation already ignores those: the standard
+            definition applies), and each row defining a group or heading your
+            data does not contain. The rows left keep their order, and ``DICT``
+            is written after your last group; with no row left it is omitted,
+            unless a non-standard heading still needs one (Rule 18), when it is
+            written as given. Pruning never adds a finding. Raises
+            ``ValueError`` for any other value.
         out: Destination path — the ``fix(out=)`` idiom for the build door.
             Given, the judged document is written there and the result is a
             [`BuildSaved`][laterite.BuildSaved] carrying ``path`` and the
@@ -2485,12 +2516,14 @@ def build_ags4(
         RuntimeError: In ``mode="strict"``, if the emitted output violates an
             error-severity rule ("strict mode rejected …"); also for an unknown
             ``dict_version`` or ``mode``.
+        ValueError: If ``dict_rows`` is not ``"keep"`` or ``"prune"``.
     """
     # `dict_version=None` passes through: the native side resolves it to the
     # dictionary's own generated fallback (`hostopts`, #923). A literal here
     # would pin this surface to an edition the engine has moved past.
     import json
 
+    _dict_rows_arg(dict_rows)
     # `_bridge` (the DuckDB fallback connection, usually None) must outlive
     # the native call — its registered relations stream lazily.
     tables, _bridge = _frames_to_tables(groups, units, types, caller="build_ags4")
@@ -2508,6 +2541,7 @@ def build_ags4(
         tran.status if tran else None,
         tran.description if tran else None,
         tran.remarks if tran else None,
+        dict_rows=dict_rows,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
@@ -3031,6 +3065,7 @@ def merge(
     dict_version: Edition | None = None,
     encoding: str | None = None,
     tran: TranStamp | None = None,
+    dict_rows: DictRowsMode = "keep",
 ) -> MergeResult:
     """Reconcile two or more AGS4 deliveries of one project into a single file.
 
@@ -3105,6 +3140,14 @@ def merge(
             than Rule 14 permits. ``remarks`` is *appended* to
             merge's own provenance note (``"Merged from N deliveries: …"``)
             rather than replacing it — both are true of the merged file.
+        dict_rows: What to do with the sources' unioned ``DICT`` rows. ``"keep"``
+            (default) writes them as reconciled. ``"prune"`` drops each row that
+            restates a group or heading in the edition's standard dictionary —
+            exporters often write one for every heading, so a merge piles them
+            up — and each row defining a group or heading the merged file does
+            not contain. ``DICT`` is written after the other groups, and is left
+            out when no row remains and no non-standard heading needs it
+            (Rule 18). Pruning never adds a finding.
 
     Returns:
         A [`MergeResult`][laterite.MergeResult]: the merged ``bytes`` and the
@@ -3116,10 +3159,12 @@ def merge(
             declared conflicting UNITs (fatal in every mode); no ``tran`` was given
             and ``on_missing_tran="error"`` refused rather than warned; or the merged
             output failed to emit.
-        ValueError: Fewer than two sources were given.
+        ValueError: Fewer than two sources were given, or ``dict_rows`` is not
+            ``"keep"`` or ``"prune"``.
     """
     if len(sources) < 2:
         raise ValueError("merge needs at least two source documents")
+    _dict_rows_arg(dict_rows)
     import json
 
     r = _native.merge_files(
@@ -3135,6 +3180,7 @@ def merge(
         tran_status=tran.status if tran else None,
         tran_description=tran.description if tran else None,
         tran_remarks=tran.remarks if tran else None,
+        dict_rows=dict_rows,
     )
     r = raise_for(r)
     return MergeResult(

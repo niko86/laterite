@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use clap::builder::TypedValueParser; // for `.map()` on PossibleValuesParser
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use laterite_ags4_merge::{MissingTranMode, TypeClashMode};
+use laterite_ags4_merge::{DictRows, MissingTranMode, TypeClashMode};
 
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
@@ -339,6 +339,24 @@ pub struct MergeArgs {
             .map(|s| s.parse::<MissingTranMode>().expect("clap restricted the value")),
     )]
     pub on_missing_tran: MissingTranMode,
+    /// What to do with the deliveries' unioned DICT rows:
+    ///
+    ///   keep  — write them as reconciled (default)
+    ///   prune — drop each row that restates a standard group or heading, or
+    ///           defines one the merged file lacks; the DICT moves after the
+    ///           other groups, and is left out if no row remains. Never adds
+    ///           a finding.
+    ///
+    /// The allowed values are projected from `DictRows::ALL`, so the CLI cannot
+    /// drift from the library's vocabulary.
+    #[arg(
+        long,
+        value_name = "MODE",
+        default_value = "keep",
+        value_parser = clap::builder::PossibleValuesParser::new(DictRows::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<DictRows>().expect("clap restricted the value")),
+    )]
+    pub dict_rows: DictRows,
     /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
     /// With the other four --tran-* flags, a fresh merge-transmission TRAN is
     /// written (recording the inputs' ISNOs/dates in `TRAN_REM`); with none of

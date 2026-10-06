@@ -242,6 +242,21 @@ The one-suffix naming (`build_ags4_unchecked` / `buildAgs4Unchecked` /
 `build_ags4_unchecked`) travels across surfaces because wasm exports are
 flat — a submodule spelling would not.
 
+## Update (2026-10-06): `dict_rows` — DICT written as given, or pruned (#1011)
+
+`EmitOpts::dict_rows` (`DictRows`, `repo:rust-packages/laterite-ags4-emit/src/emit.rs`)
+is `Keep` by default, and then the build is byte-identical to one without
+it. `Prune` drops each DICT row that restates a group or heading in the
+output edition's standard dictionary ([[O-60]] names those rows when
+validating), and each row declaring a user-defined name the output does not
+contain. The stream holds the DICT group and writes it after the caller's
+last group, because a session door never sees later groups in advance. With
+no row left the DICT is omitted, unless a non-standard heading still needs
+one for Rule 18, in which case it is written whole, so pruning never adds a
+finding. The judged doors on every surface take it (Python `dict_rows=`,
+Node and wasm `{ dictRows }`); merge passes `MergeOpts::dict_rows` straight
+through. The unchecked doors stay `Keep`.
+
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
 The typed-graph walk used to emit *every declared heading* of each class (null →

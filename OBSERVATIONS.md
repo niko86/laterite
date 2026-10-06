@@ -884,6 +884,60 @@ O-N below is an internal decision or behavioural note, not for external circulat
   test that a clean file yields no key naming a Rule. The python-ags4 key
   set, and so the parity known-failures set, is unchanged.
 
+### O-60 [VARIANCE] A DICT row that redeclares a standard group or heading gets a laterite-originated FYI (Related to Rule 18), a WARNING when it drops KEY or re-parents; python-ags4 has no such check
+- **Observed** (#1011): several exporters write a DICT row for every
+  heading they emit, standard ones included, often with `DICT_STAT`
+  `OTHER`, and a merge unions those rows, so a combined file can carry
+  dozens that restate the dictionary. Some describe a KEY heading as
+  `OTHER`, or give a `DICT_DTYP` or `DICT_UNIT` the dictionary does not.
+  Both engines read the standard definition first, so such a row changes
+  nothing either of them checks, and neither reports it. A consumer that
+  reads DICT literally acts on the row instead: the issue's case is a
+  strict downstream importer rejecting a combined file whose inputs each
+  validated.
+- **Spec** (`spec:AGS4-4.2-2025.pdf §4.1.1 Rule 18`; the DICT group in
+  `§3.6`): DICT is required where user-defined groups or headings are
+  present, and the group is described as the place to define them.
+  Nothing forbids a row for a standard name, and nothing says which
+  definition wins when one is given. A redeclaration is therefore legal;
+  the problem is what it tells a reader.
+- **python-ags4** (`check.py::combine_DICT_tables`): puts the standard
+  dictionary first and drops any later row repeating a `DICT_TYPE`,
+  `DICT_GRP` and `DICT_HDNG` combination, so a redeclaration is discarded
+  without a finding. No check compares a file's DICT with the standard.
+- **Assessment**: not an error, since no rule is broken and validation is
+  unaffected. Two tiers by the #321 test, matching the split the `--dict`
+  overlay already makes: a row that drops KEY from a standard KEY heading,
+  or gives a standard group a different parent, makes a literal reader get
+  row identity or the hierarchy wrong, so it is a warning. Any other
+  redeclaration, whether it agrees with the standard or differs in type,
+  unit, description or a status that keeps KEY, is an FYI.
+- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
+  python-ags4 defect or a spec ambiguity.
+- **Our decision** (#1011): judge against the edition validation resolved
+  (explicit option, then `TRAN_AGS`, then the fallback), one finding per
+  DICT row, on DICT at that row's line. A HEADING row for a group and
+  heading that edition defines, or a GROUP row for a standard group, is an
+  `FYI (Related to Rule 18)` naming it, listing each field that differs
+  from the standard (`DICT_STAT`, `DICT_DTYP`, `DICT_UNIT` and `DICT_DESC`;
+  `DICT_PGRP` and `DICT_DESC` for a GROUP row), and saying the standard
+  definition applies. A status is compared by its KEY, REQUIRED and OTHER
+  parts, a description ignoring case, and a field only when its column
+  exists. A row that drops KEY or re-parents is a `Warning (Related to
+  Rule 18)` instead, the [[O-44]] label; with warnings off but FYIs on,
+  compat's mode, it falls back to the FYI, as [[O-58]] does. Rows for
+  user-defined names, and rows the [[O-44]] structural checks cover, are
+  never named. Neither tier moves the verdict. `FYI (Related to Rule 18)`
+  is a new laterite-only label, so `classify` reconciles it to this
+  record; `laterite.compat` emits it like every other FYI, and the
+  python-ags4 suite's known-failures set is unchanged. `build_ags4` and
+  `merge` gain `dict_rows="prune"` on every surface (`lat merge
+  --dict-rows prune`). It drops these rows and the rows declaring a
+  user-defined name the output does not contain, writes the DICT after
+  the caller's last group, omits it when no row is left unless a
+  non-standard heading still needs one (then it is written whole), and
+  never adds a finding. `keep`, the default, is byte-identical to before.
+
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 
 ### O-47 [NOTE] Quote-aware universal-newline parsing (#422): a lone-CR terminator now splits into rows + Rule 2a (converging with python), an embedded CR/LF stays in-field + Rule 6 (diverging)

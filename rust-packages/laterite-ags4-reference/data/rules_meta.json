@@ -395,7 +395,7 @@
     {
       "rule": "18",
       "title": "DICT Group for Non-Standard Names",
-      "checks": "Checks that if the file uses non-standard GROUP or HEADING names (those flagged by Rule 9), a DICT group is present to define them. A finding means user-defined names are used without a DICT group. To fix: add a DICT group declaring the non-standard groups/headings. With --show-warnings, also flags structural defects in the file's own DICT group (a missing DICT_TYPE/DICT_GRP/DICT_HDNG column, a blank DICT_GRP, or a HEADING row with a blank DICT_HDNG) — a malformed DICT silently degrades downstream checks.",
+      "checks": "Checks that if the file uses non-standard GROUP or HEADING names (those flagged by Rule 9), a DICT group is present to define them. A finding means user-defined names are used without a DICT group. To fix: add a DICT group declaring the non-standard groups/headings. With --show-warnings, also flags structural defects in the file's own DICT group (a missing DICT_TYPE/DICT_GRP/DICT_HDNG column, a blank DICT_GRP, or a HEADING row with a blank DICT_HDNG) — a malformed DICT silently degrades downstream checks. Also names each DICT row that redeclares a group or heading the dictionary edition already defines: a warning when the row drops KEY from a standard KEY heading or gives a standard group a different parent, and with --show-fyi an FYI otherwise, listing each field that differs from the standard. The standard definition applies either way, and neither fails the file.",
       "severity": "mixed",
       "fixable": false,
       "observations": [
@@ -406,6 +406,10 @@
         {
           "id": "O-44",
           "note": "laterite adds opt-in WARNING-tier structural validation of the file's own DICT group (the first WARNING-tier producer); python-ags4 only consumes DICT and never validates its structure."
+        },
+        {
+          "id": "O-60",
+          "note": "A DICT row for a standard group or heading changes nothing either validator checks, because both read the standard definition first. Exporters often write one for every heading, and a reader that takes DICT literally can be misled, for example by a KEY heading described as OTHER. laterite names each such row; python-ags4 has no equivalent check. build_ags4 and merge can drop these rows with dict_rows=\"prune\"."
         }
       ]
     },

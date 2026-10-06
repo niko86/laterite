@@ -120,6 +120,13 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
                                      — TRAN_ISNO is a KEY heading and issue numbers
                                      differ — and Rule 14 allows exactly one
                           error      refuse, before anything is written to --out
+    --dict-rows <MODE>    what to do with the deliveries' unioned DICT rows:
+                          keep   write them as reconciled (default)
+                          prune  drop rows restating a standard group or
+                                 heading, or defining one the merged file
+                                 lacks; DICT moves after the other groups and
+                                 is left out if no row remains. Never adds a
+                                 finding
     --tran-issue <ISNO>   stamp a synthesised merge-TRAN (needs all five --tran-*
                           below; records the inputs' ISNOs/dates in TRAN_REM for
                           provenance)

@@ -33,6 +33,7 @@ import {
   resolveEncodingLabel,
   typeClashModes,
   missingTranModes,
+  dictRowsModes,
 } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
@@ -89,6 +90,7 @@ function flagValueSets(): Record<string, readonly string[]> {
   return {
     "on-type-clash": typeClashModes(),
     "on-missing-tran": missingTranModes(),
+    "dict-rows": dictRowsModes(),
   };
 }
 
@@ -152,6 +154,7 @@ const SPECS: Record<string, Spec> = {
     run: (p, json) => runMerge(p, json),
     flags: [
       ...DICT_FLAGS,
+      "dict-rows",
       "json",
       "on-missing-tran",
       "on-type-clash",
@@ -166,6 +169,7 @@ const SPECS: Record<string, Spec> = {
     ],
     valued: [
       "dict",
+      "dict-rows",
       "dict-version",
       "encoding",
       "on-missing-tran",
@@ -845,11 +849,20 @@ function runMerge(p: Parsed, json: boolean): number {
   }
   const onMissingTran = missing as NonNullable<MergeOptions["onMissingTran"]>;
 
+  // Same shape, same authority, for `--dict-rows` (#1011).
+  const rows = str(p.flags["dict-rows"]) ?? "keep";
+  const rowsModes = dictRowsModes();
+  if (!rowsModes.includes(rows)) {
+    fail(`--dict-rows: unknown mode '${rows}' (${rowsModes.join(", ")})`, 5);
+  }
+  const dictRows = rows as NonNullable<MergeOptions["dictRows"]>;
+
   let res;
   try {
     res = merge(files, {
       onTypeClash,
       onMissingTran,
+      dictRows,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
       tran: tranFromFlags(p.flags),

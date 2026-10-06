@@ -254,6 +254,13 @@ needs. The browser **Tools → Merge** tab is 2-file only
 for the common "merge one incoming delivery into what I'm working on" case,
 not a capability gap in the underlying leaf (which is N-ary).
 
+**DICT is unioned like any other group, and may be pruned on request.**
+Exporters often restate the dictionary in DICT, so the union can carry many
+rows that define nothing ([[O-60]]). `dict_rows` (`DictRows`, `keep` by
+default) is handed to the emit merge ends in; `prune` drops the restating
+rows and those for user-defined names the merged file lacks, and never adds
+a finding (`lat merge --dict-rows prune`).
+
 ## Why
 
 - **Silence ≠ deletion is the only safe default for a *reconciliation* tool**

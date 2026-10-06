@@ -51,6 +51,8 @@ _CLASH_CHOICES = tuple(_native.registry_type_clash_modes())
 #: Derived from the start rather than hand-typed and later reconciled — which is
 #: the whole lesson of the line above.
 _MISSING_TRAN_CHOICES = tuple(_native.registry_missing_tran_modes())
+#: The `--dict-rows` modes, from `DictRows::ALL` in laterite-ags4-emit (#1011).
+_DICT_ROWS_CHOICES = tuple(_native.registry_dict_rows_modes())
 
 #: Encoding labels the surface census resolves on every launcher. Mirrors
 #: `ENCODING_PROBES` in `commands/census.rs`; `test_census_probe_lists_agree` pins
@@ -573,6 +575,7 @@ def _run_merge(args: argparse.Namespace) -> int:
             dict_version=dv,
             encoding=args.encoding,
             tran=_tran_from_args(args),
+            dict_rows=args.dict_rows,
         )
     except laterite.MergeConflictError as e:
         # The library message already carries the full guidance (which modes settle
@@ -1031,6 +1034,9 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="on_missing_tran",
         choices=_MISSING_TRAN_CHOICES,
         default="reconcile",
+    )
+    pm.add_argument(
+        "--dict-rows", dest="dict_rows", choices=_DICT_ROWS_CHOICES, default="keep"
     )
     pm.add_argument("--tran-issue", dest="tran_issue")
     pm.add_argument("--tran-date", dest="tran_date")

@@ -9,6 +9,33 @@ pub fn laterite_ags4_emit::catalog::GroupView::types(&self) -> &[alloc::string::
 pub fn laterite_ags4_emit::catalog::GroupView::units(&self) -> &[alloc::string::String]
 pub fn laterite_ags4_emit::catalog::types_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
 pub fn laterite_ags4_emit::catalog::units_used<'a, G, I>(I) -> alloc::collections::btree::set::BTreeSet<alloc::string::String> where G: laterite_ags4_emit::catalog::GroupView + 'a, I: core::iter::traits::collect::IntoIterator<Item = &'a G>
+pub enum laterite_ags4_emit::DictRows
+pub laterite_ags4_emit::DictRows::Keep
+pub laterite_ags4_emit::DictRows::Prune
+impl laterite_ags4_emit::DictRows
+pub const laterite_ags4_emit::DictRows::ALL: [laterite_ags4_emit::DictRows; 2]
+pub fn laterite_ags4_emit::DictRows::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_emit::DictRows
+pub fn laterite_ags4_emit::DictRows::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_emit::DictRows
+impl core::cmp::PartialEq for laterite_ags4_emit::DictRows
+pub fn laterite_ags4_emit::DictRows::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_emit::DictRows
+pub fn laterite_ags4_emit::DictRows::default() -> Self
+impl core::fmt::Debug for laterite_ags4_emit::DictRows
+pub fn laterite_ags4_emit::DictRows::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_emit::DictRows
+impl core::marker::StructuralPartialEq for laterite_ags4_emit::DictRows
+impl core::str::traits::FromStr for laterite_ags4_emit::DictRows
+pub type laterite_ags4_emit::DictRows::Err = alloc::string::String
+pub fn laterite_ags4_emit::DictRows::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for laterite_ags4_emit::DictRows
+impl core::marker::Send for laterite_ags4_emit::DictRows
+impl core::marker::Sync for laterite_ags4_emit::DictRows
+impl core::marker::Unpin for laterite_ags4_emit::DictRows
+impl core::marker::UnsafeUnpin for laterite_ags4_emit::DictRows
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::DictRows
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::DictRows
 pub enum laterite_ags4_emit::EmitError
 pub laterite_ags4_emit::EmitError::EmbeddedNewline
 pub laterite_ags4_emit::EmitError::EmbeddedNewline::field: usize
@@ -89,6 +116,7 @@ impl<'a> core::marker::UnsafeUnpin for laterite_ags4_emit::EmitGroup<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_emit::EmitGroup<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_emit::EmitGroup<'a>
 pub struct laterite_ags4_emit::EmitOpts
+pub laterite_ags4_emit::EmitOpts::dict_rows: laterite_ags4_emit::DictRows
 pub laterite_ags4_emit::EmitOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
 pub laterite_ags4_emit::EmitOpts::mode: laterite_ags4_emit::EmitMode
 pub laterite_ags4_emit::EmitOpts::synthesise_metadata: bool

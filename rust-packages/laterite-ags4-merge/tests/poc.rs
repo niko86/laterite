@@ -307,6 +307,7 @@ fn concatenated_code_delivery(loca: &str) -> ParsedFile {
         edition: DictVersion::V4_2,
         tran: Some(TranStamp::new("1", "2026-01-01", "A", "B", "Draft")),
         synthesise_metadata: true,
+        dict_rows: laterite_ags4_merge::DictRows::Keep,
     };
     let out = emit_ags4(&groups, &opts).unwrap();
     assert!(

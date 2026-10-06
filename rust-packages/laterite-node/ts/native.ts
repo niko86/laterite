@@ -16,6 +16,7 @@ export {
   editions,
   typeClashModes,
   missingTranModes,
+  dictRowsModes,
   fallbackEdition,
   resolveEncodingLabel,
   registryDictionaryJson,
