@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use clap::builder::TypedValueParser; // for `.map()` on PossibleValuesParser
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use laterite_ags4_merge::{DictRows, MissingTranMode, RowOrder, TypeClashMode};
+use laterite_ags4_merge::{CodeCaseMode, DictRows, MissingTranMode, RowOrder, TypeClashMode};
 
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
@@ -309,7 +309,8 @@ pub struct MergeArgs {
     ///   widen   — fall back to X (free text); raw values untouched, TYPE thrown away
     ///   promote — keep the greatest precision when every code is nDP (e.g. 2DP + 5DP
     ///             -> 5DP) and zero-pad the coarser values; falls back to widen for
-    ///             nSF/nSCI and cross-family clashes. The only mode that rewrites a cell.
+    ///             nSF/nSCI and cross-family clashes. The only type-clash mode that
+    ///             rewrites a cell.
     ///
     /// The allowed values are projected from `TypeClashMode::ALL`, so the CLI cannot
     /// drift from the library's vocabulary.
@@ -375,6 +376,32 @@ pub struct MergeArgs {
             .map(|s| s.parse::<RowOrder>().expect("clap restricted the value")),
     )]
     pub row_order: RowOrder,
+    /// ABBR codes under one heading that differ only by letter case
+    /// ("Undisturbed" / "UNDISTURBED") are always warned (`abbr_code_case`):
+    ///
+    ///   keep     — leave every spelling as written (default)
+    ///   standard — rewrite a set to the edition's standard code when exactly
+    ///              one matches it ignoring case, in ABBR and every PA cell
+    ///              under that heading; a set with none, or several, is left
+    ///              as written. Applied before reconciliation, so a settled
+    ///              case difference is not a revision.
+    ///
+    /// A rewrite that would give two rows the same KEY is refused. The allowed
+    /// values are projected from `CodeCaseMode::ALL`.
+    #[arg(
+        long,
+        value_name = "MODE",
+        default_value = "keep",
+        value_parser = clap::builder::PossibleValuesParser::new(CodeCaseMode::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<CodeCaseMode>().expect("clap restricted the value")),
+    )]
+    pub on_code_case: CodeCaseMode,
+    /// A JSON file naming code rewrites, `{"HEADING": {"FROM": "TO"}}` — e.g.
+    /// `{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}`. Applied like
+    /// --on-code-case standard and before it, so it wins for the sets it names.
+    /// A heading no delivery types PA, or a code none uses, is refused.
+    #[arg(long, value_name = "PATH")]
+    pub recode: Option<PathBuf>,
     /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
     /// With the other four --tran-* flags, a fresh merge-transmission TRAN is
     /// written (recording the inputs' ISNOs/dates in `TRAN_REM`); with none of

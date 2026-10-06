@@ -47,9 +47,17 @@ Three load-bearing decisions (the full rationale is
   `Widen` falls back to `X` (the top of the AGS type lattice — raw text holds any
   value faithfully), and `Promote` keeps the column numeric by taking the greatest
   precision in the `nDP` family and zero-padding the rest. `Widen` is
-  emission-only; `Promote` is the one place merge **rewrites a cell**, confined to
-  appending zeros to a decimal (`pad_decimals` — string-only, never via `f64`,
-  never rounding).
+  emission-only; `Promote` is the one type-clash mode that **rewrites a cell**,
+  confined to appending zeros to a decimal (`pad_decimals` — string-only, never
+  via `f64`, never rounding).
+- **ABBR codes differing only by letter case are warned, and rewritten only on
+  request (#1010).** Every such set raises an `abbr_code_case` warning carrying
+  the spellings, the inputs that used each, and the single standard match.
+  `MergeOpts::recode` (caller-named) and `CodeCaseMode::Standard` (a single
+  standard match only) rewrite the ABBR rows and every `PA` cell under the
+  heading before reconciliation, through the shared plan in
+  [[laterite-ags4-reference]]'s `recode` module; a rewrite giving two rows one
+  KEY is `MergeError::KeyCollision`.
 
 Row identity comes from the ONE shared definition
 (`laterite_ags4_reference::keychain::key_heading_names`) that
@@ -59,7 +67,8 @@ row".
 ## Inputs / outputs
 
 In: a slice of `ParsedFile`s (argument order = authority) and `MergeOpts`
-(including the `TypeClashMode`). Out: a `MergeResult` (merged bytes +
+(including the `TypeClashMode`, and the `CodeCaseMode` + `Recode` re-exported
+from [[laterite-ags4-reference]]). Out: a `MergeResult` (merged bytes +
 `MergeWarning`s + `RevisionNote`s) or a `MergeError`. The merged bytes are written
 through [[laterite-ags4-emit]], whose default `EmitMode::AutoFix` repairs
 Rule-8-invalid cells exactly as it does for every other writer — that is emit's

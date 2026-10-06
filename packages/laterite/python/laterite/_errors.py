@@ -80,8 +80,10 @@ class MergeConflictError(Ags4Error):
     same heading differently and ``on_type_clash="error"`` (the default) refused to
     guess — pass ``"promote"`` to keep the greatest ``nDP`` precision, or ``"widen"``
     to fall back to ``X`` text; or two files declared conflicting **UNITs**, which is
-    fatal in every mode (no mode can absorb it — see below); or the merged output
-    failed the emitter's own re-validation."""
+    fatal in every mode (no mode can absorb it — see below); or a requested ABBR
+    code rewrite (``recode`` / ``on_code_case="standard"``) would give two rows the
+    same KEY, so merging them would lose one; or the merged output failed the
+    emitter's own re-validation."""
 
     exit_code = 6
 
@@ -106,6 +108,8 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     # its own token only so a caller can tell the three apart, because the three
     # need different fixes.
     "missing_tran": MergeConflictError,
+    # A requested ABBR code rewrite would give two rows one KEY (#1010).
+    "key_collision": MergeConflictError,
     "emit_error": MergeConflictError,
 }
 

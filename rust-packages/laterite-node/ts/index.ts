@@ -925,14 +925,36 @@ export function diff(
 
 // --- merge (N-way reconciliation) ---------------------------------------
 
+/** One spelling in an `abbr_code_case` warning, with the argument indices of
+ * the sources whose ABBR group declares it. */
+export interface CodeSpelling {
+  code: string;
+  inputs: number[];
+}
+
+/** The ABBR codes an `abbr_code_case` warning is about: under `heading`, equal
+ * ignoring letter case but different as written. `suggested` is the single
+ * standard code matching them (`null` when the edition has none, or several);
+ * `resolved` is the spelling they were rewritten to (`null` when left as
+ * written). Enough to write a {@link MergeOptions.recode} from. */
+export interface CodeCaseSet {
+  heading: string;
+  spellings: CodeSpelling[];
+  suggested: string | null;
+  resolved: string | null;
+}
+
 /** One advisory note from a merge — something reconciled without failing (a
- * recency contradiction, a non-`X` type widen, a missing merge-TRAN stamp).
- * Snake_case fields mirror the wire shape, identical to Python's dict. */
+ * recency contradiction, a non-`X` type widen, a missing merge-TRAN stamp, ABBR
+ * codes differing only by letter case). Snake_case fields mirror the wire
+ * shape, identical to Python's dict; `case` is present only on an
+ * `abbr_code_case` warning. */
 export interface MergeWarning {
   kind: string;
   group: string | null;
   heading: string | null;
   message: string;
+  case?: CodeCaseSet;
 }
 
 /** One per-row content revision — a later file changed a KEY-matched row's
@@ -1012,6 +1034,28 @@ export interface MergeOptions {
    *  reconciliation, so it never changes which row wins, `revisions` or
    *  `warnings` — only the order rows are written in. */
   rowOrder?: "input" | "key";
+  /** What to do with ABBR codes under one heading that are equal ignoring
+   *  letter case but differ as written (`"Undisturbed"` / `"UNDISTURBED"`).
+   *  Each such set is reported in every mode as an `abbr_code_case` warning
+   *  carrying a {@link CodeCaseSet}.
+   *
+   * - `"keep"`     — leave every spelling as written (the default).
+   * - `"standard"` — rewrite a set to the edition's standard code when exactly
+   *                  one matches it ignoring case, in the ABBR rows and every
+   *                  `PA` cell under that heading (part by part on
+   *                  `TRAN_RCON`). A set with none, or several, is left as
+   *                  written.
+   *
+   * The rewrite runs before reconciliation, so a settled case difference is
+   * not a revision. One that would give two rows the same KEY throws
+   * {@link MergeConflictError}. */
+  onCodeCase?: "keep" | "standard";
+  /** Rewrites you name, `{heading: {fromCode: toCode}}` — e.g.
+   *  `{ TRIG_COND: { Undisturbed: "UNDISTURBED" } }`. Applied like
+   *  `onCodeCase: "standard"` and before it, so it wins for the sets it names.
+   *  A heading no source types `PA`, or a code no source uses under it, throws
+   *  {@link BadDictError}. */
+  recode?: Record<string, Record<string, string>>;
 }
 
 /** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
@@ -1036,9 +1080,11 @@ export type MergeSource = string | Uint8Array | Ags4File;
  * @param opts - {@link MergeOptions}.
  * @returns A {@link MergeResult}: the merged `bytes` + `warnings` / `revisions` audit.
  * @throws {MergeConflictError} an unsettled TYPE clash, a UNIT clash (fatal in every
- *   mode), or the output failed to emit.
+ *   mode), a code rewrite that would give two rows one KEY, or the output failed
+ *   to emit.
  * @throws {NotAgs4Error} a source is not decodable AGS4.
- * @throws {BadDictError} an invalid `opts.dictVersion`.
+ * @throws {BadDictError} an invalid `opts.dictVersion`, or an `opts.recode`
+ *   entry naming a heading no source types `PA` or a code no source uses.
  * @throws {RangeError} fewer than two sources.
  */
 export function merge(
@@ -1058,6 +1104,8 @@ export function merge(
       opts.tran,
       opts.dictRows,
       opts.rowOrder,
+      opts.onCodeCase,
+      opts.recode,
     );
     const bytes = new Uint8Array(out.bytes);
     return {

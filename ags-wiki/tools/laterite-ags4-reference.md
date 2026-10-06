@@ -18,6 +18,7 @@ repo_refs:
   dictionary_json: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json"
   rules_meta_json: "repo:rust-packages/laterite-ags4-reference/data/rules_meta.json"
   keychain: "repo:rust-packages/laterite-ags4-reference/src/keychain.rs"
+  recode: "repo:rust-packages/laterite-ags4-reference/src/recode.rs"
 related: [crate-map, laterite-ags4-validator, laterite-ags4-core, laterite-py, dec-dictionary-single-source, core-emit-layering-inversion, dec-ags4-merge-semantics, edition-resolution, data-single-source-audit, cert-trust-v2, dec-custom-dict-overlay]
 sources: []
 ---
@@ -29,7 +30,8 @@ sources: []
 <!-- END GENERATED: crate-card -->
 
 > [!note] Its contents reach the outside world only through
-> [[laterite-ags4-validator]]'s and [[laterite-ags4-core]]'s re-exports.
+> [[laterite-ags4-validator]]'s and [[laterite-ags4-core]]'s re-exports, and
+> (for the `recode` option types) [[laterite-ags4-merge]]'s.
 
 ## What it is
 
@@ -163,7 +165,17 @@ ignoring case, which the [[O-43]] hint names), the `catalogue` module (`RULE_LAB
 `rule_metadata_json()`), the `union` module (the AGS4 parent/child
 registry — `union_groups`, `ancestor_chain`, `inherited_key_names`), and the
 `keychain` module (`key_heading_names`, the content-addressed `_id`/
-`_parent_id` derivation — moved here from `laterite-ags4-core`, see below).
+`_parent_id` derivation — moved here from `laterite-ags4-core`, see below), and
+the `recode` module (#1010): the one rewrite of ABBR codes on request that
+`merge` calls and `fix` is to call (#1024). `resolve_mapping` finds the
+case-variant sets in the inputs' ABBR rows and turns a caller's `Recode` and
+`CodeCaseMode` into the mapping to apply — `Standard` acting only on a single
+standard match from `abbr_codes_ignoring_case`, never on input order;
+`plan_rewrite` turns a mapping into cell edits (every `PA` cell, part by part on
+the input's `TRAN_RCON`) and collapsed ABBR rows, and reports the KEY collisions
+it would cause, keyed by `key_heading_names`. It edits nothing itself, so each
+caller applies its own collision policy: merge refuses, `fix` is to skip the
+set.
 
 ## Where it lives
 

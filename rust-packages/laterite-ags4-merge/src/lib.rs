@@ -25,10 +25,20 @@
 //!   greatest precision in the `nDP` family and zero-padding the rest.
 //!
 //!   Widen is emission-only: it rewrites the merged TYPE row and nothing else.
-//!   Promote is the one place merge **rewrites a cell**, and it is confined to
-//!   appending zeros to a decimal (`laterite_ags4_types::pad_decimals` — string-only,
-//!   never via `f64`, never rounding). Neither changes how rows were *matched*
-//!   (that is per-file `parse_value`) nor any content-addressed key.
+//!   Promote rewrites a cell only by appending zeros to a decimal
+//!   (`laterite_ags4_types::pad_decimals` — string-only, never via `f64`, never
+//!   rounding). Neither changes how rows were *matched* (that is per-file
+//!   `parse_value`) nor any content-addressed key.
+//! - **ABBR codes are rewritten only on request (#1010).** Codes that differ only
+//!   by letter case under one heading are always *warned* (`abbr_code_case`), but
+//!   rewritten only when the caller names the change ([`MergeOpts::recode`]) or
+//!   asks for the edition's spelling ([`CodeCaseMode::Standard`], which acts only
+//!   on a single standard match). The rewrite is the shared
+//!   [`laterite_ags4_reference::recode`] plan, applied to the inputs BEFORE
+//!   reconciliation, so a case-only difference never reaches the revision report;
+//!   and unlike promote it can change identity, so a rewrite that would make two
+//!   rows share a KEY they did not share is refused ([`MergeError::KeyCollision`])
+//!   rather than losing a row.
 //!
 //!   (Distinct from this: merge emits through [`laterite_ags4_emit`], whose
 //!   default [`EmitMode::AutoFix`] repairs Rule-8-invalid cells exactly as it does
@@ -45,8 +55,9 @@ use std::collections::{BTreeSet, HashMap};
 use laterite_ags4_emit::Cell;
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, emit_ags4};
 use laterite_ags4_parse::{ParsedFile, ParsedGroup};
-use laterite_ags4_reference::dict::DictVersion;
+use laterite_ags4_reference::dict::{DictVersion, Dictionary};
 use laterite_ags4_reference::keychain::key_heading_names;
+use laterite_ags4_reference::recode::{CellEdit, RowRef, plan_rewrite, resolve_mapping};
 use laterite_ags4_reference::union::registry;
 use laterite_ags4_types::{decimal_places, pad_decimals, parse_value};
 use serde_json::Value;
@@ -76,7 +87,7 @@ pub enum TypeClashMode {
     /// (`10.00123` → `10.00`) and destroy data, so max is the only admissible
     /// direction — which also makes the outcome independent of argument order.
     ///
-    /// This is the only mode in which merge rewrites a cell. The payoff is that a
+    /// This is the only type-clash mode that rewrites a cell. The payoff is that a
     /// promoted column stays comparable with its typed sources: `_content_hash`
     /// canonicalises `10.00` as a *number* under `2DP` but as a *string* under `X`,
     /// so a widened merge does not value-dedup against its own inputs, while a
@@ -220,7 +231,20 @@ pub struct MergeOpts {
     /// emit, after reconciliation, so it never changes which row wins, nor
     /// `revisions` or `warnings`. See [`RowOrder`].
     pub row_order: RowOrder,
+    /// Whether ABBR codes differing only by letter case are left as written
+    /// (`Keep`, the default) or settled on the edition's spelling where exactly
+    /// one standard code matches (`Standard`). The `abbr_code_case` warning fires
+    /// either way. See [`CodeCaseMode`].
+    pub on_code_case: CodeCaseMode,
+    /// Caller-named rewrites, `{heading: {from_code: to_code}}`, applied before
+    /// `on_code_case` and before reconciliation. A heading no input types `PA`,
+    /// or a code no input uses under it, is refused ([`MergeError::Recode`]).
+    pub recode: Recode,
 }
+
+/// Re-exported from [`laterite_ags4_reference::recode`], where the rewrite
+/// lives: merge and the validator's `fix` settle codes by one rule.
+pub use laterite_ags4_reference::recode::{CaseSet, CodeCaseMode, Recode, Spelling};
 
 /// Re-exported from [`laterite_ags4_emit`], where the pruning happens: merge
 /// hands the option straight to the emit it ends in, so build and merge prune
@@ -241,6 +265,8 @@ impl Default for MergeOpts {
             on_missing_tran: MissingTranMode::Reconcile,
             dict_rows: DictRows::Keep,
             row_order: RowOrder::Input,
+            on_code_case: CodeCaseMode::Keep,
+            recode: Recode::new(),
         }
     }
 }
@@ -257,6 +283,13 @@ pub struct MergeWarning {
     pub group: Option<String>,
     pub heading: Option<String>,
     pub message: String,
+    /// The case-variant set an `abbr_code_case` warning is about — every
+    /// spelling with the inputs that used it, the single standard match
+    /// (`suggested`, null when there is none) and the spelling the rewrite
+    /// settled on (`resolved`, null when it was left as written) — so a caller
+    /// can build a `recode` from it. Absent from every other kind's wire shape.
+    #[serde(rename = "case", skip_serializing_if = "Option::is_none")]
+    pub case: Option<CaseSet>,
 }
 
 /// A fatal merge failure.
@@ -281,6 +314,18 @@ pub enum MergeError {
     /// their own, and the caller asked to be refused rather than warned
     /// ([`MissingTranMode::Error`]). Raised before emit, so nothing is written.
     MissingTran,
+    /// A `recode` entry the inputs cannot honour — named, never ignored.
+    Recode(String),
+    /// The requested code rewrite would make rows that had distinct KEYs share
+    /// one, and reconciling them would silently lose a row. Raised before
+    /// reconciliation, so nothing is written.
+    KeyCollision {
+        group: String,
+        /// The KEY the rows would share.
+        key: Vec<String>,
+        /// Each row's KEY before the rewrite, with the input it came from.
+        rows: Vec<(usize, Vec<String>)>,
+    },
     /// The byte-emission stage failed.
     Emit(String),
 }
@@ -319,6 +364,21 @@ impl std::fmt::Display for MergeError {
                  on_missing_tran=reconcile to merge TRAN like any other group and be warned \
                  instead of refused."
             ),
+            MergeError::Recode(e) => write!(f, "{e}"),
+            MergeError::KeyCollision { group, key, rows } => {
+                let was: Vec<String> = rows
+                    .iter()
+                    .map(|(i, k)| format!("{k:?} (input {i})"))
+                    .collect();
+                write!(
+                    f,
+                    "key collision in {group}: the requested code rewrite gives the rows {} \
+                     the same KEY {key:?}, and merging them would lose a row. Leave that \
+                     heading's codes as written (on_code_case=keep, no recode for it), or \
+                     correct the rows in the source files.",
+                    was.join(", ")
+                )
+            }
             MergeError::Emit(e) => write!(f, "emit failed: {e}"),
         }
     }
@@ -360,6 +420,30 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
 
     // --- recency cross-check: warn if argument order contradicts TRAN_DATE ----
     recency_warnings(files, &mut warnings);
+
+    // --- ABBR code case: warn always, rewrite only on request (#1010) ----------
+    // Planned over the INPUTS, before any group is reconciled, so a case-only
+    // difference the caller settled is gone before reconciliation compares
+    // rows — it can never surface as a revision. The plan is the shared one
+    // the validator's `fix` uses; merge's own policy is only what follows it:
+    // a KEY collision refuses, where `fix` skips the set.
+    let dict = Dictionary::bundled(opts.edition);
+    let resolution = resolve_mapping(files, &dict, &opts.recode, opts.on_code_case)
+        .map_err(|e| MergeError::Recode(e.to_string()))?;
+    for set in resolution.case_sets {
+        warnings.push(code_case_warning(set, opts.on_code_case));
+    }
+    let rewrite = plan_rewrite(files, &dict, &resolution.mapping);
+    if let Some(c) = rewrite.collisions.into_iter().next() {
+        return Err(MergeError::KeyCollision {
+            group: c.group,
+            key: c.key,
+            rows: c.rows.into_iter().map(|(i, _, k)| (i, k)).collect(),
+        });
+    }
+    // The plan arrives sorted (group, then position), so each group's share
+    // is one contiguous slice, searched by position as its cells are read.
+    let (cells, dropped) = (rewrite.edits, rewrite.dropped);
 
     // --- group processing order: PROJ, then TRAN, then the rest sorted --------
     let mut codes: BTreeSet<&str> = BTreeSet::new();
@@ -413,6 +497,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
                               input's TRAN_ISNO collides with it — more than one surviving \
                               row fails Rule 14, which requires exactly one"
                         .into(),
+                    case: None,
                 }),
             }
         }
@@ -420,6 +505,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
             code,
             files,
             opts,
+            GroupEdits::of(code, &cells, &dropped),
             &mut warnings,
             &mut revisions,
         )?);
@@ -453,6 +539,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
                     "{parent} was revised; verify child group(s) {children:?} are still \
                      consistent (merge performs no cross-group consistency check)"
                 ),
+                case: None,
             });
         }
     }
@@ -476,6 +563,81 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
     })
 }
 
+/// One group's share of the code rewrite: its rewritten cells and the ABBR
+/// rows that collapsed into another, each sorted by position. Slices rather
+/// than maps — the edits are already sorted, and a map type per key shape is
+/// code the browser engine has to carry.
+#[derive(Clone, Copy)]
+struct GroupEdits<'a> {
+    cells: &'a [CellEdit],
+    dropped: &'a [RowRef],
+}
+
+impl<'a> GroupEdits<'a> {
+    /// `code`'s slice of the sorted edits, or `None` when the rewrite does
+    /// not touch it — the common case, which then reads cells as before.
+    fn of(code: &str, cells: &'a [CellEdit], dropped: &'a [RowRef]) -> Option<Self> {
+        let cells = &cells[cells.partition_point(|e| e.group.as_str() < code)..];
+        let cells = &cells[..cells.partition_point(|e| e.group == code)];
+        let dropped = &dropped[dropped.partition_point(|d| d.group.as_str() < code)..];
+        let dropped = &dropped[..dropped.partition_point(|d| d.group == code)];
+        (!cells.is_empty() || !dropped.is_empty()).then_some(GroupEdits { cells, dropped })
+    }
+
+    fn cell(self, input: usize, row: usize, col: usize) -> Option<&'a str> {
+        self.cells
+            .binary_search_by(|e| (e.input, e.row, e.col).cmp(&(input, row, col)))
+            .ok()
+            .map(|i| self.cells[i].value.as_str())
+    }
+
+    fn is_dropped(self, input: usize, row: usize) -> bool {
+        self.dropped
+            .binary_search_by(|d| (d.input, d.row).cmp(&(input, row)))
+            .is_ok()
+    }
+}
+
+/// The `abbr_code_case` warning for one case-variant set: what the inputs
+/// wrote, and what (if anything) was done about it.
+fn code_case_warning(set: CaseSet, mode: CodeCaseMode) -> MergeWarning {
+    let spelled: Vec<String> = set
+        .spellings
+        .iter()
+        .map(|s| {
+            let ins: Vec<String> = s.inputs.iter().map(ToString::to_string).collect();
+            let noun = if s.inputs.len() == 1 {
+                "input"
+            } else {
+                "inputs"
+            };
+            format!("{:?} ({noun} {})", s.code, ins.join(", "))
+        })
+        .collect();
+    let outcome = match (&set.resolved, &set.suggested) {
+        (Some(r), _) => format!("rewritten to {r:?}"),
+        (None, Some(s)) if mode == CodeCaseMode::Keep => format!(
+            "kept as written; the standard spelling is {s:?}, which on_code_case=standard \
+             would apply"
+        ),
+        (None, Some(s)) => format!("left as written; the standard spelling is {s:?}"),
+        (None, None) => "left as written: no single standard code matches them, so name the \
+                         spelling with recode"
+            .to_string(),
+    };
+    MergeWarning {
+        kind: "abbr_code_case",
+        group: Some("ABBR".into()),
+        heading: Some(set.heading.clone()),
+        message: format!(
+            "ABBR codes under {} differ only by letter case: {}; {outcome}",
+            set.heading,
+            spelled.join(", ")
+        ),
+        case: Some(set),
+    }
+}
+
 /// The `(heading -> column index)` map for a parsed group, for cell lookup.
 fn heading_index(headings: &[String]) -> HashMap<&str, usize> {
     headings
@@ -494,6 +656,25 @@ fn cell<'a>(
     h: &str,
 ) -> Option<&'a str> {
     idx.get(h).map(|&i| g.value_at(row, i).unwrap_or(""))
+}
+
+/// [`cell`], seen through the code rewrite: a rewritten cell reads its new
+/// value, so reconciliation never sees the spelling the caller settled.
+#[allow(clippy::too_many_arguments)]
+fn cell_edited<'a>(
+    idx: &HashMap<&str, usize>,
+    g: &'a ParsedGroup,
+    edits: Option<GroupEdits<'a>>,
+    fi: usize,
+    ri: usize,
+    row: &laterite_ags4_parse::DataRow,
+    h: &str,
+) -> Option<&'a str> {
+    let ci = *idx.get(h)?;
+    if let Some(v) = edits.and_then(|e| e.cell(fi, ri, ci)) {
+        return Some(v);
+    }
+    Some(g.value_at(row, ci).unwrap_or(""))
 }
 
 /// Warn when a file later in argument order carries an earlier `TRAN_DATE` than
@@ -522,6 +703,7 @@ fn recency_warnings(files: &[ParsedFile], warnings: &mut Vec<MergeWarning>) {
                         "file[{i}] is later in argument order but its TRAN_DATE ({date}) \
                          predates file[{prev_i}]'s ({prev}); argument order still wins"
                     ),
+                    case: None,
                 });
             }
             _ => {}
@@ -663,6 +845,7 @@ fn merged_type(
                              precision declared) and zero-padded the lower-precision values — no \
                              digit is changed, but the merged file asserts {n} decimal places"
                         ),
+                        case: None,
                     });
                     return Ok(TypeResolution {
                         ty,
@@ -681,6 +864,7 @@ fn merged_type(
                     message: format!(
                         "files disagree on TYPE {distinct:?}; widened to X (values kept as raw text)"
                     ),
+                    case: None,
                 });
             }
             Ok(plain("X".to_string()))
@@ -694,6 +878,7 @@ fn reconcile_group(
     code: &str,
     files: &[ParsedFile],
     opts: &MergeOpts,
+    edits: Option<GroupEdits<'_>>,
     warnings: &mut Vec<MergeWarning>,
     revisions: &mut Vec<RevisionNote>,
 ) -> Result<GroupInput, MergeError> {
@@ -777,6 +962,7 @@ fn reconcile_group(
         &id_headings,
         keyed,
         &pad,
+        edits,
         warnings,
         revisions,
     );
@@ -813,6 +999,7 @@ fn reconcile_rows(
     id_headings: &[&str],
     keyed: bool,
     pad: &[Option<usize>],
+    edits: Option<GroupEdits<'_>>,
     warnings: &mut Vec<MergeWarning>,
     revisions: &mut Vec<RevisionNote>,
 ) -> Vec<Vec<Cell>> {
@@ -833,11 +1020,16 @@ fn reconcile_rows(
         let mut seen_this_file: std::collections::HashSet<Vec<String>> =
             std::collections::HashSet::new();
 
-        for row in &g.rows {
+        for (ri, row) in g.rows.iter().enumerate() {
+            // An ABBR row the rewrite collapsed into another is not carried.
+            if edits.is_some_and(|e| e.is_dropped(*fi, ri)) {
+                continue;
+            }
+            let at = |h: &str| cell_edited(&idx, g, edits, *fi, ri, row, h);
             let row_key = || -> Vec<String> {
                 id_headings
                     .iter()
-                    .map(|k| cell(&idx, g, row, k).unwrap_or("").to_string())
+                    .map(|k| at(k).unwrap_or("").to_string())
                     .collect()
             };
 
@@ -857,6 +1049,7 @@ fn reconcile_rows(
                             "file[{fi}] has more than one {code} row with the same KEY \
                              {key:?} (a data-quality error); later wins, but review the source"
                         ),
+                        case: None,
                     });
                     dup_warned = true;
                 }
@@ -874,8 +1067,7 @@ fn reconcile_rows(
             // Overwrite every cell THIS file carries (later wins); leave the rest.
             let mut changed: Vec<String> = Vec::new();
             for h in &g.headings {
-                let (Some(&ui), Some(v)) = (union_idx.get(h.as_str()), cell(&idx, g, row, h))
-                else {
+                let (Some(&ui), Some(v)) = (union_idx.get(h.as_str()), at(h)) else {
                     continue;
                 };
                 let nt = type_of(h);
@@ -912,11 +1104,13 @@ fn reconcile_rows(
     // `Option<MCell>` cells → emit `Cell`s. A not-carried cell is Null (→ blank);
     // a carried cell is the producer's raw text, verbatim.
     //
-    // The one exception is a PROMOTED column (`pad[ui] == Some(n)`) — the only
-    // place merge rewrites data. Each non-blank cell is zero-padded to n decimal
-    // places so it satisfies Rule 8 under the promoted TYPE. `pad_decimals` is
-    // string-only and refuses any pad it can't do losslessly, so a value it turns
-    // down is kept byte-for-byte rather than rounded.
+    // The one exception is a PROMOTED column (`pad[ui] == Some(n)`) — the one
+    // place reconciliation itself rewrites data (a requested code rewrite was
+    // applied before it, as the cells were read). Each non-blank cell is
+    // zero-padded to n decimal places so it satisfies Rule 8 under the promoted
+    // TYPE. `pad_decimals` is string-only and refuses any pad it can't do
+    // losslessly, so a value it turns down is kept byte-for-byte rather than
+    // rounded.
     let mut unpaddable: Vec<usize> = vec![0; union_h.len()];
     let rows: Vec<Vec<Cell>> = order
         .into_iter()
@@ -962,6 +1156,7 @@ fn reconcile_rows(
                      TYPE their own file declared, and will trip Rule 8 on the merged file — fix \
                      them at source"
                 ),
+                case: None,
             });
         }
     }

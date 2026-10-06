@@ -1,10 +1,19 @@
 pub mod laterite_ags4_merge
+pub use laterite_ags4_merge::CaseSet
+pub use laterite_ags4_merge::CodeCaseMode
 pub use laterite_ags4_merge::DictRows
+pub use laterite_ags4_merge::Recode
 pub use laterite_ags4_merge::RowOrder
+pub use laterite_ags4_merge::Spelling
 pub use laterite_ags4_merge::TranStamp
 pub enum laterite_ags4_merge::MergeError
 pub laterite_ags4_merge::MergeError::Emit(alloc::string::String)
+pub laterite_ags4_merge::MergeError::KeyCollision
+pub laterite_ags4_merge::MergeError::KeyCollision::group: alloc::string::String
+pub laterite_ags4_merge::MergeError::KeyCollision::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_merge::MergeError::KeyCollision::rows: alloc::vec::Vec<(usize, alloc::vec::Vec<alloc::string::String>)>
 pub laterite_ags4_merge::MergeError::MissingTran
+pub laterite_ags4_merge::MergeError::Recode(alloc::string::String)
 pub laterite_ags4_merge::MergeError::TypeConflict
 pub laterite_ags4_merge::MergeError::TypeConflict::group: alloc::string::String
 pub laterite_ags4_merge::MergeError::TypeConflict::heading: alloc::string::String
@@ -84,8 +93,10 @@ pub struct laterite_ags4_merge::MergeOpts
 pub laterite_ags4_merge::MergeOpts::dict_rows: laterite_ags4_emit::emit::DictRows
 pub laterite_ags4_merge::MergeOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
 pub laterite_ags4_merge::MergeOpts::emit_mode: laterite_ags4_emit::emit::EmitMode
+pub laterite_ags4_merge::MergeOpts::on_code_case: laterite_ags4_reference::recode::CodeCaseMode
 pub laterite_ags4_merge::MergeOpts::on_missing_tran: laterite_ags4_merge::MissingTranMode
 pub laterite_ags4_merge::MergeOpts::on_type_clash: laterite_ags4_merge::TypeClashMode
+pub laterite_ags4_merge::MergeOpts::recode: laterite_ags4_reference::recode::Recode
 pub laterite_ags4_merge::MergeOpts::row_order: laterite_ags4_emit::row_order::RowOrder
 pub laterite_ags4_merge::MergeOpts::tran: core::option::Option<laterite_ags4_emit::emit::TranStamp>
 impl core::clone::Clone for laterite_ags4_merge::MergeOpts
@@ -115,6 +126,7 @@ impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeResult
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeResult
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeResult
 pub struct laterite_ags4_merge::MergeWarning
+pub laterite_ags4_merge::MergeWarning::case: core::option::Option<laterite_ags4_reference::recode::CaseSet>
 pub laterite_ags4_merge::MergeWarning::group: core::option::Option<alloc::string::String>
 pub laterite_ags4_merge::MergeWarning::heading: core::option::Option<alloc::string::String>
 pub laterite_ags4_merge::MergeWarning::kind: &'static str

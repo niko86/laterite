@@ -6,7 +6,7 @@ tags: [design, decision, architecture, merge]
 decided: "2026-07-12"
 supersedes: []
 from_gap: []
-related: [crate-map, laterite-ags4-reference, laterite-ags4-types, rule-08-typed-values, rule-17-type-group, dec-duckdb-extension, O-59]
+related: [crate-map, laterite-ags4-reference, laterite-ags4-types, rule-08-typed-values, rule-17-type-group, rule-16-abbr-group, dec-duckdb-extension, O-58, O-59]
 sources: []
 ---
 
@@ -118,7 +118,9 @@ precision would round (`10.00123` → `10.00`) and destroy data — which also
 makes the outcome **independent of argument order**, deliberately unlike the
 KEY-conflict rule (later argument wins).
 
-**`promote` is the only mode in which merge rewrites a cell.** The new
+**`promote` is the only `on_type_clash` mode that rewrites a cell.** (Until
+#1010 it was the only rewrite merge made at all; a requested ABBR code rewrite,
+below, is the second.) The new
 `laterite_ags4_types::pad_decimals(raw, n) -> Option<String>` does it —
 **string-only, never via `f64`**: the validator's existing `format_ndp` is an
 f64 round-and-render (right for a Rule 8 *fix*, where rounding is the intent;
@@ -270,6 +272,26 @@ after every group is reconciled, so it never changes which row wins, nor
 `revisions`, `warnings` or a conflict — only the order the rows are written in
 (`lat merge --row-order key`).
 
+**ABBR codes that differ only by letter case are always warned, and rewritten
+only on request (#1010).** Rule 16 looks codes up exactly, so `"Undisturbed"`
+from one delivery and `"UNDISTURBED"` from the next are two codes: both ABBR
+rows survive the union and every row carrying the other spelling reads as a
+revision. Merge now raises one `abbr_code_case` warning per such set in every
+mode, naming the heading, each spelling, the inputs that used it, and the
+single standard code matching them (the suggestion a caller can act on). It
+rewrites them only when asked: `recode` (`{heading: {from: to}}`, applied
+first) names the change, and `on_code_case = standard` settles a set only when
+exactly one standard code matches it ignoring case — none or several leaves it
+as written. Merge never picks a spelling by input order. The rewrite is the
+shared plan in `repo:rust-packages/laterite-ags4-reference/src/recode.rs`,
+applied to the inputs before reconciliation: ABBR rows collapse to one per
+target (the target's own row if an input declares one, else the standard
+description, else the first mapped row's), and every `PA` cell under the
+heading is rewritten part by part on its input's `TRAN_RCON`. A rewrite that
+would give two rows a KEY they did not share is refused
+(`MergeError::KeyCollision`, `MergeConflictError` on the bindings), before any
+bytes are written (`lat merge --on-code-case standard`, `--recode <json>`).
+
 ## Why
 
 - **Silence ≠ deletion is the only safe default for a *reconciliation* tool**
@@ -290,6 +312,17 @@ after every group is reconciled, so it never changes which row wins, nor
   deliberately too coarse for this one call: it can't tell `2DP` from `3SF`,
   but promote must, because padding one is a formatting change and padding
   the other overstates measurement precision.
+- **A code rewrite is admissible because the caller asks for it, and it is
+  safe because of where and how it runs (#1010).** It unifies spellings the
+  AGS rules treat as distinct codes but that downstream consumers commonly do
+  not: importers often key the ABBR list ignoring case, and AGS 4.2 itself
+  describes that list as not case-sensitive (§3.3 and §6.2, paraphrased; the
+  Rule 16 consequence is #1033). Merge still never chooses on its own — only a
+  named `recode` or a single standard match moves a spelling. It runs before
+  reconciliation, so a settled case difference never reaches `revisions`; and
+  because a rewrite can change identity, which `promote` never does, the KEY
+  collision guard refuses it loudly rather than letting reconciliation fold two
+  rows into one.
 
 ## Consequences
 
@@ -316,7 +349,13 @@ after every group is reconciled, so it never changes which row wins, nor
   others: behaviour at the Rust facade
   (`repo:rust-packages/laterite/tests/merge.rs`, beside the unstamped-merge test
   it changes) and vocabulary beside the sibling option's drift gate
-  (`repo:packages/laterite/tests/test_missing_tran_modes_single_source.py`). The
+  (`repo:packages/laterite/tests/test_missing_tran_modes_single_source.py`).
+  `on_code_case`/`recode` (#1010) are held in the merge crate
+  (`repo:rust-packages/laterite-ags4-merge/tests/code_case.rs`), in the shared
+  plan's own unit tests, and once per surface
+  (`repo:packages/laterite/tests/test_merge_code_case.py`,
+  `repo:rust-packages/laterite-node/test/code-case.test.ts`, the wasm
+  `merge.rs` tests, `lat`'s `cli_verbs.rs`). The
   counts above are prose, so nothing fails when they drift; treat them as an
   inventory of WHERE, not of how many.
 

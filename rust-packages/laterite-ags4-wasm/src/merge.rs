@@ -70,6 +70,12 @@ pub(crate) struct MergeOptions {
     dict_rows: Option<String>,
     /// `"input"` (default) | `"key"` — the merged rows' order (#1008).
     row_order: Option<String>,
+    /// `"keep"` (default) | `"standard"` — ABBR codes differing only by
+    /// letter case (#1010), parsed by the engine's `FromStr` like the modes
+    /// above.
+    on_code_case: Option<String>,
+    /// `{heading: {fromCode: toCode}}` — caller-named code rewrites (#1010).
+    recode: Option<laterite_ags4_merge::Recode>,
 }
 
 #[cfg(feature = "merge")]
@@ -82,6 +88,8 @@ impl WasmOptions for MergeOptions {
         "tran",
         "dictRows",
         "rowOrder",
+        "onCodeCase",
+        "recode",
     ];
     const WHAT: &'static str = "merge options";
 }
@@ -127,6 +135,20 @@ export interface MergeOptions {
    *  last, ties in input order — after reconciliation, so it never changes
    *  which row wins, `revisions` or `warnings`. */
   rowOrder?: "input" | "key";
+  /** ABBR codes under one heading that are equal ignoring letter case but
+   *  differ as written are reported in every mode as an `abbr_code_case`
+   *  warning (with a `case` record: every spelling and its inputs, the single
+   *  standard match as `suggested`, the spelling it ended as as `resolved`).
+   *  `"keep"` (default) leaves them as written. `"standard"` rewrites a set to
+   *  the edition's standard code when exactly one matches it ignoring case,
+   *  in ABBR and every `PA` cell under that heading, before reconciliation; a
+   *  set with none, or several, is left as written. A rewrite that would give
+   *  two rows one KEY is an error. */
+  onCodeCase?: "keep" | "standard";
+  /** Rewrites you name, `{heading: {fromCode: toCode}}`, applied like
+   *  `onCodeCase: "standard"` and before it. A heading neither input types
+   *  `PA`, or a code neither uses under it, is an error. */
+  recode?: Record<string, Record<string, string>>;
 }
 "#;
 
@@ -173,7 +195,7 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 #[cfg(feature = "merge")]
 fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
     use laterite_ags4_merge::{
-        DictRows, MergeOpts, MissingTranMode, RowOrder, TypeClashMode, merge_parsed,
+        CodeCaseMode, DictRows, MergeOpts, MissingTranMode, RowOrder, TypeClashMode, merge_parsed,
     };
 
     let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
@@ -197,6 +219,7 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         .parse()?;
     let dict_rows: DictRows = o.dict_rows.as_deref().unwrap_or("keep").parse()?;
     let row_order: RowOrder = o.row_order.as_deref().unwrap_or("input").parse()?;
+    let on_code_case: CodeCaseMode = o.on_code_case.as_deref().unwrap_or("keep").parse()?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -205,20 +228,12 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         tran,
         dict_rows,
         row_order,
+        on_code_case,
+        recode: o.recode.unwrap_or_default(),
         ..Default::default()
     };
 
     let res = merge_parsed(&[pa, pb], &opts).map_err(|e| e.to_string())?;
-    let warnings: Vec<_> = res
-        .warnings
-        .iter()
-        .map(|w| {
-            serde_json::json!({
-                "kind": w.kind, "group": w.group,
-                "heading": w.heading, "message": w.message,
-            })
-        })
-        .collect();
     let revisions: Vec<_> = res
         .revisions
         .iter()
@@ -231,7 +246,10 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
         .collect();
     Ok(MergeResult {
         bytes: res.bytes,
-        warnings_json: serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into()),
+        // Straight off the engine struct, as the other surfaces do: its derive
+        // owns the shape, including the `case` record only an `abbr_code_case`
+        // warning carries (#1010), so this surface cannot drop it.
+        warnings_json: serde_json::to_string(&res.warnings).unwrap_or_else(|_| "[]".into()),
         revisions_json: serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".into()),
     })
 }
@@ -651,5 +669,95 @@ mod tests {
             },
         ));
         assert!(msg.contains("input, key"), "{msg}");
+    }
+
+    /// One delivery whose ABBR declares `code` under `TRIG_COND` and whose
+    /// single TRIG row uses it.
+    #[cfg(feature = "merge")]
+    fn trig(code: &str) -> Vec<u8> {
+        format!(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+             \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"TRIG_COND\",\"{code}\",\"d\"\r\n\r\n\"GROUP\",\"TRIG\"\r\n\
+             \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\
+             \"SPEC_REF\",\"SPEC_DPTH\",\"TRIG_COND\"\r\n\
+             \"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"\"\r\n\
+             \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"PA\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",\"U\",\"S1\",\"1\",\"1.00\",\"{code}\"\r\n"
+        )
+        .into_bytes()
+    }
+
+    #[cfg(feature = "merge")]
+    #[test]
+    fn code_case_is_warned_and_settled_on_request() {
+        // #1010: keep (the default) warns with the set; standard and an
+        // explicit recode both settle it on the standard spelling.
+        let (a, b) = (trig("Undisturbed"), trig("UNDISTURBED"));
+        let run = |o: MergeOptions| merge_core(&a, &b, o).expect("merges");
+        let kept = run(MergeOptions::default());
+        let w: serde_json::Value = serde_json::from_str(&kept.warnings_json()).unwrap();
+        let case = w
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["kind"] == "abbr_code_case")
+            .expect("the warning")["case"]
+            .clone();
+        assert_eq!(case["suggested"], "UNDISTURBED");
+        assert_eq!(case["spellings"][0]["code"], "Undisturbed");
+        assert_eq!(case["spellings"][0]["inputs"][0], 0);
+        let std = run(MergeOptions {
+            on_code_case: Some("standard".into()),
+            ..Default::default()
+        });
+        let text = String::from_utf8(std.bytes()).unwrap();
+        assert!(!text.contains("\"Undisturbed\""), "{text}");
+        let mut recode = laterite_ags4_merge::Recode::new();
+        recode
+            .entry("TRIG_COND".into())
+            .or_default()
+            .insert("Undisturbed".into(), "UNDISTURBED".into());
+        let named = run(MergeOptions {
+            recode: Some(recode),
+            ..Default::default()
+        });
+        assert_eq!(named.bytes(), std.bytes());
+    }
+
+    #[cfg(feature = "merge")]
+    #[test]
+    fn a_bad_code_case_or_recode_is_refused_by_name() {
+        let (a, b) = (trig("Undisturbed"), trig("UNDISTURBED"));
+        let msg = err(merge_core(
+            &a,
+            &b,
+            MergeOptions {
+                on_code_case: Some("first".into()),
+                ..Default::default()
+            },
+        ));
+        assert!(msg.contains("keep, standard"), "{msg}");
+        for (h, from, named) in [
+            ("SAMP_REF", "1", "SAMP_REF"),
+            ("TRIG_COND", "Disturbed", "Disturbed"),
+        ] {
+            let mut recode = laterite_ags4_merge::Recode::new();
+            recode
+                .entry(h.into())
+                .or_default()
+                .insert(from.into(), "X".into());
+            let msg = err(merge_core(
+                &a,
+                &b,
+                MergeOptions {
+                    recode: Some(recode),
+                    ..Default::default()
+                },
+            ));
+            assert!(msg.contains(named), "{msg}");
+        }
     }
 }

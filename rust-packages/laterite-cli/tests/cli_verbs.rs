@@ -737,6 +737,93 @@ fn merge_row_order_key_sorts_the_merged_rows() {
 }
 
 #[test]
+fn merge_on_code_case_and_recode_settle_abbr_case_variants() {
+    // #1010: one delivery writes TRIG_COND "UNDISTURBED", the next
+    // "Undisturbed". The default warns and keeps both; `standard` and an
+    // explicit `--recode` file both settle on the standard spelling.
+    let dir = scratch();
+    let delivery = |name: &str, code: &str| {
+        let p = dir.join(name);
+        std::fs::write(
+            &p,
+            format!(
+                "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                 \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"ABBR\"\r\n\
+                 \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+                 \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+                 \"DATA\",\"TRIG_COND\",\"{code}\",\"d\"\r\n\r\n\"GROUP\",\"TRIG\"\r\n\
+                 \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\
+                 \"SPEC_REF\",\"SPEC_DPTH\",\"TRIG_COND\"\r\n\
+                 \"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"\"\r\n\
+                 \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"PA\"\r\n\
+                 \"DATA\",\"BH1\",\"1.00\",\"1\",\"U\",\"S1\",\"1\",\"1.00\",\"{code}\"\r\n"
+            ),
+        )
+        .unwrap();
+        p
+    };
+    // The non-standard spelling comes last, so it wins unless rewritten.
+    let (a, b) = (
+        delivery("a.ags", "UNDISTURBED"),
+        delivery("b.ags", "Undisturbed"),
+    );
+    let run = |extra: &[&str], name: &str| {
+        let out = dir.join(name);
+        let mut args = vec![
+            "merge",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--json",
+        ];
+        args.extend(extra);
+        (lat(&args), out)
+    };
+
+    let (o, out) = run(&[], "keep.ags");
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+    let case = v["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["kind"] == "abbr_code_case")
+        .expect("the warning")["case"]
+        .clone();
+    assert_eq!(case["suggested"], "UNDISTURBED");
+    assert!(
+        std::fs::read_to_string(&out)
+            .unwrap()
+            .contains("\"Undisturbed\"")
+    );
+
+    let (o, out) = run(&["--on-code-case", "standard"], "standard.ags");
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let standard = std::fs::read_to_string(out).unwrap();
+    assert!(!standard.contains("\"Undisturbed\""), "{standard}");
+
+    let recode = dir.join("recode.json");
+    std::fs::write(&recode, r#"{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}"#).unwrap();
+    let (o, out) = run(&["--recode", recode.to_str().unwrap()], "recode.ags");
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert_eq!(std::fs::read_to_string(out).unwrap(), standard);
+
+    // Usage errors are lat's exit 5: a mode clap does not know, a recode the
+    // deliveries cannot honour (named), a file that is not the mapping shape.
+    let (o, _) = run(&["--on-code-case", "first"], "bad.ags");
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("--on-code-case"), "{}", stderr(&o));
+    std::fs::write(&recode, r#"{"SAMP_REF": {"1": "2"}}"#).unwrap();
+    let (o, _) = run(&["--recode", recode.to_str().unwrap()], "bad.ags");
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("SAMP_REF"), "{}", stderr(&o));
+    std::fs::write(&recode, "[1, 2]").unwrap();
+    let (o, _) = run(&["--recode", recode.to_str().unwrap()], "bad.ags");
+    assert_eq!(o.status.code(), Some(5), "stderr: {}", stderr(&o));
+}
+
+#[test]
 fn merge_dict_rows_prune_drops_the_restating_rows() {
     // Both deliveries restate a standard heading in DICT and declare one the
     // merged file never carries — the #1011 shape. `keep` (the default) writes

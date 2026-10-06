@@ -849,7 +849,11 @@ pub struct MergeOutput {
 /// unless `dictVersion` forces it. Parse failure throws the mapped error.
 #[napi]
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+// napi boundary: owns the deserialized input
+// napi deserialises `recode` into the default-hasher HashMap; no caller can
+// supply another, as at `emit_ags4_from_ipc`.
+#[allow(clippy::implicit_hasher)]
 pub fn merge(
     files: Vec<Uint8Array>,
     on_type_clash: Option<String>,
@@ -861,9 +865,14 @@ pub fn merge(
     dict_rows: Option<String>,
     // `"input"` (default) | `"key"` — the merged rows' order (#1008).
     row_order: Option<String>,
+    // `"keep"` (default) | `"standard"` — ABBR codes differing only by case (#1010).
+    on_code_case: Option<String>,
+    // `{heading: {fromCode: toCode}}` — caller-named code rewrites (#1010).
+    recode: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 ) -> Result<MergeOutput> {
     use laterite_ags4_merge::{
-        DictRows, MergeError, MergeOpts, MissingTranMode, RowOrder, TypeClashMode, merge_parsed,
+        CodeCaseMode, DictRows, MergeError, MergeOpts, MissingTranMode, Recode, RowOrder,
+        TypeClashMode, merge_parsed,
     };
 
     if files.len() < 2 {
@@ -925,6 +934,18 @@ pub fn merge(
         .unwrap_or("input")
         .parse()
         .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+    let on_code_case: CodeCaseMode = on_code_case
+        .as_deref()
+        .unwrap_or("keep")
+        .parse()
+        .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+    // Ordered, so the engine's plan (and any message naming an entry) does not
+    // depend on JS object iteration order.
+    let recode: Recode = recode
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(h, m)| (h, m.into_iter().collect()))
+        .collect();
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -933,6 +954,8 @@ pub fn merge(
         tran,
         dict_rows,
         row_order,
+        on_code_case,
+        recode,
         ..Default::default()
     };
 
@@ -960,8 +983,14 @@ pub fn merge(
             e @ (MergeError::TypeConflict { .. }
             | MergeError::UnitConflict { .. }
             | MergeError::MissingTran
+            | MergeError::KeyCollision { .. }
             | MergeError::Emit(_)),
         ) => Err(Error::from_reason(format!("merge_conflict{SEP}6{SEP}{e}"))),
+        // A recode naming what the inputs do not have is the caller's argument —
+        // `bad_args`, as on the Python binding.
+        Err(e @ MergeError::Recode(_)) => {
+            Err(Error::from_reason(format!("bad_args{SEP}5{SEP}{e}")))
+        }
     }
 }
 
@@ -1825,6 +1854,18 @@ pub fn dict_rows_modes() -> Vec<String> {
 #[must_use]
 pub fn row_order_modes() -> Vec<String> {
     laterite_ags4_merge::RowOrder::ALL
+        .iter()
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
+/// The `--on-code-case` values merge accepts, in declaration order —
+/// `["keep", "standard"]` (#1010). Generated from `CodeCaseMode::ALL`, as
+/// `rowOrderModes` is, so the launcher's check and the census read one set.
+#[napi]
+#[must_use]
+pub fn code_case_modes() -> Vec<String> {
+    laterite_ags4_merge::CodeCaseMode::ALL
         .iter()
         .map(|m| m.as_str().to_string())
         .collect()

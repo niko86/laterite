@@ -35,6 +35,7 @@ import {
   missingTranModes,
   dictRowsModes,
   rowOrderModes,
+  codeCaseModes,
 } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
@@ -93,6 +94,7 @@ function flagValueSets(): Record<string, readonly string[]> {
     "on-missing-tran": missingTranModes(),
     "dict-rows": dictRowsModes(),
     "row-order": rowOrderModes(),
+    "on-code-case": codeCaseModes(),
   };
 }
 
@@ -158,9 +160,11 @@ const SPECS: Record<string, Spec> = {
       ...DICT_FLAGS,
       "dict-rows",
       "json",
+      "on-code-case",
       "on-missing-tran",
       "on-type-clash",
       "out",
+      "recode",
       "row-order",
       "tran-date",
       "tran-description",
@@ -175,9 +179,11 @@ const SPECS: Record<string, Spec> = {
       "dict-rows",
       "dict-version",
       "encoding",
+      "on-code-case",
       "on-missing-tran",
       "on-type-clash",
       "out",
+      "recode",
       "row-order",
       "tran-date",
       "tran-description",
@@ -869,6 +875,50 @@ function runMerge(p: Parsed, json: boolean): number {
   }
   const rowOrder = order as NonNullable<MergeOptions["rowOrder"]>;
 
+  // And for `--on-code-case` (#1010).
+  const caseMode = str(p.flags["on-code-case"]) ?? "keep";
+  const caseModes = codeCaseModes();
+  if (!caseModes.includes(caseMode)) {
+    fail(
+      `--on-code-case: unknown mode '${caseMode}' (${caseModes.join(", ")})`,
+      5,
+    );
+  }
+  const onCodeCase = caseMode as NonNullable<MergeOptions["onCodeCase"]>;
+
+  // `--recode` is a JSON file, as `--dict` is: codes may hold any character,
+  // so a file beats a flag syntax that would need escaping of its own.
+  let recode: MergeOptions["recode"];
+  const recodePath = str(p.flags["recode"]);
+  if (recodePath !== undefined) {
+    let text = "";
+    try {
+      text = readFileSync(recodePath, "utf8");
+    } catch (e) {
+      fail(`${recodePath}: ${(e as Error).message}`, 3);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      fail(`--recode ${recodePath}: ${(e as Error).message}`, 5);
+    }
+    const isMap = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null && !Array.isArray(v);
+    if (
+      !isMap(parsed) ||
+      !Object.values(parsed).every(
+        (m) => isMap(m) && Object.values(m).every((t) => typeof t === "string"),
+      )
+    ) {
+      fail(
+        `--recode ${recodePath}: expected a JSON object {heading: {from_code: to_code}}`,
+        5,
+      );
+    }
+    recode = parsed as NonNullable<MergeOptions["recode"]>;
+  }
+
   let res;
   try {
     res = merge(files, {
@@ -876,6 +926,8 @@ function runMerge(p: Parsed, json: boolean): number {
       onMissingTran,
       dictRows,
       rowOrder,
+      onCodeCase,
+      recode,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
       tran: tranFromFlags(p.flags),

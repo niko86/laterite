@@ -165,6 +165,15 @@ def _dict_rows_arg(dict_rows: str) -> str:
 RowOrderMode = Literal["input", "key"]
 
 
+#: What [`merge`][laterite.merge] does with ABBR codes that differ only by letter
+#: case under one heading (``"Undisturbed"`` / ``"UNDISTURBED"``): ``"keep"`` (the
+#: default — leave every spelling as written) or ``"standard"`` (rewrite a set to
+#: the edition's standard code when exactly one matches it ignoring case). Either
+#: way the set is reported as an ``abbr_code_case`` warning. Matches the engine's
+#: `CodeCaseMode`.
+CodeCaseMode = Literal["keep", "standard"]
+
+
 def _row_order_arg(row_order: str) -> str:
     """Refuse an unknown ``row_order`` as a ``ValueError`` before any work — the
     accepted set is the engine's ``RowOrder::ALL``, read through the bridge."""
@@ -3044,8 +3053,10 @@ class MergeResult:
     The two report sides make the merge auditable rather than a black box.
     `warnings` is the advisory ledger — each a ``{kind, group, heading, message}``
     record for something merge resolved without failing: a recency contradiction
-    (a file stamped older carried the winning row), a non-``X`` type widen, or a
-    missing merge-TRAN stamp. `revisions` is the per-row change log — each a
+    (a file stamped older carried the winning row), a non-``X`` type widen, a
+    missing merge-TRAN stamp, or ABBR codes differing only by letter case (an
+    ``abbr_code_case`` record, which also carries a ``case`` field — see
+    [`merge`][laterite.merge]'s ``on_code_case``). `revisions` is the per-row change log — each a
     ``{group, key, changed, winner_file}`` record naming a KEY-matched row whose
     values a later file changed (compared through the typed value, so a
     formatting-only edit is not reported) and which input (`winner_file`, an
@@ -3103,6 +3114,8 @@ def merge(
     tran: TranStamp | None = None,
     dict_rows: DictRowsMode = "keep",
     row_order: RowOrderMode = "input",
+    on_code_case: CodeCaseMode = "keep",
+    recode: Mapping[str, Mapping[str, str]] | None = None,
 ) -> MergeResult:
     """Reconcile two or more AGS4 deliveries of one project into a single file.
 
@@ -3192,6 +3205,29 @@ def merge(
             Sorting happens after reconciliation, so it never changes which row
             wins, nor ``revisions`` or ``warnings`` — only the order rows are
             written in.
+        on_code_case: What to do with ABBR codes under one heading that are
+            equal ignoring letter case but differ as written
+            (``"Undisturbed"`` / ``"UNDISTURBED"``). Each such set is reported in
+            every mode as an ``abbr_code_case`` warning whose ``case`` field lists
+            every spelling with the inputs that used it, the ``suggested``
+            standard spelling (``None`` when there is not exactly one) and the
+            spelling it was ``resolved`` to (``None`` when left as written).
+            ``"keep"`` (default) leaves them as written, so the output is as
+            before. ``"standard"`` rewrites a set to the edition's standard code
+            when exactly one matches it ignoring case — even a spelling no input
+            used — in the ABBR rows and every ``PA`` cell under that heading,
+            part by part for values joined with ``TRAN_RCON``. A set with no
+            standard match, or several, is left as written. The rewrite runs
+            before reconciliation, so a settled case difference is not a
+            revision.
+        recode: Rewrites you name, ``{heading: {from_code: to_code}}`` — for
+            example ``{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}``. Applied
+            like ``"standard"`` (ABBR rows and every ``PA`` cell, part by part,
+            before reconciliation) and before it, so it wins for the sets it
+            names. The ABBR row a target ends with is the target's own row when
+            an input declares one; otherwise it takes the standard description,
+            failing that the first mapped row's. A heading no input types ``PA``,
+            or a code no input uses under it, is refused.
 
     Returns:
         A [`MergeResult`][laterite.MergeResult]: the merged ``bytes`` and the
@@ -3201,8 +3237,13 @@ def merge(
         MergeConflictError: A heading was typed differently by two files and
             ``on_type_clash="error"`` (the default) refused to settle it; two files
             declared conflicting UNITs (fatal in every mode); no ``tran`` was given
-            and ``on_missing_tran="error"`` refused rather than warned; or the merged
-            output failed to emit.
+            and ``on_missing_tran="error"`` refused rather than warned; a code
+            rewrite (``recode`` or ``on_code_case="standard"``) would give two
+            rows the same KEY they did not share, so merging them would lose a
+            row; or the merged output failed to emit.
+        BadDictError: ``on_code_case`` is not ``"keep"`` or ``"standard"`` (the
+            same refusal as an unknown ``on_type_clash``), or a ``recode`` entry
+            names a heading no input types ``PA`` or a code no input uses.
         ValueError: Fewer than two sources were given, ``dict_rows`` is not
             ``"keep"`` or ``"prune"``, or ``row_order`` is not ``"input"`` or
             ``"key"``.
@@ -3228,6 +3269,10 @@ def merge(
         tran_remarks=tran.remarks if tran else None,
         dict_rows=dict_rows,
         row_order=row_order,
+        on_code_case=on_code_case,
+        recode=(
+            None if recode is None else {h: dict(codes) for h, codes in recode.items()}
+        ),
     )
     r = raise_for(r)
     return MergeResult(

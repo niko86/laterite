@@ -71,9 +71,11 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-code-case": true,
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--recode": true,
           "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
@@ -132,6 +134,10 @@
         "merge --dict-rows": [
           "keep",
           "prune"
+        ],
+        "merge --on-code-case": [
+          "keep",
+          "standard"
         ],
         "merge --on-missing-tran": [
           "error",
@@ -236,9 +242,11 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-code-case": true,
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--recode": true,
           "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
@@ -299,6 +307,10 @@
         "merge --dict-rows": [
           "keep",
           "prune"
+        ],
+        "merge --on-code-case": [
+          "keep",
+          "standard"
         ],
         "merge --on-missing-tran": [
           "error",
@@ -403,9 +415,11 @@
           "--dict-version": true,
           "--encoding": true,
           "--json": false,
+          "--on-code-case": true,
           "--on-missing-tran": true,
           "--on-type-clash": true,
           "--out": true,
+          "--recode": true,
           "--row-order": true,
           "--tran-date": true,
           "--tran-description": true,
@@ -466,6 +480,10 @@
         "merge --dict-rows": [
           "keep",
           "prune"
+        ],
+        "merge --on-code-case": [
+          "keep",
+          "standard"
         ],
         "merge --on-missing-tran": [
           "error",
