@@ -107,7 +107,7 @@ censor = ["dep:laterite-ags4-censor", "dep:sha2", "dep:hex"]
 
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.19.0" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.19.1" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
 # ONE shared id maths every surface uses (byte-identical to the extension + wheel
@@ -118,7 +118,7 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.19
 # Optional because only two surfaces reach it directly: the keychain (`arrow`)
 # and the AGS4 read codec `ags4_to_xlsx` configures (`excel`). Validation and
 # the JSON read path go through the parse leaf, never core.
-laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.17.0", default-features = false, optional = true }
+laterite-ags4-core = { path = "../laterite-ags4-core", version = "0.17.1", default-features = false, optional = true }
 # The certificate trust model — ONE decision about whether a cert may stand in for
 # the engine, shared by every surface. This crate used to make that call itself.
 laterite-ags4-trust = { path = "../laterite-ags4-trust", version = "0.18.2", optional = true }
@@ -135,7 +135,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.13.0" }
 # `build_ags4_ipc` path — the same conversion the native host uses, not a copy.
 # arrow's display fallback stays comfy-table-free. The JSON `build_ags4` door
 # needs none of it, which is why the feature moved off this line.
-laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.20.0" }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.20.1" }
 # `hostopts` (#923, its own crate since #947): the shared option-normalisation
 # seam. Wasm-safe by the same argument as emit — it adds only what emit +
 # validator already pull; its path arm is structurally unused here (no fs).
@@ -144,11 +144,11 @@ laterite-ags4-hostopts = { path = "../laterite-ags4-hostopts", version = "0.3.2"
 # out of this crate as a wasm-safe leaf so the same engine-consistent diff
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
 # validator dict + laterite-ags4-types, all already pulled here — no new weight.
-laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.14.0", optional = true }
+laterite-ags4-diff = { path = "../laterite-ags4-diff", version = "0.14.1", optional = true }
 # `merge()` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
 # already here — the same leaf PyO3 + Node + the CLI reuse.
-laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.18.0", optional = true }
+laterite-ags4-merge = { path = "../laterite-ags4-merge", version = "0.18.1", optional = true }
 # `censor()` — the shared AGS4 scrub engine (laterite-dev#581) behind the browser
 # Anonymiser, the SAME engine the corpus `censor` tool drives. Wasm-safe: it
 # pulls only parse + reference + types, all already here. The leaf takes a
