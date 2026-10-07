@@ -77,10 +77,16 @@ describe("the notes cover the map they are drawn from", () => {
     // By IDENTITY, not by count: a decremented number passes while pointing at
     // the wrong records. The shapes with no difference at all are the ordinary
     // case and have nothing to explain.
-    const shapes = map.difference_shapes
-      .filter((s) => s.rust_only.length || s.python_only.length)
-      .map((s) => s.triage)
-      .sort();
+    // A shape may be several O-Ns at once ("O-61 + O-52": the did-you-mean
+    // rides along with the declined parentage check), and the page shows one
+    // note per O-N, so the comparison is over the O-Ns the shapes name.
+    const shapes = [
+      ...new Set(
+        map.difference_shapes
+          .filter((s) => s.rust_only.length || s.python_only.length)
+          .flatMap((s) => s.triage.split(" + ")),
+      ),
+    ].sort();
     expect(notes.notes.map((n) => n.observation).sort()).toEqual(shapes);
   });
 
@@ -203,12 +209,9 @@ describe("pythonFindingCount", () => {
     // disagrees rather than the first one the loop reached.
     const wrong: string[] = [];
     for (const state of map.states) {
-      // Built from the NON-FYI keys, the same subset the generator keys on:
-      // the map measures both engines with every tier on and the demo shows
-      // one fewer. Rebuilding it from every key would agree only while nothing
-      // raises an FYI, which is the coincidence this whole gate exists over.
+      // Built from EVERY key, the way the generator keys it since #1024:
+      // the demo asks for FYI, so it holds every tier the map measured.
       const signature = Object.keys(state.rust_rule_counts)
-        .filter((rule) => !rule.startsWith("FYI"))
         .sort()
         .map((rule) => `${rule}=${state.rust_rule_counts[rule]}`)
         .join("|");
@@ -256,20 +259,25 @@ describe("pythonFindingCount", () => {
     ).toBeNull();
   });
 
-  it("keys on the tiers the demo shows, not the tiers the sweep measured", () => {
-    // The sweep measures laterite with FYI on so the two engines are
-    // tier-comparable; the demo's validate call leaves it off. An FYI arriving
-    // in the findings must not change the key, or every lookup misses at once.
+  it("keys on every tier, FYI included, the way the sweep measured it", () => {
+    // #1024: the demo asks for FYI, so the seed's did-you-mean is one of the
+    // findings the page holds. Dropping it from the key, as the page did while
+    // FYI was off, would miss the seed's entry and say "not measured" over
+    // the delivery as shipped.
     const seed = map.states.find((s) => s.id === "seed")!;
-    const withFyi = [
-      ...findingsFrom(seed.rust_rule_counts),
-      {
-        rule: "FYI (Related to Rule 16)",
-        severity: "fyi",
-      } as unknown as Finding,
-    ];
-    expect(pythonFindingCount(withFyi, SEEDED)).toBe(
-      pythonFindingCount(findingsFrom(seed.rust_rule_counts), SEEDED),
+    expect(seed.rust_rule_counts["FYI (Related to Rule 16)"]).toBeGreaterThan(
+      0,
     );
+    const withoutFyi = findingsFrom(
+      Object.fromEntries(
+        Object.entries(seed.rust_rule_counts).filter(
+          ([rule]) => !rule.startsWith("FYI"),
+        ),
+      ),
+    );
+    expect(pythonFindingCount(withoutFyi, SEEDED)).toBeNull();
+    expect(
+      pythonFindingCount(findingsFrom(seed.rust_rule_counts), SEEDED),
+    ).not.toBeNull();
   });
 });

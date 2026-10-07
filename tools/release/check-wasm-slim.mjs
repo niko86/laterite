@@ -85,8 +85,14 @@ const EXPECTED_CLASSES = {
 // What the ceilings are for is the failure the surface check CANNOT see: a heavy
 // dependency landing on an UNGATED path, where the export list is unchanged and
 // only the weight moved. Both leave ~12% headroom over slim for honest growth.
-const MAX_GZIP_BYTES = 850 * 1024; // slim 757.3
-const MAX_RAW_BYTES = 2100 * 1024; // slim 1868.9
+//
+// Raised once, on purpose, in #1024 (an owner decision, not a leak): the fix
+// engine's ABBR code rewrite reuses `merge`'s recode plan, which until then
+// only the gated `merge` export reached — so slim now carries it, along with
+// the Rule 16 near-miss suggestions. The raise is the smallest round step that
+// clears the artifact that change produced.
+const MAX_GZIP_BYTES = 870 * 1024; // slim 757.3 (2026-08-16)
+const MAX_RAW_BYTES = 2150 * 1024; // slim 1868.9 (2026-08-16)
 
 checkWasmArtifact({
   label: "wasm-slim",

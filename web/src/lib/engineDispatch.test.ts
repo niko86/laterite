@@ -568,12 +568,9 @@ describe("the request → engine argument contract", () => {
     });
   });
 
-  it("hands computeFixes its dictionary positionally, null and all", async () => {
-    // The one op that does NOT normalise: `compute_fixes` takes the dict as a
-    // positional argument and reads `null` itself, where every options-object op
-    // above needs `undefined`. Pinned because the asymmetry looks like an
-    // oversight and a helpful `?? undefined` here would change what the engine
-    // receives.
+  it("hands computeFixes its dictionary as an option, null made undefined", async () => {
+    // `compute_fixes` takes an options object since #1024, so it normalises a
+    // `null` dictionary to `undefined` like every options-object op above.
     const compute_fixes = vi.fn(() => []);
     const { at, reply } = collect();
     const dispatch = createEngineDispatch(
@@ -591,11 +588,10 @@ describe("the request → engine argument contract", () => {
       encoding: "utf-8",
     });
 
-    expect(compute_fixes).toHaveBeenCalledWith(
-      expect.any(Uint8Array),
-      null,
-      "utf-8",
-    );
+    expect(compute_fixes).toHaveBeenCalledWith(expect.any(Uint8Array), {
+      dictVersion: undefined,
+      encoding: "utf-8",
+    });
     expect(at(0).msg).toEqual({ id: 1, ok: true, kind: "fixes", fixes: [] });
   });
 

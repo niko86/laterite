@@ -65,13 +65,6 @@ NOTES = ROOT / "web" / "landing" / "demo" / "divergence-notes.json"
 COUNTS = ROOT / "web" / "landing" / "demo" / "python-counts.json"
 FORGE = "laterite-ags4-forge"
 
-#: The prefix a rule key wears when the finding is FYI-tier. It is the tier
-#: marker in this key space — `Warning (Related to Rule 10c)` and
-#: `FYI (Related to Rule 16)` are how forge names the two non-error tiers — and
-#: it is the one thing separating what this map measures from what the demo
-#: shows. See `visible_signature`.
-FYI_PREFIX = "FYI"
-
 
 class Reader(TypedDict):
     """The reader-facing half of a triage entry: which direction the difference
@@ -91,6 +84,11 @@ class Triage(TypedDict):
     triage: str
     why: str
     reader: NotRequired[Reader]
+    #: True only for a laterite-only finding that rides ON TOP of whatever else
+    #: a state does, independently of it — see `components`. Off by default,
+    #: because a shape that composes is matched less strictly than one that
+    #: does not, and that has to be a decision recorded on the entry.
+    composes: NotRequired[bool]
 
 
 #: The difference shapes this sweep knows how to explain. A shape is the pair
@@ -142,6 +140,27 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], Triage] = {
             ),
         },
     },
+    (("FYI (Related to Rule 16)",), ()): {
+        "triage": "O-61",
+        "why": (
+            "the seed's undefined SAMP_TYPE value is one letter-case away from "
+            "a code its ABBR declares, so laterite adds a did-you-mean FYI "
+            "beside the Rule 16 error both engines raise. python-ags4 has no "
+            "such suggestion. It sits on the value, not on the state, so it "
+            "rides along with every other difference the state has"
+        ),
+        "reader": {
+            "side": "ours",
+            "text": (
+                "python-ags4 reports the undefined code and stops there. We add a "
+                "line naming up to three codes it could have been: the file's own "
+                "ABBR entries first, then standard ones it never declared, matched "
+                "ignoring case, ignoring separators, or a typo or two away. It is a "
+                "suggestion only; the error stays an error and nothing is rewritten."
+            ),
+        },
+        "composes": True,
+    },
     ((), ("FYI",)): {
         "triage": "O-53",
         "why": (
@@ -161,6 +180,47 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], Triage] = {
         },
     },
 }
+
+
+Shape = tuple[tuple[str, ...], tuple[str, ...]]
+
+
+def components(shape: Shape) -> list[Shape] | None:
+    """The KNOWN entries that together explain `shape`, or None if they do not.
+
+    A shape is normally matched whole: that is what keeps the match from being
+    loose. The exception is an entry marked `composes` — a laterite-only finding
+    attached to one VALUE (O-61's did-you-mean), which appears on top of every
+    other difference a state has without changing it. Matching those whole
+    would need one entry per combination, each restating another entry's
+    explanation, and the demo would hang the combination's note off every rule
+    in it. So such a rule is peeled off as its own component, and what is left
+    must still match a KNOWN shape exactly. Nothing else is decomposed.
+    """
+    if shape in KNOWN:
+        return [shape]
+    rust_only, python_only = shape
+    peeled = [
+        ((rule,), ())
+        for rule in rust_only
+        if KNOWN.get(((rule,), ()), {}).get("composes")
+    ]
+    if not peeled:
+        return None
+    rest: Shape = (
+        tuple(r for r in rust_only if ((r,), ()) not in peeled),
+        python_only,
+    )
+    if rest not in KNOWN:
+        return None
+    return [*peeled, *([rest] if rest != ((), ()) else [])]
+
+
+def triage_of(shape: Shape) -> str:
+    parts = components(shape)
+    if parts is None:
+        return "UNTRIAGED"
+    return " + ".join(KNOWN[p]["triage"] for p in parts)
 
 
 def run(
@@ -258,7 +318,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
             tuple(sorted(set(rust) - set(py))),
             tuple(sorted(set(py) - set(rust))),
         )
-        known = KNOWN.get(shape)
+        known = components(shape)
         if known is None:
             unknown.append(
                 f"{state_id}: rust-only {list(shape[0])}, python-only {list(shape[1])}"
@@ -290,7 +350,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
                 "difference": {
                     "rust_only": list(shape[0]),
                     "python_only": list(shape[1]),
-                    "triage": (known or {}).get("triage", "UNTRIAGED"),
+                    "triage": triage_of(shape),
                 },
             }
         )
@@ -353,8 +413,8 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
                 "rust_only": list(ro),
                 "python_only": list(po),
                 "states": len(ids),
-                "triage": KNOWN.get((ro, po), {}).get("triage", "UNTRIAGED"),
-                "why": KNOWN.get((ro, po), {}).get("why", ""),
+                "triage": triage_of((ro, po)),
+                "why": "; ".join(KNOWN[p]["why"] for p in components((ro, po)) or []),
                 "example": sorted(ids)[0],
             }
             for (ro, po), ids in sorted(shapes.items(), key=lambda kv: -len(kv[1]))
@@ -393,35 +453,42 @@ def build_notes(doc: dict) -> tuple[dict, list[str]]:
     notes: list[dict] = []
     missing: list[str] = []
 
-    for shape in doc["difference_shapes"]:
-        if not shape["rust_only"] and not shape["python_only"]:
-            continue
-        key = (tuple(shape["rust_only"]), tuple(shape["python_only"]))
-        reader = KNOWN.get(key, {}).get("reader")
+    # One note per COMPONENT, not per whole shape (see `components`): a state
+    # whose shape is O-61 plus O-52 shows each note on the finding it is about,
+    # and each note counts every state that carries it.
+    def parts_of(st: dict) -> list[Shape]:
+        diff = st["difference"]
+        # An untriaged state has no parts; build_map has already failed the run.
+        return components((tuple(diff["rust_only"]), tuple(diff["python_only"]))) or []
+
+    seen: dict[Shape, list[str]] = {}
+    for st in doc["states"]:
+        for key in parts_of(st):
+            if key != ((), ()):
+                seen.setdefault(key, []).append(st["id"])
+
+    for key, state_ids in seen.items():
+        known = KNOWN[key]
+        reader = known.get("reader")
         if not reader:
             missing.append(
-                f"{shape['triage']}: shape {key} has no `reader` note, so the "
-                f"demo would show its {shape['states']} state(s) with nothing "
+                f"{known['triage']}: shape {key} has no `reader` note, so the "
+                f"demo would show its {len(state_ids)} state(s) with nothing "
                 f"said about them"
             )
             continue
 
         note = {
-            "observation": shape["triage"],
+            "observation": known["triage"],
             "side": reader["side"],
             "text": reader["text"],
-            "states": shape["states"],
+            "states": len(state_ids),
         }
         if reader["side"] == "theirs":
             # Every cell edit that reaches this shape, so a reader who finds it
             # by another route is not met with silence.
             cells = []
-            for state_id in sorted(
-                st["id"]
-                for st in doc["states"]
-                if tuple(st["difference"]["python_only"]) == key[1]
-                and tuple(st["difference"]["rust_only"]) == key[0]
-            ):
+            for state_id in sorted(state_ids):
                 by = by_state[state_id]["reached_by"]
                 if "value" in by:
                     cells.append(
@@ -434,14 +501,14 @@ def build_notes(doc: dict) -> tuple[dict, list[str]]:
                     )
             if not cells:
                 missing.append(
-                    f"{shape['triage']}: reached by no single cell edit, so "
+                    f"{known['triage']}: reached by no single cell edit, so "
                     f"the demo has nothing exact to match on — this shape "
                     f"needs a trigger the browser can evaluate"
                 )
                 continue
             note["when_cell_is"] = cells
         else:
-            note["rules"] = list(shape["rust_only"])
+            note["rules"] = list(key[0])
         notes.append(note)
 
     # The third case the demo was asked to explain — the same rule key raised by
@@ -476,24 +543,19 @@ def build_notes(doc: dict) -> tuple[dict, list[str]]:
     }, missing
 
 
-def visible_signature(rust_rule_counts: dict[str, int]) -> tuple[str, list[str]]:
-    """A state's laterite finding signature AS THE DEMO SEES IT, and what that
-    cost.
+def laterite_signature(rust_rule_counts: dict[str, int]) -> str:
+    """A state's laterite finding signature, over EVERY tier.
 
     The two engines are compared here with every tier on, which is what makes a
-    difference mean anything (see `dual_validate`). The demo's `validate` call
-    takes the wasm defaults: warnings on, **FYI off**. So the signature the
-    browser can compute for itself is over the visible tiers only, and building
-    it from the same subset here is what makes the lookup a function of
-    something the page actually holds rather than of something forge measured.
-
-    The dropped keys come back rather than vanishing, because they are not a
-    detail: the map's laterite total and the demo's displayed total are the
-    same number only while this list is empty.
+    difference mean anything (see `dual_validate`), and since #1024 the demo's
+    `validate` call asks for FYI too, so the page holds the same tiers forge
+    measured. The browser's half is `signatureOf` in divergence.ts, which keys
+    on every finding the engine returns for the same reason. Until #1024 the
+    demo left FYI off and both halves dropped the tier; that held only while no
+    swept state raised one, and O-61's did-you-mean raises one in nearly all of
+    them.
     """
-    dropped = sorted(k for k in rust_rule_counts if k.startswith(FYI_PREFIX))
-    visible = {k: v for k, v in rust_rule_counts.items() if k not in dropped}
-    return "|".join(f"{k}={visible[k]}" for k in sorted(visible)), dropped
+    return "|".join(f"{k}={rust_rule_counts[k]}" for k in sorted(rust_rule_counts))
 
 
 def _cell(state: dict) -> dict | None:
@@ -535,28 +597,11 @@ def build_python_counts(doc: dict) -> tuple[dict, list[str]]:
     """
     problems: list[str] = []
     by_signature: dict[str, dict[int, list[dict]]] = {}
-    fyi_states: list[str] = []
 
     for state in doc["states"]:
-        signature, dropped = visible_signature(state["rust_rule_counts"])
-        if dropped:
-            fyi_states.append(f"{state['id']} ({', '.join(dropped)})")
+        signature = laterite_signature(state["rust_rule_counts"])
         total = sum(state["python_rule_counts"].values())
         by_signature.setdefault(signature, {}).setdefault(total, []).append(state)
-
-    # The trap this gate exists for, which had no gate at all: the map measures
-    # laterite with FYI ON and the demo displays it OFF. They are the same
-    # number only while nothing raises one — true today, and true by accident
-    # rather than by design.
-    if fyi_states:
-        problems.append(
-            f"{len(fyi_states)} state(s) raise a laterite FYI the demo does not "
-            f"display ({', '.join(fyi_states[:5])}"
-            f"{' …' if len(fyi_states) > 5 else ''}), so the page would put "
-            "python-ags4's total beside a laterite total it is not showing. "
-            "Either turn the demo's `fyi` option on, or stop counting the tier "
-            "here — not a call this generator may make on its own."
-        )
 
     entries: list[dict] = []
     for signature, by_total in sorted(by_signature.items()):
@@ -641,10 +686,10 @@ def build_python_counts(doc: dict) -> tuple[dict, list[str]]:
             "states": len(doc["states"]),
             "signatures": len(entries),
             "laterite_tiers": (
-                "errors and warnings, which are the tiers the demo's own "
-                "validate call surfaces. The map itself measures FYI too, and "
-                "a state that raised one would fail this generator rather "
-                "than reach here"
+                "errors, warnings and FYI: every tier the map measures, which "
+                "since #1024 is also every tier the demo's own validate call "
+                "asks for, so the signature is keyed on the findings the page "
+                "actually holds"
             ),
             "python_total": (
                 "every finding python-ags4 reports at any tier, which is what "

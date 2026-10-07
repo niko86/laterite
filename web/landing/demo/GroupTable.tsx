@@ -49,6 +49,8 @@ import { Button, Icon, Popover } from "@shared/components";
 import type { DemoGroup, DemoHeading } from "./schema";
 import { singleLine, type Group } from "./delivery";
 import { FindingCallout } from "./FindingCallout";
+import { SuggestionLine } from "./SuggestionLine";
+import { foldSuggestions } from "./suggestions";
 import { coarsePointer } from "./pointer";
 import {
   severityCellTint,
@@ -56,7 +58,12 @@ import {
   severityRowTint,
   worstSeverity,
 } from "./severity";
-import { findingsForCell, findingsForRow, isManualFinding } from "./store";
+import {
+  findingsForCell,
+  findingsForRow,
+  isManualFinding,
+  report,
+} from "./store";
 
 /** The in-place value input (#525), its own component for two reasons: mount
  *  focus/select read PROPS rather than signals inside a lifecycle callback,
@@ -551,22 +558,41 @@ export const GroupTable: Component<{
                                     failing() || rowFailing() ? (
                                       <For
                                         each={
-                                          failing()
-                                            ? cellFindings()
-                                            : findingsForRow(
-                                                props.schema.code,
-                                                rowIndex(),
-                                              )
+                                          /* The did-you-mean is not one of
+                                             the cell's findings (it names no
+                                             cell), so it is looked up in the
+                                             whole report and folded under
+                                             the Rule 16 error (#1024). */
+                                          foldSuggestions(
+                                            failing()
+                                              ? cellFindings()
+                                              : findingsForRow(
+                                                  props.schema.code,
+                                                  rowIndex(),
+                                                ),
+                                            report()?.findings ?? [],
+                                          )
                                         }
                                       >
-                                        {(f) => (
-                                          <FindingCallout
-                                            severity={f.severity}
-                                            rule={f.rule}
-                                            manual={isManualFinding(f)}
-                                          >
-                                            {f.desc}
-                                          </FindingCallout>
+                                        {(card) => (
+                                          <>
+                                            <FindingCallout
+                                              severity={card.finding.severity}
+                                              rule={card.finding.rule}
+                                              manual={isManualFinding(
+                                                card.finding,
+                                              )}
+                                            >
+                                              {card.finding.desc}
+                                            </FindingCallout>
+                                            <Show when={card.suggestion}>
+                                              {(sg) => (
+                                                <SuggestionLine
+                                                  suggestion={sg()}
+                                                />
+                                              )}
+                                            </Show>
+                                          </>
                                         )}
                                       </For>
                                     ) : undefined

@@ -174,6 +174,12 @@ what will change before anything is rewritten. Each fix carries its `kind`, the
 `rule` it answers, the `line` and a `risk`. And because `apply_fixes` takes the
 ledger back, you can hand it a **subset**: whatever the user actually ticked.
 
+`compute_fixes(bytes, { dictVersion?, encoding?, onCodeCase?, recode? })` takes
+its settings as one options object. `onCodeCase: "standard"` and `recode` ask
+for an ABBR code rewrite, with the same meaning as on `merge`. It comes back as
+one safe `recode_abbreviation` fix. A set whose rewrite would give two rows the
+same KEY is left as written.
+
 Notice what repair does _not_ do. Rule 4 is gone; Rules 13/14/15/16/17 remain,
 because those are the mandatory catalogs this fragment never had and no repair
 will invent them. "Fixed" means the defects a machine can settle are settled. It

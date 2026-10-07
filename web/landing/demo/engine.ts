@@ -66,7 +66,10 @@ const encoder = new TextEncoder();
 
 export async function validateText(text: string): Promise<Report> {
   const m = await engine();
-  const raw = m.validate(encoder.encode(text));
+  // FYI on (#1024): the page shows every tier the sweep measures, so the
+  // did-you-mean suggestion can sit under the error it explains, and the
+  // python-ags4 count is keyed on the same findings the map recorded.
+  const raw = m.validate(encoder.encode(text), { fyi: true });
   if (raw.error) return { ok: false, findings: [], error: raw.error };
   return { ok: raw.ok, findings: flatten(raw.findings) };
 }

@@ -96,6 +96,35 @@ pub fn sibling_fixed_path(path: &Path) -> PathBuf {
     path.with_file_name(fname)
 }
 
+/// Read a `--recode` file, `{heading: {from_code: to_code}}`, exiting 3 when it
+/// cannot be read and 5 when it is not that shape. A JSON file, as `--dict` is:
+/// codes may hold any character, so a file beats a flag syntax that would need
+/// escaping of its own. Shared by `merge` and `fix`, so the two read and refuse
+/// it the same way.
+pub fn read_recode(path: Option<&Path>) -> laterite_ags4_merge::Recode {
+    let Some(p) = path else {
+        return laterite_ags4_merge::Recode::new();
+    };
+    let text = match std::fs::read_to_string(p) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: {}: {e}", p.display());
+            exit(3);
+        }
+    };
+    match serde_json::from_str(&text) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!(
+                "error: --recode {}: expected a JSON object {{heading: {{from_code: \
+                 to_code}}}}: {e}",
+                p.display()
+            );
+            exit(5);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

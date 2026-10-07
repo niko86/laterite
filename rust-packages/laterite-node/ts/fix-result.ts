@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
-import type { AppliedFix, Finding } from "./native";
+import type { AppliedFix, Finding, SkippedRewrite } from "./native";
 
-export type { AppliedFix };
+export type { AppliedFix, SkippedRewrite };
 
 /**
  * The product of {@link fix} — the Node port of laterite-py's `FixResult`.
@@ -24,8 +24,11 @@ export type { AppliedFix };
  * "did anything change?". Crucially, `findings` is *not* the input's problems —
  * it is the residual after re-validation: the rule violations that survived the
  * repair and still need a human. `dictVersion` records the AGS4 edition the fix
- * resolved against. `toString()` gives a one-line summary (byte count, fixes
- * applied, residual findings).
+ * resolved against. `skipped` lists the ABBR code rewrites you asked for
+ * (`recode` / `onCodeCase: "standard"`) that were left undone because they
+ * would have given two rows one KEY — a skip is not a finding, so `findings`
+ * stays errors and warnings only. `toString()` gives a one-line summary
+ * (byte count, fixes applied, residual findings).
  */
 export class FixResult {
   constructor(
@@ -35,6 +38,10 @@ export class FixResult {
     /** The fixes that were applied (`{kind, label, rule, line?, risk}`). */
     readonly applied: AppliedFix[],
     readonly dictVersion: string,
+    /** Requested ABBR code rewrites left undone because they would have given
+     *  two rows one KEY (`{heading, codes, target, group, key}`); empty when
+     *  none were. */
+    readonly skipped: SkippedRewrite[] = [],
   ) {}
 
   /** How many fixes were applied. */

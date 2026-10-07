@@ -5,12 +5,14 @@
 
 use std::process::exit;
 
-use laterite_ags4_validator::{CheckOptions, findings, fix_document};
+use laterite_ags4_validator::{
+    CheckOptions, CodeRewrite, FixError, SkippedRewrite, findings, fix_document_recoding,
+};
 use laterite_cliutil::{Spinner, write_atomic};
 use serde_json::json;
 
 use crate::cli::FixArgs;
-use crate::commands::common::{apply_dict_args, sibling_fixed_path};
+use crate::commands::common::{apply_dict_args, read_recode, sibling_fixed_path};
 
 /// One applied fix as the `--json` report carries it: the whole `Fix` serialised
 /// (`{kind, label, rule, line, risk}`, serde `snake_case` — the shape the Node
@@ -36,6 +38,10 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
         },
         &args.dict,
     );
+    let rewrite = CodeRewrite {
+        recode: read_recode(args.recode.as_deref()),
+        on_code_case: args.on_code_case,
+    };
     let path = args.file.as_path();
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
     let spinner = Spinner::start(&format!("fixing {name}..."), quiet);
@@ -48,12 +54,19 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
             exit(3);
         }
     };
-    let outcome = match fix_document(&raw, &opts, args.risky) {
+    let outcome = match fix_document_recoding(&raw, &opts, args.risky, None, &[], &rewrite) {
         Ok(o) => o,
-        Err(e) => {
+        Err(FixError::Validator(e)) => {
             drop(spinner);
             eprintln!("error: {e}");
             exit(e.exit_code());
+        }
+        // A recode naming what the file does not have is the caller's
+        // argument: the usage-class code `lat merge` gives it.
+        Err(e @ FixError::Recode(_)) => {
+            drop(spinner);
+            eprintln!("error: {e}");
+            exit(5);
         }
     };
     drop(spinner);
@@ -80,12 +93,17 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
         // `risky_available` is a human-only hint here: the Node `FixReport` has no
         // risky-count field to mirror, so keeping it out of the machine report is what
         // keeps `fix --json` byte-identical across the three launchers (laterite-dev#545).
-        let report = json!({
+        let mut report = json!({
             "file": path.display().to_string(),
             "dest": dest.display().to_string(),
             "applied": applied,
             "residual": n_residual,
         });
+        // Only when a requested rewrite was left undone, so a run that asked
+        // for none reports exactly what it always did.
+        if !outcome.skipped.is_empty() {
+            report["skipped"] = serde_json::to_value(&outcome.skipped).unwrap_or_default();
+        }
         println!(
             "{}",
             serde_json::to_string_pretty(&report).unwrap_or_default()
@@ -115,6 +133,9 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
             dest.display()
         );
     }
+    for s in &outcome.skipped {
+        println!("{}", skipped_line(s));
+    }
     if !args.risky && outcome.risky_available > 0 {
         println!(
             "{} more fixable with --fix-risky (intent-guessing fixes withheld)",
@@ -130,4 +151,17 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
         dest.display()
     );
     exit(1);
+}
+
+/// One requested rewrite `fix` left undone, as the three launchers print it.
+fn skipped_line(s: &SkippedRewrite) -> String {
+    let codes: Vec<String> = s.codes.iter().map(|c| format!("{c:?}")).collect();
+    format!(
+        "left {} under {} as written: rewriting to {:?} would give two {} rows the KEY {:?}",
+        codes.join(", "),
+        s.heading,
+        s.target,
+        s.group,
+        s.key.join("|")
+    )
 }

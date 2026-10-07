@@ -135,24 +135,16 @@ const BY_SIGNATURE = new Map<string, CountEntry>(
 
 /** laterite's finding signature, in the form the sweep recorded it.
  *
- *  FYI-tier findings are excluded because the sweep excludes them: it measures
- *  both engines with every tier on so a difference means something, and then
- *  keys this table on the subset the demo's own `validate` call surfaces, which
- *  takes the wasm default of FYI off. The generator refuses to write the table
- *  at all if a swept state ever raises one, so the two cannot drift apart
- *  quietly — this filter is the browser's half of that agreement. */
+ *  Every tier counts, FYI included, because the sweep counts every tier: it
+ *  measures both engines with all of them on so a difference means something,
+ *  and since #1024 the demo's own `validate` call asks for FYI too, so the
+ *  page holds the findings forge measured. Until then both halves dropped the
+ *  FYI tier, which held only while no swept state raised one; O-61's
+ *  did-you-mean raises one in nearly all of them. The generator's
+ *  `laterite_signature` is the other half of this agreement. */
 function signatureOf(findings: readonly Finding[]): string {
   const tally = new Map<string, number>();
-  for (const f of findings) {
-    // TWO discriminators on purpose. The generator sees forge's report and
-    // drops on the rule key's tier prefix; this sees the wasm engine's and has
-    // a real severity to read. They describe the same tier through different
-    // producers, and nothing gates that those two producers name a tier the
-    // same way — so this drops on either, and a disagreement between them
-    // costs a state's lookup rather than every state's.
-    if (f.severity === "fyi" || f.rule.startsWith("FYI")) continue;
-    tally.set(f.rule, (tally.get(f.rule) ?? 0) + 1);
-  }
+  for (const f of findings) tally.set(f.rule, (tally.get(f.rule) ?? 0) + 1);
   return [...tally.keys()]
     .sort()
     .map((rule) => `${rule}=${tally.get(rule)}`)

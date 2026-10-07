@@ -4,14 +4,14 @@
 use std::path::Path;
 use std::process::exit;
 
-use laterite_ags4_merge::{MergeError, MergeOpts, Recode, TranStamp, merge_parsed};
+use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, merge_parsed};
 use laterite_ags4_parse::parse_bytes;
 use laterite_ags4_validator::dict::FALLBACK;
 use laterite_ags4_validator::{CheckOptions, ValidatorError, resolve_dict_version, tran_ags_of};
 use laterite_cliutil::Spinner;
 
 use crate::cli::MergeArgs;
-use crate::commands::common::apply_dict_args;
+use crate::commands::common::{apply_dict_args, read_recode};
 
 /// Merge `args.files` in order (last wins a KEY conflict) → `args.out`. Edition is
 /// picked from the newest file's `TRAN_AGS` (forced by `--dict-version`). `--json`
@@ -20,31 +20,7 @@ use crate::commands::common::apply_dict_args;
 pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
     let opts = apply_dict_args(CheckOptions::default(), &args.dict);
 
-    // `--recode` is a JSON file, as `--dict` is: codes may hold any character,
-    // so a file beats a flag syntax that would need escaping of its own.
-    let recode: Recode = match &args.recode {
-        None => Recode::new(),
-        Some(p) => {
-            let text = match std::fs::read_to_string(p) {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("error: {}: {e}", p.display());
-                    exit(3);
-                }
-            };
-            match serde_json::from_str(&text) {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!(
-                        "error: --recode {}: expected a JSON object {{heading: {{from_code: \
-                         to_code}}}}: {e}",
-                        p.display()
-                    );
-                    exit(5);
-                }
-            }
-        }
-    };
+    let recode = read_recode(args.recode.as_deref());
 
     let spinner = Spinner::start("merging...", quiet);
     let read = |p: &Path| match std::fs::read(p) {

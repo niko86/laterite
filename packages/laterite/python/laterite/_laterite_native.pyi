@@ -8805,6 +8805,8 @@ def fix_file(
     dict_path: Any = ...,
     dict_bytes: Any = ...,
     dict_replace: Any = ...,
+    on_code_case: Any = ...,
+    recode: Any = ...,
 ) -> Any: ...
 def list_rules() -> Any: ...
 def merge_files(

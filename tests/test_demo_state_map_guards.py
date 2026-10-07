@@ -44,23 +44,47 @@ def test_the_committed_map_needs_no_excuses(gen, committed):
     assert notes["notes"], "the map has differences, so it must have notes"
 
 
-def test_a_difference_shape_with_no_reader_note_stops_the_run(gen, committed):
+def test_a_difference_shape_with_no_reader_note_stops_the_run(
+    gen, committed, monkeypatch
+):
     """The demo renders from these notes. A shape that reaches the page with no
     note renders as silence, and silence is what a state with NO difference
-    looks like."""
+    looks like. Notes are built per triaged COMPONENT of a state's shape since
+    #1024, so the gap is a triaged entry with no `reader`, carried by a state."""
+    shape = (("Warning (Related to Rule 99)",), ())
+    monkeypatch.setitem(
+        gen.KNOWN, shape, {"triage": "O-99", "why": "invented for this test"}
+    )
     doc = json.loads(json.dumps(committed))
-    doc["difference_shapes"].append(
+    doc["states"].append(
         {
-            "rust_only": ["Warning (Related to Rule 99)"],
-            "python_only": [],
-            "states": 1,
-            "triage": "O-99",
-            "why": "invented for this test",
-            "example": "made-up",
+            "id": "made-up",
+            "reached_by": {},
+            "difference": {
+                "rust_only": list(shape[0]),
+                "python_only": [],
+                "triage": "O-99",
+            },
         }
     )
     _, gaps = gen.build_notes(doc)
     assert any("O-99" in g for g in gaps), gaps
+
+
+def test_a_composing_finding_is_peeled_off_and_nothing_else_is(gen):
+    """#1024: O-61's did-you-mean rides on top of every other difference, so a
+    shape carrying it is explained by peeling it off and matching the rest
+    exactly. Only an entry marked `composes` may be peeled, so two ordinary
+    shapes never combine into one that nothing triaged."""
+    o61 = ("FYI (Related to Rule 16)",)
+    o52 = ("Warning (Related to Rule 10c)",)
+    assert gen.components(((*o61, *o52), ())) == [(o61, ()), (o52, ())]
+    assert gen.triage_of(((*o61, *o52), ())) == "O-61 + O-52"
+    assert gen.components((o61, ())) == [(o61, ())]
+    # O-52 and O-45's warning are each known alone; together they are not.
+    assert gen.components(((*o52, "Warning (Related to Rule 14)"), ("FYI",))) is None
+    # And the rest must still match whole: O-61 cannot excuse an unknown rule.
+    assert gen.components(((*o61, "Warning (Related to Rule 99)"), ())) is None
 
 
 def test_a_per_rule_count_difference_stops_the_run(gen, committed):
@@ -137,26 +161,34 @@ def test_a_collision_hidden_behind_a_shared_cell_stops_the_run(gen, committed):
     assert any("invented-shared-cell" in p for p in problems), problems
 
 
-def test_a_laterite_fyi_stops_the_run(gen, committed):
-    """The live trap this gate was written for. The map measures laterite with
-    FYI ON so the two engines are tier-comparable; the demo's own validate call
-    leaves FYI OFF. Those are the same number only while nothing raises one —
-    true today, and true by accident. A state that raised one would put
-    python-ags4's total beside a laterite total the page is not showing."""
+def test_a_laterite_fyi_is_counted_not_refused(gen, committed):
+    """Until #1024 the demo left FYI off and a state raising a laterite FYI
+    stopped the run. The demo now asks for FYI, so an FYI is part of what the
+    page holds: it keys the lookup rather than refusing it."""
     doc = json.loads(json.dumps(committed))
-    doc["states"][0]["rust_rule_counts"]["FYI (Related to Rule 16)"] = 1
-    _, problems = gen.build_python_counts(doc)
-    assert any("FYI (Related to Rule 16)" in p for p in problems), problems
+    state = doc["states"][0]
+    state["rust_rule_counts"]["FYI (Related to Rule 99)"] = 1
+    counts, problems = gen.build_python_counts(doc)
+    assert problems == [], problems
+    assert any(
+        "FYI (Related to Rule 99)=1" in e["signature"] for e in counts["signatures"]
+    )
 
 
 def test_the_signature_is_what_the_demo_can_see(gen):
     """The signature has to be computable from the findings the page holds, or
-    the lookup keys off something the browser does not have."""
-    visible, dropped = gen.visible_signature(
-        {"AGS Format Rule 8": 2, "FYI (Related to Rule 16)": 1, "AGS Format Rule 1": 1}
+    the lookup keys off something the browser does not have. The page asks for
+    FYI since #1024, so every tier is in it."""
+    assert (
+        gen.laterite_signature(
+            {
+                "AGS Format Rule 8": 2,
+                "FYI (Related to Rule 16)": 1,
+                "AGS Format Rule 1": 1,
+            }
+        )
+        == "AGS Format Rule 1=1|AGS Format Rule 8=2|FYI (Related to Rule 16)=1"
     )
-    assert visible == "AGS Format Rule 1=1|AGS Format Rule 8=2"
-    assert dropped == ["FYI (Related to Rule 16)"]
 
 
 def test_a_collision_needing_two_overrides_stops_the_run(gen, committed):

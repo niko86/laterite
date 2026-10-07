@@ -357,13 +357,13 @@
     {
       "rule": "16",
       "title": "Abbreviation Definitions",
-      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the concatenator declared in TRAN_RCON and each part must be defined separately; with no TRAN_RCON declared the field is not split at all. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group. One case is fixed automatically: when every undefined part of a value is a defined code with whitespace around it (\" D\" where \"D\" is defined, or \"B + D\" split on +), the padding is trimmed and the parts are rejoined with the bare concatenator (\"D\", \"B+D\"), in every group that repeats the value. A value with any part that stays undefined after trimming is left untouched, and so is a value that already passes, or one whose trim would give two rows the same KEY values.",
+      "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the concatenator declared in TRAN_RCON and each part must be defined separately; with no TRAN_RCON declared the field is not split at all. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group. One case is fixed automatically: when every undefined part of a value is a defined code with whitespace around it (\" D\" where \"D\" is defined, or \"B + D\" split on +), the padding is trimmed and the parts are rejoined with the bare concatenator (\"D\", \"B+D\"), in every group that repeats the value. A value with any part that stays undefined after trimming is left untouched, and so is a value that already passes, or one whose trim would give two rows the same KEY values. Two more repairs run only when you ask for them, with the same options as merge: recode names code rewrites ({\"TRIG_COND\": {\"Undisturbed\": \"UNDISTURBED\"}}), and on_code_case=\"standard\" rewrites codes that differ only by letter case to the edition's standard spelling. Both rewrite the ABBR rows and every PA cell under the heading. A set whose rewrite would give two rows the same KEY values is left as written and reported as skipped.",
       "severity": "mixed",
       "fixable": true,
       "observations": [
         {
           "id": "O-43",
-          "note": "laterite adds an FYI when a PA value is self-declared in the ABBR group but is not a standard abbreviation for its heading (a typo or invented code), and names the standard code when one matches it ignoring case; python-ags4 has no equivalent check."
+          "note": "laterite adds an FYI when a PA value is self-declared in the ABBR group but is not a standard abbreviation for its heading (a typo or invented code), and names up to three standard codes close to it (the same ignoring case or separators, or one or two letters off); python-ags4 has no equivalent check."
         },
         {
           "id": "O-54",
@@ -376,6 +376,10 @@
         {
           "id": "O-58",
           "note": "When your ABBR group declares codes under one heading that differ only by letter case (\"Undisturbed\" and \"UNDISTURBED\"), laterite names them: some importers treat them as the same code and reject the file. Under AGS 4.2, which treats ABBR codes as case-insensitive, this is a warning shown by default; under earlier editions it is an opt-in FYI. Neither fails validation. python-ags4 has no equivalent check."
+        },
+        {
+          "id": "O-61",
+          "note": "When a PA value is not defined but is close to a code your ABBR group declares or the dictionary lists (\"UNDISTURBD\" for \"UNDISTURBED\"), laterite adds an FYI naming up to three likely codes, your own first. It is a suggestion only: nothing is rewritten. python-ags4 has no equivalent check."
         }
       ]
     },

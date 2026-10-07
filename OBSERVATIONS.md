@@ -652,7 +652,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 - **Assessment**: a clean-room data-quality signal that catches typo'd / invented abbreviations the error-tier rules cannot (the file IS Rule-16-valid). Informational (FYI) and opt-in, never changes the error verdict, so python-parity is untouched.
 - **Upstream-reportable**: **[NO]** — an additive laterite feature, not a python-ags4 defect (though their unimplemented Warnings section could adopt it).
 - **Our decision** (#199): ship as an FYI under the existing `FYI (Related to Rule 16)` bucket — no new finding key, so the compat severity classifier treats it as FYI unchanged. FYI, not WARNING: the file breaks no rule.
-- **Hint** (#1009): a non-standard code is often a standard one in the wrong case (`"Undisturbed"` for `TRIG_COND` `"UNDISTURBED"`). When the edition's standard picklist for the heading has codes equal to the declared one ignoring case, the FYI ends `; did you mean "…"?` naming all of them, joined with `or`; the wording before it is unchanged, and a code with no case variant keeps the original message byte for byte. Two spellings in one file colliding with each other is a separate FYI, [[O-58]].
+- **Hint** (#1009, widened by #1024): a non-standard code is often a standard one misspelt — in the wrong case (`"Undisturbed"` for `TRIG_COND` `"UNDISTURBED"`), with a different separator, or one keystroke off. When the edition's standard picklist for the heading has codes close to the declared one, the FYI ends `; did you mean "…"?` naming them, joined with `or`; the wording before it is unchanged, and a code with nothing close keeps the original message byte for byte. Close means one of three levels, tried in order: equal ignoring case; equal ignoring case and the separators `-` `_` `.` `/`; or, when both codes are at least four characters long, a Damerau–Levenshtein distance (case-insensitive) of at most one edit, or two once the longer code passes six characters. At most three are named, ranked by level, then distance, then dictionary order. The same closeness drives the [[O-61]] FYI for an undefined value. Two spellings in one file colliding with each other is a separate FYI, [[O-58]].
 
 ### O-44 [VARIANCE] Structural validation of a file-level DICT group is a laterite-originated WARNING (Related to Rule 18); python-ags4 only consumes DICT, never validates it
 - **Observed**: Rule 18 requires a DICT group for non-standard names but says nothing about the DICT's OWN well-formedness. A file can declare custom groups/headings through a MALFORMED DICT (a missing `DICT_TYPE`/`DICT_GRP`/`DICT_HDNG` column, a blank `DICT_GRP`, a `HEADING`-row with a blank `DICT_HDNG`). The engine only *consumes* DICT, so a malformed one degrades every downstream check with zero feedback.
@@ -835,7 +835,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
   separate `Warning (...)` label
   is what lets compat's severity classifier count it as a warning, and
   the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
-  standard case variant. Collapsing the variants is not done here.
+  standard case variant. Validation never collapses the variants. `fix` does when asked (#1024): `on_code_case="standard"` or an explicit `recode`, `merge`'s two options, rewrite the ABBR rows and every `PA` cell under the heading as one safe Rule 16 fix, and leave a set as written, reported as skipped, when the rewrite would give two rows one KEY.
 
 ### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8); python-ags4 has no such check
 - **Observed** (#1013): a file can declare a standard heading with a
@@ -937,6 +937,36 @@ O-N below is an internal decision or behavioural note, not for external circulat
   the caller's last group, omits it when no row is left unless a
   non-standard heading still needs one (then it is written whole), and
   never adds a finding. `keep`, the default, is byte-identical to before.
+
+### O-61 [VARIANCE] An undefined PA value close to a known code gets a laterite-originated "did you mean" FYI (Related to Rule 16); python-ags4 has no such check
+- **Observed** (#1024): a `PA` value that fails Rule 16 is very often a
+  near miss of a code the file or the dictionary already has:
+  `"UNDISTURBD"` under `TRIG_COND` where ABBR declares
+  `"UNDISTURBED"`, or the right letters in the wrong case. Both engines
+  report the undefined value; neither says what it was probably meant
+  to be, so the reader has to search the ABBR group and the picklist by
+  hand.
+- **Spec** (`spec:AGS4-4.2-2025.pdf §4.1.1 Rule 16`): a `PA` value must
+  be defined in the file's ABBR group. The specification says nothing
+  about suggesting a correction.
+- **python-ags4** (`check.py::rule_16`): reports the undefined value and
+  stops; nothing compares it with the defined codes.
+- **Assessment**: the error is right and stays as it is. A suggestion is
+  a reading aid, not a judgement on the file, so it belongs in the
+  opt-in FYI tier and never moves the verdict.
+- **Upstream-reportable**: **[NO]** — an additive laterite advisory, not a
+  python-ags4 defect or a spec ambiguity.
+- **Our decision** (#1024): with FYIs on, for each part of a `PA` value
+  that fails Rule 16, emit one `FYI (Related to Rule 16)` naming the
+  close codes: the file's own ABBR codes for that heading first, labelled
+  as declared, then standard codes of the resolved edition the file does
+  not declare, labelled as standard. Close means one of three levels, tried in order: equal ignoring case; equal ignoring case and the separators `-` `_` `.` `/`; or, when both codes are at least four characters long, a Damerau–Levenshtein distance (case-insensitive) of at most one edit, or two once the longer code passes six characters. At most three are named, ranked by level, then distance, then dictionary order. When nothing is close there is no FYI, and when
+  the [[O-57]] whitespace FYI already explains the value it is not
+  repeated. The label is the existing one, so compat passes it through
+  as an FYI and the python-ags4 known-failures set is unchanged. It is a
+  suggestion only: `fix` never acts on it, and rewrites a code only when
+  the caller names the rewrite (`recode`, `on_code_case="standard"`,
+  [[O-58]]).
 
 ## Post-V8 — #422 quote-aware universal-newline line splitting
 

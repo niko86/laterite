@@ -83,7 +83,7 @@ build, plus seven more behind the features described below
   `meta(code)` (`{headings, units, types, sql_types}`), and
   `arrow_ipc(code)` — one **typed Apache Arrow IPC stream per group**,
   built lazily so peak residency is a single batch.
-- `compute_fixes(bytes, dict_version, encoding)` → the safe/risky `Fix[]` for
+- `compute_fixes(bytes, { dictVersion, encoding, onCodeCase, recode })` → the safe/risky `Fix[]` for
   a file (the Fix tab's oracle; a **separate** surface from the findings — see
   [[tools/laterite-ags4-wasm]]).
 - `apply_fixes(bytes, encoding, fixes)` → `Result<Vec<u8>, JsError>` (the patched

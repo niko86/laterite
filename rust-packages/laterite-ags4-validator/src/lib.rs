@@ -71,8 +71,8 @@ pub use dict::{DictResolution, DictVersion, Dictionary};
 pub use error::ValidatorError;
 pub use findings::{Finding, Findings};
 pub use fixes::{
-    Fix, FixKind, FixOutcome, Fixes, SpanEdit, apply_fixes, compute_fixes, fix_document,
-    fix_document_selective,
+    CodeRewrite, Fix, FixError, FixKind, FixOutcome, Fixes, SkippedRewrite, SpanEdit, apply_fixes,
+    compute_fixes, fix_document, fix_document_recoding, fix_document_selective,
 };
 // The phf-projected dictionary (`Dictionary`, `DictVersion`, `dictionary_dto`,
 // …) moved into the reference leaf (laterite-dev#475 PR2). Re-exported as a module (not

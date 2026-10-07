@@ -165,12 +165,12 @@ def _dict_rows_arg(dict_rows: str) -> str:
 RowOrderMode = Literal["input", "key"]
 
 
-#: What [`merge`][laterite.merge] does with ABBR codes that differ only by letter
-#: case under one heading (``"Undisturbed"`` / ``"UNDISTURBED"``): ``"keep"`` (the
-#: default — leave every spelling as written) or ``"standard"`` (rewrite a set to
-#: the edition's standard code when exactly one matches it ignoring case). Either
-#: way the set is reported as an ``abbr_code_case`` warning. Matches the engine's
-#: `CodeCaseMode`.
+#: What [`merge`][laterite.merge] and [`fix`][laterite.fix] do with ABBR codes that
+#: differ only by letter case under one heading (``"Undisturbed"`` /
+#: ``"UNDISTURBED"``): ``"keep"`` (the default — leave every spelling as written) or
+#: ``"standard"`` (rewrite a set to the edition's standard code when exactly one
+#: matches it ignoring case). Merge reports each set as an ``abbr_code_case``
+#: warning either way. Matches the engine's `CodeCaseMode`.
 CodeCaseMode = Literal["keep", "standard"]
 
 
@@ -1230,6 +1230,8 @@ class Ags4File:
         exclude: list[FixableRule] | None = None,
         dict_version: Edition | None = None,
         encoding: str | None = None,
+        recode: Mapping[str, Mapping[str, str]] | None = None,
+        on_code_case: CodeCaseMode = "keep",
     ) -> Ags4File:
         """Repair this file and return a new, repaired [`Ags4File`][laterite.Ags4File] — the fluent
         transform, so ``read(path).fix().validate().save(out)`` reads as one chain.
@@ -1243,7 +1245,8 @@ class Ags4File:
         ``risky=True`` even when named in ``only``). ``dict_version`` / ``encoding``
         override the edition / source encoding — ``encoding`` defaults to the one this
         handle was [`read`][laterite.read] with, so a cp1252 file is re-read as cp1252.
-        The same engine the browser fix UI uses.
+        ``recode`` / ``on_code_case`` rewrite ABBR codes on request, as on the free
+        [`fix`][laterite.fix]. The same engine the browser fix UI uses.
 
         Non-destructive — the source on disk is untouched; persist the repaired handle
         with [`save`][laterite.Ags4File.save]. The [`FixResult`][laterite.FixResult] — what was applied and the residual
@@ -1265,6 +1268,8 @@ class Ags4File:
             exclude=exclude,
             dict_version=dict_version,
             encoding=encoding if encoding is not None else self._encoding,
+            recode=recode,
+            on_code_case=on_code_case,
         )
         repaired = read(data=report.bytes, backend=self._backend, xn=self._xn)
         repaired._fix_report = report
@@ -2828,10 +2833,24 @@ class FixResult:
             (intent-guessing fixes withheld from the safe set); ``0`` when ``risky``
             was passed. A discoverability signal — non-zero means more is repairable
             without your having to guess that an opt-in tier exists.
+        skipped (list[dict]): The ABBR code rewrites you asked for (``recode`` /
+            ``on_code_case="standard"``) that were left undone because they would
+            have given two rows of one group the same KEY — each a ``{heading,
+            codes, target, group, key}`` record: the spellings left as written,
+            the code they would have become, and the group and KEY they would
+            have collided on. Empty when nothing was skipped. A skip is not a
+            finding, so ``findings`` stays errors and warnings only.
         text (str): The repaired bytes decoded as UTF-8.
     """
 
-    __slots__ = ("applied", "bytes", "dict_version", "findings", "risky_available")
+    __slots__ = (
+        "applied",
+        "bytes",
+        "dict_version",
+        "findings",
+        "risky_available",
+        "skipped",
+    )
 
     def __init__(
         self,
@@ -2840,12 +2859,14 @@ class FixResult:
         applied: list[dict],
         dict_version: str,
         risky_available: int = 0,
+        skipped: list[dict] | None = None,
     ) -> None:
         self.bytes = data
         self.findings = findings
         self.applied = applied
         self.dict_version = dict_version
         self.risky_available = risky_available
+        self.skipped = [] if skipped is None else skipped
 
     @property
     def fixes_applied(self) -> int:
@@ -2866,9 +2887,10 @@ class FixResult:
             if self.risky_available
             else ""
         )
+        skipped = f", {len(self.skipped)} rewrite(s) skipped" if self.skipped else ""
         return (
             f"<FixResult {len(self.bytes)} bytes, applied={self.fixes_applied}, "
-            f"{len(self.findings)} residual finding(s){risky}>"
+            f"{len(self.findings)} residual finding(s){risky}{skipped}>"
         )
 
 
@@ -2885,6 +2907,8 @@ def fix(
     exclude: list[FixableRule] | None = None,
     in_place: bool = False,
     out: str | os.PathLike[str] | None = None,
+    recode: Mapping[str, Mapping[str, str]] | None = None,
+    on_code_case: CodeCaseMode = "keep",
 ) -> FixResult:
     """Mechanically repair an existing AGS4 file and return a [`FixResult`][laterite.FixResult].
 
@@ -2932,15 +2956,40 @@ def fix(
             to ``False``.
         out: Destination path to write the repaired bytes to. Mutually exclusive
             with ``in_place``. ``None`` leaves the result unwritten.
+        recode: ABBR code rewrites you name, ``{heading: {from_code: to_code}}`` —
+            for example ``{"TRIG_COND": {"Undisturbed": "UNDISTURBED"}}`` — with
+            [`merge`][laterite.merge]'s meaning: the ABBR rows and every ``PA`` cell
+            under the heading are rewritten, part by part for values joined with
+            ``TRAN_RCON``, and an ABBR row whose code collapses into one the file
+            already declares is removed. A heading the file does not type ``PA``,
+            or a code it does not use there, is refused.
+        on_code_case: ``"keep"`` (default) leaves ABBR codes that differ only by
+            letter case as written; ``"standard"`` rewrites such a set to the
+            edition's standard code when exactly one matches it ignoring case, and
+            leaves it when none or several do. Applied after ``recode``, never to
+            a set ``recode`` names. ``recode`` and ``"standard"`` are your explicit
+            instructions, so they apply without ``risky=True``; they are rule
+            ``"16"`` repairs, so ``only`` / ``exclude`` select them like any other.
+            A rewrite that would give two rows of one group the same KEY is not
+            made: that whole set is left as written and listed in
+            [`FixResult.skipped`][laterite.FixResult.skipped], and the rest of the
+            file is still fixed. ``fix`` never chooses a spelling itself — the
+            "did you mean" codes in the Rule 16 FYIs are suggestions only.
 
     Returns:
         FixResult: The repaired UTF-8 ``bytes``, the residual ``findings`` that the
         fixer could not mechanically resolve, the ``applied`` list of fixes made,
-        and the resolved ``dict_version``.
+        the resolved ``dict_version``, and any requested code rewrites it
+        ``skipped``.
 
     Raises:
         TypeError: If both ``in_place=True`` and ``out`` are given.
-        ValueError: If ``only`` / ``exclude`` name a rule that is not fixable.
+        ValueError: If ``only`` / ``exclude`` name a rule that is not fixable, or
+            if ``recode`` / ``on_code_case="standard"`` is asked for while ``only``
+            leaves out rule ``"16"`` or ``exclude`` names it.
+        BadDictError: ``on_code_case`` is not ``"keep"`` or ``"standard"``, or a
+            ``recode`` entry names a heading the file does not type ``PA`` or a
+            code it does not use there.
         Ags4Error: If ``in_place=True`` but the source is not a path (so there is
             nothing to overwrite) — use ``out=<path>`` or [`FixResult.save`][laterite.FixResult.save]
             instead.
@@ -2951,6 +3000,14 @@ def fix(
         raise TypeError("pass only one of in_place=True / out=<path>")
     only = _validate_fixable(only, "only")
     exclude = _validate_fixable(exclude, "exclude")
+    if (recode or on_code_case == "standard") and (
+        (only is not None and "16" not in only)
+        or (exclude is not None and "16" in exclude)
+    ):
+        raise ValueError(
+            "fix(): recode= / on_code_case='standard' ask for an ABBR code rewrite, "
+            'which is a rule "16" repair, but only= / exclude= leave rule "16" out'
+        )
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = raise_for(
         _native.fix_file(
@@ -2962,6 +3019,12 @@ def fix(
             include_risky=risky,
             only=only,
             exclude=exclude,
+            on_code_case=on_code_case,
+            recode=(
+                None
+                if recode is None
+                else {h: dict(codes) for h, codes in recode.items()}
+            ),
         )
     )
     by_rule: dict[str, list[dict]] = json.loads(res["findings_json"])
@@ -2972,6 +3035,7 @@ def fix(
         list(res["applied"]),
         res["dict_version"],
         res.get("risky_available", 0),
+        json.loads(res.get("skipped_json", "[]")),
     )
 
     if in_place:

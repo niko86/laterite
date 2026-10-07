@@ -13,6 +13,10 @@
 //! this leaf's own `data/`, at which point the leaf owns them outright.
 
 pub mod catalogue;
+// How close one ABBR code is to another — the ranking behind Rule 16's "did
+// you mean" hints (#1024). Next to `dict` because its first level is the
+// case-insensitive picklist lookup's own comparison.
+pub mod closeness;
 pub mod dict;
 // The Rule 18 effective dictionary (standard ∪ the delivery file's own DICT
 // group) — the one shared implementation (#777), consumed by the validator's

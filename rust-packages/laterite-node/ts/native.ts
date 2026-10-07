@@ -59,6 +59,7 @@ export type {
   Finding,
   ValidationReport,
   AppliedFix,
+  SkippedRewrite,
   GroupIpc,
   PackStats,
   UnpackStats,

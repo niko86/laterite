@@ -42,6 +42,14 @@
 //!    that heading (`" D"` → `"D"`, `"B + D"` → `"B+D"`). Safe: it picks no
 //!    code, it only removes padding from one the file already names. A cell
 //!    with any part that stays undefined is left whole.
+//!  * **Rule 16 (on request)** — rewrite ABBR codes the caller names
+//!    ([`CodeRewrite`], #1024): a `recode` mapping, or the edition's single
+//!    standard spelling of a case-variant set. Never computed unless asked
+//!    for, and never chosen here: the "did you mean" closeness behind the
+//!    Rule 16 FYIs only suggests. The rewrite is the shared
+//!    `laterite_ags4_reference::recode` plan merge uses; where merge refuses a
+//!    rewrite that would give two rows one KEY, `fix` leaves that set as
+//!    written and says so ([`SkippedRewrite`]).
 //!
 //! Apply ordering + the expected-value guard live in [`apply_fixes`]: a
 //! span carries the text it *expects* to find, so a stale/over-applied
@@ -57,6 +65,10 @@ use crate::findings::{Findings, Target};
 use crate::parse::{ParsedFile, field_span, split_ags_line};
 use crate::rules::groups::AbbrLookup;
 use crate::rules::typed_values::{format_ndp, format_nsci, format_nsf};
+use laterite_ags4_reference::recode::{Mapping, Rewrite, plan_rewrite, resolve_mapping};
+// The rewrite's vocabulary, re-exported so a surface that only depends on the
+// validator (the browser engine) names it without a second dependency.
+pub use laterite_ags4_reference::recode::{CodeCaseMode, Recode, RecodeError};
 
 /// One in-line text edit: replace the char range `[start, end)` on a
 /// 1-based source `line` with `replacement`. `expected` is the text the
@@ -91,6 +103,11 @@ pub enum FixKind {
     PadShortRow,
     QuoteUnquotedRow,
     TrimAbbreviation,
+    /// A caller-requested ABBR code rewrite ([`CodeRewrite`]). The one kind
+    /// that removes lines: an edit spanning a whole line and replacing it
+    /// with nothing deletes that line, terminator and all — an ABBR row whose
+    /// code collapsed into one the file already declares.
+    RecodeAbbreviation,
 }
 
 /// How confident the fix is. `Safe` rewrites are unambiguous from the file
@@ -128,6 +145,7 @@ impl FixKind {
             Self::PadShortRow => "pad_short_row",
             Self::QuoteUnquotedRow => "quote_unquoted_row",
             Self::TrimAbbreviation => "trim_abbreviation",
+            Self::RecodeAbbreviation => "recode_abbreviation",
         }
     }
 }
@@ -159,6 +177,16 @@ pub struct Fix {
 }
 
 pub type Fixes = Vec<Fix>;
+
+impl SpanEdit {
+    /// Whether this edit deletes its whole line — only ever honoured on a
+    /// [`FixKind::RecodeAbbreviation`] fix, the one kind that drops rows.
+    fn removes_line(&self) -> bool {
+        self.start == 0
+            && self.replacement.is_empty()
+            && self.end as usize == self.expected.chars().count()
+    }
+}
 
 // Rule-label consts. Kept local (the rule modules' own consts are
 // private) — these must stay string-identical to them; the compute tests
@@ -860,6 +888,220 @@ fn trims_merge_keys(
     false
 }
 
+/// An ABBR code rewrite a caller asks `fix` for (#1024): the same two
+/// instructions `merge` takes, with the same meaning — `recode` names a
+/// rewrite outright, and [`CodeCaseMode::Standard`] settles a case-variant
+/// set on the edition's spelling when exactly one standard code matches it.
+/// `recode` applies first. The default asks for nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CodeRewrite {
+    pub recode: Recode,
+    pub on_code_case: CodeCaseMode,
+}
+
+impl CodeRewrite {
+    /// Whether anything is asked for — the default and a `keep` with no
+    /// recode are both nothing, and leave `fix` exactly as it was.
+    #[must_use]
+    pub fn is_requested(&self) -> bool {
+        !self.recode.is_empty() || self.on_code_case == CodeCaseMode::Standard
+    }
+}
+
+/// A set of codes under one heading `fix` was asked to rewrite to `target`
+/// but left as written, because the rewrite would have given two rows of
+/// `group` the same `key`. Merge refuses such a rewrite outright; `fix`
+/// repairs what it can and reports this instead.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SkippedRewrite {
+    pub heading: String,
+    /// Every spelling of the set, each left as written.
+    pub codes: Vec<String>,
+    pub target: String,
+    pub group: String,
+    pub key: Vec<String>,
+}
+
+/// What [`compute_recode_fix`] decided: the one fix carrying every rewrite
+/// that is safe to make (none when nothing is left to rewrite), and the sets
+/// it left alone.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RecodeFix {
+    pub fix: Option<Fix>,
+    pub skipped: Vec<SkippedRewrite>,
+}
+
+/// Plan the ABBR code rewrite `rewrite` asks for over `parsed`, as one
+/// [`FixKind::RecodeAbbreviation`] fix.
+///
+/// The plan is the shared `laterite_ags4_reference::recode` one — the ABBR
+/// rows and every `PA` cell under a rewritten heading, part by part on
+/// `TRAN_RCON` — so `fix` and `merge` settle a code by one rule. Where they
+/// differ is a KEY collision: a set whose rewrite would make two rows share a
+/// KEY they did not share is dropped from the mapping whole, every spelling
+/// left as written, and the plan made again until none collides.
+///
+/// # Errors
+///
+/// The [`RecodeError`] naming the first `recode` entry `parsed` cannot honour.
+pub fn compute_recode_fix(
+    parsed: &ParsedFile,
+    dict: Dictionary<'_>,
+    rewrite: &CodeRewrite,
+) -> Result<RecodeFix, RecodeError> {
+    let files = std::slice::from_ref(parsed);
+    let resolved = resolve_mapping(files, &dict, &rewrite.recode, rewrite.on_code_case)?.mapping;
+    let mut skipped: Vec<SkippedRewrite> = Vec::new();
+    // The mapping is rebuilt from `resolved` each pass, leaving out every set
+    // skipped so far, rather than edited in place: removing from a `BTreeMap`
+    // pulls in rebalancing code the browser engine would otherwise not carry.
+    let mut mapping = without_skipped(&resolved, &skipped);
+    let (edits, dropped) = loop {
+        let Rewrite {
+            edits,
+            dropped,
+            collisions,
+        } = plan_rewrite(files, &dict, &mapping);
+        let Some(c) = collisions.into_iter().next() else {
+            break (edits, dropped);
+        };
+        let before = skipped.len();
+        for (heading, from) in &c.codes {
+            let Some(target) = mapping.get(heading).and_then(|m| m.get(from)) else {
+                continue;
+            };
+            if skipped
+                .iter()
+                .any(|s| s.heading == *heading && s.target == *target)
+            {
+                continue;
+            }
+            let codes = mapping[heading]
+                .iter()
+                .filter(|(_, t)| *t == target)
+                .map(|(f, _)| f.clone())
+                .collect();
+            skipped.push(SkippedRewrite {
+                heading: heading.clone(),
+                codes,
+                target: target.clone(),
+                group: c.group.clone(),
+                key: c.key.clone(),
+            });
+        }
+        // Every collision names the entries that caused it, so each pass
+        // skips at least one set; were one ever to name none, rewriting
+        // nothing is the only plan left that cannot lose a row.
+        mapping = if skipped.len() == before {
+            Mapping::new()
+        } else {
+            without_skipped(&resolved, &skipped)
+        };
+    };
+
+    let line_text: HashMap<u32, &str> = parsed
+        .raw_lines
+        .iter()
+        .map(|rl| (rl.number, parsed.line_text(rl)))
+        .collect();
+    let mut spans: Vec<SpanEdit> = Vec::new();
+    let mut cells = 0usize;
+    for e in &edits {
+        let Some(row) = parsed.groups.get(&e.group).and_then(|g| g.rows.get(e.row)) else {
+            continue;
+        };
+        let Some(&raw) = line_text.get(&row.line) else {
+            continue;
+        };
+        // `col` indexes one AGS4 group's headings — nowhere near u32::MAX.
+        #[allow(clippy::cast_possible_truncation)]
+        let Some((s, end)) = field_span(raw, e.col as u32) else {
+            continue;
+        };
+        let expected: String = raw
+            .chars()
+            .skip(s as usize)
+            .take((end - s) as usize)
+            .collect();
+        spans.push(SpanEdit {
+            line: row.line,
+            start: s,
+            end,
+            replacement: e.value.replace('"', "\"\""),
+            expected,
+        });
+        cells += usize::from(e.group != "ABBR");
+    }
+    for d in &dropped {
+        let Some(row) = parsed.groups.get(&d.group).and_then(|g| g.rows.get(d.row)) else {
+            continue;
+        };
+        let Some(&body) = line_text.get(&row.line) else {
+            continue;
+        };
+        // A line is a few hundred characters, not u32::MAX.
+        #[allow(clippy::cast_possible_truncation)]
+        let end = body.chars().count() as u32;
+        spans.push(SpanEdit {
+            line: row.line,
+            start: 0,
+            end,
+            replacement: String::new(),
+            expected: body.to_string(),
+        });
+    }
+    let Some(line) = spans.iter().map(|e| e.line).min() else {
+        return Ok(RecodeFix { fix: None, skipped });
+    };
+    let mut named = String::new();
+    let mut n = 0usize;
+    for (h, m) in &mapping {
+        for (f, t) in m {
+            if n > 0 {
+                named.push_str("; ");
+            }
+            n += 1;
+            // Writing into a String cannot fail.
+            let _ = std::fmt::Write::write_fmt(&mut named, format_args!("{f:?} → {t:?} under {h}"));
+        }
+    }
+    let removed = dropped.len();
+    let fix = Fix {
+        kind: FixKind::RecodeAbbreviation,
+        label: format!(
+            "Rewrite ABBR code{} as asked: {named} ({cells} cell{}, {removed} ABBR row{} removed, \
+             Rule 16)",
+            if n == 1 { "" } else { "s" },
+            if cells == 1 { "" } else { "s" },
+            if removed == 1 { "" } else { "s" },
+        ),
+        rule: RULE_16.to_string(),
+        line: Some(line),
+        risk: FixRisk::Safe,
+        edits: spans,
+    };
+    Ok(RecodeFix {
+        fix: Some(fix),
+        skipped,
+    })
+}
+
+/// `resolved` less every set in `skipped` — each a heading and the target its
+/// codes were mapped to, so a skipped set leaves whole.
+fn without_skipped(resolved: &Mapping, skipped: &[SkippedRewrite]) -> Mapping {
+    let mut out = Mapping::new();
+    for (h, m) in resolved {
+        for (f, t) in m {
+            if !skipped.iter().any(|s| s.heading == *h && s.target == *t) {
+                out.entry(h.clone())
+                    .or_default()
+                    .insert(f.clone(), t.clone());
+            }
+        }
+    }
+    out
+}
+
 /// Walk a raw DATA line the way [`crate::parse::split_ags_line`] does,
 /// reporting whether the tokenizer would have to TOLERATE a malformation —
 /// an unterminated quote, or stray characters between a closing quote and the
@@ -1117,12 +1359,24 @@ fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> 
 pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     // Group in-line edits by line.
     let mut by_line: HashMap<u32, Vec<&SpanEdit>> = HashMap::new();
+    // A plain list, searched linearly: a recode drops a handful of ABBR rows,
+    // and a second map type is code the browser engine downloads.
+    let mut removals: Vec<&SpanEdit> = Vec::new();
     let mut strip_bom = false;
     let mut normalize_crlf = false;
     for fix in selected {
         match fix.kind {
             FixKind::StripBom => strip_bom = true,
             FixKind::NormalizeCrlf => normalize_crlf = true,
+            FixKind::RecodeAbbreviation => {
+                for ed in &fix.edits {
+                    if ed.removes_line() {
+                        removals.push(ed);
+                    } else {
+                        by_line.entry(ed.line).or_default().push(ed);
+                    }
+                }
+            }
             _ => {
                 for ed in &fix.edits {
                     by_line.entry(ed.line).or_default().push(ed);
@@ -1151,6 +1405,15 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
         // Every terminator/delimiter is ASCII, so `start..body_end` is a valid
         // char boundary of `text`.
         let body = &text[span.start..span.body_end];
+
+        // A removal still answers to its `expected` guard: a line that no
+        // longer reads as planned is kept, never deleted on a stale plan.
+        if removals
+            .iter()
+            .any(|ed| ed.line == number && ed.expected == body)
+        {
+            continue;
+        }
 
         let edited = match by_line.get(&number) {
             None => body.to_string(),
@@ -1229,6 +1492,10 @@ pub struct FixOutcome {
     pub applied: Fixes,
     pub dict_version: crate::DictVersion,
     pub resolution: crate::DictResolution,
+    /// The requested code rewrites left undone because they would have given
+    /// two rows one KEY ([`fix_document_recoding`]); empty when none were
+    /// requested.
+    pub skipped: Vec<SkippedRewrite>,
     /// How many *risky* fixes (after any `only`/`exclude` selection) were withheld
     /// because `include_risky` was false — i.e. how many more `risky=true` would
     /// apply. `0` when `include_risky` is true. A discoverability signal so a
@@ -1272,6 +1539,69 @@ pub fn fix_document_selective(
     only: Option<&[String]>,
     exclude: &[String],
 ) -> Result<FixOutcome, crate::ValidatorError> {
+    fix_document_recoding(
+        raw,
+        opts,
+        include_risky,
+        only,
+        exclude,
+        &CodeRewrite::default(),
+    )
+    .map_err(|e| match e {
+        FixError::Validator(v) => v,
+        // No rewrite was requested, so there was no recode to refuse.
+        FixError::Recode(r) => crate::ValidatorError::NotAgs4(r.to_string()),
+    })
+}
+
+/// Why [`fix_document_recoding`] refused: the document itself, or a
+/// requested rewrite the document cannot honour.
+#[derive(Debug)]
+pub enum FixError {
+    Validator(crate::ValidatorError),
+    /// A `recode` entry naming a heading the file does not type `PA`, a code
+    /// it does not use, or an empty target — the caller's argument, refused
+    /// by name rather than ignored.
+    Recode(RecodeError),
+}
+
+impl std::fmt::Display for FixError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FixError::Validator(e) => e.fmt(f),
+            FixError::Recode(e) => e.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for FixError {}
+
+impl From<crate::ValidatorError> for FixError {
+    fn from(e: crate::ValidatorError) -> Self {
+        FixError::Validator(e)
+    }
+}
+
+/// [`fix_document_selective`], also applying the ABBR code rewrite the caller
+/// asked for (#1024) — see [`CodeRewrite`] and [`compute_recode_fix`].
+///
+/// The rewrite is an explicit instruction, so it applies without
+/// `include_risky`; it is a rule `"16"` fix, so `only` / `exclude` select it
+/// like any other. A caller that asks for a rewrite while excluding rule 16
+/// has contradicted itself, and the surfaces refuse that before calling here.
+///
+/// # Errors
+///
+/// [`FixError::Validator`] as [`fix_document_selective`]; [`FixError::Recode`]
+/// for a `recode` entry the document cannot honour.
+pub fn fix_document_recoding(
+    raw: &[u8],
+    opts: &crate::CheckOptions,
+    include_risky: bool,
+    only: Option<&[String]>,
+    exclude: &[String],
+    rewrite: &CodeRewrite,
+) -> Result<FixOutcome, FixError> {
     let has_bom = raw.starts_with(&[0xEF, 0xBB, 0xBF]);
     let pf = crate::parse::parse_bytes(raw, opts.encoding)?;
     let tran = crate::tran_ags_of(&pf);
@@ -1281,6 +1611,12 @@ pub fn fix_document_selective(
     crate::rules::run_all(&pf, &dict, opts, &mut found);
 
     let mut selected = compute_fixes(&pf, &found, dict);
+    let mut skipped = Vec::new();
+    if rewrite.is_requested() {
+        let planned = compute_recode_fix(&pf, dict, rewrite).map_err(FixError::Recode)?;
+        selected.extend(planned.fix);
+        skipped = planned.skipped;
+    }
     // Per-rule selection applies to the full computed set first (short label).
     if only.is_some() || !exclude.is_empty() {
         selected.retain(|f| {
@@ -1331,6 +1667,7 @@ pub fn fix_document_selective(
             dict_version: dv,
             resolution: res,
             risky_available,
+            skipped,
         });
     }
 
@@ -1352,6 +1689,7 @@ pub fn fix_document_selective(
         dict_version: dv2,
         resolution: res2,
         risky_available,
+        skipped,
     })
 }
 
@@ -2344,6 +2682,244 @@ mod tests {
         );
         assert_eq!(out.risky_available, 0);
         assert!(!out.residual.contains_key(RULE_16), "{:?}", out.residual);
+    }
+
+    /// #1009's repro, reduced: SAMP keyed on `SAMP_TYPE` (`samp`), a TRIG
+    /// child per sample carrying `conds` in `TRIG_COND`, and ABBR declaring
+    /// every code in `abbr` under its heading. `TRAN_RCON` is `+`; 4.1.1.
+    fn code_case_file(abbr: &[(&str, &str)], samp: (&str, &str), conds: (&str, &str)) -> String {
+        use std::fmt::Write as _;
+        let mut s = String::from(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+             \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+             \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\",\"TRAN_RCON\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"4.1.1\",\"+\"\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n",
+        );
+        for (h, c) in abbr {
+            write!(s, "\"DATA\",{h:?},{c:?},\"d\"\r\n").expect("String write");
+        }
+        let key = "\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"";
+        let units = "\"UNIT\",\"\",\"m\",\"\",\"\",\"\"";
+        let types = "\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"";
+        write!(
+            s,
+            "\r\n\"GROUP\",\"SAMP\"\r\n{key}\r\n{units}\r\n{types}\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{:?},\"S1\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{:?},\"S1\"\r\n\r\n\
+             \"GROUP\",\"TRIG\"\r\n{key},\"SPEC_REF\",\"TRIG_COND\"\r\n{units},\"\",\"\"\r\n\
+             {types},\"X\",\"PA\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{:?},\"S1\",\"1\",{:?}\r\n\
+             \"DATA\",\"BH1\",\"1.00\",\"1\",{:?},\"S1\",\"1\",{:?}\r\n",
+            samp.0, samp.1, samp.0, conds.0, samp.1, conds.1
+        )
+        .expect("String write");
+        s
+    }
+
+    /// Whether Rule 10a reports two rows sharing a KEY (rather than a KEY
+    /// heading missing, which the reduced fixtures above do on purpose).
+    fn duplicate_keys(found: &Findings) -> bool {
+        found
+            .get(RULE_10A)
+            .is_some_and(|v| v.iter().any(|f| !f.desc.contains("not present")))
+    }
+
+    fn recode(h: &str, from: &str, to: &str) -> CodeRewrite {
+        let mut r = CodeRewrite::default();
+        r.recode
+            .entry(h.into())
+            .or_default()
+            .insert(from.into(), to.into());
+        r
+    }
+
+    fn standard() -> CodeRewrite {
+        CodeRewrite {
+            on_code_case: CodeCaseMode::Standard,
+            ..CodeRewrite::default()
+        }
+    }
+
+    fn fix_with(src: &str, rewrite: &CodeRewrite) -> FixOutcome {
+        fix_document_recoding(
+            src.as_bytes(),
+            &CheckOptions::default(),
+            false,
+            None,
+            &[],
+            rewrite,
+        )
+        .expect("fixes")
+    }
+
+    /// The repro: both spellings declared, one TRIG row using each.
+    fn repro() -> String {
+        code_case_file(
+            &[
+                ("SAMP_TYPE", "U"),
+                ("SAMP_TYPE", "D"),
+                ("TRIG_COND", "Undisturbed"),
+                ("TRIG_COND", "UNDISTURBED"),
+            ],
+            ("U", "D"),
+            ("Undisturbed", "UNDISTURBED"),
+        )
+    }
+
+    #[test]
+    fn recode_collapses_abbr_and_rewrites_every_cell() {
+        let out = fix_with(&repro(), &recode("TRIG_COND", "Undisturbed", "UNDISTURBED"));
+        let text = String::from_utf8(out.fixed).expect("utf-8");
+        assert!(!text.contains("\"Undisturbed\""), "{text}");
+        assert_eq!(
+            text.matches("\"TRIG_COND\",\"UNDISTURBED\"").count(),
+            1,
+            "{text}"
+        );
+        assert_eq!(text.matches(",\"UNDISTURBED\"\r\n").count(), 2, "{text}");
+        // The fixture is no complete delivery; what matters is that the rewrite
+        // leaves no undefined code and no duplicated KEY behind it.
+        assert!(!out.residual.contains_key(RULE_16), "{:?}", out.residual);
+        assert!(!duplicate_keys(&out.residual), "{:?}", out.residual);
+        assert!(out.skipped.is_empty());
+        let recoded: Vec<&Fix> = out
+            .applied
+            .iter()
+            .filter(|f| f.kind == FixKind::RecodeAbbreviation)
+            .collect();
+        assert_eq!(recoded.len(), 1);
+        assert_eq!(recoded[0].rule, RULE_16);
+        assert_eq!(
+            recoded[0].risk,
+            FixRisk::Safe,
+            "an instruction, not a guess"
+        );
+    }
+
+    #[test]
+    fn standard_gives_the_same_bytes_as_the_named_recode() {
+        let named = fix_with(&repro(), &recode("TRIG_COND", "Undisturbed", "UNDISTURBED"));
+        assert_eq!(fix_with(&repro(), &standard()).fixed, named.fixed);
+    }
+
+    #[test]
+    fn standard_leaves_a_set_with_two_standard_matches() {
+        let src = code_case_file(
+            &[
+                ("SAMP_TYPE", "U"),
+                ("SAMP_TYPE", "D"),
+                ("TRIG_COND", "UNDISTURBED"),
+                ("PTST_TYPE", "CONSTANT HEAD"),
+                ("PTST_TYPE", "Constant Head"),
+            ],
+            ("U", "D"),
+            ("UNDISTURBED", "UNDISTURBED"),
+        );
+        let out = fix_with(&src, &standard());
+        assert_eq!(out.fixed, src.as_bytes(), "nothing was rewritten");
+        assert!(out.applied.is_empty());
+    }
+
+    #[test]
+    fn a_rewrite_merging_two_keyed_rows_is_skipped_and_the_rest_fixed() {
+        // SAMP rows differ only in SAMP_TYPE "U" / "u": settling that set would
+        // give them one KEY. TRIG_COND's set is independent and still settles.
+        let src = code_case_file(
+            &[
+                ("SAMP_TYPE", "U"),
+                ("SAMP_TYPE", "u"),
+                ("TRIG_COND", "Undisturbed"),
+                ("TRIG_COND", "UNDISTURBED"),
+            ],
+            ("U", "u"),
+            ("Undisturbed", "UNDISTURBED"),
+        );
+        let out = fix_with(&src, &standard());
+        let text = String::from_utf8(out.fixed).expect("utf-8");
+        assert!(text.contains("\"SAMP_TYPE\",\"u\""), "{text}");
+        assert!(!text.contains("\"Undisturbed\""), "{text}");
+        assert_eq!(
+            out.skipped,
+            vec![SkippedRewrite {
+                heading: "SAMP_TYPE".into(),
+                codes: vec!["u".into()],
+                target: "U".into(),
+                group: "SAMP".into(),
+                key: vec![
+                    "BH1".into(),
+                    "1.00".into(),
+                    "1".into(),
+                    "U".into(),
+                    "S1".into()
+                ],
+            }]
+        );
+        assert!(!duplicate_keys(&out.residual), "{:?}", out.residual);
+        // A recode naming the same set is skipped the same way, not raised.
+        let out = fix_with(&src, &recode("SAMP_TYPE", "u", "U"));
+        assert_eq!(out.skipped.len(), 1);
+        assert!(out.applied.is_empty());
+    }
+
+    #[test]
+    fn a_recode_the_file_cannot_honour_is_refused_by_name() {
+        let e = fix_document_recoding(
+            repro().as_bytes(),
+            &CheckOptions::default(),
+            false,
+            None,
+            &[],
+            &recode("SAMP_REF", "1", "2"),
+        )
+        .err()
+        .expect("refused");
+        assert!(matches!(e, FixError::Recode(_)), "{e}");
+        assert!(e.to_string().contains("SAMP_REF"), "{e}");
+    }
+
+    #[test]
+    fn excluding_rule_16_leaves_the_recode_out() {
+        let out = fix_document_recoding(
+            repro().as_bytes(),
+            &CheckOptions::default(),
+            false,
+            None,
+            &["16".to_string()],
+            &standard(),
+        )
+        .expect("fixes");
+        assert!(out.applied.is_empty());
+    }
+
+    #[test]
+    fn a_line_removal_answers_to_its_expected_guard() {
+        let text = "A\r\nB\r\nC\r\n";
+        let removal = |expected: &str| Fix {
+            kind: FixKind::RecodeAbbreviation,
+            label: String::new(),
+            rule: RULE_16.into(),
+            line: Some(2),
+            risk: FixRisk::Safe,
+            edits: vec![SpanEdit {
+                line: 2,
+                start: 0,
+                end: 1,
+                replacement: String::new(),
+                expected: expected.into(),
+            }],
+        };
+        assert_eq!(apply_fixes(text, false, &[removal("B")]), "A\r\nC\r\n");
+        assert_eq!(
+            apply_fixes(text, false, &[removal("X")]),
+            text,
+            "stale: kept"
+        );
+        // Only the recode kind removes lines; any other empties the line.
+        let mut other = removal("B");
+        other.kind = FixKind::TrimAbbreviation;
+        assert_eq!(apply_fixes(text, false, &[other]), "A\r\n\r\nC\r\n");
     }
 
     #[test]

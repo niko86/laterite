@@ -849,6 +849,69 @@ test("fine: findings speak one vocabulary — tinted cell with popover, chipped 
   await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
 });
 
+test("fine: the did-you-mean sits under its error in the panel and the popover, never as its own card", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(
+    hasTouch,
+    "the panel stacks and the popover hovers only on a fine pointer (#591, #592)",
+  );
+  await page.goto("/");
+  // #1024: the demo asks for FYI, so the seed's undefined "b" brings O-61's
+  // suggestion. It folds under each Rule 16 error (SAMP and LLPL) and no
+  // panel row carries the FYI label on its own.
+  const rule16 = page
+    .locator("#findings li")
+    .filter({ hasText: "not defined" });
+  await expect(rule16).toHaveCount(2);
+  for (const row of await rule16.all()) {
+    await expect(row.getByTestId("suggestion")).toContainText(
+      'Did you mean "B" (declared in ABBR)?',
+    );
+  }
+  await expect(
+    page
+      .locator("#findings li")
+      .filter({ hasText: "FYI (Related to Rule 16)" }),
+  ).toHaveCount(0);
+
+  const cell = page.getByRole("button", {
+    name: "Edit SAMP_TYPE on row 1 of SAMP",
+  });
+  await cell.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toContainText("Rule 16");
+  await expect(tooltip.getByTestId("suggestion")).toContainText(
+    'Did you mean "B"',
+  );
+});
+
+test("touch: the did-you-mean sits under its error in the strip and the field card", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(
+    !hasTouch,
+    "the strip and the carousel are the coarse pointer's (#525, #591)",
+  );
+  await page.goto("/");
+  const strip = page.locator('[aria-label="SAMP findings"]');
+  await expect(strip.getByTestId("suggestion")).toContainText(
+    'Did you mean "B"',
+  );
+  await expect(strip).not.toContainText("FYI (Related to Rule 16)");
+
+  await page
+    .getByRole("button", { name: "Edit SAMP_TYPE on row 1 of SAMP" })
+    .click();
+  const card = page.getByRole("group", { name: "Editing row 1 of SAMP" });
+  await expect(card.getByTestId("suggestion")).toContainText(
+    'Did you mean "B"',
+  );
+  await expect(card).not.toContainText("FYI (Related to Rule 16)");
+});
+
 test("the corner flag pins the cell's corner, and a failing pick wears one wash", async ({
   page,
 }) => {
@@ -3320,11 +3383,19 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
   // is what stops the keystrokes landing on the cell button and clearing
   // nothing, which would be a green test over an unmade edit.
 
-  // Nothing to explain on the delivery as seeded: the seed's four findings are
-  // ones both engines raise, so a note here would be noise on every load.
+  // On the delivery as seeded the only thing to explain is O-61 (#1024): the
+  // seed's four errors are ones both engines raise, and the did-you-mean
+  // folded under each Rule 16 error is ours alone, so its note rides there and
+  // nowhere else.
+  const notes = panel.locator("p", { hasText: "vs python-ags4" });
   await expect(panel).not.toContainText("O-52");
   await expect(panel).not.toContainText("O-53");
-  await expect(panel).not.toContainText("vs python-ags4");
+  await expect(notes.filter({ hasNotText: "O-61" })).toHaveCount(0);
+  for (const row of await panel
+    .locator("li")
+    .filter({ hasText: "AGS Format Rule 16" })
+    .all())
+    await expect(row).toContainText("O-61");
 
   // CASE 1 — we raise it, they do not. Blanking a child's parent key strands
   // the row: laterite says the parentage check was DECLINED, python-ags4 is
@@ -3353,8 +3424,12 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
   await expect(declined).toContainText("O-52");
 
   // And nowhere else: every other finding in this state is one both engines
-  // raise, so exactly one note is on screen.
-  await expect(panel.getByText("vs python-ags4")).toHaveCount(1);
+  // raise, so exactly one O-52 note is on screen, and nothing besides it and
+  // the seed's O-61 notes.
+  await expect(notes.filter({ hasText: "O-52" })).toHaveCount(1);
+  await expect(
+    notes.filter({ hasNotText: "O-52" }).filter({ hasNotText: "O-61" }),
+  ).toHaveCount(0);
 
   // The note explains a finding of OURS, so it rides with one. It is not the
   // standalone panel, which names the other tool in its own heading.
