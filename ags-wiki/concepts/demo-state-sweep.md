@@ -14,7 +14,7 @@ repo_refs:
   notes: "repo:web/landing/demo/divergence-notes.json"
   counts: "repo:web/landing/demo/python-counts.json"
   lookup: "repo:web/landing/demo/divergence.ts"
-related: [parity-model, laterite-ags4-forge, validator-site, O-53]
+related: [parity-model, laterite-ags4-forge, validator-site, O-53, O-61]
 sources: []
 ---
 # demo state sweep: what both engines say about every state the demo can reach
@@ -117,6 +117,14 @@ against a known one carrying its O-N. An unrecognised shape **fails the run**
 rather than being written down: it is either a new record to write or a defect
 in one of the two engines, and both need a person.
 
+One kind of entry is matched in parts rather than whole. A laterite-only finding
+attached to one value, independent of whatever else the state does, is marked
+`composes` on its entry: [[O-61]]'s did-you-mean is the only one (#1024). It
+rides on top of every other difference, so a shape such as "[[O-61]] plus
+[[O-52]]" is explained by peeling it off and matching what is left exactly.
+Each part gets its own reader note on the finding it is about; nothing else is
+decomposed.
+
 The generator earned that guard twice on the day it was written. First it
 rejected a shape that turned out to be the declined-parentage warning added
 hours earlier: a validator change had moved four demo states, and the sweep is
@@ -213,13 +221,15 @@ Three things make it honest rather than merely convenient:
 - **A signature the sweep never measured says so.** Silence is
   indistinguishable from the two engines agreeing, which is the confusion this
   whole line of work exists to remove.
-- **The signature is keyed on the tiers the DEMO shows, not the tiers the sweep
-  measured.** The sweep runs both engines with every tier on, because that is
-  what makes a difference mean anything; the demo's own `validate` call takes
-  the wasm default of FYI off. A swept state that raised a laterite FYI would
-  put python's total beside a laterite total the page is not showing, so it
-  **fails the run** rather than being written. Nothing checked that before, and
-  it was true only by accident.
+- **The signature is keyed on every tier, FYI included.** The sweep runs both
+  engines with every tier on, because that is what makes a difference mean
+  anything, and since #1024 the demo's own `validate` call asks for FYI too, so
+  the page holds the findings forge measured. Until then the demo took the wasm
+  default of FYI off and both halves dropped the tier, with a guard that failed
+  the run if a swept state raised a laterite FYI; [[O-61]]'s did-you-mean
+  raised one in nearly every state, and the owner chose to show the tier
+  rather than stop counting it. The page folds that suggestion under the Rule
+  16 error it explains instead of giving it a card of its own.
 
 Two designs were measured and rejected, so they do not get retried. **Hashing
 the delivery text** is exact but over-strict: typing a project name changes the

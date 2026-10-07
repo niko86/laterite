@@ -67,7 +67,9 @@ describe("validateText", () => {
       ],
     });
     const report = await validateText("hello");
-    expect(validate).toHaveBeenCalledWith(new TextEncoder().encode("hello"));
+    expect(validate).toHaveBeenCalledWith(new TextEncoder().encode("hello"), {
+      fyi: true,
+    });
     expect(report.ok).toBe(false);
     expect(report.findings).toEqual([
       {
@@ -80,6 +82,17 @@ describe("validateText", () => {
         desc: "bad",
       },
     ]);
+  });
+
+  it("asks the engine for the FYI tier, which the wasm default leaves off (#1024)", async () => {
+    // The did-you-mean suggestion is an FYI, and the python-ags4 count is
+    // keyed on every tier the sweep measured: without this option the page
+    // would show neither, and every count lookup would miss.
+    validate.mockReturnValueOnce({ ok: true, findings: [] });
+    await validateText("x");
+    expect(validate).toHaveBeenLastCalledWith(expect.any(Uint8Array), {
+      fyi: true,
+    });
   });
 
   it("passes the engine's error envelope through instead of swallowing it", async () => {

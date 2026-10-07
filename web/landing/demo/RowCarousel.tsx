@@ -37,6 +37,8 @@ import {
 } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
+import { SuggestionLine } from "./SuggestionLine";
+import { foldSuggestions } from "./suggestions";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
 import { findingsForCell, groupFindingsNaming, setCell } from "./store";
@@ -91,7 +93,10 @@ export const RowCarousel: Component<{
     const named = groupFindingsNaming(props.schema.code, h.name).filter(
       (f) => !failing().includes(f),
     );
-    return [...failing(), ...named];
+    // The did-you-mean folds under its Rule 16 error (#1024): both reach
+    // this card through the name-match, and the suggestion is not a second
+    // verdict on the field.
+    return foldSuggestions([...failing(), ...named]);
   });
 
   const step = (by: number) => {
@@ -239,14 +244,17 @@ export const RowCarousel: Component<{
               </p>
 
               <For each={explains()}>
-                {(finding) => (
+                {(card) => (
                   <div class="mt-2">
                     <FindingCallout
-                      severity={finding.severity}
-                      rule={finding.rule}
+                      severity={card.finding.severity}
+                      rule={card.finding.rule}
                     >
-                      {finding.desc}
+                      {card.finding.desc}
                     </FindingCallout>
+                    <Show when={card.suggestion}>
+                      {(s) => <SuggestionLine suggestion={s()} />}
+                    </Show>
                   </div>
                 )}
               </For>

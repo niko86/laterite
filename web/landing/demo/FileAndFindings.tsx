@@ -32,6 +32,8 @@ import {
 import { Button, Checkbox } from "@shared/components";
 import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
+import { SuggestionLine } from "./SuggestionLine";
+import { foldSuggestions, type Shown } from "./suggestions";
 import { Carousel } from "../components/Carousel";
 import { severityLineTint, verdictTint, worstPerLine } from "./severity";
 import { verdictState } from "./verdict";
@@ -55,7 +57,6 @@ import {
   pythonFindingCount,
   type DivergenceNote,
 } from "./divergence";
-import type { Finding } from "./engine";
 
 /* One row of the panel — the shared callout with the panel's two extras: the
    click-to-focus wiring, and the GROUP chip. The chip is what tells the two
@@ -107,20 +108,34 @@ const TheyRaiseBlock: Component<{ note: DivergenceNote }> = (props) => (
   </div>
 );
 
-const FindingRow: Component<{ finding: Finding }> = (props) => {
-  const note = createMemo(() => divergenceForRule(props.finding.rule));
+const FindingRow: Component<{ card: Shown }> = (props) => {
+  const finding = () => props.card.finding;
+  const note = createMemo(() => divergenceForRule(finding().rule));
+  /* The folded suggestion's own note (O-61), under the suggestion it is
+     about rather than under the error: python-ags4 raises the error too, so
+     the difference is the suggestion and nothing else. */
+  const suggestionNote = createMemo(() => {
+    const s = props.card.suggestion;
+    return s ? divergenceForRule(s.rule) : undefined;
+  });
   return (
     <>
       <FindingCallout
-        severity={props.finding.severity}
-        rule={props.finding.rule}
-        group={props.finding.group || undefined}
-        line={props.finding.line}
-        disabled={props.finding.line === null}
-        onClick={() => setFocusLine(props.finding.line)}
+        severity={finding().severity}
+        rule={finding().rule}
+        group={finding().group || undefined}
+        line={finding().line}
+        disabled={finding().line === null}
+        onClick={() => setFocusLine(finding().line)}
       >
-        {props.finding.desc}
+        {finding().desc}
       </FindingCallout>
+      <Show when={props.card.suggestion}>
+        {(s) => <SuggestionLine suggestion={s()} />}
+      </Show>
+      <Show when={suggestionNote()}>
+        {(n) => <DivergenceNoteBlock note={n()} />}
+      </Show>
       <Show when={note()}>{(n) => <DivergenceNoteBlock note={n()} />}</Show>
     </>
   );
@@ -145,6 +160,11 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
     alignedView() ? alignLines(lines()) : lines(),
   );
   const findings = createMemo(() => report()?.findings ?? []);
+  /* The cards the list renders: the findings with each did-you-mean folded
+     under its Rule 16 error (#1024). The header still counts `findings()` —
+     every finding the engine returned, the number python-ags4's total stands
+     beside — while the carousel counts cards. */
+  const cards = createMemo(() => foldSuggestions(findings()));
   /* The refused run's surface (#638): an errored report carries an empty
      findings list, and this panel's zero-state read "Clean" over it. The
      refusal renders the engine's own message — the UI neither rewords a
@@ -446,10 +466,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                 fallback={
                   <Carousel
                     label="Findings"
-                    items={findings()}
+                    items={cards()}
                     chrome="counter"
                     noun="finding"
-                    card={(f) => <FindingRow finding={f()} />}
+                    card={(c) => <FindingRow card={c()} />}
                   />
                 }
               >
@@ -476,10 +496,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                       </li>
                     )}
                   </For>
-                  <Index each={findings()}>
-                    {(finding) => (
+                  <Index each={cards()}>
+                    {(card) => (
                       <li>
-                        <FindingRow finding={finding()} />
+                        <FindingRow card={card()} />
                       </li>
                     )}
                   </Index>

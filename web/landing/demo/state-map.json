@@ -93,7 +93,7 @@
       "setCell": 198,
       "sequence": 4
     },
-    "difference_shapes": 4,
+    "difference_shapes": 5,
     "count_differences": 0
   },
   "not_covered": {
@@ -167,43 +167,57 @@
   },
   "difference_shapes": [
     {
-      "rust_only": [],
+      "rust_only": [
+        "FYI (Related to Rule 16)"
+      ],
       "python_only": [],
-      "states": 217,
-      "triage": "no difference",
-      "why": "the two engines agree on which rules the state breaks",
+      "states": 216,
+      "triage": "O-61",
+      "why": "the seed's undefined SAMP_TYPE value is one letter-case away from a code its ABBR declares, so laterite adds a did-you-mean FYI beside the Rule 16 error both engines raise. python-ags4 has no such suggestion. It sits on the value, not on the state, so it rides along with every other difference the state has",
       "example": "add-row-LLPL"
     },
     {
       "rust_only": [
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 10c)"
       ],
       "python_only": [],
       "states": 4,
-      "triage": "O-52",
-      "why": "a child row whose parent KEY cells are all empty claims no parent, so laterite DECLINES the parentage check and says so at the warning tier. python-ags4 reports nothing, for the reason O-52 documents: the all-empty key matches the parent's UNIT pseudo-row through its merge",
+      "triage": "O-61 + O-52",
+      "why": "the seed's undefined SAMP_TYPE value is one letter-case away from a code its ABBR declares, so laterite adds a did-you-mean FYI beside the Rule 16 error both engines raise. python-ags4 has no such suggestion. It sits on the value, not on the state, so it rides along with every other difference the state has; a child row whose parent KEY cells are all empty claims no parent, so laterite DECLINES the parentage check and says so at the warning tier. python-ags4 reports nothing, for the reason O-52 documents: the all-empty key matches the parent's UNIT pseudo-row through its merge",
       "example": "seq-add-row-then-blank-its-key"
     },
     {
       "rust_only": [],
+      "python_only": [],
+      "states": 1,
+      "triage": "no difference",
+      "why": "the two engines agree on which rules the state breaks",
+      "example": "seq-delete-a-group-and-use-what-it-defined"
+    },
+    {
+      "rust_only": [
+        "FYI (Related to Rule 16)"
+      ],
       "python_only": [
         "FYI"
       ],
       "states": 1,
-      "triage": "O-53",
-      "why": "a BLANK TRAN_AGS: python-ags4 stacks its unrecognised-edition FYI on the cell, on top of the Rule 10b error the blank already earns. laterite reports the cell once and states the schema it fell back to on the report envelope instead",
+      "triage": "O-61 + O-53",
+      "why": "the seed's undefined SAMP_TYPE value is one letter-case away from a code its ABBR declares, so laterite adds a did-you-mean FYI beside the Rule 16 error both engines raise. python-ags4 has no such suggestion. It sits on the value, not on the state, so it rides along with every other difference the state has; a BLANK TRAN_AGS: python-ags4 stacks its unrecognised-edition FYI on the cell, on top of the Rule 10b error the blank already earns. laterite reports the cell once and states the schema it fell back to on the report envelope instead",
       "example": "set-TRAN-0-TRAN_AGS-blank"
     },
     {
       "rust_only": [
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 14)"
       ],
       "python_only": [
         "FYI"
       ],
       "states": 1,
-      "triage": "O-45",
-      "why": "one condition, two tiers: a TRAN_AGS that is present but not a recognised edition is a laterite warning shown by default, and the same finding in python-ags4's opt-in FYI tier. Both engines report it, so this shape is a tier difference and not a silence",
+      "triage": "O-61 + O-45",
+      "why": "the seed's undefined SAMP_TYPE value is one letter-case away from a code its ABBR declares, so laterite adds a did-you-mean FYI beside the Rule 16 error both engines raise. python-ags4 has no such suggestion. It sits on the value, not on the state, so it rides along with every other difference the state has; one condition, two tiers: a TRAN_AGS that is present but not a recognised edition is a laterite warning shown by default, and the same finding in python-ags4's opt-in FYI tier. Both engines report it, so this shape is a tier difference and not a silence",
       "example": "set-TRAN-0-TRAN_AGS-non-ascii"
     }
   ],
@@ -220,7 +234,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -230,7 +245,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -238,9 +254,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -254,7 +272,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -264,7 +283,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -272,9 +292,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -290,7 +312,8 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 13",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -304,7 +327,8 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 13": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -314,9 +338,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -330,7 +356,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -340,7 +367,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -348,9 +376,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -366,7 +396,8 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 14",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -380,7 +411,8 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 14": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -390,9 +422,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -404,7 +438,8 @@
       "dictionary": "V4_1",
       "rust_rules": [
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 16",
@@ -412,16 +447,19 @@
       ],
       "rust_rule_counts": {
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 16": 1,
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -433,7 +471,8 @@
       "dictionary": "V4_1",
       "rust_rules": [
         "AGS Format Rule 10c",
-        "AGS Format Rule 16"
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -441,16 +480,19 @@
       ],
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
-        "AGS Format Rule 16": 2
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -464,7 +506,8 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 13",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -476,7 +519,8 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 13": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -485,9 +529,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -500,7 +546,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -510,7 +557,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -518,9 +566,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -534,7 +584,8 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 14",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -546,7 +597,8 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 14": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -555,9 +607,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -571,7 +625,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -581,7 +636,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -589,9 +645,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -605,7 +663,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -615,7 +674,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -623,9 +683,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -638,7 +700,8 @@
       "dictionary": "V4_1",
       "rust_rules": [
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 16",
@@ -646,16 +709,19 @@
       ],
       "rust_rule_counts": {
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -668,7 +734,8 @@
       "dictionary": "V4_1",
       "rust_rules": [
         "AGS Format Rule 10c",
-        "AGS Format Rule 16"
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -676,16 +743,19 @@
       ],
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
-        "AGS Format Rule 16": 2
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -699,7 +769,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -709,7 +780,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -717,9 +789,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -735,7 +809,8 @@
         "AGS Format Rule 13",
         "AGS Format Rule 16",
         "AGS Format Rule 2",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -749,7 +824,8 @@
         "AGS Format Rule 13": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 2": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -759,9 +835,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -775,7 +853,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -785,7 +864,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -793,9 +873,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -809,7 +891,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -819,7 +902,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -827,9 +911,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -843,7 +929,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -853,7 +940,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -861,9 +949,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -879,7 +969,8 @@
         "AGS Format Rule 14",
         "AGS Format Rule 16",
         "AGS Format Rule 2",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -893,7 +984,8 @@
         "AGS Format Rule 14": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 2": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -903,9 +995,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -918,7 +1012,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -928,7 +1023,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -936,9 +1032,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -953,6 +1051,7 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
         "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 10c)"
       ],
       "python_rules": [
@@ -964,6 +1063,7 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
         "Warning (Related to Rule 10c)": 1
       },
       "python_rule_counts": {
@@ -973,10 +1073,11 @@
       },
       "difference": {
         "rust_only": [
+          "FYI (Related to Rule 16)",
           "Warning (Related to Rule 10c)"
         ],
         "python_only": [],
-        "triage": "O-52"
+        "triage": "O-61 + O-52"
       }
     },
     {
@@ -1020,7 +1121,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1030,7 +1132,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -1038,9 +1141,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1055,7 +1160,8 @@
         "AGS Format Rule 10a",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10a",
@@ -1067,7 +1173,8 @@
         "AGS Format Rule 10a": 2,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 3
+        "AGS Format Rule 8": 3,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10a": 2,
@@ -1076,9 +1183,11 @@
         "AGS Format Rule 8": 3
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1096,7 +1205,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1106,7 +1216,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -1114,9 +1225,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1134,7 +1247,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1144,7 +1258,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -1152,9 +1267,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1172,7 +1289,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1182,7 +1300,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -1190,9 +1309,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1210,7 +1331,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1220,7 +1342,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -1228,9 +1351,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1249,7 +1374,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -1261,7 +1387,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -1270,9 +1397,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1290,7 +1419,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1300,7 +1430,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1308,9 +1439,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1328,7 +1461,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1338,7 +1472,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1346,9 +1481,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1367,7 +1504,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -1379,7 +1517,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -1388,9 +1527,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1408,7 +1549,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1418,7 +1560,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1426,9 +1569,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1446,7 +1591,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1456,7 +1602,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1464,9 +1611,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1484,7 +1633,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1494,7 +1644,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1502,9 +1653,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1523,7 +1676,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -1535,7 +1689,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -1544,9 +1699,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1564,7 +1721,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1574,7 +1732,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1582,9 +1741,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1602,7 +1763,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1612,7 +1774,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1620,9 +1783,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1640,7 +1805,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1650,7 +1816,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1658,9 +1825,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1679,7 +1848,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -1691,7 +1861,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -1700,9 +1871,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1720,7 +1893,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1730,7 +1904,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1738,9 +1913,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1758,7 +1935,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1768,7 +1946,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1776,9 +1955,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1796,7 +1977,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1806,7 +1988,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1814,9 +1997,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1834,7 +2019,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1844,7 +2030,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1852,9 +2039,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1872,7 +2061,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1882,7 +2072,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1890,9 +2081,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1910,7 +2103,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1920,7 +2114,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1928,9 +2123,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1948,7 +2145,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -1958,7 +2156,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -1966,9 +2165,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -1987,7 +2188,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -1999,7 +2201,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2008,9 +2211,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2028,7 +2233,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2038,7 +2244,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2046,9 +2253,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2066,7 +2275,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2076,7 +2286,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2084,9 +2295,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2104,7 +2317,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2114,7 +2328,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2122,9 +2337,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2142,7 +2359,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2152,7 +2370,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2160,9 +2379,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2180,7 +2401,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2190,7 +2412,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2198,9 +2421,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2218,7 +2443,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2228,7 +2454,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2236,9 +2463,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2256,7 +2485,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2266,7 +2496,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2274,9 +2505,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2295,7 +2528,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -2307,7 +2541,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2316,9 +2551,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2336,7 +2573,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2346,7 +2584,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2354,9 +2593,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2374,7 +2615,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2384,7 +2626,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2392,9 +2635,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2412,7 +2657,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2422,7 +2668,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2430,9 +2677,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2450,7 +2699,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2460,7 +2710,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -2468,9 +2719,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2489,7 +2742,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -2501,7 +2755,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2510,9 +2765,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2530,7 +2787,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2540,7 +2798,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2548,9 +2807,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2568,7 +2829,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2578,7 +2840,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2586,9 +2849,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2607,7 +2872,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -2619,7 +2885,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2628,9 +2895,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2648,7 +2917,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2658,7 +2928,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2666,9 +2937,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2686,7 +2959,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2696,7 +2970,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2704,9 +2979,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2724,7 +3001,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2734,7 +3012,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2742,9 +3021,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2763,7 +3044,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -2775,7 +3057,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2784,9 +3067,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2804,7 +3089,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2814,7 +3100,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2822,9 +3109,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2842,7 +3131,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2852,7 +3142,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2860,9 +3151,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2880,7 +3173,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2890,7 +3184,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2898,9 +3193,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2919,7 +3216,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -2931,7 +3229,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -2940,9 +3239,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2960,7 +3261,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -2970,7 +3272,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -2978,9 +3281,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -2998,7 +3303,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3008,7 +3314,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3016,9 +3323,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3036,7 +3345,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3046,7 +3356,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3054,9 +3365,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3074,7 +3387,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3084,7 +3398,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3092,9 +3407,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3112,7 +3429,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3122,7 +3440,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3130,9 +3449,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3150,7 +3471,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3160,7 +3482,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3168,9 +3491,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3188,7 +3513,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3198,7 +3524,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3206,9 +3533,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3227,7 +3556,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -3239,7 +3569,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -3248,9 +3579,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3268,7 +3601,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3278,7 +3612,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3286,9 +3621,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3306,7 +3643,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3316,7 +3654,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -3324,9 +3663,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3344,7 +3685,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3354,7 +3696,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3362,9 +3705,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3382,7 +3727,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3392,7 +3738,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3400,9 +3747,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3420,7 +3769,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3430,7 +3780,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3438,9 +3789,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3458,7 +3811,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3468,7 +3822,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3476,9 +3831,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3496,7 +3853,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3506,7 +3864,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3514,9 +3873,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3535,7 +3896,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -3547,7 +3909,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -3556,9 +3919,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3576,7 +3941,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3586,7 +3952,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3594,9 +3961,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3614,7 +3983,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3624,7 +3994,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3632,9 +4003,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3652,7 +4025,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3662,7 +4036,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3670,9 +4045,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3690,7 +4067,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3700,7 +4078,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3708,9 +4087,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3729,7 +4110,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -3741,7 +4123,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -3750,9 +4133,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3770,7 +4155,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3780,7 +4166,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3788,9 +4175,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3808,7 +4197,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3818,7 +4208,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3826,9 +4217,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3847,7 +4240,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -3859,7 +4253,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -3868,9 +4263,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3888,7 +4285,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3898,7 +4296,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3906,9 +4305,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3926,7 +4327,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3936,7 +4338,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3944,9 +4347,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -3964,7 +4369,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -3974,7 +4380,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -3982,9 +4389,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4003,7 +4412,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -4015,7 +4425,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -4024,9 +4435,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4044,7 +4457,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4054,7 +4468,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4062,9 +4477,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4082,7 +4499,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4092,7 +4510,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4100,9 +4519,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4120,7 +4541,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4130,7 +4552,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4138,9 +4561,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4159,7 +4584,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -4171,7 +4597,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -4180,9 +4607,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4200,7 +4629,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4210,7 +4640,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4218,9 +4649,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4238,7 +4671,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4248,7 +4682,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4256,9 +4691,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4276,7 +4713,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4286,7 +4724,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4294,9 +4733,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4314,7 +4755,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4324,7 +4766,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4332,9 +4775,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4352,7 +4797,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4362,7 +4808,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4370,9 +4817,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4390,7 +4839,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4400,7 +4850,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4408,9 +4859,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4428,7 +4881,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4438,7 +4892,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4446,9 +4901,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4467,7 +4924,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -4479,7 +4937,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -4488,9 +4947,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4508,7 +4969,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4518,7 +4980,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4526,9 +4989,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4546,7 +5011,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4556,7 +5022,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4564,9 +5031,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4584,7 +5053,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4594,7 +5064,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4602,9 +5073,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4622,7 +5095,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4632,7 +5106,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4640,9 +5115,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4660,7 +5137,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4670,7 +5148,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4678,9 +5157,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4698,7 +5179,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4708,7 +5190,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4716,9 +5199,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4736,7 +5221,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4746,7 +5232,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4754,9 +5241,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4775,7 +5264,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -4787,7 +5277,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -4796,9 +5287,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4816,7 +5309,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4826,7 +5320,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4834,9 +5329,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4854,7 +5351,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4864,7 +5362,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4872,9 +5371,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4892,7 +5393,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4902,7 +5404,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4910,9 +5413,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4930,7 +5435,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4940,7 +5446,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -4948,9 +5455,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -4967,7 +5476,8 @@
       "dictionary": "V4_1",
       "rust_rules": [
         "AGS Format Rule 10c",
-        "AGS Format Rule 16"
+        "AGS Format Rule 16",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -4975,16 +5485,19 @@
       ],
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
-        "AGS Format Rule 16": 2
+        "AGS Format Rule 16": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5002,7 +5515,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5012,7 +5526,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5020,9 +5535,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5040,7 +5557,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5050,7 +5568,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -5058,9 +5577,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5078,7 +5599,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5088,7 +5610,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -5096,9 +5619,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5117,7 +5642,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5129,7 +5655,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5138,9 +5665,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5158,7 +5687,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5168,7 +5698,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5176,9 +5707,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5197,7 +5730,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5209,7 +5743,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5218,9 +5753,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5238,7 +5775,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5248,7 +5786,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5256,9 +5795,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5276,7 +5817,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5286,7 +5828,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5294,9 +5837,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5315,7 +5860,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5327,7 +5873,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5336,9 +5883,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5356,7 +5905,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5366,7 +5916,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5374,9 +5925,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5394,7 +5947,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5404,7 +5958,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5412,9 +5967,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5432,7 +5989,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5442,7 +6000,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5450,9 +6009,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5470,7 +6031,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5480,7 +6042,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5488,9 +6051,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5508,7 +6073,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5518,7 +6084,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5526,9 +6093,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5546,7 +6115,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5556,7 +6126,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5564,9 +6135,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5584,7 +6157,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5594,7 +6168,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5602,9 +6177,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5622,7 +6199,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5632,7 +6210,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -5640,9 +6219,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5660,7 +6241,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5670,7 +6252,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -5678,9 +6261,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5699,7 +6284,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5711,7 +6297,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5720,9 +6307,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5740,7 +6329,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5750,7 +6340,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5758,9 +6349,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5779,7 +6372,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5791,7 +6385,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5800,9 +6395,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5820,7 +6417,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5830,7 +6428,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5838,9 +6437,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5858,7 +6459,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5868,7 +6470,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5876,9 +6479,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5897,7 +6502,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -5909,7 +6515,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -5918,9 +6525,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5938,7 +6547,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5948,7 +6558,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5956,9 +6567,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -5976,7 +6589,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -5986,7 +6600,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -5994,9 +6609,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6015,7 +6632,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6027,7 +6645,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6036,9 +6655,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6056,7 +6677,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6066,7 +6688,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -6074,9 +6697,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6095,7 +6720,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -6107,7 +6733,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -6116,9 +6743,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6137,7 +6766,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6149,7 +6779,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6158,9 +6789,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6178,7 +6811,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6188,7 +6822,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -6196,9 +6831,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6217,7 +6854,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6229,7 +6867,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6238,9 +6877,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6258,7 +6899,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6268,7 +6910,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -6276,9 +6919,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6297,6 +6942,7 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
         "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 10c)"
       ],
       "python_rules": [
@@ -6308,6 +6954,7 @@
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
         "Warning (Related to Rule 10c)": 1
       },
       "python_rule_counts": {
@@ -6317,10 +6964,11 @@
       },
       "difference": {
         "rust_only": [
+          "FYI (Related to Rule 16)",
           "Warning (Related to Rule 10c)"
         ],
         "python_only": [],
-        "triage": "O-52"
+        "triage": "O-61 + O-52"
       }
     },
     {
@@ -6339,7 +6987,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6351,7 +7000,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6360,9 +7010,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6380,7 +7032,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6390,7 +7043,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -6398,9 +7052,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6418,7 +7074,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6428,7 +7085,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6436,9 +7094,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6456,7 +7116,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6466,7 +7127,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6474,9 +7136,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6495,7 +7159,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6507,7 +7172,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6516,9 +7182,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6536,7 +7204,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6546,7 +7215,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6554,9 +7224,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6574,7 +7246,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6584,7 +7257,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6592,9 +7266,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6613,7 +7289,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6625,7 +7302,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6634,9 +7312,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6654,7 +7334,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6664,7 +7345,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6672,9 +7354,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6692,7 +7376,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6702,7 +7387,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6710,9 +7396,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6730,7 +7418,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6740,7 +7429,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6748,9 +7438,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6768,7 +7460,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6778,7 +7471,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6786,9 +7480,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6806,7 +7502,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6816,7 +7513,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 1,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6824,9 +7522,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6845,7 +7545,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -6857,7 +7558,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -6866,9 +7568,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6886,7 +7590,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6896,7 +7601,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 1
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -6904,9 +7610,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6924,7 +7632,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -6934,7 +7643,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -6942,9 +7652,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -6963,6 +7675,7 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
         "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 10c)"
       ],
       "python_rules": [
@@ -6974,6 +7687,7 @@
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
         "Warning (Related to Rule 10c)": 1
       },
       "python_rule_counts": {
@@ -6983,10 +7697,11 @@
       },
       "difference": {
         "rust_only": [
+          "FYI (Related to Rule 16)",
           "Warning (Related to Rule 10c)"
         ],
         "python_only": [],
-        "triage": "O-52"
+        "triage": "O-61 + O-52"
       }
     },
     {
@@ -7005,7 +7720,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7017,7 +7733,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7026,9 +7743,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7046,7 +7765,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7056,7 +7776,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 3,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 3,
@@ -7064,9 +7785,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7084,7 +7807,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7094,7 +7818,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7102,9 +7827,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7122,7 +7849,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7132,7 +7860,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7140,9 +7869,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7161,7 +7892,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7173,7 +7905,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7182,9 +7915,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7202,7 +7937,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7212,7 +7948,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7220,9 +7957,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7240,7 +7979,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7250,7 +7990,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7258,9 +7999,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7279,7 +8022,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7291,7 +8035,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7300,9 +8045,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7320,7 +8067,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7330,7 +8078,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7338,9 +8087,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7358,7 +8109,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7368,7 +8120,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7376,9 +8129,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7396,7 +8151,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7406,7 +8162,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7414,9 +8171,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7434,7 +8193,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7444,7 +8204,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7452,9 +8213,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7472,7 +8235,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7482,7 +8246,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7490,9 +8255,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7511,7 +8278,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7523,7 +8291,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7532,9 +8301,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7552,7 +8323,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7562,7 +8334,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7570,9 +8343,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7590,7 +8365,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7600,7 +8376,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7608,9 +8385,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7629,6 +8408,7 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
         "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 10c)"
       ],
       "python_rules": [
@@ -7640,6 +8420,7 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
         "Warning (Related to Rule 10c)": 1
       },
       "python_rule_counts": {
@@ -7649,10 +8430,11 @@
       },
       "difference": {
         "rust_only": [
+          "FYI (Related to Rule 16)",
           "Warning (Related to Rule 10c)"
         ],
         "python_only": [],
-        "triage": "O-52"
+        "triage": "O-61 + O-52"
       }
     },
     {
@@ -7671,7 +8453,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7683,7 +8466,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7692,9 +8476,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7712,7 +8498,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7722,7 +8509,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 2,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 2,
@@ -7730,9 +8518,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7750,7 +8540,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7760,7 +8551,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -7768,9 +8560,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7788,7 +8582,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7798,7 +8593,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -7806,9 +8602,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7827,7 +8625,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7839,7 +8638,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7848,9 +8648,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7868,7 +8670,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7878,7 +8681,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -7886,9 +8690,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7906,7 +8712,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7916,7 +8723,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -7924,9 +8732,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7945,7 +8755,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -7957,7 +8768,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -7966,9 +8778,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -7986,7 +8800,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -7996,7 +8811,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8004,9 +8820,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8024,7 +8842,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8034,7 +8853,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8042,9 +8862,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8062,7 +8884,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8072,7 +8895,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8080,9 +8904,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8100,7 +8926,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8110,7 +8937,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8118,9 +8946,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8138,7 +8968,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8148,7 +8979,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8156,9 +8988,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8177,7 +9011,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -8189,7 +9024,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -8198,9 +9034,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8218,7 +9056,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8228,7 +9067,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 3,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8236,9 +9076,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8257,7 +9099,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8270,7 +9113,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8280,11 +9124,13 @@
         "FYI": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [
           "FYI"
         ],
-        "triage": "O-53"
+        "triage": "O-61 + O-53"
       }
     },
     {
@@ -8304,6 +9150,7 @@
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
         "AGS Format Rule 8",
+        "FYI (Related to Rule 16)",
         "Warning (Related to Rule 14)"
       ],
       "python_rules": [
@@ -8318,6 +9165,7 @@
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
         "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2,
         "Warning (Related to Rule 14)": 1
       },
       "python_rule_counts": {
@@ -8329,12 +9177,13 @@
       },
       "difference": {
         "rust_only": [
+          "FYI (Related to Rule 16)",
           "Warning (Related to Rule 14)"
         ],
         "python_only": [
           "FYI"
         ],
-        "triage": "O-45"
+        "triage": "O-61 + O-45"
       }
     },
     {
@@ -8352,7 +9201,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8362,7 +9212,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8370,9 +9221,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8391,7 +9244,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8403,7 +9257,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8412,9 +9267,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8432,7 +9289,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8442,7 +9300,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 2
+        "AGS Format Rule 8": 2,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8450,9 +9309,11 @@
         "AGS Format Rule 8": 2
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8470,7 +9331,8 @@
       "rust_rules": [
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10c",
@@ -8480,7 +9342,8 @@
       "rust_rule_counts": {
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10c": 1,
@@ -8488,9 +9351,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8509,7 +9374,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8521,7 +9387,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8530,9 +9397,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8551,7 +9420,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -8563,7 +9433,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -8572,9 +9443,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8593,7 +9466,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8605,7 +9479,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8614,9 +9489,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8635,7 +9512,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -8647,7 +9525,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -8656,9 +9535,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8677,7 +9558,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8689,7 +9571,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8698,9 +9581,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8719,7 +9604,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -8731,7 +9617,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -8740,9 +9627,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8761,7 +9650,8 @@
         "AGS Format Rule 10b",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 10b",
@@ -8773,7 +9663,8 @@
         "AGS Format Rule 10b": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 10b": 1,
@@ -8782,9 +9673,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     },
     {
@@ -8803,7 +9696,8 @@
         "AGS Format Rule 1",
         "AGS Format Rule 10c",
         "AGS Format Rule 16",
-        "AGS Format Rule 8"
+        "AGS Format Rule 8",
+        "FYI (Related to Rule 16)"
       ],
       "python_rules": [
         "AGS Format Rule 1",
@@ -8815,7 +9709,8 @@
         "AGS Format Rule 1": 1,
         "AGS Format Rule 10c": 1,
         "AGS Format Rule 16": 2,
-        "AGS Format Rule 8": 1
+        "AGS Format Rule 8": 1,
+        "FYI (Related to Rule 16)": 2
       },
       "python_rule_counts": {
         "AGS Format Rule 1": 1,
@@ -8824,9 +9719,11 @@
         "AGS Format Rule 8": 1
       },
       "difference": {
-        "rust_only": [],
+        "rust_only": [
+          "FYI (Related to Rule 16)"
+        ],
         "python_only": [],
-        "triage": "no difference"
+        "triage": "O-61"
       }
     }
   ]

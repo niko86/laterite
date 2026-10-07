@@ -40,6 +40,15 @@
           "value": ""
         }
       ]
+    },
+    {
+      "observation": "O-61",
+      "side": "ours",
+      "text": "python-ags4 reports the undefined code and stops there. We add a line naming up to three codes it could have been: the file's own ABBR entries first, then standard ones it never declared, matched ignoring case, ignoring separators, or a typo or two away. It is a suggestion only; the error stays an error and nothing is rewritten.",
+      "states": 222,
+      "rules": [
+        "FYI (Related to Rule 16)"
+      ]
     }
   ]
 }
