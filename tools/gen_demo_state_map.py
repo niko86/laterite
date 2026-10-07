@@ -152,11 +152,11 @@ KNOWN: dict[tuple[tuple[str, ...], tuple[str, ...]], Triage] = {
         "reader": {
             "side": "ours",
             "text": (
-                "python-ags4 reports the undefined code and stops there. We add a "
-                "line naming up to three codes it could have been: the file's own "
-                "ABBR entries first, then standard ones it never declared, matched "
-                "ignoring case, ignoring separators, or a typo or two away. It is a "
-                "suggestion only; the error stays an error and nothing is rewritten."
+                "python-ags4 names the undefined code and leaves it there. We also "
+                "say what it was probably meant to be, looking in the file's own "
+                "ABBR first and the standard dictionary second for a code that "
+                "differs only by case, by separators, or by a typo or two. The error "
+                "stands either way; we never change the file for you."
             ),
         },
         "composes": True,
