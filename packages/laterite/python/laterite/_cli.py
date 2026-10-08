@@ -19,6 +19,7 @@ every cross-surface gate still green — they all compared one hand-list to anot
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -1277,7 +1278,32 @@ def census() -> dict:
     }
 
 
+def _utf8_stdio() -> None:
+    """Put both output streams on UTF-8, whatever encoding the console claims.
+
+    On Windows a cp1252 console or pipe hands Python a cp1252 text stream, and
+    the guide's first `→` killed `lat --help` with a UnicodeEncodeError before
+    a new user saw a line of it; a finding or error text carrying such a
+    character went the same way. The Rust binary and the Node launcher write
+    bytes and cannot hit this, so the three `lat` programs only agree on the
+    wire if this one stops deferring to the console. The policy is exactly
+    Python's UTF-8 mode (PEP 540: stdout surrogateescape, stderr
+    backslashreplace), which 3.15 makes the default (PEP 686); the wheel ships
+    for 3.12+, so the launcher applies it itself. `errors` is passed on both,
+    because `reconfigure` resets it to strict when only the encoding is given.
+    A stream a host swapped in that is not a TextIOWrapper — pythonw's None, a
+    GUI's redirector — is left alone.
+    """
+    for stream, errors in (
+        (sys.stdout, "surrogateescape"),
+        (sys.stderr, "backslashreplace"),
+    ):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors=errors)
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
 
     # `--readme` is the whole guide wherever it appears. `--help` is not: the
