@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.13.0"]
+# dependencies = ["laterite==0.14.0"]
 # ///
 """Docs example — run it with `uv run ex03_at_fanout_groups.py`, from anywhere.
 
