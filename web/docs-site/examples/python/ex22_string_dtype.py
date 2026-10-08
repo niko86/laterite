@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite[compat,pyarrow]==0.13.0"]
+# dependencies = ["laterite[compat,pyarrow]==0.14.0"]
 # ///
 """Docs example — run it with `uv run ex22_string_dtype.py`, from anywhere.
 

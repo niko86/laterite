@@ -578,7 +578,7 @@ wheels = [
 
 [[package]]
 name = "laterite"
-version = "0.13.0"
+version = "0.14.0"
 source = { editable = "packages/laterite" }
 dependencies = [
     { name = "duckdb" },
@@ -610,7 +610,7 @@ provides-extras = ["compat", "pyarrow", "all"]
 
 [[package]]
 name = "laterite-workspace"
-version = "0.13.0"
+version = "0.14.0"
 source = { virtual = "." }
 dependencies = [
     { name = "duckdb" },
