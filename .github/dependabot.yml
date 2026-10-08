@@ -49,6 +49,12 @@ updates:
     groups:
       cargo:
         update-types: ["minor", "patch"]
+    # encoding_rs 0.8.40+ declares rust-version 1.88, above the 1.85 floor the
+    # published crates promise, so every proposal fails check_msrv (#1029).
+    # Drop this when the floor is raised deliberately, not to make a bump pass.
+    ignore:
+      - dependency-name: "encoding_rs"
+        versions: [">0.8.35"]
 
   # Python deps — the uv workspace (pyproject.toml + uv.lock at the repo root).
   - package-ecosystem: uv
