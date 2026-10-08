@@ -55,7 +55,7 @@ jobs:
   # `!cancelled()` + `result != 'success'` clause below — see laterite-dev#561: when the
   # filter cannot answer, the honest read is "run it", never "nothing changed".
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pull-requests: read
@@ -115,7 +115,7 @@ jobs:
   # different signals ("we regressed" and "they released") into one red X.
   upstream-pin:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,7 +162,7 @@ jobs:
   # same cheap `--no-install-workspace` sync upstream-pin uses is enough.
   dropin-surface:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -199,7 +199,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.demo == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -243,7 +243,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.compat == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

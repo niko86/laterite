@@ -36,7 +36,7 @@ jobs:
     # Fast pure-TS lane: no Rust/wasm toolchain, no Chromium download. The
     # vitest suite imports only wasm-free modules, so it needs no build. (tsc
     # is in the e2e job — it requires the generated wasm bindings.)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -73,7 +73,7 @@ jobs:
   e2e:
     # GitHub-hosted: public runs are free minutes, and the warm pool is kept for
     # ci.yml's per-PR builds. Cold wasm build here; e2e runs only on web changes.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

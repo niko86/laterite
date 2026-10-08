@@ -271,155 +271,8 @@ jobs:
   # crashing, and it IS in `notify`'s needs so a derivation that has silently
   # stopped deriving is heard. `TRACKER_EXCLUDED` in
   # tests/test_nightly_wiring.py stays empty. (#716, #806)
-  engine-cut:
-    needs: [coverage]
-    runs-on: ubuntu-latest
-    # A ceiling, not a cost. A night that renders on the pinned nightly (#998)
-    # builds cargo-public-api and documents published crates; a normal night
-    # takes none of it.
-    timeout-minutes: 45
-    permissions:
-      contents: write # PR mode pushes the cut branch
-      pull-requests: write # PR mode opens/updates the cut PR
-      issues: write # the release tracking issue
-      actions: write # cancel the stale pending publish run, dispatch a fresh one
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Baselines are the published tarballs' commits, an arbitrary distance
-          # back — a shallow clone would silently fail to place them and the
-          # cut would conclude nothing, with no indication why.
-          fetch-depth: 0
-      - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          enable-cache: false
-      # ONE registry sweep; every later step reads this file, so the tracker,
-      # the dispatch and the cut PR cannot act on answers that disagree.
-      - name: release status
-        id: status
-        run: |
-          uv run --no-project python tools/release/release_status.py --json > /tmp/status.json
-          echo "unmeasured=$(jq '[.engine_crates[] | select(.api_delta_source == "unavailable")] | length' /tmp/status.json)" >> "$GITHUB_OUTPUT"
-      # A crate whose published snapshot was rendered on another nightly than
-      # HEAD's pin, and whose snapshot text moved, cannot trust a text diff
-      # (#998). It needs both sides rendered on the pinned nightly. Installing
-      # that is minutes of source build, so only a night that needs it pays:
-      # the first sweep finds those crates "unmeasured", and this re-sweeps
-      # with the toolchain present, replacing the file whole.
-      - name: Install the pinned nightly (only when a delta is unmeasured)
-        if: steps.status.outputs.unmeasured != '0'
-        run: rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
-      - name: install cargo-public-api (only when a delta is unmeasured)
-        if: steps.status.outputs.unmeasured != '0'
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
-        with:
-          # The version ci.yml's publish-gates pins: its renderer is half of
-          # what writes a snapshot line.
-          tool: cargo-public-api@0.52.0
-      - name: re-measure on one toolchain
-        if: steps.status.outputs.unmeasured != '0'
-        run: uv run --no-project python tools/release/release_status.py --json > /tmp/status.json
-      - name: render the report + the derived cut
-        run: |
-          uv run --no-project python tools/release/engine_cut.py --render /tmp/status.json | tee /tmp/report.txt
-          {
-            echo "### Release status + engine cut"
-            echo '```'
-            cat /tmp/report.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: drive the release tracking issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set +e
-          uv run --no-project python tools/release/engine_cut.py --items /tmp/status.json > /tmp/items.txt
-          code=$?
-          set -e
-          if [ "$code" = "3" ]; then
-            echo "registry partially unreachable and nothing owed elsewhere — tracker left as it stands"
-            exit 0
-          fi
-          [ "$code" = "0" ] || exit "$code"
-          ITEMS="$(cat /tmp/items.txt)" python3 tools/issue_tracker.py --tracker release
-      - name: publish owed -> dispatch a fresh run, cancelling any stale one
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          uv run --no-project python tools/release/engine_cut.py --publish-owed /tmp/status.json > /tmp/publish.txt
-          if [ ! -s /tmp/publish.txt ]; then
-            echo "no publish owed"
-            exit 0
-          fi
-          echo "publish owed for: $(tr '\n' ' ' < /tmp/publish.txt)"
-          # Since 2026-09-03 the `crates` environment has no required reviewer,
-          # so a dispatched run executes immediately and no run should ever sit
-          # `waiting`. The cancel loop stays as defence: a run stuck waiting
-          # (a reviewer re-added, a platform wobble) would otherwise publish
-          # main AS OF APPROVAL TIME — the staleness that bit on 2026-08-30
-          # and again on 2026-09-02 (#887's race).
-          for id in $(gh run list --workflow publish-crates.yml --status waiting --json databaseId --jq '.[].databaseId'); do
-            echo "cancelling stale pending publish run $id"
-            gh run cancel "$id"
-          done
-          gh workflow run publish-crates.yml --ref main -f execute=true
-          echo "dispatched publish-crates (execute=true) — runs unattended (no environment reviewer)"
-      - name: Install Rust toolchain (PR mode — bump_crate regenerates the lock)
-        if: vars.ENGINE_CUT_MODE == 'pr'
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-        with:
-          toolchain: stable
-      - name: apply the owed bumps (PR mode)
-        id: bumps
-        if: vars.ENGINE_CUT_MODE == 'pr'
-        run: |
-          uv run --no-project python tools/release/engine_cut.py --bumps /tmp/status.json > /tmp/bumps.txt
-          if [ ! -s /tmp/bumps.txt ]; then
-            echo "no bumps owed"
-            echo "any=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "any=true" >> "$GITHUB_OUTPUT"
-          while read -r crate part; do
-            uv run --no-project python tools/release/bump_crate.py "$crate" "$part"
-          done < /tmp/bumps.txt
-          {
-            echo "✅ Based on \`main\` — safe to merge."
-            echo ""
-            echo "The nightly engine cut (#806), derived from tonight's registry sweep:"
-            echo ""
-            echo '```'
-            cat /tmp/report.txt
-            echo '```'
-            echo ""
-            echo "One PR for the whole owed set, rebuilt from current main each night."
-          } > /tmp/pr-body.md
-      # With the default github.token the created PR triggers NO workflows, so
-      # its required checks never report and it cannot merge — set
-      # ENGINE_CUT_TOKEN (fine-grained PAT: contents + pull-requests write)
-      # when promoting to PR mode. Recorded on dec-engine-publish-automation.md.
-      - name: open or update the cut PR
-        if: vars.ENGINE_CUT_MODE == 'pr' && steps.bumps.outputs.any == 'true'
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
-          token: ${{ secrets.ENGINE_CUT_TOKEN || github.token }}
-          branch: nightly/engine-cut
-          title: "release: the nightly engine cut (#806)"
-          commit-message: "release: the nightly engine cut (#806)"
-          labels: no-changelog
-          add-paths: rust-packages/**
-          body-path: /tmp/pr-body.md
-
-  # Link + badge health check. ci.yml's `docs` job runs `mkdocs build --strict`,
-  # which only validates INTERNAL links — this catches dead EXTERNAL links + dead
-  # badge targets in the README and docs, rot that's otherwise invisible. Runs
-  # GitHub-hosted (pure network, no build) so it doesn't tie up a pool lane.
-  # Nightly, not per-PR: external checks are inherently flaky (rate limits,
-  # transient 5xx), so a slow-changing rot check belongs here, not on a merge gate.
   links:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -551,7 +404,7 @@ jobs:
   # GitHub-hosted and toolchain-free: this installs a published wheel from PyPI,
   # so it needs no Rust, no maturin and none of the pool's warm caches.
   docs-vs-released-wheel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -716,7 +569,7 @@ jobs:
   # the same reason its neighbour's does — a reader installs cold, and a leg
   # asking what a reader gets should resolve the way a reader does.
   docs-example-headers:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -761,7 +614,7 @@ jobs:
   # the released tag, so the tree-ahead window is amnestied where it is measured
   # rather than by staying out of `notify` (#493 — this leg IS in `notify` now).
   docs-vs-released-npm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -897,7 +750,7 @@ jobs:
   # GitHub-hosted and toolchain-free — a published npm package needs no Rust, no
   # wasm-pack and no wasm32 target.
   docs-vs-released-wasm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1006,7 +859,7 @@ jobs:
   #
   # GitHub-hosted: a Rust toolchain and a registry, no workspace build.
   docs-vs-released-crates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1065,7 +918,7 @@ jobs:
   # GitHub-hosted and toolchain-free: pip `duckdb` and a network install. No Rust,
   # no maturin, no extension build.
   docs-vs-released-duckdb:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1210,7 +1063,7 @@ jobs:
   # GitHub-hosted: it builds all four surfaces (~50 min cold), so it runs off the
   # 2-lane pool on free public minutes, in parallel with the pool jobs.
   output-values:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 50
     env:
       UV_LINK_MODE: copy # see ci.yml's python job — silences the copy-fallback warning
@@ -1292,7 +1145,7 @@ jobs:
   # a ruleset's bypass_actors. GitHub-hosted: pure API + jq, no build, no pool lane.
   ruleset-drift:
     if: github.repository == 'niko86/laterite'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -1333,7 +1186,7 @@ jobs:
   # No credential and no checkout: this reads response headers from the public
   # host, which is the only thing that can prove a dashboard setting is still live.
   cdn-headers:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       # The canary the deploy uploads — see web/cloudflare/README.md for why a
@@ -1400,7 +1253,7 @@ jobs:
   # Stdlib-only (`uv run --no-project`): no wheel, no Rust, ~10s. GitHub-hosted so
   # it doesn't take a pool lane.
   wiki-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1471,45 +1324,3 @@ jobs:
   # they were already asking for. `tests/test_nightly_wiring.py` holds the set
   # complete: a new job reports here or the gate is red, and an exclusion has to
   # be written down with its reason rather than left as an omission.
-  notify:
-    needs:
-      - coverage
-      - deny
-      - links
-      - engine-cut
-      - wheel-smoke
-      - docs-vs-released-wheel
-      - docs-example-headers
-      - docs-vs-released-npm
-      - docs-vs-released-wasm
-      - docs-vs-released-crates
-      - docs-vs-released-duckdb
-      - ruleset-drift
-      - cdn-headers
-      - output-values
-      - wiki-lint
-    if: always()
-    # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
-    # the whole point of this job is to reliably open the tracking issue.
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: drive the nightly tracking issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          command -v gh >/dev/null 2>&1 || {
-            echo "gh CLI not on runner — relying on the default scheduled-failure email"
-            exit 0
-          }
-          # Stdlib-only by design, so this job needs no Python/uv setup step —
-          # see the module docstring. Every decision lives in `plan_items()`,
-          # which tests/test_issue_tracker.py exercises branch by branch. The
-          # same module drives wiki-ext-drift.yml's issue, hence the name.
-          python3 tools/issue_tracker.py
