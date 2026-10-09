@@ -105,7 +105,7 @@ impl App {
             for f in items {
                 rows.push(FRow {
                     rule: short.clone(),
-                    line: f.line.map(|l| l.to_string()).unwrap_or_else(|| "-".into()),
+                    line: f.line.map_or_else(|| "-".into(), |l| l.to_string()),
                     group: f.group.clone(),
                     desc: f.desc.clone(),
                 });
@@ -125,7 +125,7 @@ impl App {
             // `None` ⇒ the CLI's auto-detect mode (no forced --dict-version);
             // the resolved edition isn't surfaced through `check_file`, so
             // show "auto" rather than a misleading specific version.
-            dict: dict.map(|d| d.as_str()).unwrap_or("auto"),
+            dict: dict.map_or("auto", DictVersion::as_str),
             visible: (0..rows.len()).collect(),
             rows,
             state: TableState::default(),
@@ -310,11 +310,9 @@ fn event_loop<B: Backend<Error = io::Error>>(
             } else {
                 match k.code {
                     KeyCode::Char('q') | KeyCode::Esc => app.quit = true,
-                    KeyCode::Enter => {
-                        if app.selected_frow().is_some() {
-                            app.detail = true;
-                            app.detail_scroll = 0;
-                        }
+                    KeyCode::Enter if app.selected_frow().is_some() => {
+                        app.detail = true;
+                        app.detail_scroll = 0;
                     }
                     KeyCode::Tab => app.cycle_filter_col(),
                     KeyCode::Down | KeyCode::Char('j') => app.move_by(1),
