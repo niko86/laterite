@@ -174,7 +174,12 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
     # columns). A naïve split() would mis-count fields and fire false
     # ragged-row raises on legitimate files.
     reader = csv.reader(io.StringIO(text), strict=False)
-    for lineno, fields in enumerate(reader, start=1):
+    # The record's PHYSICAL start line, as python-ags4 reports it: one past
+    # the lines the reader had consumed before it. Counting records falls
+    # short after a quoted field spanning a newline (#1052).
+    next_line = 1
+    for fields in reader:
+        lineno, next_line = next_line, reader.line_num + 1
         if not fields or not any(f.strip() for f in fields):
             continue
         descriptor = fields[0]

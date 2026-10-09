@@ -70,13 +70,16 @@ impl Span {
     }
 }
 
-/// One physical source line. Always retained — a line is a [`Span`] over a
+/// One source record — a physical line, or several when a quoted field
+/// spans a newline (O-47 keeps that one record). Always retained — a line is a [`Span`] over a
 /// buffer the parse keeps anyway, so the old opt-in overlay collapsed into
 /// the base model — except under [`ParseOptions::locate_only`], which
 /// retains no text at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawLine {
-    /// 1-indexed, matching how editors + the AGS4 validator report.
+    /// 1-indexed PHYSICAL line the record starts on, matching how editors +
+    /// python-ags4 report (#1052). Strictly increasing but NOT contiguous
+    /// after a spanning field, so find a line by number, never by `index + 1`.
     pub number: u32,
     /// Line content with the trailing CR/LF stripped: a span into
     /// [`ParsedFile::text`] (read via [`ParsedFile::line_text`]).
@@ -319,13 +322,17 @@ pub struct ParsedFile {
     /// is the de-duplicated view of this; anything that needs to LOCATE bytes must
     /// read this instead (see [`GroupRecord`]).
     pub group_records: Vec<GroupRecord>,
-    /// Every line — empty only under [`ParseOptions::locate_only`].
+    /// Every record, in source order — empty only under
+    /// [`ParseOptions::locate_only`].
     pub raw_lines: Vec<RawLine>,
     /// Source byte offset of each physical line's start in the ORIGINAL
     /// bytes (BOM included — byte 0 is genuinely byte 0), parallel to
     /// `raw_lines`. PROFILE-GATED: filled only under
     /// [`ParseOptions::retain_source_offsets`], empty under `validating()`.
     pub line_byte_offsets: Vec<u64>,
+    /// How many RECORDS the file holds — one per [`RawLine`], so it falls
+    /// short of the last physical line after a quoted field spanning a
+    /// newline. Compare a line number against `raw_lines`, not this.
     pub total_lines: u32,
     /// File began with a UTF-8 BOM (`EF BB BF`).
     pub has_bom: bool,
@@ -684,34 +691,46 @@ enum QState {
 /// UNLESS the next line begins with a data descriptor (the unterminated-quote
 /// backstop). `memchr3` keeps the scan at SIMD speed on the common (long,
 /// delimiter-sparse) runs.
-fn next_line(bytes: &[u8], start: usize) -> LineSpan {
+///
+/// Also returns how many physical newlines the body EMBEDS, counted here
+/// because this is the one place that already finds them: a reported line
+/// is the physical line an editor shows (#1052), so the record after a
+/// spanning field starts that many lines further on. An embedded `\r\n` is
+/// one newline, as it is to an editor.
+fn next_line(bytes: &[u8], start: usize) -> (LineSpan, u32) {
     let n = bytes.len();
-    let eof = || LineSpan {
-        start,
-        body_end: n,
-        term: LineTerminator::Unterminated,
-        next: n,
-    };
+    let mut embedded = 0u32;
     let mut i = start;
     let mut state = QState::FieldStart;
+    let eof = |embedded| {
+        (
+            LineSpan {
+                start,
+                body_end: n,
+                term: LineTerminator::Unterminated,
+                next: n,
+            },
+            embedded,
+        )
+    };
     loop {
         match state {
             QState::FieldStart => {
                 if i >= n {
-                    return eof();
+                    return eof(embedded);
                 }
                 match bytes[i] {
                     b'"' => {
                         state = QState::Quoted;
                         i += 1;
                     }
-                    b'\r' | b'\n' => return terminate_at(bytes, start, i),
+                    b'\r' | b'\n' => return (terminate_at(bytes, start, i), embedded),
                     // Any other byte begins an unquoted field; reprocess it there.
                     _ => state = QState::Unquoted,
                 }
             }
             QState::Quoted => match memchr::memchr3(b'"', b'\r', b'\n', &bytes[i..]) {
-                None => return eof(),
+                None => return eof(embedded),
                 Some(off) => {
                     let j = i + off;
                     if bytes[j] == b'"' {
@@ -725,7 +744,11 @@ fn next_line(bytes: &[u8], start: usize) -> LineSpan {
                         // CR/LF inside quotes → embedded content, unless the next
                         // line is clearly a new row (unterminated-quote recovery).
                         if starts_with_descriptor(bytes, terminator_end(bytes, j)) {
-                            return terminate_at(bytes, start, j);
+                            return (terminate_at(bytes, start, j), embedded);
+                        }
+                        // A `\r` whose `\n` follows is counted at the `\n`.
+                        if bytes[j] == b'\n' || bytes.get(j + 1) != Some(&b'\n') {
+                            embedded += 1;
                         }
                         i = j + 1;
                     }
@@ -736,14 +759,15 @@ fn next_line(bytes: &[u8], start: usize) -> LineSpan {
             // what to do next, so clippy's match_same_arms is right to merge them.
             QState::AfterClose | QState::Unquoted => {
                 match memchr::memchr3(b',', b'\r', b'\n', &bytes[i..]) {
-                    None => return eof(),
+                    None => return eof(embedded),
                     Some(off) => {
                         let j = i + off;
                         if bytes[j] == b',' {
                             state = QState::FieldStart;
                             i = j + 1;
                         } else {
-                            return terminate_at(bytes, start, j); // CR/LF outside quotes
+                            // CR/LF outside quotes
+                            return (terminate_at(bytes, start, j), embedded);
                         }
                     }
                 }
@@ -752,20 +776,35 @@ fn next_line(bytes: &[u8], start: usize) -> LineSpan {
     }
 }
 
+/// Physical newlines inside an already-split record body, by the rule
+/// [`next_line`] counts with as it walks (an embedded `\r\n` is one). For a
+/// writer that authored the body rather than walked it — the builder.
+pub(crate) fn embedded_newlines(body: &[u8]) -> u32 {
+    let mut n = 0u32;
+    for j in memchr::memchr2_iter(b'\r', b'\n', body) {
+        if body[j] == b'\n' || body.get(j + 1) != Some(&b'\n') {
+            n = n.saturating_add(1);
+        }
+    }
+    n
+}
+
 /// Iterator over the quote-aware [`LineSpan`]s of a buffer — the ONE line model
-/// the parser and `apply_fixes` share, so their line numbering agrees by
-/// construction (fix edits carry parser line numbers and must land on the same
-/// line the fixer reconstructs). A buffer that ends exactly at a terminator
-/// yields no phantom trailing blank line.
+/// the parser and `apply_fixes` share, numbered through [`numbered_line_spans`]
+/// so their line numbers agree by construction (fix edits carry parser line
+/// numbers and must land on the same line the fixer reconstructs). A buffer
+/// that ends exactly at a terminator yields no phantom trailing blank line.
 pub struct LineSpans<'a> {
     bytes: &'a [u8],
     pos: usize,
     done: bool,
+    /// The physical line the next span starts on.
+    line: u32,
 }
 
-impl Iterator for LineSpans<'_> {
-    type Item = LineSpan;
-    fn next(&mut self) -> Option<LineSpan> {
+impl LineSpans<'_> {
+    /// The next span with the physical line it starts on.
+    fn next_numbered(&mut self) -> Option<(u32, LineSpan)> {
         if self.done || self.pos > self.bytes.len() {
             return None;
         }
@@ -775,20 +814,52 @@ impl Iterator for LineSpans<'_> {
             self.done = true;
             return None;
         }
-        let span = next_line(self.bytes, self.pos);
+        let (span, embedded) = next_line(self.bytes, self.pos);
         self.pos = span.next;
-        Some(span)
+        let line = self.line;
+        // Saturating: a u32 of lines is ~40+ GB of file, far past the u32
+        // span space `append_text` already refuses.
+        self.line = self.line.saturating_add(1).saturating_add(embedded);
+        Some((line, span))
     }
 }
 
-/// Quote-aware line spans over raw bytes (the parser's entry).
+impl Iterator for LineSpans<'_> {
+    type Item = LineSpan;
+    fn next(&mut self) -> Option<LineSpan> {
+        self.next_numbered().map(|(_, span)| span)
+    }
+}
+
+/// Quote-aware line spans over raw bytes. Positional: the Nth span is the
+/// Nth record, which is NOT line N after a quoted field spanning a newline —
+/// number with [`numbered_line_spans`].
 #[must_use]
 pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
     LineSpans {
         bytes,
         pos: 0,
         done: false,
+        line: 1,
     }
+}
+
+/// [`line_spans`] with each span's 1-indexed PHYSICAL start line — the ONE
+/// numbering the parser and `apply_fixes` share, so a fix's line lands on
+/// the record the parser reported (#1052).
+pub struct NumberedLineSpans<'a>(LineSpans<'a>);
+
+impl Iterator for NumberedLineSpans<'_> {
+    type Item = (u32, LineSpan);
+    fn next(&mut self) -> Option<(u32, LineSpan)> {
+        self.0.next_numbered()
+    }
+}
+
+/// Quote-aware line spans paired with the physical line each starts on.
+#[must_use]
+pub fn numbered_line_spans(bytes: &[u8]) -> NumberedLineSpans<'_> {
+    NumberedLineSpans(line_spans(bytes))
 }
 
 /// Append one run of decoded text to the retained buffer, returning the
@@ -865,10 +936,12 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     // Tokenizer scratch, reused across lines — bounds, not Strings.
     let mut fspans: Vec<FieldSpan> = Vec::new();
 
-    let mut number = 0u32;
-    for span in line_spans(bytes) {
+    // Physical, not per-record: a quoted field spanning a newline moves every
+    // later record's line on (#1052). `total_lines` stays the record count.
+    let mut records = 0u32;
+    for (number, span) in numbered_line_spans(bytes) {
         let byte_offset = span.start as u64; // absolute, BOM included
-        number += 1;
+        records += 1;
         // `had_crlf` stays "was this CRLF-terminated" (Rule 2a). A lone `\r`
         // (classic Mac) or lone `\n` (Unix) terminator is now a genuine split
         // point like `\r\n`, but reported as improper rather than swallowed as
@@ -877,7 +950,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         let had_crlf = span.term == LineTerminator::Crlf;
         let mut body = &bytes[span.start..span.body_end];
         // Strip a leading BOM for DECODE only; byte_offset stays 0.
-        if number == 1 && body.starts_with(BOM) {
+        if records == 1 && body.starts_with(BOM) {
             body = &body[BOM.len()..];
         }
         let (text, had_repl, borrowed) = decode_line(body, opts.encoding, opts.on_invalid_utf8)?;
@@ -1090,7 +1163,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         return Err(ParseError::NotAgs4("no GROUP rows found".to_string()));
     }
 
-    let total_lines = number; // every line counted (raw_lines may be empty)
+    let total_lines = records; // every record counted (raw_lines may be empty)
     // ONE buffer of decoded text for the whole file, ADOPTED (not copied)
     // into the Arc and shared into each group by refcount so a group handed
     // out alone can still resolve its spans.

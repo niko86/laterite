@@ -40,6 +40,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Fixed
 
 - **The wheel's `lat` no longer dies with a `UnicodeEncodeError` on a non-UTF-8 console.** On Windows a cp1252 console or pipe gave the launcher a cp1252 output stream, and the guide's first `→` killed `lat --help` and `lat --readme` before a new user saw a line of it; a finding or error carrying such a character went the same way. `main()` now puts both output streams on UTF-8 with the policy of Python's UTF-8 mode (the default from 3.15, PEP 686), so the launcher emits the same bytes as the Rust binary whatever the console says. Only the Python `lat` was affected: the binary and the Node launcher write bytes.
+- **Line numbers are right after a quoted field that spans a newline (#1052).** Such a field stays one row (O-47), but every line after it was reported one short per newline it held: a finding on a TYPE row pointed at the UNIT row above. Lines are now the physical lines an editor shows and python-ags4 reports, on every surface: findings, fixes, the group, heading, unit, type and data row lines, `get_line_numbers`, and `laterite.compat`'s duplicate-group and ragged-row messages. The spanning row itself is reported where it starts, as before, and `--fix` still edits the right row. `total_lines` is unchanged and is documented as what it always was: the number of records, which is fewer than the last line number after a spanning field. The parse leaf adds `numbered_line_spans`, which pairs each record with its physical start line.
 
 ## [0.14.0] — 2026-10-08
 

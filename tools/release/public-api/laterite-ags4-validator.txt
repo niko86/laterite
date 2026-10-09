@@ -379,6 +379,7 @@ pub use laterite_ags4_validator::parse::RawLine
 pub use laterite_ags4_validator::parse::Span
 pub use laterite_ags4_validator::parse::field_span
 pub use laterite_ags4_validator::parse::line_spans
+pub use laterite_ags4_validator::parse::numbered_line_spans
 pub use laterite_ags4_validator::parse::split_ags_line
 pub use laterite_ags4_validator::parse::split_ags_line_spans
 pub fn laterite_ags4_validator::parse::parse_bytes(&[u8], &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_validator::error::ValidatorError>

@@ -172,9 +172,13 @@ fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut Findings) {
 /// Rule 4 — GROUP-row arity + UNIT/TYPE/DATA field-count == HEADING.
 fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut Findings) {
     // 4.1: the GROUP row carries only the descriptor + the group name.
-    // Re-split the raw GROUP line (raw_lines is line-ordered, 1-indexed
-    // contiguous, so index = line-1).
-    if let Some(rl) = parsed.raw_lines.get((g.group_line - 1) as usize) {
+    // Re-split the raw GROUP line, found BY NUMBER: line numbers are physical
+    // and skip past a quoted field spanning a newline, so the index is not
+    // line-1 (#1052). They stay strictly increasing, so a binary search holds.
+    let at = parsed
+        .raw_lines
+        .binary_search_by_key(&g.group_line, |rl| rl.number);
+    if let Some(rl) = at.ok().map(|i| &parsed.raw_lines[i]) {
         let fields = split_ags_line(parsed.line_text(rl));
         if fields.len() > 2 {
             add(
@@ -273,6 +277,21 @@ mod tests {
         let r2 = f.get(RULE_2).expect("Rule 2");
         assert_eq!(r2.len(), 1);
         assert_eq!(r2[0].group, "LOCA");
+    }
+
+    #[test]
+    fn rule_4_finds_a_group_row_after_a_field_spanning_a_newline() {
+        // PROJ's DATA row spans lines 5-6, so LOCA's GROUP row is line 8 but
+        // the 7th record: Rule 4.1 must re-split the row AT line 8 (#1052).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"two\r\nlines\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\",\"extra\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH01\"\r\n";
+        let f = run(src);
+        let r4 = f.get(RULE_4).expect("Rule 4");
+        assert_eq!(r4.len(), 1, "{r4:?}");
+        assert_eq!((r4[0].group.as_str(), r4[0].line), ("LOCA", Some(8)));
     }
 
     #[test]

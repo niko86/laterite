@@ -24,7 +24,7 @@ use crate::error::ValidatorError;
 
 pub use laterite_ags4_parse::{
     DataRow, FieldSpan, ParseError, ParsedFile, ParsedGroup, RawLine, Span, field_span, line_spans,
-    split_ags_line, split_ags_line_spans,
+    numbered_line_spans, split_ags_line, split_ags_line_spans,
 };
 
 /// Parse an AGS4 file from disk (UTF-8). Invalid UTF-8 is decoded lossily

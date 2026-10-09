@@ -31,8 +31,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::{
-    DataRow, GroupRecord, ParseError, ParsedFile, ParsedGroup, RawLine, append_text, span_at,
-    unescape_doubled,
+    DataRow, GroupRecord, ParseError, ParsedFile, ParsedGroup, RawLine, append_text,
+    embedded_newlines, span_at, unescape_doubled,
 };
 
 /// One written cell, located by the writer: the byte range of its LOGICAL
@@ -80,7 +80,11 @@ struct Fixup {
 #[derive(Default)]
 pub struct ParsedFileBuilder {
     out: Vec<u8>,
+    /// The last physical line written — a row whose quoted cell embeds a
+    /// newline spans more than one (#1052).
     line: u32,
+    /// Rows recorded: `total_lines` is a record count, as the walk's is.
+    records: u32,
     raw_lines: Vec<RawLine>,
     groups: BTreeMap<String, ParsedGroup>,
     group_order: Vec<String>,
@@ -138,8 +142,9 @@ impl ParsedFileBuilder {
         if u32::try_from(body.end).is_err() {
             return Err(ParseError::TooLarge);
         }
-        self.line += 1;
-        let number = self.line;
+        let number = self.line + 1;
+        self.line = number + embedded_newlines(&self.out[body.clone()]);
+        self.records += 1;
         self.raw_lines.push(RawLine {
             number,
             text: span_at(body.start, body.end),
@@ -275,7 +280,7 @@ impl ParsedFileBuilder {
                 // group-level coordinates above are populated, as every
                 // profile's are.
                 line_byte_offsets: Vec::new(),
-                total_lines: self.line,
+                total_lines: self.records,
                 has_bom: false,
                 total_bytes: emitted_len as u64,
                 // The written bytes ARE the source: nothing was decoded or
@@ -309,10 +314,12 @@ mod tests {
             ),
             ("\"UNIT\",\"\",\"\"", RowTag::Unit, &["", ""]),
             ("\"TYPE\",\"ID\",\"X\"", RowTag::Type, &["ID", "X"]),
+            // The embedded CRLF spans two physical lines: every row after it
+            // must be numbered past it, as the walk numbers it (#1052).
             (
-                "\"DATA\",\"P1\",\"say \"\"hi\"\"\"",
+                "\"DATA\",\"P1\",\"say \"\"hi\"\"\r\nagain\"",
                 RowTag::Data,
-                &["P1", "say \"\"hi\"\""],
+                &["P1", "say \"\"hi\"\"\r\nagain"],
             ),
             ("", RowTag::Blank, &[]),
             ("\"GROUP\",\"LOCA\"", RowTag::Group, &["LOCA"]),
@@ -382,7 +389,7 @@ mod tests {
         }
         // The escaped cell resolved through the fix-up region.
         let proj = &built.groups["PROJ"];
-        assert_eq!(proj.cell(1, 0), Some("say \"hi\""));
+        assert_eq!(proj.cell(1, 0), Some("say \"hi\"\r\nagain"));
     }
 
     /// A redeclared group code keeps ONE entry: descriptor rows overwrite,

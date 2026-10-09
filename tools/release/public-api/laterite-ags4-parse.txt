@@ -264,6 +264,17 @@ impl<'a> core::marker::Unpin for laterite_ags4_parse::LineSpans<'a>
 impl<'a> core::marker::UnsafeUnpin for laterite_ags4_parse::LineSpans<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::LineSpans<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::LineSpans<'a>
+pub struct laterite_ags4_parse::NumberedLineSpans<'a>(_)
+impl core::iter::traits::iterator::Iterator for laterite_ags4_parse::NumberedLineSpans<'_>
+pub type laterite_ags4_parse::NumberedLineSpans<'_>::Item = (u32, laterite_ags4_parse::LineSpan)
+pub fn laterite_ags4_parse::NumberedLineSpans<'_>::next(&mut self) -> core::option::Option<(u32, laterite_ags4_parse::LineSpan)>
+impl<'a> core::marker::Freeze for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::marker::Send for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::marker::Sync for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::NumberedLineSpans<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::NumberedLineSpans<'a>
 pub struct laterite_ags4_parse::ParseOptions
 pub laterite_ags4_parse::ParseOptions::encoding: &'static encoding_rs::Encoding
 pub laterite_ags4_parse::ParseOptions::locate_only: bool
@@ -389,6 +400,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::Span
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::Span
 pub fn laterite_ags4_parse::field_span(&str, u32) -> core::option::Option<(u32, u32)>
 pub fn laterite_ags4_parse::line_spans(&[u8]) -> laterite_ags4_parse::LineSpans<'_>
+pub fn laterite_ags4_parse::numbered_line_spans(&[u8]) -> laterite_ags4_parse::NumberedLineSpans<'_>
 pub fn laterite_ags4_parse::parse_bytes(&[u8], &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
 pub fn laterite_ags4_parse::parse_bytes_opts(&[u8], laterite_ags4_parse::ParseOptions) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
 pub fn laterite_ags4_parse::parse_str(&str) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>

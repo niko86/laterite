@@ -205,6 +205,39 @@ def test_compat_strict_pre_check_raises_on_duplicate_groups(tmp_path):
         AGS4.AGS4_to_dict(str(bad))
 
 
+_SPANNING_PROJ = (
+    '"GROUP","PROJ"\r\n'
+    '"HEADING","PROJ_ID","PROJ_NAME"\r\n'
+    '"UNIT","",""\r\n'
+    '"TYPE","ID","X"\r\n'
+    '"DATA","P1","two\r\nlines"\r\n'  # one record over physical lines 5-6
+    "\r\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("tail", "message"),
+    [
+        (
+            '"GROUP","PROJ"\r\n',
+            r"duplicated in Line 8 \(first seen on Line 1\)",
+        ),
+        (
+            '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_NATE"\r\n'
+            '"UNIT","",""\r\n"TYPE","ID","2DP"\r\n"DATA","BH01"\r\n',
+            r"Line 12 of group 'LOCA'",
+        ),
+    ],
+)
+def test_compat_strict_pre_check_reports_physical_lines(tmp_path, tail, message):
+    """A quoted field spanning a newline is one record but two lines: the
+    pre-check reports the physical line, as python-ags4 does (#1052)."""
+    bad = tmp_path / "spanning.ags"
+    bad.write_bytes((_SPANNING_PROJ + tail).encode())
+    with pytest.raises(AGS4.AGS4Error, match=message):
+        AGS4.AGS4_to_dict(str(bad))
+
+
 def test_compat_strict_pre_check_raises_on_ragged_data_row(tmp_path):
     """compat enforces python-ags4 strictness: DATA row with field count
     ≠ HEADING raises AGS4Error (native parser would silently pad/trim)."""
