@@ -35,6 +35,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Changed
 
 - **A KEY heading declared with a type other than the dictionary's is now a WARNING, shown by default.** The declared-type advisory (O-59) stays an FYI on any other heading; on a KEY heading it rides `Warning (Related to Rule 8)` and says so (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID.`). A KEY column typed its own way is where a child's TYPE row comes to differ from its parent's, and python-ags4's Rule 10c rejects that child on its TYPE line (O-52), so a producer now sees the cause without `--show-fyi`. The verdict does not move, and `--no-warnings` hides it. Native surfaces only, as before: `laterite.compat` withholds both labels.
+- **The wheel's PyO3 binding moves from 0.29.2 to 0.29.3 (#1050).** A bug-fix release on the 0.29 line: further fixes to Windows linking, small performance work, and fixes to FFI definitions and to clippy lints raised by PyO3's macros. Only `laterite-py` depends on PyO3, and the new release keeps the same minimum Rust version, so nothing is held. Nothing a consumer calls changes.
 
 ### Fixed
 
