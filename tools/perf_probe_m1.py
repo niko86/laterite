@@ -50,7 +50,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import datetime
+import datetime as dt
 import hashlib
 import json
 import platform
@@ -346,7 +346,7 @@ def main() -> int:
             "third family (#833): per-mode fresh-child peak memory on this OS; "
             "never shares a table with the darwin lane or dhat numbers"
         ),
-        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "commit": commit.stdout.strip() if commit.returncode == 0 else "unknown",
         "platform": platform.platform(),
         "arch": platform.machine(),

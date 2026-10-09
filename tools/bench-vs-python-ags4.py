@@ -99,7 +99,7 @@ toolchain built; both are checked before any timing starts.
 from __future__ import annotations
 
 import argparse
-import datetime
+import datetime as dt
 import gc
 import hashlib
 import json
@@ -587,7 +587,7 @@ def build_results(
     )
     return {
         "schema": RESULTS_SCHEMA,
-        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "commit": commit.stdout.strip() if commit.returncode == 0 else "unknown",
         "invocation": invocation or {},
         "machine": {

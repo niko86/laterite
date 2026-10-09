@@ -16,7 +16,7 @@ added/removed/reclassified without regenerating the index.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import json
 import re
 import sys
@@ -49,7 +49,7 @@ def render(today: str | None = None) -> str:
     faithfulness check can pin it to the committed file's own stamp and
     compare the *derived content* without every run past the original
     generation day looking like drift (see `_normalize_generated`)."""
-    today = today or datetime.date.today().isoformat()
+    today = today or dt.date.today().isoformat()
     counts: dict[str, int] = {}
     status_dist: dict[str, int] = {}
     sections: list[str] = []

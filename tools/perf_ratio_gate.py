@@ -57,7 +57,7 @@ python-ags4 importable); the bench child inherits the interpreter.
 from __future__ import annotations
 
 import argparse
-import datetime
+import datetime as dt
 import importlib.util
 import json
 import os
@@ -223,7 +223,7 @@ def doc_header(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "mode": args.mode,
-        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "measured_sha": args.measured_sha or None,
         "instrument_sha": args.instrument_sha or None,
         "hardware_class": hardware_class(),
