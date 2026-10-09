@@ -12,12 +12,18 @@
 // (~96% of the native build) is now paid only by the explicit keyed variant. The
 // gap between "read only" and "read + table (keys)" below is that keychain cost.
 //
+// Vitest 5 made `bench` a fixture on the test context rather than a top-level
+// export: a benchmark is a `test()` that registers its cases and awaits them.
+// `bench.compare` runs the registrations as one group and reports them in a
+// single table, which is what the one `describe` block gave under 4 — the
+// read-only / keyed gap above is read off that table.
+//
 // Run: `npm run bench` (needs the native addon built — `npm run build` — and the
 // fixture generated — `tools/gen-bench-fixtures.sh`). Not part of `vitest run`.
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 import { read } from "../ts/index";
 
@@ -29,32 +35,39 @@ describe("node/read", () => {
   if (!existsSync(fixture)) {
     // Keep the suite runnable on a clean checkout — a skipped bench, like the
     // Rust benches, rather than a hard failure.
-    bench.skip(
-      "large — fixture absent (run tools/gen-bench-fixtures.sh)",
-      () => {},
-    );
+    test.skip("large — fixture absent (run tools/gen-bench-fixtures.sh)", () => {});
   } else {
     const bytes = readFileSync(fixture);
 
-    // Parse only — the floor the typed materialization builds on.
-    bench("read [large]", () => {
-      read(bytes);
-    });
+    // Bench mode floors the test timeout at 60 s (Vitest raises any lower
+    // `testTimeout` to that for a benchmark project), and three cases times
+    // the samples tinybench takes on a 25 MB fixture can exceed it. A benchmark
+    // runs a fixed number of samples; a deadline on top of that is not a
+    // measurement, so the timeout is off for this test.
+    test("large", { timeout: 0 }, async ({ bench }) => {
+      await bench.compare(
+        // Parse only — the floor the typed materialization builds on.
+        bench("read [large]", () => {
+          read(bytes);
+        }),
 
-    // The full default typed read: parse + `table(code)` for every group. Post-#6
-    // the keychain is SKIPPED here (keys-less native build), so this is now close
-    // to parse + the bare typed build.
-    bench("read + table(all groups) [large]", () => {
-      const f = read(bytes);
-      for (const code of f.groups) f.table(code);
-    });
+        // The full default typed read: parse + `table(code)` for every group.
+        // Post-#6 the keychain is SKIPPED here (keys-less native build), so this
+        // is now close to parse + the bare typed build.
+        bench("read + table(all groups) [large]", () => {
+          const f = read(bytes);
+          for (const code of f.groups) f.table(code);
+        }),
 
-    // The keyed variant keeps `_id`/`_parent_id`, so it still pays the keychain —
-    // the ~490 ms gap to the default above is exactly that keychain, now charged
-    // only when a caller actually asks for the keys (#6).
-    bench("read + table(all, keys) [large]", () => {
-      const f = read(bytes);
-      for (const code of f.groups) f.table(code, { keys: true });
+        // The keyed variant keeps `_id`/`_parent_id`, so it still pays the
+        // keychain — the ~490 ms gap to the default above is exactly that
+        // keychain, now charged only when a caller actually asks for the keys
+        // (#6).
+        bench("read + table(all, keys) [large]", () => {
+          const f = read(bytes);
+          for (const code of f.groups) f.table(code, { keys: true });
+        }),
+      );
     });
   }
 });

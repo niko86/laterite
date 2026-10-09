@@ -11,11 +11,16 @@
 // come back as Arrow IPC bytes to be decoded host-side. That copy is real and
 // part of what a browser pays, so it stays in the measured path.
 //
-// The wasm init is async (`import()` the glue, then instantiate from bytes), but
-// vitest's benchmark runner does NOT await a `beforeAll` before the first
-// iteration — so the setup runs at MODULE TOP-LEVEL (ESM top-level await),
-// exactly as node's `read.bench.ts` reads its fixture synchronously before
-// registering benches. By the time `describe` runs, `glue`/`bytes` are ready.
+// The wasm init is async (`import()` the glue, then instantiate from bytes), and
+// it runs at MODULE TOP-LEVEL (ESM top-level await), exactly as node's
+// `read.bench.ts` reads its fixture synchronously before registering benches:
+// `describe.skipIf` needs `ready` at collection time, which no hook could give
+// it. By the time `describe` runs, `glue`/`bytes` are set.
+//
+// Vitest 5 made `bench` a fixture on the test context rather than a top-level
+// export: a benchmark is a `test()` that registers its cases and awaits them.
+// `bench.compare` runs the registrations as one group and reports them in a
+// single table, which is what the one `describe` block gave under 4.
 //
 // `web/src/wasm` is gitignored (built by `npm run build:wasm`); the fixture is
 // built by `tools/gen-bench-fixtures.sh`. Self-skips when either is absent — a
@@ -26,7 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The FULL build (#355): this benches `read` + `arrow_ipc`, the Explore ingest
@@ -93,39 +98,50 @@ if (ready) {
 }
 
 describe.skipIf(!ready)("wasm/read", () => {
-  // Parse into the typed dataset (columns still lazy) — the floor the
-  // materialization builds on. `free()` returns the wasm-side allocation so a
-  // tight loop over 25 MB doesn't grow linear memory unboundedly.
-  bench("read [large]", () => {
-    const ds = glue.read(bytes);
-    ds.free();
-  });
+  // Bench mode floors the test timeout at 60 s (Vitest raises any lower
+  // `testTimeout` to that for a benchmark project), and four cases times the
+  // samples tinybench takes on a 25 MB fixture exceed it. A benchmark runs a
+  // fixed number of samples; a deadline on top of that is not a measurement,
+  // so the timeout is off for this test.
+  test("large", { timeout: 0 }, async ({ bench }) => {
+    await bench.compare(
+      // Parse into the typed dataset (columns still lazy) — the floor the
+      // materialization builds on. `free()` returns the wasm-side allocation so
+      // a tight loop over 25 MB doesn't grow linear memory unboundedly.
+      bench("read [large]", () => {
+        const ds = glue.read(bytes);
+        ds.free();
+      }),
 
-  // The full typed read: parse + build every group's Arrow IPC, keys-less (the
-  // node default post-#6). This is the browser explorer's actual read cost.
-  bench("read + arrow_ipc(all groups) [large]", () => {
-    const ds = glue.read(bytes);
-    for (const code of ds.group_codes()) ds.arrow_ipc(code, false);
-    ds.free();
-  });
+      // The full typed read: parse + build every group's Arrow IPC, keys-less
+      // (the node default post-#6). This is the browser explorer's actual read
+      // cost.
+      bench("read + arrow_ipc(all groups) [large]", () => {
+        const ds = glue.read(bytes);
+        for (const code of ds.group_codes()) ds.arrow_ipc(code, false);
+        ds.free();
+      }),
 
-  // Keyed variant — keeps `_id`/`_parent_id`, so it pays the content-key chain;
-  // the gap to the keys-less build above is that keychain cost on the wasm path.
-  bench("read + arrow_ipc(all, keys) [large]", () => {
-    const ds = glue.read(bytes);
-    for (const code of ds.group_codes()) ds.arrow_ipc(code, true);
-    ds.free();
-  });
+      // Keyed variant — keeps `_id`/`_parent_id`, so it pays the content-key
+      // chain; the gap to the keys-less build above is that keychain cost on
+      // the wasm path.
+      bench("read + arrow_ipc(all, keys) [large]", () => {
+        const ds = glue.read(bytes);
+        for (const code of ds.group_codes()) ds.arrow_ipc(code, true);
+        ds.free();
+      }),
 
-  // The validator path, both tier gates off — comparable to the Rust
-  // `check_file/large` baseline (269 ms @ 25 MB, native).
-  bench("validate [large]", () => {
-    glue.validate(bytes, {
-      // Both tier gates OFF explicitly: `warnings` now defaults to true, so
-      // omitting it would quietly change what this benchmark measures.
-      warnings: false,
-      fyi: false,
-      encoding: "utf-8",
-    });
+      // The validator path, both tier gates off — comparable to the Rust
+      // `check_file/large` baseline (269 ms @ 25 MB, native).
+      bench("validate [large]", () => {
+        glue.validate(bytes, {
+          // Both tier gates OFF explicitly: `warnings` now defaults to true, so
+          // omitting it would quietly change what this benchmark measures.
+          warnings: false,
+          fyi: false,
+          encoding: "utf-8",
+        });
+      }),
+    );
   });
 });

@@ -71,11 +71,21 @@ export default defineConfig({
       // The node package makes the same call structurally (its coverage
       // include is `ts/**`, so its bench/ never enters the denominator);
       // this exclude is that decision in this config's idiom.
+      //
+      // Root config files are build/test configuration, not app code — and
+      // `landing/sharedAlias.test.ts` imports `vite.config.ts` to pin the
+      // shared alias, so this lane does execute it. The 4 → 5 bump of
+      // @vitest/coverage-v8 put that file in the report (the one row the two
+      // runs differ by), and a config file's build-only plugin hooks then sit
+      // in the denominator at zero — which moved the branches figure under the
+      // floor with no test changed. The build and e2e exercise config, so it
+      // is excluded here like the bench harness.
       exclude: [
         "src/wasm/**",
         "src/wasm-full/**",
         "src/wasm-tokenizer/**",
         "bench/**",
+        "**/*.config.ts",
       ],
       // Floor gate, not a target. Introduced at 65 (68.76% baseline); ratcheted to
       // 95, and now to 99 after duckTypes / loadSensitive / the relationship
