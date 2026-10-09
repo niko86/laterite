@@ -749,9 +749,9 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       # `tui` is not a default feature, so the step above never compiles the
-      # check view behind it, and four warnings sat there unseen (#1054). Not a
-      # blanket --all-features: the wasm crate's features exclude each other
-      # (see its per-feature loop below).
+      # check view behind it, and four warnings sat there unseen (#1054). A
+      # named list rather than --all-features, like the wasm crate's loop
+      # below: each gated feature is opted in here deliberately.
       - name: cargo clippy (laterite-cli, feature gates)
         working-directory: rust-packages
         run: |
