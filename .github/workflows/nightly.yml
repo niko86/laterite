@@ -66,7 +66,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile). SHA-pinned; Dependabot bumps it.
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-llvm-cov
 
@@ -232,7 +232,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -312,7 +312,7 @@ jobs:
         run: rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
       - name: install cargo-public-api (only when a delta is unmeasured)
         if: steps.status.outputs.unmeasured != '0'
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           # The version ci.yml's publish-gates pins: its renderer is half of
           # what writes a snapshot line.
