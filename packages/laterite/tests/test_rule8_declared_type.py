@@ -142,3 +142,51 @@ def test_native_only_not_through_compat():
     errors = AGS4.check_file(io.StringIO(drifted.decode()))
     assert FYI8 not in errors
     assert "FYI (Related to Rule 16)" in errors
+
+
+# --- the KEY-heading tier (O-59, promoted after O-52's TYPE-row trigger) ------
+
+WARN8 = "Warning (Related to Rule 8)"
+LNMC_LOCA_AS_X = '"TYPE","X","2DP","X","PA","ID","X","2DP","X"\n'
+
+
+def _loca_as_x() -> bytes:
+    """LNMC's KEY ``LOCA_ID`` declared ``X``; ``X`` is in the TYPE group already."""
+    text = _build()
+    assert text.count(LNMC_TYPES) == 1
+    return _crlf(text.replace(LNMC_TYPES, LNMC_LOCA_AS_X))
+
+
+def _warn8(report) -> list[dict]:
+    return [d for d in report.findings.to_dicts() if d["rule"] == WARN8]
+
+
+def test_a_key_heading_departure_warns_by_default():
+    # No fyi=True: warnings are on by default, and this one rides that tier,
+    # because a KEY column typed its own way is what python-ags4's Rule 10c
+    # rejects once the parent's TYPE row disagrees (O-52).
+    rep = laterite.validate(_loca_as_x())
+    assert [d["desc"] for d in _warn8(rep)] == [
+        "LNMC.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID."
+    ]
+    assert {d["severity"] for d in _warn8(rep)} == {"warning"}
+    assert _fyi8(rep) == []
+    assert rep.is_valid
+    # A warning, so only the -Werror dial lets it decide anything.
+    assert not laterite.validate(_loca_as_x(), warnings_as_errors=True).is_valid
+
+
+def test_no_warnings_hides_the_key_warning_rather_than_demoting_it():
+    rep = laterite.validate(_loca_as_x(), warnings=False, fyi=True)
+    assert _warn8(rep) == []
+    assert _fyi8(rep) == []
+
+
+def test_the_key_warning_is_native_only_too():
+    import io
+
+    from laterite import compat as AGS4
+
+    errors = AGS4.check_file(io.StringIO(_loca_as_x().decode()))
+    assert WARN8 not in errors
+    assert not any("Rule" in k for k in errors), sorted(errors)

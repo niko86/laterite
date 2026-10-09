@@ -40,10 +40,12 @@ const FYI_BEARING_RULES: &[&str] = &["1", "8", "10c", "16", "18"];
 /// that is present but not a recognised edition, so the file was judged against
 /// a fallback dictionary its author never declared; O-45), and
 /// `rules/groups.rs::rule_16_case_collision` (Rule 16 — ABBR codes differing
-/// only by letter case in a file judged against 4.2 or later; O-58). 10c and 16
-/// are redundant for the set-equality gate below, which already has them from
-/// the FYI list — they are here because this const's job is to name the WARNING
-/// emitters, and #656's went unnamed for a release.
+/// only by letter case in a file judged against 4.2 or later; O-58), and
+/// `rules/typed_values.rs::declared_type` (Rule 8 — a KEY heading declared with
+/// a type other than the dictionary's; O-59). 8, 10c and 16 are redundant for
+/// the set-equality gate below, which already has them from the FYI list — they
+/// are here because this const's job is to name the WARNING emitters, and
+/// #656's went unnamed for a release.
 ///
 /// That gate compares this list to `rules_meta.json` and cannot see a rule
 /// missing from BOTH sides: Rule 14 emitted its warning for a release while
@@ -51,7 +53,7 @@ const FYI_BEARING_RULES: &[&str] = &["1", "8", "10c", "16", "18"];
 /// other throughout (#769). `tests/regression.rs::rule_labels_inventory_is_grounded_against_real_emissions`
 /// is the shape that would ground these against what the engine actually emits.
 #[cfg(test)]
-const WARN_BEARING_RULES: &[&str] = &["10c", "14", "16", "18"];
+const WARN_BEARING_RULES: &[&str] = &["8", "10c", "14", "16", "18"];
 
 #[cfg(test)]
 mod tests {

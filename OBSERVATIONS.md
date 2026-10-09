@@ -837,7 +837,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
   the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Validation never collapses the variants. `fix` does when asked (#1024): `on_code_case="standard"` or an explicit `recode`, `merge`'s two options, rewrite the ABBR rows and every `PA` cell under the heading as one safe Rule 16 fix, and leave a set as written, reported as skipped, when the rewrite would give two rows one KEY.
 
-### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8); python-ags4 has no such check
+### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8), a WARNING when the heading is KEY; python-ags4 has no such check
 - **Observed** (#1013): a file can declare a standard heading with a
   different data type from the dictionary edition it is checked against —
   `LNMC_MC` as `1DP` where 4.1.1 types it `X`, or `CONS_INCE` as `2DP` where
@@ -883,6 +883,17 @@ O-N below is an internal decision or behavioural note, not for external circulat
   python-ags4 users never asked for, and its key trips python-ags4's own
   test that a clean file yields no key naming a Rule. The python-ags4 key
   set, and so the parity known-failures set, is unchanged.
+- **Our decision (2026-10-09, after [[O-52]]'s TYPE-row trigger)**: the
+  departure on a **KEY** heading is promoted to `Warning (Related to Rule
+  8)`, shown by default on every native surface and still never deciding
+  the verdict; any other heading keeps the FYI. A KEY column is a join
+  column: typed its own way it is one edit from disagreeing with its
+  parent's TYPE row, and python-ags4's Rule 10c then rejects the child on
+  its TYPE line — a delivery laterite had passed, with the cause sitting
+  behind `--show-fyi`. The message says the heading is KEY
+  (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is
+  ID.`). `--no-warnings` hides it rather than demoting it. `laterite.compat`
+  withholds both labels, for the reason it withheld the first.
 
 ### O-60 [VARIANCE] A DICT row that redeclares a standard group or heading gets a laterite-originated FYI (Related to Rule 18), a WARNING when it drops KEY or re-parents; python-ags4 has no such check
 - **Observed** (#1011): several exporters write a DICT row for every
