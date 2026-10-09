@@ -243,6 +243,13 @@ fn reconcile(
     if ro.remove("FYI (Related to Rule 8)") {
         ids.push("O-59");
     }
+    // The same advisory on a KEY heading rides the warning tier (O-59, promoted
+    // once O-52's TYPE-row trigger showed what it costs), so forge's
+    // `include_warnings` run would otherwise file every file that types a KEY
+    // column its own way as an action. One record, whichever tiers are present.
+    if ro.remove("Warning (Related to Rule 8)") && !ids.contains(&"O-59") {
+        ids.push("O-59");
+    }
     // O-60: laterite names a DICT row that redeclares a standard group or
     // heading (#1011). python-ags4 only reads DICT for what the standard lacks
     // and never compares the two, so the label is rust-only by construction on
@@ -537,6 +544,17 @@ mod tests {
             classify(&both, &Ok(BTreeSet::new())),
             Parity::RustOnlyRules { .. }
         ));
+        // The KEY-heading tier reconciles to the same record, and both tiers at
+        // once name it once.
+        for labels in [
+            &["Warning (Related to Rule 8)"][..],
+            &["FYI (Related to Rule 8)", "Warning (Related to Rule 8)"][..],
+        ] {
+            match classify(&rules(labels), &Ok(BTreeSet::new())) {
+                Parity::KnownDivergence { observation, .. } => assert_eq!(observation, "O-59"),
+                other => panic!("expected KnownDivergence O-59 for {labels:?}, got {other:?}"),
+            }
+        }
     }
 
     #[test]

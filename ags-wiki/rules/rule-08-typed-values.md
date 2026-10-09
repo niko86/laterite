@@ -39,7 +39,7 @@ The `n` in a parametric TYPE (`nDP`/`nSF`/`nSCI`) is read straight off the file'
 
 A separate, narrower issue lives one step further along the same `0DP` path: Rule 8's strict grammar check (`is_ndp(s, 0)`) already flags an out-of-range/fractional integer cell on both validators, but the *conversion* of that cell to a number diverged — laterite's pre-#611 `f as i64` saturated to a fabricated `i64::MAX` where python-ags4's `int(float(s))` preserves full precision. laterite-dev#611 range-guards the conversion to Null instead; see [[O-50]] / [[0dp-integer-conversion-precision-loss]].
 
-The declared TYPE row is this rule's authority, and nothing here compares it with the dictionary. With FYIs on, `declared_type_fyi` (same module, run beside this rule) names each standard heading whose declared type differs from the resolved edition's dictionary type, as `FYI (Related to Rule 8)`: the file is valid, but values typed one way fail this rule once combined with a file typed the other. It never changes the verdict; see [[O-59]].
+The declared TYPE row is this rule's authority, and nothing here compares it with the dictionary. `declared_type` (same module, run beside this rule) names each standard heading whose declared type differs from the resolved edition's dictionary type: on a KEY heading as `Warning (Related to Rule 8)`, shown by default, because that is where a child's TYPE row comes to differ from its parent's and python-ags4's Rule 10c then rejects the child on its TYPE line ([[O-52]]); on any other heading as `FYI (Related to Rule 8)`, with FYIs on. The file is valid either way — values typed one way fail this rule once combined with a file typed the other — and neither tier changes the verdict; see [[O-59]].
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
@@ -68,7 +68,7 @@ timeline
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
 - Divergence (Rust↔python): none on pandas-range dates — dogfood-confirmed by [[strat-rule8-pandas-range]] (both flag Rule 8 on pre-1678/post-2262 dates). A separate DT/`yyyy-mm` precision bug was tracked and fixed — see [[rule8-dt-yyyy-mm-false-positive]] (refuted/resolved).
-- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type; python-ags4 has no equivalent.
+- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type, a WARNING when that heading is KEY; python-ags4 has no equivalent.
 
 ## Related
 [[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]] · [[O-49]] · [[O-50]] · [[O-59]] · [[numeric-type-count-uncapped-format-width]] · [[0dp-integer-conversion-precision-loss]]

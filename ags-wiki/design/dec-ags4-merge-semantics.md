@@ -144,10 +144,11 @@ validity proof):**
   to be *declared*, not the reverse, and there is no rule requiring a
   heading's TYPE to equal the *dictionary's* TYPE (promoting `LOCA_GL` from
   `2DP` to `5DP` is spec-legal even though the dictionary says `2DP`).
-  The validator's opt-in `FYI (Related to Rule 8)` does report such a
-  difference ([[O-59]]), so a promoted merge validated with FYIs on names
-  the promoted heading; it is never an error, and `on_type_clash` still
-  settles only clashes between the inputs' declared TYPE rows.
+  The validator's `FYI (Related to Rule 8)` does report such a difference
+  ([[O-59]]) — on a KEY heading as `Warning (Related to Rule 8)`, shown by
+  default — so a promoted merge validated with FYIs on names the promoted
+  heading; it is never an error, and `on_type_clash` still settles only
+  clashes between the inputs' declared TYPE rows.
 
 **The composition payoff with `_content_hash` (#448/#499).** `content_hash`
 canonicalises a cell *through its declared TYPE*

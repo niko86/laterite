@@ -201,8 +201,9 @@ through `compat.check_file` — python-ags4 emits FYI keys (`FYI`,
 parity tests assert on. The native `laterite.validate(...)` /
 `lat` CLI default `include_fyi=False`.
 
-One laterite FYI is withheld from `compat.check_file`:
-`FYI (Related to Rule 8)`, the declared-TYPE-differs-from-dictionary
+One laterite advisory is withheld from `compat.check_file`, at both of
+its tiers: `FYI (Related to Rule 8)` and, for a KEY heading,
+`Warning (Related to Rule 8)` — the declared-TYPE-differs-from-dictionary
 advisory (O-59). It is native-only, so compat's key set stays
 python-ags4's.
 

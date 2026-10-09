@@ -177,7 +177,7 @@
         },
         {
           "id": "O-59",
-          "note": "A standard heading declared with a different data type from the dictionary (LNMC_MC as 1DP where the dictionary says X, or CONS_INCE as 2DP where it says 3DP) breaks no rule, because this rule reads the TYPE row the file declares. It matters once files are combined: whichever TYPE row survives, the other producer's values fail. With --show-fyi laterite names each such heading once, with the dictionary edition and its type. python-ags4 has no equivalent check."
+          "note": "A standard heading declared with a different data type from the dictionary (LNMC_MC as 1DP where the dictionary says X, or CONS_INCE as 2DP where it says 3DP) breaks no rule, because this rule reads the TYPE row the file declares. It matters once files are combined: whichever TYPE row survives, the other producer's values fail. With --show-fyi laterite names each such heading once, with the dictionary edition and its type. On a KEY heading the departure is a warning, shown by default: a KEY column typed its own way is where a child's TYPE row comes to differ from its parent's, and python-ags4's Rule 10c rejects that child on its TYPE line (O-52). python-ags4 has no equivalent check."
         }
       ]
     },

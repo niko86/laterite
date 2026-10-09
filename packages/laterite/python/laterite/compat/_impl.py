@@ -805,8 +805,10 @@ def _python_ags4_edition(tran_ags: Any) -> str:
     return _PYAGS4_STANDARD_DICT.get(str(tran_ags).strip(), "4.1.1")
 
 
-#: The one engine label `check_file` withholds (O-59) — see the loop there.
-_NATIVE_ONLY_FYI = "FYI (Related to Rule 8)"
+#: The engine labels `check_file` withholds (O-59, both tiers) — see the loop there.
+_NATIVE_ONLY_LABELS = frozenset(
+    {"FYI (Related to Rule 8)", "Warning (Related to Rule 8)"}
+)
 
 
 def check_file(
@@ -882,12 +884,13 @@ def check_file(
         )
 
     for f in r["findings"]:
-        # O-59: the declared-type FYI stays native-only. Real files depart
-        # from the dictionary's types often, so in the drop-in it would be
-        # noise python-ags4 users never asked for, and its key trips
-        # python-ags4's own "no Rule keys" test. Only this label is dropped;
-        # every other FYI (O-43/O-57/O-58 included) flows through as before.
-        if f["rule"] == _NATIVE_ONLY_FYI:
+        # O-59: the declared-type advisory stays native-only at both tiers —
+        # the FYI, and the warning a KEY heading's departure rides. Real files
+        # depart from the dictionary's types often, so in the drop-in it would
+        # be noise python-ags4 users never asked for, and either key trips
+        # python-ags4's own "no Rule keys" test. Only these labels are dropped;
+        # every other FYI and warning (O-43/O-57/O-58 included) flows through.
+        if f["rule"] in _NATIVE_ONLY_LABELS:
             continue
         desc = f["desc"]
         if match_python_ags4_wording:
