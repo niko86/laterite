@@ -534,7 +534,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -627,7 +627,7 @@ jobs:
           workspaces: rust-packages
 
       - name: install cargo-public-api + cargo-semver-checks
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           # cargo-public-api pinned for the same reason as the nightly: its
           # renderer is half of what writes a snapshot line.
@@ -747,6 +747,20 @@ jobs:
         working-directory: rust-packages
         # --all-targets lints tests/benches/examples too, not just lib/bin code.
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # `tui` is not a default feature, so the step above never compiles the
+      # check view behind it, and four warnings sat there unseen (#1054). A
+      # named list rather than --all-features, like the wasm crate's loop
+      # below: each gated feature is opted in here deliberately.
+      - name: cargo clippy (laterite-cli, feature gates)
+        working-directory: rust-packages
+        run: |
+          set -euo pipefail
+          for f in tui; do
+            echo "::group::laterite-cli --features $f"
+            cargo clippy -p laterite-cli --features "$f" --all-targets -- -D warnings
+            echo "::endgroup::"
+          done
 
       # Nothing ran `cargo doc` at all until #748, so rustdoc warnings
       # accumulated silently and indefinitely — 62 of them across 14 crates by

@@ -2259,11 +2259,11 @@
           "severity": "fyi"
         },
         {
-          "rule": "FYI (Related to Rule 8)",
+          "rule": "Warning (Related to Rule 8)",
           "line": 80,
           "group": "SAMP",
           "field_index": 1,
-          "severity": "fyi"
+          "severity": "warning"
         }
       ]
     },

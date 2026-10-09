@@ -34,6 +34,12 @@ const RULE_8: &str = "AGS Format Rule 8";
 // RULE_8 so the declared-vs-dictionary advisory can never be counted as a Rule 8
 // error — compat's severity classifier reads the label, not the Severity (O-59).
 const RULE_8_FYI: &str = "FYI (Related to Rule 8)";
+// The same advisory on a KEY heading, one tier up and shown by default. A KEY
+// column is a join column: typed differently from the dictionary it is one edit
+// away from disagreeing with its parent's TYPE row, and python-ags4's Rule 10c
+// then rejects the child's own TYPE row as an orphan (O-52) — a delivery
+// laterite passed. Its own label, so the FYI bucket stays FYI-pure.
+const RULE_8_WARN: &str = "Warning (Related to Rule 8)";
 
 /// What a TYPE-row code asks us to check. Unknown / deliberately
 /// unvalidated codes (`X`, `XN`, `MC`, `RL`, `PA`, `PT`, `PU`, …) are
@@ -204,9 +210,26 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
 /// has no standard type to differ from. Any difference counts, precision
 /// included (`2DP` against `3DP` formats every value differently). A blank
 /// TYPE cell is left to Rules 4 and 17. One finding per heading, never per row.
+///
+/// Two tiers, by the heading's dictionary status. A KEY heading is a join
+/// column, so a departure there is a WARNING (`include_warnings`, on by default
+/// on every surface): the child and parent TYPE rows now have a way to
+/// disagree, and python-ags4's Rule 10c rejects a child whose TYPE row differs
+/// from its parent's in a KEY column — on the TYPE line, as an orphan (O-52) —
+/// so a producer has to see it before delivery, not after `--show-fyi`. Any
+/// other heading stays an FYI (`include_fyi`). Neither tier moves the verdict.
 // `ci` is a column index within one group, bounded far below u32::MAX.
 #[allow(clippy::cast_possible_truncation)]
-pub(crate) fn declared_type_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+pub(crate) fn declared_type(
+    parsed: &ParsedFile,
+    dict: &Dictionary,
+    include_warnings: bool,
+    include_fyi: bool,
+    found: &mut Findings,
+) {
+    if !include_warnings && !include_fyi {
+        return;
+    }
     let edition = dict.version();
     let standard = Dictionary::bundled(edition);
     for code in &parsed.group_order {
@@ -231,13 +254,27 @@ pub(crate) fn declared_type_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &
             if expected.is_empty() || expected == declared {
                 continue;
             }
+            let key = std_heading.status.trim().eq_ignore_ascii_case("KEY");
+            let (label, severity, shown, what) = if key {
+                (
+                    RULE_8_WARN,
+                    Severity::Warning,
+                    include_warnings,
+                    "is a KEY heading declared",
+                )
+            } else {
+                (RULE_8_FYI, Severity::Fyi, include_fyi, "is declared")
+            };
+            if !shown {
+                continue;
+            }
             add_at(
                 found,
-                RULE_8_FYI,
+                label,
                 g.type_line,
                 code,
                 format!(
-                    "{code}.{heading} is declared {declared}; the {} dictionary type is {expected}.",
+                    "{code}.{heading} {what} {declared}; the {} dictionary type is {expected}.",
                     edition.as_str()
                 ),
                 Location {
@@ -246,7 +283,7 @@ pub(crate) fn declared_type_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &
                     heading: Some(heading.clone()),
                     ..Default::default()
                 },
-                Severity::Fyi,
+                severity,
             );
         }
     }
@@ -1032,14 +1069,66 @@ mod tests {
         )
     }
 
-    fn declared_fyis(src: &str, edition: &str) -> Vec<String> {
+    /// LNMC with its KEY `LOCA_ID` declared `loca_type` and the rest as the
+    /// dictionary types it.
+    fn lnmc_keyed(loca_type: &str) -> String {
+        format!(
+            "\"GROUP\",\"LNMC\"\r\n\
+             \"HEADING\",\"LOCA_ID\",\"LNMC_MC\"\r\n\
+             \"UNIT\",\"\",\"%\"\r\n\
+             \"TYPE\",\"{loca_type}\",\"X\"\r\n\
+             \"DATA\",\"BH1\",\"11.3\"\r\n"
+        )
+    }
+
+    fn declared(src: &str, edition: &str, warnings: bool, fyi: bool) -> Findings {
         let version = crate::dict::DictVersion::from_edition(edition).expect("bundled edition");
         let pf = parse_str(src).expect("fixture parses");
         let mut f = Findings::new();
-        declared_type_fyi(&pf, &Dictionary::bundled(version), &mut f);
-        f.get(RULE_8_FYI)
+        declared_type(&pf, &Dictionary::bundled(version), warnings, fyi, &mut f);
+        f
+    }
+
+    fn descs(f: &Findings, label: &str) -> Vec<String> {
+        f.get(label)
             .map(|v| v.iter().map(|x| x.desc.clone()).collect())
             .unwrap_or_default()
+    }
+
+    fn declared_fyis(src: &str, edition: &str) -> Vec<String> {
+        descs(&declared(src, edition, true, true), RULE_8_FYI)
+    }
+
+    #[test]
+    fn a_key_heading_departure_is_a_warning_shown_without_fyi() {
+        // Warnings on, FYI off — every surface's default — still names it, one
+        // tier up and under its own label.
+        let f = declared(&lnmc_keyed("X"), "4.1.1", true, false);
+        assert_eq!(
+            descs(&f, RULE_8_WARN),
+            vec![
+                "LNMC.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID."
+                    .to_string()
+            ]
+        );
+        assert!(descs(&f, RULE_8_FYI).is_empty());
+        assert_eq!(
+            f.get(RULE_8_WARN).expect("the warning")[0].severity,
+            Severity::Warning
+        );
+        // The dictionary's own type is silent at either tier.
+        let f = declared(&lnmc_keyed("ID"), "4.1.1", true, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty() && descs(&f, RULE_8_FYI).is_empty());
+    }
+
+    #[test]
+    fn each_tier_follows_its_own_switch() {
+        // `--no-warnings` hides the KEY warning; it is not demoted to an FYI.
+        let f = declared(&lnmc_keyed("X"), "4.1.1", false, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty() && descs(&f, RULE_8_FYI).is_empty());
+        // A non-KEY departure is FYI-only: warnings alone do not surface it.
+        let f = declared(&lnmc("1DP", ("LNMC_TEMP", "0DP")), "4.1.1", true, false);
+        assert!(descs(&f, RULE_8_WARN).is_empty() && descs(&f, RULE_8_FYI).is_empty());
     }
 
     #[test]

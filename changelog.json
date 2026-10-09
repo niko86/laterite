@@ -6,10 +6,18 @@
   "unreleased": {
     "summary": "",
     "added": [],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**A KEY heading declared with a type other than the dictionary's is now a WARNING, shown by default.** The declared-type advisory (O-59) stays an FYI on any other heading; on a KEY heading it rides `Warning (Related to Rule 8)` and says so (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID.`). A KEY column typed its own way is where a child's TYPE row comes to differ from its parent's, and python-ags4's Rule 10c rejects that child on its TYPE line (O-52), so a producer now sees the cause without `--show-fyi`. The verdict does not move, and `--no-warnings` hides it. Native surfaces only, as before: `laterite.compat` withholds both labels."
+      }
+    ],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**The wheel's `lat` no longer dies with a `UnicodeEncodeError` on a non-UTF-8 console.** On Windows a cp1252 console or pipe gave the launcher a cp1252 output stream, and the guide's first `→` killed `lat --help` and `lat --readme` before a new user saw a line of it; a finding or error carrying such a character went the same way. `main()` now puts both output streams on UTF-8 with the policy of Python's UTF-8 mode (the default from 3.15, PEP 686), so the launcher emits the same bytes as the Rust binary whatever the console says. Only the Python `lat` was affected: the binary and the Node launcher write bytes."
+      }
+    ],
     "security": []
   },
   "releases": [

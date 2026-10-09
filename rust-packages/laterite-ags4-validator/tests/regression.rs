@@ -671,6 +671,7 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
         "FYI (Related to Rule 16)",
         "FYI (Related to Rule 18)",
         "FYI (Related to Rule 10c)",
+        "Warning (Related to Rule 8)",
         "Warning (Related to Rule 10c)",
         "Warning (Related to Rule 18)",
         // The custom-overlay buckets (laterite-dev#568, tiered by #321). No fixture in this

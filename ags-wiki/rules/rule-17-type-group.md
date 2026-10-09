@@ -61,7 +61,7 @@ timeline
 ```
 
 - Edition deltas (spec text): **none** — see [[ags4-rules-frozen-dictionary-evolves]].
-- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type; python-ags4 has no equivalent.
+- Divergence (Rust↔python): [[O-59]] — laterite adds an FYI when a standard heading's declared TYPE differs from the dictionary edition's type, a WARNING when that heading is KEY; python-ags4 has no equivalent.
 
 ## Related
 [[rule-families]] · [[traceability-chain]] · [[parity-model]] · [[ags-4.2]] · [[dec-ags4-merge-semantics]] · [[O-59]]
