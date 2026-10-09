@@ -238,6 +238,14 @@ def test_compat_strict_pre_check_reports_physical_lines(tmp_path, tail, message)
         AGS4.AGS4_to_dict(str(bad))
 
 
+def test_compat_strict_pre_check_counts_a_lone_cr_in_a_buffer():
+    """A buffer is read without open()'s newline translation, so an embedded
+    lone CR must still count as the line break it is (#1052)."""
+    src = _SPANNING_PROJ.replace("two\r\nlines", "two\rlines") + '"GROUP","PROJ"\r\n'
+    with pytest.raises(AGS4.AGS4Error, match=r"duplicated in Line 8 "):
+        AGS4.AGS4_to_dict(io.StringIO(src))
+
+
 def test_compat_strict_pre_check_raises_on_ragged_data_row(tmp_path):
     """compat enforces python-ags4 strictness: DATA row with field count
     ≠ HEADING raises AGS4Error (native parser would silently pad/trim)."""

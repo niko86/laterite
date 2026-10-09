@@ -71,10 +71,10 @@ impl Span {
 }
 
 /// One source record — a physical line, or several when a quoted field
-/// spans a newline (O-47 keeps that one record). Always retained — a line is a [`Span`] over a
-/// buffer the parse keeps anyway, so the old opt-in overlay collapsed into
-/// the base model — except under [`ParseOptions::locate_only`], which
-/// retains no text at all.
+/// spans a newline (O-47 keeps that one record). Always retained — a line
+/// is a [`Span`] over a buffer the parse keeps anyway, so the old opt-in
+/// overlay collapsed into the base model — except under
+/// [`ParseOptions::locate_only`], which retains no text at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawLine {
     /// 1-indexed PHYSICAL line the record starts on, matching how editors +
@@ -325,7 +325,7 @@ pub struct ParsedFile {
     /// Every record, in source order — empty only under
     /// [`ParseOptions::locate_only`].
     pub raw_lines: Vec<RawLine>,
-    /// Source byte offset of each physical line's start in the ORIGINAL
+    /// Source byte offset of each record's start in the ORIGINAL
     /// bytes (BOM included — byte 0 is genuinely byte 0), parallel to
     /// `raw_lines`. PROFILE-GATED: filled only under
     /// [`ParseOptions::retain_source_offsets`], empty under `validating()`.
@@ -353,8 +353,8 @@ impl ParsedFile {
         line.text.slice(&self.text)
     }
 
-    /// Source byte offset of physical line `i` (0-based index into
-    /// `raw_lines`), if this parse's profile retained the per-line
+    /// Source byte offset of record `i` (0-based index into `raw_lines`,
+    /// NOT a line number — see [`RawLine::number`]), if this parse's profile retained the per-line
     /// source-byte coordinate ([`ParseOptions::retain_source_offsets`]).
     #[must_use]
     pub fn line_byte_offset(&self, i: usize) -> Option<u64> {
@@ -746,7 +746,9 @@ fn next_line(bytes: &[u8], start: usize) -> (LineSpan, u32) {
                         if starts_with_descriptor(bytes, terminator_end(bytes, j)) {
                             return (terminate_at(bytes, start, j), embedded);
                         }
-                        // A `\r` whose `\n` follows is counted at the `\n`.
+                        // A `\r` whose `\n` follows is counted at the `\n`
+                        // — the rule `embedded_newlines` restates for the
+                        // builder; a unit test holds the two together.
                         if bytes[j] == b'\n' || bytes.get(j + 1) != Some(&b'\n') {
                             embedded += 1;
                         }
@@ -1408,3 +1410,36 @@ pub fn field_span(line: &str, field_index: u32) -> Option<(u32, u32)> {
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 mod readme_doctests {}
+
+#[cfg(test)]
+mod tests {
+    use super::{embedded_newlines, numbered_line_spans};
+    use proptest::prelude::*;
+
+    proptest! {
+        /// The walk counts embedded newlines as it goes; the builder counts a
+        /// body it authored with `embedded_newlines`. Two statements of one
+        /// rule can drift, so every record's line must be the last one's plus
+        /// one plus what its body embeds — on input that includes unterminated
+        /// quotes and the descriptor backstop, not just well-formed rows.
+        #[test]
+        fn the_walk_and_the_helper_count_embedded_newlines_alike(
+            parts in prop::collection::vec(
+                prop_oneof![
+                    Just("\""), Just(","), Just("\r"), Just("\n"), Just("\r\n"),
+                    Just("a"), Just("\"DATA\""),
+                ],
+                0..40,
+            )
+        ) {
+            let src = parts.concat();
+            let bytes = src.as_bytes();
+            let spans: Vec<_> = numbered_line_spans(bytes).collect();
+            for pair in spans.windows(2) {
+                let ((line, span), (next, _)) = (pair[0], pair[1]);
+                let body = &bytes[span.start..span.body_end];
+                prop_assert_eq!(next, line + 1 + embedded_newlines(body), "{:?}", src);
+            }
+        }
+    }
+}

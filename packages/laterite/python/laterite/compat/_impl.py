@@ -173,7 +173,10 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
     # data fields to be quoted, so embedded commas are common in DESC
     # columns). A naïve split() would mis-count fields and fire false
     # ragged-row raises on legitimate files.
-    reader = csv.reader(io.StringIO(text), strict=False)
+    # newline=None splits on a lone CR as well, as open() already did for a
+    # path, so a buffer counts lines the same way. Only field COUNTS are read
+    # here, so the translated newlines inside a field change nothing.
+    reader = csv.reader(io.StringIO(text, newline=None), strict=False)
     # The record's PHYSICAL start line, as python-ags4 reports it: one past
     # the lines the reader had consumed before it. Counting records falls
     # short after a quoted field spanning a newline (#1052).
