@@ -748,6 +748,20 @@ jobs:
         # --all-targets lints tests/benches/examples too, not just lib/bin code.
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # `tui` is not a default feature, so the step above never compiles the
+      # check view behind it, and four warnings sat there unseen (#1054). Not a
+      # blanket --all-features: the wasm crate's features exclude each other
+      # (see its per-feature loop below).
+      - name: cargo clippy (laterite-cli, feature gates)
+        working-directory: rust-packages
+        run: |
+          set -euo pipefail
+          for f in tui; do
+            echo "::group::laterite-cli --features $f"
+            cargo clippy -p laterite-cli --features "$f" --all-targets -- -D warnings
+            echo "::endgroup::"
+          done
+
       # Nothing ran `cargo doc` at all until #748, so rustdoc warnings
       # accumulated silently and indefinitely — 62 of them across 14 crates by
       # the time anyone looked, the substantive class being public documentation
