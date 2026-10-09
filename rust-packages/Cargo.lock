@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
@@ -2179,7 +2179,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.14.1"
+version = "0.14.2"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "arrow",
  "criterion",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-merge"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
@@ -2269,7 +2269,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parse"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-reference"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "chrono",
  "criterion",
