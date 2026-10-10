@@ -232,8 +232,31 @@ def test_the_render_parser_nets_a_changed_item_like_the_text_diff():
         "+impl core::marker::Send for demo::Foo",
     ]
     added, removed, names = rs.net_delta(out)
-    assert (added, removed) == (2, 2)
+    # The `+impl` counts too (#1023): an added auto-trait impl is API.
+    assert (added, removed) == (3, 2)
     assert names == ["pub fn demo::f(u8)", "pub fn demo::gone()"]
+
+
+# --- impl lines are API: a method-less impl has no `pub fn` to count (#1023) ---
+
+
+def test_an_added_method_less_impl_is_an_addition_and_cuts_a_minor():
+    """`Copy` brings no method line, so counting only `pub` lines cut it as a
+    patch while the 0.x mapping requires a minor for any addition."""
+    added, removed, _ = rs.net_delta(["+impl core::marker::Copy for demo::X"])
+    assert (added, removed) == (1, 0)
+    assert rs.required_part(added, removed, True, False) == "minor"
+
+
+def test_an_impl_removed_and_re_added_verbatim_nets_to_zero():
+    line = "impl core::marker::Copy for demo::X"
+    assert rs.net_delta([f"-{line}", f"+{line}"]) == (0, 0, [])
+
+
+def test_a_removed_impl_is_a_removal_and_is_named():
+    added, removed, names = rs.net_delta(["-impl core::cmp::Eq for demo::X"])
+    assert (added, removed) == (0, 1)
+    assert names == ["impl core::cmp::Eq for demo::X"]
 
 
 # --- the source is reported on every run ---
