@@ -376,15 +376,20 @@ jobs:
         if: vars.ENGINE_CUT_MODE == 'pr'
         run: |
           uv run --no-project python tools/release/engine_cut.py --bumps /tmp/status.json > /tmp/bumps.txt
-          if [ ! -s /tmp/bumps.txt ]; then
+          while read -r crate part; do
+            uv run --no-project python tools/release/bump_crate.py "$crate" "$part"
+          done < /tmp/bumps.txt
+          # The coherence cascade (#1043): a moved floor strands the published
+          # crates pinning it, and each patch that fixes one can strand the
+          # next. The loop and its stop rules live in engine_cut.py, where they
+          # are tested; a stuck cascade exits non-zero here, so no PR opens.
+          uv run --no-project python tools/release/engine_cut.py --cascade > /tmp/cascade.txt
+          if [ ! -s /tmp/bumps.txt ] && [ ! -s /tmp/cascade.txt ]; then
             echo "no bumps owed"
             echo "any=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "any=true" >> "$GITHUB_OUTPUT"
-          while read -r crate part; do
-            uv run --no-project python tools/release/bump_crate.py "$crate" "$part"
-          done < /tmp/bumps.txt
           {
             echo "✅ Based on \`main\` — safe to merge."
             echo ""
@@ -393,6 +398,12 @@ jobs:
             echo '```'
             cat /tmp/report.txt
             echo '```'
+            if [ -s /tmp/cascade.txt ]; then
+              echo ""
+              echo '```'
+              cat /tmp/cascade.txt
+              echo '```'
+            fi
             echo ""
             echo "One PR for the whole owed set, rebuilt from current main each night."
           } > /tmp/pr-body.md
