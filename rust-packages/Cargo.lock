@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "chrono",
  "criterion",
