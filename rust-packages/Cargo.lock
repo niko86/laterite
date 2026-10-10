@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.20.2"
+version = "0.20.3"
 dependencies = [
  "arrow",
  "criterion",
@@ -2238,7 +2238,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-hostopts"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "encoding_rs",
  "laterite-ags4-emit",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.18.3"
+version = "0.18.4"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "chrono",
  "criterion",
