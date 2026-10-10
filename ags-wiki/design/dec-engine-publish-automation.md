@@ -234,6 +234,16 @@ equivalent per-stamp PR review.
     sparse-index rows carry each version's requirement ranges, so the cut
     derives it, and ci.yml's repo-gates run the same check per PR,
     failing only debt the PR introduces.
+  - **The cascade a cut causes is applied in the same run (#1043,
+    2026-10-10).** The derivation above reads the registry as it stands, so
+    it cannot see the pins a bump made *that night* strands. Those were
+    pushed onto the cut branch by hand (#953: three patches; #1031: two
+    rounds; #1065: three) and thrown away by the next nightly rebuild.
+    `repo:tools/release/engine_cut.py`'s `--cascade` now runs the coherence
+    reading after the owed bumps, patches every crate it names, and repeats.
+    At most one round per published engine crate: a round that adds no new
+    crate, or the limit, fails the job before the PR step. The cut PR lists
+    the cascade apart from the owed bumps, each with the floor that caused it.
   - **Publish dispatch is automatic nightly** for stamped-but-absent crates,
     cancelling any stale pending run first — a pending approval publishes
     `main` as of *approval* time, so nightly re-dispatch bounds that staleness

@@ -372,3 +372,162 @@ def test_stamp_of_version_finds_the_commit_that_set_the_line():
 def test_a_version_never_stamped_resolves_to_nothing():
     manifest = REPO / "rust-packages" / "laterite-ags4-emit" / "Cargo.toml"
     assert rs.stamp_of_version(manifest, "9.9.9") == ""
+
+
+# --- the coherence cascade: the cut applies it, round by round (#1043) ---
+
+REF, CORE, DIFF = "laterite-ags4-reference", "laterite-ags4-core", "laterite-ags4-diff"
+EMIT, MERGE, VAL = (
+    "laterite-ags4-emit",
+    "laterite-ags4-merge",
+    "laterite-ags4-validator",
+)
+
+
+class _World:
+    """A registry whose stranded set answers to what has been bumped so far.
+
+    `rounds` maps "every crate bumped so far" to the debt the check names
+    next — the shape #1031 had to walk by hand, replayed without a network.
+    """
+
+    def __init__(self, rounds: list[tuple[set[str], list[tuple[str, str]]]]):
+        self.rounds = rounds
+        self.bumped: list[str] = []
+
+    def stranded(self) -> list[tuple[str, str]]:
+        done = set(self.bumped)
+        for after, debt in self.rounds:
+            if after == done:
+                return debt
+        return []
+
+    def bump(self, crate: str) -> None:
+        self.bumped.append(crate)
+
+
+def _1031() -> _World:
+    return _World(
+        [
+            (
+                set(),
+                [
+                    (CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0"),
+                    (DIFF, f"{REF} ^0.15.0 left behind by floor 0.16.0"),
+                ],
+            ),
+            (
+                {CORE, DIFF},
+                [
+                    (EMIT, f"{CORE} ^0.16.0 left behind by floor 0.17.1"),
+                    (MERGE, f"{DIFF} ^0.13.0 left behind by floor 0.14.1"),
+                    (VAL, f"{CORE} ^0.16.0 left behind by floor 0.17.1"),
+                ],
+            ),
+        ]
+    )
+
+
+def test_the_cascade_replays_1031s_two_rounds_in_one_run():
+    """Reference's minor strands core + diff; their patches strand emit, merge
+    and validator. #1031 needed a human for each round; one run does both."""
+    world = _1031()
+    applied = ec.cascade(world.stranded, world.bump, limit=12)
+    assert world.bumped == [CORE, DIFF, EMIT, MERGE, VAL]
+    assert [(b.crate, b.round) for b in applied] == [
+        (CORE, 1),
+        (DIFF, 1),
+        (EMIT, 2),
+        (MERGE, 2),
+        (VAL, 2),
+    ]
+    # Each bump says whose moved floor made it necessary.
+    assert applied[2].because == (f"{CORE} ^0.16.0 left behind by floor 0.17.1",)
+
+
+def test_nothing_stranded_bumps_nothing():
+    """A cut with no stranded pin behaves exactly as before the cascade."""
+    world = _World([])
+    assert ec.cascade(world.stranded, world.bump, limit=12) == []
+    assert world.bumped == []
+
+
+def test_a_round_that_adds_no_new_crate_is_stuck_and_names_the_debt():
+    """Bumping a crate that is demanded again did not clear it — another lap
+    would loop forever, so the cut fails loudly instead of opening a PR."""
+    world = _World(
+        [
+            (set(), [(CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0")]),
+            ({CORE}, [(CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0")]),
+        ]
+    )
+    with pytest.raises(ec.CascadeStuck) as stuck:
+        ec.cascade(world.stranded, world.bump, limit=12)
+    assert stuck.value.demanded == [CORE]
+    assert "no new crate" in str(stuck.value)
+    assert world.bumped == [CORE]
+
+
+def test_the_round_limit_fails_with_the_debt_still_owed():
+    world = _1031()
+    with pytest.raises(ec.CascadeStuck) as stuck:
+        ec.cascade(world.stranded, world.bump, limit=1)
+    assert stuck.value.demanded == [EMIT, MERGE, VAL]
+    assert "limit" in str(stuck.value)
+
+
+def test_the_limit_is_the_published_engine_crate_count(monkeypatch):
+    monkeypatch.setattr(rs, "engine_crates", lambda: [CORE, DIFF, "laterite"])
+    monkeypatch.setattr(
+        rs, "release_tier", lambda c: "product" if c == "laterite" else "engine"
+    )
+    assert ec.cascade_limit() == 2
+
+
+def test_the_cascade_section_names_round_and_cause():
+    world = _1031()
+    text = ec.render_cascade(ec.cascade(world.stranded, world.bump, limit=12))
+    assert "coherence cascade" in text
+    assert f"{EMIT} patch" in text and "round 2" in text
+    assert f"{CORE} ^0.16.0 left behind by floor 0.17.1" in text
+    assert ec.render_cascade([]) == ""
+
+
+def test_coherence_reading_returns_the_debt_it_prints(monkeypatch):
+    """The cascade reads the gate's own answer — the check stays the one
+    authority on what is stranded, never a second derivation."""
+    monkeypatch.setattr(rs, "engine_crates", lambda: [DIFF])
+    monkeypatch.setattr(rs, "release_tier", lambda c: "engine")
+    monkeypatch.setattr(rs, "version_of", lambda *a: "0.11.0")
+    monkeypatch.setattr(rs, "workspace_floors", lambda text=None: {REF: "0.12.0"})
+    fetch = _fetch_for({DIFF: [_row("0.11.0", [(REF, "^0.11.0")])]})
+    reading = rs.coherence_reading(fetch, None)
+    assert reading.introduced == [(DIFF, f"{REF} ^0.11.0 left behind by floor 0.12.0")]
+    assert (reading.asked, reading.unreachable, reading.standing) == (1, 0, 0)
+
+
+def test_a_stuck_cascade_exits_4_with_no_pr_body(capsys, monkeypatch):
+    """The job's guarantee, not just the loop's: a stuck cascade prints no PR
+    section on stdout and exits non-zero, so the PR step never runs."""
+    debt = [(CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0")]
+    reading = rs.Coherence(introduced=debt, standing=0, unreachable=0, asked=1)
+    monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
+    monkeypatch.setattr(ec, "_bump_patch", lambda crate: None)
+    monkeypatch.setattr(ec, "cascade_limit", lambda: 12)
+    monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
+    assert ec.main() == ec.EXIT_CASCADE_STUCK
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert (
+        f"cascade stuck: round 2 added no new crate; still demanded: {CORE}" in out.err
+    )
+
+
+def test_the_cascade_reports_its_scope_every_round(capsys, monkeypatch):
+    reading = rs.Coherence(introduced=[], standing=0, unreachable=3, asked=9)
+    monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
+    monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
+    assert ec.main() == 0
+    err = capsys.readouterr().err
+    assert "9 published engine crate(s) asked, 3 unreachable" in err
+    assert "concluding nothing" in err

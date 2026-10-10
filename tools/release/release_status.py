@@ -1078,23 +1078,29 @@ def render_cut(s: Report) -> str:
     return "\n".join(lines)
 
 
-def check_coherence(
-    fetch: Callable[[str], list[dict] | None], base_manifest_text: str | None
-) -> int:
-    """The PR gate for #809's class: a floor may not move past a published pin.
+@dataclass(frozen=True)
+class Coherence:
+    """One coherence reading: the stranded `(crate, reason)` pairs and its scope.
 
-    Fails (1) only on debt this tree INTRODUCES relative to the base manifest —
-    standing debt is the nightly cut's to fix, and a gate that reddens every PR
-    over someone else's debt is a gate that gets skipped. With no base, all
-    debt counts (the nightly's absolute reading). An unreachable registry
-    concludes nothing and fails nothing, out loud — the scope line prints on
-    every run, pass or fail.
+    The gate prints it and the nightly cut's cascade (#1043) acts on it, so
+    both read one derivation rather than the cascade re-deriving the debt.
     """
+
+    introduced: list[tuple[str, str]]
+    standing: int
+    unreachable: int
+    asked: int
+
+
+def coherence_reading(
+    fetch: Callable[[str], list[dict] | None], base_manifest_text: str | None
+) -> Coherence:
+    """Which published crates this tree's floors strand — see `check_coherence`."""
     floors = workspace_floors()
     base_floors = (
         workspace_floors(base_manifest_text) if base_manifest_text is not None else {}
     )
-    introduced: list[str] = []
+    introduced: list[tuple[str, str]] = []
     standing = unreachable = asked = 0
     for crate in engine_crates():
         if release_tier(crate) != "engine":
@@ -1116,7 +1122,25 @@ def check_coherence(
             else set()
         )
         standing += len(set(now) & before)
-        introduced += (f"{crate}: {d}" for d in now if d not in before)
+        introduced += ((crate, d) for d in now if d not in before)
+    return Coherence(introduced, standing, unreachable, asked)
+
+
+def check_coherence(
+    fetch: Callable[[str], list[dict] | None], base_manifest_text: str | None
+) -> int:
+    """The PR gate for #809's class: a floor may not move past a published pin.
+
+    Fails (1) only on debt this tree INTRODUCES relative to the base manifest —
+    standing debt is the nightly cut's to fix, and a gate that reddens every PR
+    over someone else's debt is a gate that gets skipped. With no base, all
+    debt counts (the nightly's absolute reading). An unreachable registry
+    concludes nothing and fails nothing, out loud — the scope line prints on
+    every run, pass or fail.
+    """
+    reading = coherence_reading(fetch, base_manifest_text)
+    standing, unreachable, asked = reading.standing, reading.unreachable, reading.asked
+    introduced = [f"{crate}: {d}" for crate, d in reading.introduced]
     print(
         f"coherence: {asked} published engine crate(s) asked, {unreachable} unreachable"
         + (
