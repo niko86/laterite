@@ -180,12 +180,14 @@ def main() -> int:
 
         def stranded() -> list[tuple[str, str]]:
             reading = rs.coherence_reading(fetch, None)
-            if reading.unreachable:
-                print(
-                    f"cascade: {reading.unreachable} crate(s) unreachable — "
-                    "this pass concludes nothing for them",
-                    file=sys.stderr,
-                )
+            # Every round, clean or not: a registry that answered for nobody
+            # would otherwise read as "nothing stranded" and open the PR.
+            print(
+                f"cascade: {reading.asked} published engine crate(s) asked, "
+                f"{reading.unreachable} unreachable"
+                + (" — concluding nothing for those" if reading.unreachable else ""),
+                file=sys.stderr,
+            )
             return reading.introduced
 
         try:

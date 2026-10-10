@@ -485,8 +485,8 @@ def test_the_limit_is_the_published_engine_crate_count(monkeypatch):
 
 
 def test_the_cascade_section_names_round_and_cause():
-    applied = ec.cascade(*(lambda w: (w.stranded, w.bump))(_1031()), limit=12)
-    text = ec.render_cascade(applied)
+    world = _1031()
+    text = ec.render_cascade(ec.cascade(world.stranded, world.bump, limit=12))
     assert "coherence cascade" in text
     assert f"{EMIT} patch" in text and "round 2" in text
     assert f"{CORE} ^0.16.0 left behind by floor 0.17.1" in text
@@ -504,3 +504,30 @@ def test_coherence_reading_returns_the_debt_it_prints(monkeypatch):
     reading = rs.coherence_reading(fetch, None)
     assert reading.introduced == [(DIFF, f"{REF} ^0.11.0 left behind by floor 0.12.0")]
     assert (reading.asked, reading.unreachable, reading.standing) == (1, 0, 0)
+
+
+def test_a_stuck_cascade_exits_4_with_no_pr_body(capsys, monkeypatch):
+    """The job's guarantee, not just the loop's: a stuck cascade prints no PR
+    section on stdout and exits non-zero, so the PR step never runs."""
+    debt = [(CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0")]
+    reading = rs.Coherence(introduced=debt, standing=0, unreachable=0, asked=1)
+    monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
+    monkeypatch.setattr(ec, "_bump_patch", lambda crate: None)
+    monkeypatch.setattr(ec, "cascade_limit", lambda: 12)
+    monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
+    assert ec.main() == ec.EXIT_CASCADE_STUCK
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert (
+        f"cascade stuck: round 2 added no new crate; still demanded: {CORE}" in out.err
+    )
+
+
+def test_the_cascade_reports_its_scope_every_round(capsys, monkeypatch):
+    reading = rs.Coherence(introduced=[], standing=0, unreachable=3, asked=9)
+    monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
+    monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
+    assert ec.main() == 0
+    err = capsys.readouterr().err
+    assert "9 published engine crate(s) asked, 3 unreachable" in err
+    assert "concluding nothing" in err
