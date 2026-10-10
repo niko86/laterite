@@ -42,7 +42,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import datetime
+import datetime as dt
 import importlib.util
 import json
 import sys
@@ -85,7 +85,7 @@ def build_manifest(
     rungs.sort(key=lambda r: r["bytes"])
     return {
         "schema": LADDER_SCHEMA,
-        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "forge": {"scaffold": scaffold, "seed": seed},
         "rungs": rungs,
     }

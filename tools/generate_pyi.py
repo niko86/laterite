@@ -51,7 +51,7 @@ def _py_type(ags_type: str) -> str:
     if t == "0DP":
         return "int"
     if t == "DT":
-        return "_dt.datetime"
+        return "dt.datetime"
     if t == "YN":
         return "bool"
     if t == "RL":
@@ -239,7 +239,7 @@ def generate() -> str:
         "\n"
         "from __future__ import annotations\n"
         "\n"
-        "import datetime as _dt\n"
+        "import datetime as dt\n"
         "from typing import Any\n"
         "\n"
     )

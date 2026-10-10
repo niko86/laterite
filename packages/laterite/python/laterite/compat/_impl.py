@@ -29,7 +29,7 @@ https://gitlab.com/ags-data-format-wg/ags-python-library
 from __future__ import annotations
 
 import contextlib
-import datetime
+import datetime as dt
 import hashlib
 import warnings
 from pathlib import Path
@@ -961,7 +961,7 @@ def check_file(
         "Metadata",
         "Time (UTC)",
         "",
-        datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
+        dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%S"),
     )
     add("Metadata", "File encoding", "", encoding)
 

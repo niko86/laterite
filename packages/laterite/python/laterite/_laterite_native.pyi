@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-import datetime as _dt
+import datetime as dt
 from typing import Any
 
 class AAVT:
@@ -386,7 +386,7 @@ class ARTW:
     artw_md2: float | None
     artw_mde: int | None
     artw_mds: int | None
-    artw_date: _dt.datetime | None
+    artw_date: dt.datetime | None
     artw_rem: str | None
     artw_meth: str | None
     artw_lab: str | None
@@ -413,7 +413,7 @@ class ARTW:
         artw_md2: float | None = ...,
         artw_mde: int | None = ...,
         artw_mds: int | None = ...,
-        artw_date: _dt.datetime | None = ...,
+        artw_date: dt.datetime | None = ...,
         artw_rem: str | None = ...,
         artw_meth: str | None = ...,
         artw_lab: str | None = ...,
@@ -574,7 +574,7 @@ class BKFL:
     bkfl_base: float | None
     bkfl_desc: str | None
     bkfl_leg: str | None
-    bkfl_date: _dt.datetime | None
+    bkfl_date: dt.datetime | None
     bkfl_rem: str | None
     file_fset: str | None
     def __init__(
@@ -585,7 +585,7 @@ class BKFL:
         bkfl_base: float | None = ...,
         bkfl_desc: str | None = ...,
         bkfl_leg: str | None = ...,
-        bkfl_date: _dt.datetime | None = ...,
+        bkfl_date: dt.datetime | None = ...,
         bkfl_rem: str | None = ...,
         file_fset: str | None = ...,
     ) -> None: ...
@@ -749,7 +749,7 @@ class CHIS:
     chis_from: float | None
     chis_to: float | None
     chis_time: str | None
-    chis_star: _dt.datetime | None
+    chis_star: dt.datetime | None
     chis_tool: str | None
     chis_rem: str | None
     file_fset: str | None
@@ -760,7 +760,7 @@ class CHIS:
         chis_from: float | None = ...,
         chis_to: float | None = ...,
         chis_time: str | None = ...,
-        chis_star: _dt.datetime | None = ...,
+        chis_star: dt.datetime | None = ...,
         chis_tool: str | None = ...,
         chis_rem: str | None = ...,
         file_fset: str | None = ...,
@@ -777,7 +777,7 @@ class CHOC:
     choc_ref: str | None
     choc_from: str | None
     choc_to: str | None
-    choc_ddis: _dt.datetime | None
+    choc_ddis: dt.datetime | None
     choc_btch: str | None
     choc_rem: str | None
     choc_cont: int | None
@@ -793,7 +793,7 @@ class CHOC:
         choc_ref: str | None = ...,
         choc_from: str | None = ...,
         choc_to: str | None = ...,
-        choc_ddis: _dt.datetime | None = ...,
+        choc_ddis: dt.datetime | None = ...,
         choc_btch: str | None = ...,
         choc_rem: str | None = ...,
         choc_cont: int | None = ...,
@@ -1066,7 +1066,7 @@ class CPDG:
     cpdg_cv: float | None
     cpdg_cvmt: str | None
     cpdg_rem: str | None
-    cpdg_date: _dt.datetime | None
+    cpdg_date: dt.datetime | None
     cpdg_oper: str | None
     cpdg_anby: str | None
     test_stat: str | None
@@ -1092,7 +1092,7 @@ class CPDG:
         cpdg_cv: float | None = ...,
         cpdg_cvmt: str | None = ...,
         cpdg_rem: str | None = ...,
-        cpdg_date: _dt.datetime | None = ...,
+        cpdg_date: dt.datetime | None = ...,
         cpdg_oper: str | None = ...,
         cpdg_anby: str | None = ...,
         test_stat: str | None = ...,
@@ -1140,7 +1140,7 @@ class CPTG:
     loca_id: str | None
     cptg_tesn: str | None
     cptg_type: str | None
-    cptg_date: _dt.datetime | None
+    cptg_date: dt.datetime | None
     cptg_ped: float | None
     cptg_rate: int | None
     cptg_ornt: int | None
@@ -1166,8 +1166,8 @@ class CPTG:
     cptg_fpc: float | None
     cptg_upc: float | None
     cptg_cpcl: str | None
-    cptg_crdt: _dt.datetime | None
-    cptg_cddt: _dt.datetime | None
+    cptg_crdt: dt.datetime | None
+    cptg_cddt: dt.datetime | None
     cptg_lca: str | None
     cptg_filt: str | None
     cptg_fric: bool | None
@@ -1198,7 +1198,7 @@ class CPTG:
         loca_id: str | None = ...,
         cptg_tesn: str | None = ...,
         cptg_type: str | None = ...,
-        cptg_date: _dt.datetime | None = ...,
+        cptg_date: dt.datetime | None = ...,
         cptg_ped: float | None = ...,
         cptg_rate: int | None = ...,
         cptg_ornt: int | None = ...,
@@ -1224,8 +1224,8 @@ class CPTG:
         cptg_fpc: float | None = ...,
         cptg_upc: float | None = ...,
         cptg_cpcl: str | None = ...,
-        cptg_crdt: _dt.datetime | None = ...,
-        cptg_cddt: _dt.datetime | None = ...,
+        cptg_crdt: dt.datetime | None = ...,
+        cptg_cddt: dt.datetime | None = ...,
         cptg_lca: str | None = ...,
         cptg_filt: str | None = ...,
         cptg_fric: bool | None = ...,
@@ -1399,7 +1399,7 @@ class CPTT:
     cptt_u3: float | None
     cptt_incx: float | None
     cptt_incy: float | None
-    cptt_time: _dt.datetime | None
+    cptt_time: dt.datetime | None
     cptt_dur: float | None
     cptt_tf: float | None
     cptt_rf: float | None
@@ -1451,7 +1451,7 @@ class CPTT:
         cptt_u3: float | None = ...,
         cptt_incx: float | None = ...,
         cptt_incy: float | None = ...,
-        cptt_time: _dt.datetime | None = ...,
+        cptt_time: dt.datetime | None = ...,
         cptt_dur: float | None = ...,
         cptt_tf: float | None = ...,
         cptt_rf: float | None = ...,
@@ -1672,7 +1672,7 @@ class CTRD:
     spec_dpth: float | None
     ctrc_tesn: str | None
     ctrp_cyc: int | None
-    ctrd_time: _dt.datetime | None
+    ctrd_time: dt.datetime | None
     ctrd_cond: str | None
     ctrd_sdia: float | None
     ctrd_high: float | None
@@ -1712,7 +1712,7 @@ class CTRD:
         spec_dpth: float | None = ...,
         ctrc_tesn: str | None = ...,
         ctrp_cyc: int | None = ...,
-        ctrd_time: _dt.datetime | None = ...,
+        ctrd_time: dt.datetime | None = ...,
         ctrd_cond: str | None = ...,
         ctrd_sdia: float | None = ...,
         ctrd_high: float | None = ...,
@@ -1948,7 +1948,7 @@ class CTRS:
 
 class DCPG:
     loca_id: str | None
-    dcpg_date: _dt.datetime | None
+    dcpg_date: dt.datetime | None
     dcpg_tesn: str | None
     dcpg_dpth: float | None
     dcpg_zero: int | None
@@ -1966,7 +1966,7 @@ class DCPG:
         self,
         *,
         loca_id: str | None = ...,
-        dcpg_date: _dt.datetime | None = ...,
+        dcpg_date: dt.datetime | None = ...,
         dcpg_tesn: str | None = ...,
         dcpg_dpth: float | None = ...,
         dcpg_zero: int | None = ...,
@@ -1986,7 +1986,7 @@ class DCPG:
 
 class DCPT:
     loca_id: str | None
-    dcpg_date: _dt.datetime | None
+    dcpg_date: dt.datetime | None
     dcpg_tesn: str | None
     dcpg_dpth: float | None
     dcpt_cblo: int | None
@@ -1997,7 +1997,7 @@ class DCPT:
         self,
         *,
         loca_id: str | None = ...,
-        dcpg_date: _dt.datetime | None = ...,
+        dcpg_date: dt.datetime | None = ...,
         dcpg_tesn: str | None = ...,
         dcpg_dpth: float | None = ...,
         dcpt_cblo: int | None = ...,
@@ -2149,7 +2149,7 @@ class DMDG:
     dmdg_mhmt: str | None
     dmdg_kh: float | None
     dmdg_khmt: str | None
-    dmdg_date: _dt.datetime | None
+    dmdg_date: dt.datetime | None
     test_stat: str | None
     dmdg_rem: str | None
     file_fset: str | None
@@ -2167,7 +2167,7 @@ class DMDG:
         dmdg_mhmt: str | None = ...,
         dmdg_kh: float | None = ...,
         dmdg_khmt: str | None = ...,
-        dmdg_date: _dt.datetime | None = ...,
+        dmdg_date: dt.datetime | None = ...,
         test_stat: str | None = ...,
         dmdg_rem: str | None = ...,
         file_fset: str | None = ...,
@@ -2201,7 +2201,7 @@ class DMDT:
 class DMTG:
     loca_id: str | None
     dmtg_tesn: str | None
-    dmtg_date: _dt.datetime | None
+    dmtg_date: dt.datetime | None
     dmtg_ornt: int | None
     dmtg_ped: float | None
     dmtg_wat: float | None
@@ -2242,7 +2242,7 @@ class DMTG:
         *,
         loca_id: str | None = ...,
         dmtg_tesn: str | None = ...,
-        dmtg_date: _dt.datetime | None = ...,
+        dmtg_date: dt.datetime | None = ...,
         dmtg_ornt: int | None = ...,
         dmtg_ped: float | None = ...,
         dmtg_wat: float | None = ...,
@@ -2379,7 +2379,7 @@ class DMTT:
     dmtt_mth: int | None
     dmtt_bcva: float | None
     dmtt_bcvb: float | None
-    dmtt_tmst: _dt.datetime | None
+    dmtt_tmst: dt.datetime | None
     dmtt_a: float | None
     dmtt_tma: float | None
     dmtt_b: float | None
@@ -2404,7 +2404,7 @@ class DMTT:
         dmtt_mth: int | None = ...,
         dmtt_bcva: float | None = ...,
         dmtt_bcvb: float | None = ...,
-        dmtt_tmst: _dt.datetime | None = ...,
+        dmtt_tmst: dt.datetime | None = ...,
         dmtt_a: float | None = ...,
         dmtt_tma: float | None = ...,
         dmtt_b: float | None = ...,
@@ -2427,7 +2427,7 @@ class DMTT:
 class DMTZ:
     loca_id: str | None
     dmtg_tesn: str | None
-    dmtz_date: _dt.datetime | None
+    dmtz_date: dt.datetime | None
     dmtz_type: str | None
     dmtz_bcva: float | None
     dmtz_bcvb: float | None
@@ -2438,7 +2438,7 @@ class DMTZ:
         *,
         loca_id: str | None = ...,
         dmtg_tesn: str | None = ...,
-        dmtz_date: _dt.datetime | None = ...,
+        dmtz_date: dt.datetime | None = ...,
         dmtz_type: str | None = ...,
         dmtz_bcva: float | None = ...,
         dmtz_bcvb: float | None = ...,
@@ -2454,8 +2454,8 @@ class DOBS:
     dobs_base: float | None
     dobs_set: str | None
     dobs_durn: str | None
-    dobs_stim: _dt.datetime | None
-    dobs_etim: _dt.datetime | None
+    dobs_stim: dt.datetime | None
+    dobs_etim: dt.datetime | None
     dobs_dhrt: float | None
     dobs_dhrs: int | None
     dobs_penr: float | None
@@ -2482,8 +2482,8 @@ class DOBS:
         dobs_base: float | None = ...,
         dobs_set: str | None = ...,
         dobs_durn: str | None = ...,
-        dobs_stim: _dt.datetime | None = ...,
-        dobs_etim: _dt.datetime | None = ...,
+        dobs_stim: dt.datetime | None = ...,
+        dobs_etim: dt.datetime | None = ...,
         dobs_dhrt: float | None = ...,
         dobs_dhrs: int | None = ...,
         dobs_penr: float | None = ...,
@@ -2537,7 +2537,7 @@ class DPRB:
 class DPRG:
     loca_id: str | None
     dprg_tesn: str | None
-    dprg_date: _dt.datetime | None
+    dprg_date: dt.datetime | None
     dprg_type: str | None
     dprg_meth: str | None
     dprg_mass: float | None
@@ -2567,7 +2567,7 @@ class DPRG:
         *,
         loca_id: str | None = ...,
         dprg_tesn: str | None = ...,
-        dprg_date: _dt.datetime | None = ...,
+        dprg_date: dt.datetime | None = ...,
         dprg_type: str | None = ...,
         dprg_meth: str | None = ...,
         dprg_mass: float | None = ...,
@@ -2680,16 +2680,16 @@ class ELRG:
     elrg_casc: str | None
     elrg_ticp: int | None
     elrg_tict: int | None
-    elrg_rdat: _dt.datetime | None
+    elrg_rdat: dt.datetime | None
     elrg_sgrp: str | None
-    elrg_dtim: _dt.datetime | None
+    elrg_dtim: dt.datetime | None
     elrg_test: str | None
     elrg_tord: str | None
     elrg_locn: str | None
     elrg_bas: str | None
     elrg_dil: int | None
     elrg_lmth: str | None
-    elrg_ldtm: _dt.datetime | None
+    elrg_ldtm: dt.datetime | None
     elrg_iref: str | None
     elrg_ityp: str | None
     elrg_size: int | None
@@ -2741,16 +2741,16 @@ class ELRG:
         elrg_casc: str | None = ...,
         elrg_ticp: int | None = ...,
         elrg_tict: int | None = ...,
-        elrg_rdat: _dt.datetime | None = ...,
+        elrg_rdat: dt.datetime | None = ...,
         elrg_sgrp: str | None = ...,
-        elrg_dtim: _dt.datetime | None = ...,
+        elrg_dtim: dt.datetime | None = ...,
         elrg_test: str | None = ...,
         elrg_tord: str | None = ...,
         elrg_locn: str | None = ...,
         elrg_bas: str | None = ...,
         elrg_dil: int | None = ...,
         elrg_lmth: str | None = ...,
-        elrg_ldtm: _dt.datetime | None = ...,
+        elrg_ldtm: dt.datetime | None = ...,
         elrg_iref: str | None = ...,
         elrg_ityp: str | None = ...,
         elrg_size: int | None = ...,
@@ -2794,18 +2794,18 @@ class ERES:
     eres_duni: str | None
     eres_ticp: int | None
     eres_tict: int | None
-    eres_rdat: _dt.datetime | None
+    eres_rdat: dt.datetime | None
     eres_sgrp: str | None
     spec_prep: str | None
     spec_desc: str | None
-    eres_dtim: _dt.datetime | None
+    eres_dtim: dt.datetime | None
     eres_test: str | None
     eres_tord: str | None
     eres_locn: str | None
     eres_bas: str | None
     eres_dil: int | None
     eres_lmth: str | None
-    eres_ldtm: _dt.datetime | None
+    eres_ldtm: dt.datetime | None
     eres_iref: str | None
     eres_size: int | None
     eres_perp: float | None
@@ -2846,18 +2846,18 @@ class ERES:
         eres_duni: str | None = ...,
         eres_ticp: int | None = ...,
         eres_tict: int | None = ...,
-        eres_rdat: _dt.datetime | None = ...,
+        eres_rdat: dt.datetime | None = ...,
         eres_sgrp: str | None = ...,
         spec_prep: str | None = ...,
         spec_desc: str | None = ...,
-        eres_dtim: _dt.datetime | None = ...,
+        eres_dtim: dt.datetime | None = ...,
         eres_test: str | None = ...,
         eres_tord: str | None = ...,
         eres_locn: str | None = ...,
         eres_bas: str | None = ...,
         eres_dil: int | None = ...,
         eres_lmth: str | None = ...,
-        eres_ldtm: _dt.datetime | None = ...,
+        eres_ldtm: dt.datetime | None = ...,
         eres_iref: str | None = ...,
         eres_size: int | None = ...,
         eres_perp: float | None = ...,
@@ -3048,7 +3048,7 @@ class FGHG:
     fghg_cas: float | None
     fghg_sfac: float | None
     fghg_sfrf: str | None
-    fghg_date: _dt.datetime | None
+    fghg_date: dt.datetime | None
     fghg_type: str | None
     fghg_cnfg: str | None
     fghg_meth: str | None
@@ -3082,7 +3082,7 @@ class FGHG:
         fghg_cas: float | None = ...,
         fghg_sfac: float | None = ...,
         fghg_sfrf: str | None = ...,
-        fghg_date: _dt.datetime | None = ...,
+        fghg_date: dt.datetime | None = ...,
         fghg_type: str | None = ...,
         fghg_cnfg: str | None = ...,
         fghg_meth: str | None = ...,
@@ -3142,8 +3142,8 @@ class FGHS:
     fghg_base: float | None
     fghg_tesn: str | None
     fghs_stg: int | None
-    fghs_sttm: _dt.datetime | None
-    fghs_entm: _dt.datetime | None
+    fghs_sttm: dt.datetime | None
+    fghs_entm: dt.datetime | None
     fghs_head: float | None
     fghs_flow: float | None
     fghs_iprm: float | None
@@ -3158,8 +3158,8 @@ class FGHS:
         fghg_base: float | None = ...,
         fghg_tesn: str | None = ...,
         fghs_stg: int | None = ...,
-        fghs_sttm: _dt.datetime | None = ...,
-        fghs_entm: _dt.datetime | None = ...,
+        fghs_sttm: dt.datetime | None = ...,
+        fghs_entm: dt.datetime | None = ...,
         fghs_head: float | None = ...,
         fghs_flow: float | None = ...,
         fghs_iprm: float | None = ...,
@@ -3176,7 +3176,7 @@ class FGHT:
     fghg_base: float | None
     fghg_tesn: str | None
     fghi_inst: str | None
-    fght_time: _dt.datetime | None
+    fght_time: dt.datetime | None
     fght_type: str | None
     fghs_stg: int | None
     fght_durn: str | None
@@ -3192,7 +3192,7 @@ class FGHT:
         fghg_base: float | None = ...,
         fghg_tesn: str | None = ...,
         fghi_inst: str | None = ...,
-        fght_time: _dt.datetime | None = ...,
+        fght_time: dt.datetime | None = ...,
         fght_type: str | None = ...,
         fghs_stg: int | None = ...,
         fght_durn: str | None = ...,
@@ -3211,7 +3211,7 @@ class FILE:
     file_type: str | None
     file_prog: str | None
     file_doct: str | None
-    file_date: _dt.datetime | None
+    file_date: dt.datetime | None
     file_rem: str | None
     def __init__(
         self,
@@ -3222,7 +3222,7 @@ class FILE:
         file_type: str | None = ...,
         file_prog: str | None = ...,
         file_doct: str | None = ...,
-        file_date: _dt.datetime | None = ...,
+        file_date: dt.datetime | None = ...,
         file_rem: str | None = ...,
     ) -> None: ...
     def walk(self, code: str) -> list[Any]: ...
@@ -3369,8 +3369,8 @@ class GCHM:
     gchm_dev: str | None
     gchm_sgrp: str | None
     gchm_lsid: str | None
-    gchm_rdat: _dt.datetime | None
-    gchm_dtim: _dt.datetime | None
+    gchm_rdat: dt.datetime | None
+    gchm_dtim: dt.datetime | None
     gchm_test: str | None
     gchm_iref: str | None
     gchm_ityp: str | None
@@ -3406,8 +3406,8 @@ class GCHM:
         gchm_dev: str | None = ...,
         gchm_sgrp: str | None = ...,
         gchm_lsid: str | None = ...,
-        gchm_rdat: _dt.datetime | None = ...,
-        gchm_dtim: _dt.datetime | None = ...,
+        gchm_rdat: dt.datetime | None = ...,
+        gchm_dtim: dt.datetime | None = ...,
         gchm_test: str | None = ...,
         gchm_iref: str | None = ...,
         gchm_ityp: str | None = ...,
@@ -3575,8 +3575,8 @@ class HDPH:
     hdph_top: float | None
     hdph_base: float | None
     hdph_type: str | None
-    hdph_star: _dt.datetime | None
-    hdph_endd: _dt.datetime | None
+    hdph_star: dt.datetime | None
+    hdph_endd: dt.datetime | None
     hdph_crew: str | None
     hdph_exc: str | None
     hdph_shor: str | None
@@ -3588,7 +3588,7 @@ class HDPH:
     hdph_btyp: str | None
     hdph_blen: float | None
     hdph_log: str | None
-    hdph_logd: _dt.datetime | None
+    hdph_logd: dt.datetime | None
     hdph_rem: str | None
     hdph_env: str | None
     hdph_meth: str | None
@@ -3601,8 +3601,8 @@ class HDPH:
         hdph_top: float | None = ...,
         hdph_base: float | None = ...,
         hdph_type: str | None = ...,
-        hdph_star: _dt.datetime | None = ...,
-        hdph_endd: _dt.datetime | None = ...,
+        hdph_star: dt.datetime | None = ...,
+        hdph_endd: dt.datetime | None = ...,
         hdph_crew: str | None = ...,
         hdph_exc: str | None = ...,
         hdph_shor: str | None = ...,
@@ -3614,7 +3614,7 @@ class HDPH:
         hdph_btyp: str | None = ...,
         hdph_blen: float | None = ...,
         hdph_log: str | None = ...,
-        hdph_logd: _dt.datetime | None = ...,
+        hdph_logd: dt.datetime | None = ...,
         hdph_rem: str | None = ...,
         hdph_env: str | None = ...,
         hdph_meth: str | None = ...,
@@ -3652,7 +3652,7 @@ class ICBR:
     icbr_tesn: str | None
     icbr_icbr: float | None
     icbr_mc: str | None
-    icbr_date: _dt.datetime | None
+    icbr_date: dt.datetime | None
     icbr_kent: str | None
     icbr_seat: int | None
     icbr_surc: int | None
@@ -3675,7 +3675,7 @@ class ICBR:
         icbr_tesn: str | None = ...,
         icbr_icbr: float | None = ...,
         icbr_mc: str | None = ...,
-        icbr_date: _dt.datetime | None = ...,
+        icbr_date: dt.datetime | None = ...,
         icbr_kent: str | None = ...,
         icbr_seat: int | None = ...,
         icbr_surc: int | None = ...,
@@ -3698,7 +3698,7 @@ class IDEN:
     loca_id: str | None
     iden_dpth: float | None
     iden_tesn: str | None
-    iden_date: _dt.datetime | None
+    iden_date: dt.datetime | None
     iden_type: str | None
     iden_iden: float | None
     iden_mc: str | None
@@ -3719,7 +3719,7 @@ class IDEN:
         loca_id: str | None = ...,
         iden_dpth: float | None = ...,
         iden_tesn: str | None = ...,
-        iden_date: _dt.datetime | None = ...,
+        iden_date: dt.datetime | None = ...,
         iden_type: str | None = ...,
         iden_iden: float | None = ...,
         iden_mc: str | None = ...,
@@ -3742,7 +3742,7 @@ class IFID:
     loca_id: str | None
     ifid_dpth: float | None
     ifid_tesn: str | None
-    ifid_date: _dt.datetime | None
+    ifid_date: dt.datetime | None
     ifid_res: str | None
     ifid_rem: str | None
     ifid_env: str | None
@@ -3759,7 +3759,7 @@ class IFID:
         loca_id: str | None = ...,
         ifid_dpth: float | None = ...,
         ifid_tesn: str | None = ...,
-        ifid_date: _dt.datetime | None = ...,
+        ifid_date: dt.datetime | None = ...,
         ifid_res: str | None = ...,
         ifid_rem: str | None = ...,
         ifid_env: str | None = ...,
@@ -3779,7 +3779,7 @@ class IPEN:
     ipen_dpth: float | None
     ipen_tesn: str | None
     ipen_ipen: str | None
-    ipen_date: _dt.datetime | None
+    ipen_date: dt.datetime | None
     ipen_rem: str | None
     ipen_env: str | None
     ipen_meth: str | None
@@ -3796,7 +3796,7 @@ class IPEN:
         ipen_dpth: float | None = ...,
         ipen_tesn: str | None = ...,
         ipen_ipen: str | None = ...,
-        ipen_date: _dt.datetime | None = ...,
+        ipen_date: dt.datetime | None = ...,
         ipen_rem: str | None = ...,
         ipen_env: str | None = ...,
         ipen_meth: str | None = ...,
@@ -3814,7 +3814,7 @@ class IPID:
     loca_id: str | None
     ipid_dpth: float | None
     ipid_tesn: str | None
-    ipid_date: _dt.datetime | None
+    ipid_date: dt.datetime | None
     ipid_temp: float | None
     ipid_res: str | None
     ipid_rem: str | None
@@ -3832,7 +3832,7 @@ class IPID:
         loca_id: str | None = ...,
         ipid_dpth: float | None = ...,
         ipid_tesn: str | None = ...,
-        ipid_date: _dt.datetime | None = ...,
+        ipid_date: dt.datetime | None = ...,
         ipid_temp: float | None = ...,
         ipid_res: str | None = ...,
         ipid_rem: str | None = ...,
@@ -3863,7 +3863,7 @@ class IPRG:
     iprg_flow: float | None
     iprg_awl: float | None
     iprg_head: float | None
-    iprg_date: _dt.datetime | None
+    iprg_date: dt.datetime | None
     iprg_rem: str | None
     iprg_env: str | None
     iprg_meth: str | None
@@ -3889,7 +3889,7 @@ class IPRG:
         iprg_flow: float | None = ...,
         iprg_awl: float | None = ...,
         iprg_head: float | None = ...,
-        iprg_date: _dt.datetime | None = ...,
+        iprg_date: dt.datetime | None = ...,
         iprg_rem: str | None = ...,
         iprg_env: str | None = ...,
         iprg_meth: str | None = ...,
@@ -3932,7 +3932,7 @@ class IRDX:
     loca_id: str | None
     irdx_dpth: float | None
     irdx_tesn: str | None
-    irdx_date: _dt.datetime | None
+    irdx_date: dt.datetime | None
     irdx_ph: float | None
     irdx_mpot: int | None
     irdx_irdx: int | None
@@ -3951,7 +3951,7 @@ class IRDX:
         loca_id: str | None = ...,
         irdx_dpth: float | None = ...,
         irdx_tesn: str | None = ...,
-        irdx_date: _dt.datetime | None = ...,
+        irdx_date: dt.datetime | None = ...,
         irdx_ph: float | None = ...,
         irdx_mpot: int | None = ...,
         irdx_irdx: int | None = ...,
@@ -3974,7 +3974,7 @@ class IRES:
     ires_tesn: str | None
     ires_base: float | None
     ires_type: str | None
-    ires_date: _dt.datetime | None
+    ires_date: dt.datetime | None
     ires_ires: float | None
     ires_res1: float | None
     ires_res2: float | None
@@ -3995,7 +3995,7 @@ class IRES:
         ires_tesn: str | None = ...,
         ires_base: float | None = ...,
         ires_type: str | None = ...,
-        ires_date: _dt.datetime | None = ...,
+        ires_date: dt.datetime | None = ...,
         ires_ires: float | None = ...,
         ires_res1: float | None = ...,
         ires_res2: float | None = ...,
@@ -4015,7 +4015,7 @@ class IRES:
 class ISAG:
     loca_id: str | None
     isag_tesn: str | None
-    isag_date: _dt.datetime | None
+    isag_date: dt.datetime | None
     isag_durn: str | None
     isag_pwid: float | None
     isag_plen: float | None
@@ -4039,7 +4039,7 @@ class ISAG:
         *,
         loca_id: str | None = ...,
         isag_tesn: str | None = ...,
-        isag_date: _dt.datetime | None = ...,
+        isag_date: dt.datetime | None = ...,
         isag_durn: str | None = ...,
         isag_pwid: float | None = ...,
         isag_plen: float | None = ...,
@@ -4183,7 +4183,7 @@ class ISTA:
     ista_rem: str | None
     ista_anby: str | None
     ista_cont: str | None
-    ista_date: _dt.datetime | None
+    ista_date: dt.datetime | None
     test_stat: str | None
     file_fset: str | None
     def __init__(
@@ -4215,7 +4215,7 @@ class ISTA:
         ista_rem: str | None = ...,
         ista_anby: str | None = ...,
         ista_cont: str | None = ...,
-        ista_date: _dt.datetime | None = ...,
+        ista_date: dt.datetime | None = ...,
         test_stat: str | None = ...,
         file_fset: str | None = ...,
     ) -> None: ...
@@ -4227,8 +4227,8 @@ class ISTG:
     istg_tesn: str | None
     istg_type: str | None
     istg_link: float | None
-    istg_star: _dt.datetime | None
-    istg_end: _dt.datetime | None
+    istg_star: dt.datetime | None
+    istg_end: dt.datetime | None
     istg_ref: str | None
     istg_recc: str | None
     istg_recd: str | None
@@ -4259,8 +4259,8 @@ class ISTG:
         istg_tesn: str | None = ...,
         istg_type: str | None = ...,
         istg_link: float | None = ...,
-        istg_star: _dt.datetime | None = ...,
-        istg_end: _dt.datetime | None = ...,
+        istg_star: dt.datetime | None = ...,
+        istg_end: dt.datetime | None = ...,
         istg_ref: str | None = ...,
         istg_recc: str | None = ...,
         istg_recd: str | None = ...,
@@ -4321,7 +4321,7 @@ class ISTS:
     istg_tesn: str | None
     ists_sgln: str | None
     ists_type: str | None
-    ists_dtim: _dt.datetime | None
+    ists_dtim: dt.datetime | None
     ists_rate: float | None
     ists_ptrt: float | None
     ists_ttly: float | None
@@ -4335,7 +4335,7 @@ class ISTS:
         istg_tesn: str | None = ...,
         ists_sgln: str | None = ...,
         ists_type: str | None = ...,
-        ists_dtim: _dt.datetime | None = ...,
+        ists_dtim: dt.datetime | None = ...,
         ists_rate: float | None = ...,
         ists_ptrt: float | None = ...,
         ists_ttly: float | None = ...,
@@ -4350,7 +4350,7 @@ class ITCH:
     loca_id: str | None
     itch_dpth: float | None
     itch_tesn: str | None
-    itch_date: _dt.datetime | None
+    itch_date: dt.datetime | None
     itch_tcon: float | None
     itch_tres: float | None
     itch_temp: int | None
@@ -4369,7 +4369,7 @@ class ITCH:
         loca_id: str | None = ...,
         itch_dpth: float | None = ...,
         itch_tesn: str | None = ...,
-        itch_date: _dt.datetime | None = ...,
+        itch_date: dt.datetime | None = ...,
         itch_tcon: float | None = ...,
         itch_tres: float | None = ...,
         itch_temp: int | None = ...,
@@ -4393,7 +4393,7 @@ class IVAN:
     ivan_type: str | None
     ivan_ivan: str | None
     ivan_ivar: str | None
-    ivan_date: _dt.datetime | None
+    ivan_date: dt.datetime | None
     ivan_rem: str | None
     ivan_env: str | None
     ivan_meth: str | None
@@ -4412,7 +4412,7 @@ class IVAN:
         ivan_type: str | None = ...,
         ivan_ivan: str | None = ...,
         ivan_ivar: str | None = ...,
-        ivan_date: _dt.datetime | None = ...,
+        ivan_date: dt.datetime | None = ...,
         ivan_rem: str | None = ...,
         ivan_env: str | None = ...,
         ivan_meth: str | None = ...,
@@ -4428,10 +4428,10 @@ class IVAN:
 
 class LBSG:
     lbsg_ref: str | None
-    lbsg_date: _dt.datetime | None
+    lbsg_date: dt.datetime | None
     lbsg_from: str | None
     lbsg_to: str | None
-    lbsg_due: _dt.datetime | None
+    lbsg_due: dt.datetime | None
     lbsg_rem: str | None
     lbsg_stat: str | None
     file_fset: str | None
@@ -4440,10 +4440,10 @@ class LBSG:
         self,
         *,
         lbsg_ref: str | None = ...,
-        lbsg_date: _dt.datetime | None = ...,
+        lbsg_date: dt.datetime | None = ...,
         lbsg_from: str | None = ...,
         lbsg_to: str | None = ...,
-        lbsg_due: _dt.datetime | None = ...,
+        lbsg_due: dt.datetime | None = ...,
         lbsg_rem: str | None = ...,
         lbsg_stat: str | None = ...,
         file_fset: str | None = ...,
@@ -4467,9 +4467,9 @@ class LBST:
     lbst_depn: str | None
     lbst_stat: str | None
     lbst_rem: str | None
-    lbst_due: _dt.datetime | None
+    lbst_due: dt.datetime | None
     lbst_detl: str | None
-    lbst_done: _dt.datetime | None
+    lbst_done: dt.datetime | None
     file_fset: str | None
     def __init__(
         self,
@@ -4488,9 +4488,9 @@ class LBST:
         lbst_depn: str | None = ...,
         lbst_stat: str | None = ...,
         lbst_rem: str | None = ...,
-        lbst_due: _dt.datetime | None = ...,
+        lbst_due: dt.datetime | None = ...,
         lbst_detl: str | None = ...,
-        lbst_done: _dt.datetime | None = ...,
+        lbst_done: dt.datetime | None = ...,
         file_fset: str | None = ...,
     ) -> None: ...
     def walk(self, code: str) -> list[Any]: ...
@@ -4850,10 +4850,10 @@ class LOCA:
     loca_gl: float | None
     loca_rem: str | None
     loca_fdep: float | None
-    loca_star: _dt.datetime | None
+    loca_star: dt.datetime | None
     loca_purp: str | None
     loca_term: str | None
-    loca_endd: _dt.datetime | None
+    loca_endd: dt.datetime | None
     loca_lett: str | None
     loca_locx: float | None
     loca_locy: float | None
@@ -4883,7 +4883,7 @@ class LOCA:
     loca_orid: str | None
     loca_orjo: str | None
     loca_orco: str | None
-    loca_gldt: _dt.datetime | None
+    loca_gldt: dt.datetime | None
     loca_vssl: str | None
     loca_nsri: int | None
     loca_lsri: int | None
@@ -4950,10 +4950,10 @@ class LOCA:
         loca_gl: float | None = ...,
         loca_rem: str | None = ...,
         loca_fdep: float | None = ...,
-        loca_star: _dt.datetime | None = ...,
+        loca_star: dt.datetime | None = ...,
         loca_purp: str | None = ...,
         loca_term: str | None = ...,
-        loca_endd: _dt.datetime | None = ...,
+        loca_endd: dt.datetime | None = ...,
         loca_lett: str | None = ...,
         loca_locx: float | None = ...,
         loca_locy: float | None = ...,
@@ -4983,7 +4983,7 @@ class LOCA:
         loca_orid: str | None = ...,
         loca_orjo: str | None = ...,
         loca_orco: str | None = ...,
-        loca_gldt: _dt.datetime | None = ...,
+        loca_gldt: dt.datetime | None = ...,
         loca_vssl: str | None = ...,
         loca_nsri: int | None = ...,
         loca_lsri: int | None = ...,
@@ -5682,7 +5682,7 @@ class MOND:
     loca_id: str | None
     mong_id: str | None
     mong_dis: float | None
-    mond_dtim: _dt.datetime | None
+    mond_dtim: dt.datetime | None
     mond_type: str | None
     mond_ref: str | None
     mond_inst: str | None
@@ -5702,7 +5702,7 @@ class MOND:
         loca_id: str | None = ...,
         mong_id: str | None = ...,
         mong_dis: float | None = ...,
-        mond_dtim: _dt.datetime | None = ...,
+        mond_dtim: dt.datetime | None = ...,
         mond_type: str | None = ...,
         mond_ref: str | None = ...,
         mond_inst: str | None = ...,
@@ -5725,7 +5725,7 @@ class MONG:
     mong_id: str | None
     mong_dis: float | None
     pipe_ref: str | None
-    mong_date: _dt.datetime | None
+    mong_date: dt.datetime | None
     mong_type: str | None
     mong_detl: str | None
     mong_trz: float | None
@@ -5751,7 +5751,7 @@ class MONG:
         mong_id: str | None = ...,
         mong_dis: float | None = ...,
         pipe_ref: str | None = ...,
-        mong_date: _dt.datetime | None = ...,
+        mong_date: dt.datetime | None = ...,
         mong_type: str | None = ...,
         mong_detl: str | None = ...,
         mong_trz: float | None = ...,
@@ -5778,8 +5778,8 @@ class MONS:
     loca_id: str | None
     mong_id: str | None
     mong_dis: float | None
-    mons_star: _dt.datetime | None
-    mons_endd: _dt.datetime | None
+    mons_star: dt.datetime | None
+    mons_endd: dt.datetime | None
     mons_by: str | None
     mons_type: str | None
     mons_stat: str | None
@@ -5793,8 +5793,8 @@ class MONS:
         loca_id: str | None = ...,
         mong_id: str | None = ...,
         mong_dis: float | None = ...,
-        mons_star: _dt.datetime | None = ...,
-        mons_endd: _dt.datetime | None = ...,
+        mons_star: dt.datetime | None = ...,
+        mons_endd: dt.datetime | None = ...,
         mons_by: str | None = ...,
         mons_type: str | None = ...,
         mons_stat: str | None = ...,
@@ -5846,7 +5846,7 @@ class PLTG:
     pltg_ev2: float | None
     pltg_mosr: float | None
     pltg_emod: float | None
-    pltg_date: _dt.datetime | None
+    pltg_date: dt.datetime | None
     pltg_stab: float | None
     pltg_styp: str | None
     pltg_rem: str | None
@@ -5875,7 +5875,7 @@ class PLTG:
         pltg_ev2: float | None = ...,
         pltg_mosr: float | None = ...,
         pltg_emod: float | None = ...,
-        pltg_date: _dt.datetime | None = ...,
+        pltg_date: dt.datetime | None = ...,
         pltg_stab: float | None = ...,
         pltg_styp: str | None = ...,
         pltg_rem: str | None = ...,
@@ -6000,7 +6000,7 @@ class PMMG:
     loca_id: str | None
     pmmg_dpth: float | None
     pmmg_tesn: str | None
-    pmmg_date: _dt.datetime | None
+    pmmg_date: dt.datetime | None
     pmmg_dcu: float | None
     pmmg_prwl: float | None
     pmmg_ref: str | None
@@ -6017,7 +6017,7 @@ class PMMG:
     pmmg_meth: str | None
     pmmg_crem: str | None
     pmmg_rem: str | None
-    pmmg_crdt: _dt.datetime | None
+    pmmg_crdt: dt.datetime | None
     pmmg_oper: str | None
     pmmg_anby: str | None
     pmmg_cont: str | None
@@ -6033,7 +6033,7 @@ class PMMG:
         loca_id: str | None = ...,
         pmmg_dpth: float | None = ...,
         pmmg_tesn: str | None = ...,
-        pmmg_date: _dt.datetime | None = ...,
+        pmmg_date: dt.datetime | None = ...,
         pmmg_dcu: float | None = ...,
         pmmg_prwl: float | None = ...,
         pmmg_ref: str | None = ...,
@@ -6050,7 +6050,7 @@ class PMMG:
         pmmg_meth: str | None = ...,
         pmmg_crem: str | None = ...,
         pmmg_rem: str | None = ...,
-        pmmg_crdt: _dt.datetime | None = ...,
+        pmmg_crdt: dt.datetime | None = ...,
         pmmg_oper: str | None = ...,
         pmmg_anby: str | None = ...,
         pmmg_cont: str | None = ...,
@@ -6124,7 +6124,7 @@ class PMTG:
     loca_id: str | None
     pmtg_dpth: float | None
     pmtg_tesn: str | None
-    pmtg_date: _dt.datetime | None
+    pmtg_date: dt.datetime | None
     pmtg_wat: float | None
     pmtg_cont: str | None
     pmtg_crew: str | None
@@ -6149,8 +6149,8 @@ class PMTG:
     pmtg_axis: str | None
     pmtg_prwl: float | None
     pmtg_tc: str | None
-    pmtg_stad: _dt.datetime | None
-    pmtg_endd: _dt.datetime | None
+    pmtg_stad: dt.datetime | None
+    pmtg_endd: dt.datetime | None
     pmtg_topp: float | None
     pmtg_botp: float | None
     pmtg_sbht: str | None
@@ -6164,7 +6164,7 @@ class PMTG:
     pmtg_pprd: bool | None
     pmtg_cmt: str | None
     pmtg_crem: str | None
-    pmtg_crdt: _dt.datetime | None
+    pmtg_crdt: dt.datetime | None
     pmtg_anby: str | None
     pmtds: list[PMTD]
     pmtls: list[PMTL]
@@ -6176,7 +6176,7 @@ class PMTG:
         loca_id: str | None = ...,
         pmtg_dpth: float | None = ...,
         pmtg_tesn: str | None = ...,
-        pmtg_date: _dt.datetime | None = ...,
+        pmtg_date: dt.datetime | None = ...,
         pmtg_wat: float | None = ...,
         pmtg_cont: str | None = ...,
         pmtg_crew: str | None = ...,
@@ -6201,8 +6201,8 @@ class PMTG:
         pmtg_axis: str | None = ...,
         pmtg_prwl: float | None = ...,
         pmtg_tc: str | None = ...,
-        pmtg_stad: _dt.datetime | None = ...,
-        pmtg_endd: _dt.datetime | None = ...,
+        pmtg_stad: dt.datetime | None = ...,
+        pmtg_endd: dt.datetime | None = ...,
         pmtg_topp: float | None = ...,
         pmtg_botp: float | None = ...,
         pmtg_sbht: str | None = ...,
@@ -6216,7 +6216,7 @@ class PMTG:
         pmtg_pprd: bool | None = ...,
         pmtg_cmt: str | None = ...,
         pmtg_crem: str | None = ...,
-        pmtg_crdt: _dt.datetime | None = ...,
+        pmtg_crdt: dt.datetime | None = ...,
         pmtg_anby: str | None = ...,
         pmtds: list[PMTD] | None = ...,
         pmtls: list[PMTL] | None = ...,
@@ -6361,20 +6361,20 @@ class PMTZ:
     def __repr__(self) -> str: ...
 
 class PREM:
-    prem_dtim: _dt.datetime | None
+    prem_dtim: dt.datetime | None
     prem_comp: str | None
     prem_rem: str | None
     prem_durn: str | None
-    prem_etim: _dt.datetime | None
+    prem_etim: dt.datetime | None
     file_fset: str | None
     def __init__(
         self,
         *,
-        prem_dtim: _dt.datetime | None = ...,
+        prem_dtim: dt.datetime | None = ...,
         prem_comp: str | None = ...,
         prem_rem: str | None = ...,
         prem_durn: str | None = ...,
-        prem_etim: _dt.datetime | None = ...,
+        prem_etim: dt.datetime | None = ...,
         file_fset: str | None = ...,
     ) -> None: ...
     def walk(self, code: str) -> list[Any]: ...
@@ -6408,7 +6408,7 @@ class PROJ:
 
 class PTIM:
     loca_id: str | None
-    ptim_dtim: _dt.datetime | None
+    ptim_dtim: dt.datetime | None
     ptim_dpth: float | None
     ptim_cas: float | None
     ptim_wat: str | None
@@ -6418,7 +6418,7 @@ class PTIM:
         self,
         *,
         loca_id: str | None = ...,
-        ptim_dtim: _dt.datetime | None = ...,
+        ptim_dtim: dt.datetime | None = ...,
         ptim_dpth: float | None = ...,
         ptim_cas: float | None = ...,
         ptim_wat: str | None = ...,
@@ -6561,7 +6561,7 @@ class PUMG:
 class PUMT:
     loca_id: str | None
     pumg_test: str | None
-    pumt_dtim: _dt.datetime | None
+    pumt_dtim: dt.datetime | None
     pumt_dpth: float | None
     pumt_quat: float | None
     pumt_rem: str | None
@@ -6571,7 +6571,7 @@ class PUMT:
         *,
         loca_id: str | None = ...,
         pumg_test: str | None = ...,
-        pumt_dtim: _dt.datetime | None = ...,
+        pumt_dtim: dt.datetime | None = ...,
         pumt_dpth: float | None = ...,
         pumt_quat: float | None = ...,
         pumt_rem: str | None = ...,
@@ -6592,7 +6592,7 @@ class RCAG:
     spec_prep: str | None
     spec_base: float | None
     rcag_dev: str | None
-    rcag_date: _dt.datetime | None
+    rcag_date: dt.datetime | None
     rcag_cond: str | None
     rcag_gsiz: float | None
     rcag_anis: str | None
@@ -6622,7 +6622,7 @@ class RCAG:
         spec_prep: str | None = ...,
         spec_base: float | None = ...,
         rcag_dev: str | None = ...,
-        rcag_date: _dt.datetime | None = ...,
+        rcag_date: dt.datetime | None = ...,
         rcag_cond: str | None = ...,
         rcag_gsiz: float | None = ...,
         rcag_anis: str | None = ...,
@@ -7551,7 +7551,7 @@ class SAMP:
     samp_type: str | None
     samp_id: str | None
     samp_base: float | None
-    samp_dtim: _dt.datetime | None
+    samp_dtim: dt.datetime | None
     samp_ublo: int | None
     samp_cont: str | None
     samp_prep: str | None
@@ -7565,7 +7565,7 @@ class SAMP:
     samp_why: str | None
     samp_rem: str | None
     samp_desc: str | None
-    samp_desd: _dt.datetime | None
+    samp_desd: dt.datetime | None
     samp_log: str | None
     samp_cond: str | None
     samp_clss: str | None
@@ -7573,7 +7573,7 @@ class SAMP:
     samp_temp: int | None
     samp_pres: float | None
     samp_flow: float | None
-    samp_etim: _dt.datetime | None
+    samp_etim: dt.datetime | None
     samp_durn: str | None
     samp_capt: str | None
     samp_link: float | None
@@ -7645,7 +7645,7 @@ class SAMP:
         samp_type: str | None = ...,
         samp_id: str | None = ...,
         samp_base: float | None = ...,
-        samp_dtim: _dt.datetime | None = ...,
+        samp_dtim: dt.datetime | None = ...,
         samp_ublo: int | None = ...,
         samp_cont: str | None = ...,
         samp_prep: str | None = ...,
@@ -7659,7 +7659,7 @@ class SAMP:
         samp_why: str | None = ...,
         samp_rem: str | None = ...,
         samp_desc: str | None = ...,
-        samp_desd: _dt.datetime | None = ...,
+        samp_desd: dt.datetime | None = ...,
         samp_log: str | None = ...,
         samp_cond: str | None = ...,
         samp_clss: str | None = ...,
@@ -7667,7 +7667,7 @@ class SAMP:
         samp_temp: int | None = ...,
         samp_pres: float | None = ...,
         samp_flow: float | None = ...,
-        samp_etim: _dt.datetime | None = ...,
+        samp_etim: dt.datetime | None = ...,
         samp_durn: str | None = ...,
         samp_capt: str | None = ...,
         samp_link: float | None = ...,
@@ -8224,7 +8224,7 @@ class TNPC:
 
 class TRAN:
     tran_isno: str | None
-    tran_date: _dt.datetime | None
+    tran_date: dt.datetime | None
     tran_prod: str | None
     tran_stat: str | None
     tran_desc: str | None
@@ -8238,7 +8238,7 @@ class TRAN:
         self,
         *,
         tran_isno: str | None = ...,
-        tran_date: _dt.datetime | None = ...,
+        tran_date: dt.datetime | None = ...,
         tran_prod: str | None = ...,
         tran_stat: str | None = ...,
         tran_desc: str | None = ...,
@@ -8308,21 +8308,21 @@ class TREG:
 
 class TREM:
     loca_id: str | None
-    trem_dtim: _dt.datetime | None
+    trem_dtim: dt.datetime | None
     trem_comp: str | None
     trem_rem: str | None
     trem_durn: str | None
-    trem_etim: _dt.datetime | None
+    trem_etim: dt.datetime | None
     file_fset: str | None
     def __init__(
         self,
         *,
         loca_id: str | None = ...,
-        trem_dtim: _dt.datetime | None = ...,
+        trem_dtim: dt.datetime | None = ...,
         trem_comp: str | None = ...,
         trem_rem: str | None = ...,
         trem_durn: str | None = ...,
-        trem_etim: _dt.datetime | None = ...,
+        trem_etim: dt.datetime | None = ...,
         file_fset: str | None = ...,
     ) -> None: ...
     def walk(self, code: str) -> list[Any]: ...
@@ -8604,7 +8604,7 @@ class WGPG:
     loca_id: str | None
     wgpg_id: str | None
     wgpg_tool: str | None
-    wgpg_date: _dt.datetime | None
+    wgpg_date: dt.datetime | None
     wgpg_strt: float | None
     wgpg_stop: float | None
     wgpg_bhd: float | None
@@ -8628,7 +8628,7 @@ class WGPG:
         loca_id: str | None = ...,
         wgpg_id: str | None = ...,
         wgpg_tool: str | None = ...,
-        wgpg_date: _dt.datetime | None = ...,
+        wgpg_date: dt.datetime | None = ...,
         wgpg_strt: float | None = ...,
         wgpg_stop: float | None = ...,
         wgpg_bhd: float | None = ...,
@@ -8727,7 +8727,7 @@ class WSTD:
 class WSTG:
     loca_id: str | None
     wstg_dpth: float | None
-    wstg_dtim: _dt.datetime | None
+    wstg_dtim: dt.datetime | None
     wstg_seal: float | None
     wstg_cas: float | None
     wstg_rem: str | None
@@ -8738,7 +8738,7 @@ class WSTG:
         *,
         loca_id: str | None = ...,
         wstg_dpth: float | None = ...,
-        wstg_dtim: _dt.datetime | None = ...,
+        wstg_dtim: dt.datetime | None = ...,
         wstg_seal: float | None = ...,
         wstg_cas: float | None = ...,
         wstg_rem: str | None = ...,

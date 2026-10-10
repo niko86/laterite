@@ -10,7 +10,7 @@ never raise on arbitrary AGS4-shaped text.
 
 from __future__ import annotations
 
-import datetime as _dt
+import datetime as dt
 
 import pytest
 from hypothesis import given
@@ -197,9 +197,9 @@ _ALLOWED_RETURN_TYPES = (
     int,
     float,
     bool,
-    _dt.datetime,
-    _dt.date,
-    _dt.time,
+    dt.datetime,
+    dt.date,
+    dt.time,
     str,
 )
 
@@ -299,13 +299,13 @@ def test_parse_value_integer_code_round_trips(n):
 
 def test_parse_value_datetime_exact_values():
     # Full datetime.
-    assert parse_value("2020-08-18 09:30:00", "DT") == _dt.datetime(
+    assert parse_value("2020-08-18 09:30:00", "DT") == dt.datetime(
         2020, 8, 18, 9, 30, 0
     )
     # Date-only DT → promoted to midnight (the shared parse_datetime rule).
-    assert parse_value("2020-08-18", "DT") == _dt.datetime(2020, 8, 18, 0, 0, 0)
+    assert parse_value("2020-08-18", "DT") == dt.datetime(2020, 8, 18, 0, 0, 0)
     # dd/mm/yyyy date-only under DT normalises the same way.
-    assert parse_value("15/03/2024", "DT") == _dt.datetime(2024, 3, 15, 0, 0, 0)
+    assert parse_value("15/03/2024", "DT") == dt.datetime(2024, 3, 15, 0, 0, 0)
     # Unparseable → None (permissive, never raises).
     assert parse_value("not a date", "DT") is None
 

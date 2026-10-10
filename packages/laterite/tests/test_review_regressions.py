@@ -21,7 +21,7 @@ were either discovered or first introduced:
 
 from __future__ import annotations
 
-import datetime as _dt
+import datetime as dt
 
 import laterite
 import pytest
@@ -75,8 +75,8 @@ from laterite.ags_types import parse_value
         ("YN", "y", True),
         ("YN", "bogus", None),
         # DT -> datetime
-        ("DT", "2024-03-15 09:30", _dt.datetime(2024, 3, 15, 9, 30)),
-        ("DT", "2024-03-15", _dt.datetime(2024, 3, 15)),
+        ("DT", "2024-03-15 09:30", dt.datetime(2024, 3, 15, 9, 30)),
+        ("DT", "2024-03-15", dt.datetime(2024, 3, 15)),
         ("DT", "not a date", None),
     ],
 )

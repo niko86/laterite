@@ -43,7 +43,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import datetime
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -101,7 +101,7 @@ def merge(docs: dict[str, dict[str, Any]]) -> dict[str, Any]:
             cells.setdefault(row["op"], {}).setdefault(row["rung"], {})[surface] = cell
     return {
         "schema": MATRIX_SCHEMA,
-        "generated": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "surfaces": surfaces,
         "cells": cells,
     }
