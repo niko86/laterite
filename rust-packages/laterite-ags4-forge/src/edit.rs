@@ -749,10 +749,13 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
                 for n in g.group_line..=last {
                     plan.insert(n, Line::Drop);
                 }
-                // The separator that followed it, if the next line is blank —
-                // leaving it behind doubles the gap on every deletion.
-                if last < parsed.total_lines && line_text(last + 1).trim().is_empty() {
-                    plan.insert(last + 1, Line::Drop);
+                // The separator that followed it, if the next RECORD is blank —
+                // leaving it behind doubles the gap on every deletion. Not
+                // `last + 1`: a last row spanning a newline ends further on
+                // (#1052).
+                let next = parsed.raw_lines.iter().find(|l| l.number > last);
+                if let Some(next) = next.filter(|l| parsed.line_text(l).trim().is_empty()) {
+                    plan.insert(next.number, Line::Drop);
                 }
             }
             Op::DeleteColumn { heading, group } => {
@@ -808,13 +811,12 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, EditError> {
     if parsed.has_bom {
         out.push('\u{feff}');
     }
-    for line in &parsed.raw_lines {
+    // Paired by POSITION: both are one entry per record, while a line number
+    // runs past its record's position after a field spanning a newline
+    // (#1052).
+    for (line, &terminator) in parsed.raw_lines.iter().zip(&terminators) {
         // Each line keeps its OWN terminator, which is what lets a file with
         // mixed endings survive an edit to one of them.
-        let terminator = terminators
-            .get(line.number as usize - 1)
-            .copied()
-            .unwrap_or("");
         match plan.get(&line.number) {
             Some(Line::Drop) => {}
             Some(Line::Replace(s)) => {
@@ -1313,6 +1315,28 @@ mod tests {
             !out.starts_with("\r\n"),
             "the separator blank line must go with the group: {out:?}"
         );
+    }
+
+    #[test]
+    fn a_field_spanning_a_newline_moves_neither_the_separator_nor_a_terminator() {
+        // PROJ's last row spans lines 5-6, so its separator is line 7, not
+        // `last + 1`; and every later line number runs one past its record's
+        // position, so a terminator looked up by number lands on its
+        // neighbour's — the lone LF on LOCA's HEADING must survive (#1052).
+        let loca = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\n\
+                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH01\"\r\n";
+        let src = format!(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+             \"TYPE\",\"X\"\r\n\"DATA\",\"a\r\nb\"\r\n\r\n{loca}"
+        );
+        let out = apply(
+            &src,
+            &[Op::DeleteGroup {
+                group: "PROJ".into(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(out, loca);
     }
 
     #[test]

@@ -1386,22 +1386,18 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     }
 
     // Rebuild the text line-by-line so each edit's char offsets stay local to
-    // its own line (offsets are per-line, as field_span yields). Re-split with
-    // the SAME quote-aware line model the parser used (`parse::line_spans`), so
-    // a fix's line number lands on the same line here even for `\r`/lone-`\n`-
-    // terminated or embedded-newline files — a plain `split('\n')` would number
-    // those lines differently and misplace the edit (#422). Each line's
-    // ORIGINAL terminator is re-emitted verbatim, so a well-formed file
-    // round-trips byte-for-byte; the terminator is never inside `body`, so a CR
-    // strip only ever touches embedded content.
+    // its own line (offsets are per-line, as field_span yields). Re-split AND
+    // re-number with the SAME quote-aware line model the parser used
+    // (`parse::numbered_line_spans`), so a fix's line number lands on the same
+    // line here even for `\r`/lone-`\n`-terminated files (#422) and after a
+    // quoted field spanning a newline, where the physical line is not the
+    // record's position (#1052). Each line's ORIGINAL terminator is re-emitted
+    // verbatim, so a well-formed file round-trips byte-for-byte; the
+    // terminator is never inside `body`, so a CR strip only ever touches
+    // embedded content.
     let mut result = String::with_capacity(text.len());
     let src = text.as_bytes();
-    for (i, span) in crate::parse::line_spans(src).enumerate() {
-        // A 1-based line number for one input file — reaching u32::MAX
-        // lines would need ~40+ GB of file content, far beyond any real or
-        // stress-test AGS4 file (the perf matrix tops out at ~1GB).
-        #[allow(clippy::cast_possible_truncation)]
-        let number = (i + 1) as u32;
+    for (number, span) in crate::parse::numbered_line_spans(src) {
         // Every terminator/delimiter is ASCII, so `start..body_end` is a valid
         // char boundary of `text`.
         let body = &text[span.start..span.body_end];
@@ -2207,6 +2203,32 @@ mod tests {
         assert_eq!(pad.risk, FixRisk::Safe);
         let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(pad));
         assert!(out.contains("\"DATA\",\"BH01\",\"\""), "got: {out:?}");
+    }
+
+    #[test]
+    fn a_fix_after_a_field_spanning_a_newline_lands_on_its_own_row() {
+        // PROJ's DATA row spans lines 5-6, so LOCA's short row is line 12 but
+        // the 11th record. The fix carries the parser's physical line and
+        // apply_fixes must number the same way, or the pad lands nowhere
+        // (#1052).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"two\r\nlines\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+                   \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"BH01\"\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
+        let pad = fixes
+            .iter()
+            .find(|f| f.kind == FixKind::PadShortRow)
+            .expect("a pad-short-row fix");
+        assert_eq!(pad.edits[0].line, 12);
+        let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(pad));
+        assert_eq!(
+            out,
+            src.replace("\"DATA\",\"BH01\"", "\"DATA\",\"BH01\",\"\""),
+            "only LOCA's row changes; the spanning row is untouched"
+        );
     }
 
     #[test]

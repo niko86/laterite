@@ -27,7 +27,7 @@
 use std::collections::HashSet;
 
 use encoding_rs::UTF_8;
-use laterite_ags4_parse::split_ags_line;
+use laterite_ags4_parse::{line_spans, numbered_line_spans, split_ags_line};
 use laterite_ags4_validator::CheckOptions;
 use laterite_ags4_validator::fixes::{Fix, fix_document};
 use laterite_ags4_validator::parse::parse_bytes;
@@ -52,41 +52,48 @@ fn edited_lines(applied: &[Fix]) -> HashSet<u32> {
         .collect()
 }
 
-/// (c) — cell preservation / anti-truncation. Compares logical lines
-/// (`str::lines()` normalises line endings + a trailing newline; a leading BOM is
-/// stripped first), so the whole-doc fixes (CRLF/BOM) don't perturb it. For every
-/// line the field count never shrinks (a shrink is the truncation signature); and
-/// a line no `SpanEdit` touched is byte-identical field-for-field.
-// `i` is a line number within a proptest-generated fixture (bounded by the
-// generator's own size config, far under u32::MAX).
-#[allow(clippy::cast_possible_truncation)]
+/// (c) — cell preservation / anti-truncation. Compares RECORDS (a leading BOM is
+/// stripped first; terminators are not part of a record), so the whole-doc fixes
+/// (CRLF/BOM) don't perturb it. For every record the field count never shrinks
+/// (a shrink is the truncation signature); and a record no `SpanEdit` touched is
+/// byte-identical field-for-field.
+///
+/// Records, not `str::lines()`: an edit's line is the engine's PHYSICAL line,
+/// which counts a lone CR embedded in a quoted cell as a line break (as an editor
+/// and python-ags4 do) where `str::lines()` does not (#1052). They pair up by
+/// position — no fix in the menu changes the record count — and the original
+/// record's physical number is what an edit names.
 fn assert_cells_preserved(raw: &[u8], fixed: &[u8], applied: &[Fix]) -> Result<(), TestCaseError> {
     let orig = String::from_utf8_lossy(raw);
     let out = String::from_utf8_lossy(fixed);
     let orig = orig.strip_prefix('\u{feff}').unwrap_or(&orig);
     let out = out.strip_prefix('\u{feff}').unwrap_or(&out);
-    let ol: Vec<&str> = orig.lines().collect();
-    let nl: Vec<&str> = out.lines().collect();
+    let ol: Vec<(u32, &str)> = numbered_line_spans(orig.as_bytes())
+        .map(|(n, s)| (n, &orig[s.start..s.body_end]))
+        .collect();
+    let nl: Vec<&str> = line_spans(out.as_bytes())
+        .map(|s| &out[s.start..s.body_end])
+        .collect();
     prop_assert_eq!(
         ol.len(),
         nl.len(),
-        "fix changed the line COUNT (no fix in the menu should)"
+        "fix changed the record COUNT (no fix in the menu should)"
     );
     let touched = edited_lines(applied);
-    for (i, (o, n)) in ol.iter().zip(nl.iter()).enumerate() {
+    for ((line, o), n) in ol.iter().zip(nl.iter()) {
         let of = split_ags_line(o);
         let nf = split_ags_line(n);
         prop_assert!(
             nf.len() >= of.len(),
             "line {} lost fields {} -> {} (truncation): {:?} -> {:?}",
-            i + 1,
+            line,
             of.len(),
             nf.len(),
             o,
             n
         );
-        if !touched.contains(&((i + 1) as u32)) {
-            prop_assert_eq!(&of, &nf, "untouched line {} changed", i + 1);
+        if !touched.contains(line) {
+            prop_assert_eq!(&of, &nf, "untouched line {} changed", line);
         }
     }
     Ok(())
