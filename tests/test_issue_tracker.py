@@ -284,3 +284,23 @@ def test_release_an_unknown_token_renders_verbatim_never_dropped() -> None:
     """The tracker must never report on less than it holds."""
     body = REL.body(["laterite-ags4-x:someday-new-act"], RUN, 1)
     assert "laterite-ags4-x:someday-new-act" in body
+
+
+# --- the label a new tracker is born with -------------------------------------
+
+
+def test_a_created_tracker_carries_the_tracking_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Born unlabelled, a status issue reads as untriaged work to every sweep.
+
+    `docs/agents/triage-labels.md` puts bot-maintained status issues outside the
+    triage state machine by their `tracking` label; #1064 and #1068 were opened
+    without it and surfaced as "unlabeled" in the first sweep after them.
+    """
+    calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(nt, "_gh", lambda *args, check=True: calls.append(args) or "")
+    nt._execute({"action": "create", "title": "T", "body": "B"}, "o/r")
+    (args,) = calls
+    assert args[:2] == ("issue", "create")
+    assert args[args.index("--label") + 1] == "tracking"

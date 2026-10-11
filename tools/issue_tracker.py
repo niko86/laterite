@@ -393,6 +393,11 @@ def _execute(action: dict[str, Any], repo: str) -> None:
             action["title"],
             "--body",
             action["body"],
+            # Outside the triage state machine by this label
+            # (docs/agents/triage-labels.md); without it every sweep lists the
+            # tracker as untriaged work.
+            "--label",
+            "tracking",
         )
         print("opened the nightly tracker")
         return
