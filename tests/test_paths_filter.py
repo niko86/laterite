@@ -92,6 +92,14 @@ only thing that shows the claim is not stale:
                           nothing: the block has carried no negation since #313,
                           so that branch is unexercised by this corpus.
                           `dot: true`, as above.
+  #1034 (corpus drift)  1868 paths x 62 patterns = 115816 pairs, exact agreement
+                        — the `corpus` filter joined for the `corpus-drift`
+                          job: the validator and its path deps, hostopts,
+                          corpus-qa, the vendored fixtures, the lockfile, the
+                          job's script, this workflow and build-accel. Falsified
+                          first the #786 way: a planted `_matches` inversion on
+                          `.rs` paths produced 14136 mismatches. `dot: true`,
+                          as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are
@@ -298,6 +306,51 @@ def test_code_is_true_for_gate_inputs(filters: dict[str, list[str]], path: str) 
     assert _filter_matches(filters["code"], path), (
         f"a gate in the python/rust/test jobs reads {path}, but no positive rule "
         "in `code` declares it — the gate would never fire (#207)"
+    )
+
+
+# --- `corpus`: the finding-drift job fires on the engine, not on the web ------
+#
+# #1034's acceptance pair. The positive half is the trigger the job exists for:
+# a validator-only PR must re-check the corpus, or the drift it causes merges
+# green and the baseline goes stale, which is the state the issue was filed in.
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "rust-packages/laterite-ags4-validator/src/rules/groups.rs",
+        "rust-packages/laterite-ags4-parse/src/lib.rs",
+        "rust-packages/laterite-ags4-reference/data/ags_dictionary.json",
+        "rust-packages/laterite-ags4-types/src/lib.rs",
+        "rust-packages/laterite-ags4-corpus-qa/src/baseline.rs",
+        "rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json",
+        "rust-packages/laterite-ags4-forge/vendor/pyags4-tests/4.1-rule8-1.ags",
+        "rust-packages/Cargo.lock",
+        "tools/check_corpus_drift.py",
+    ],
+)
+def test_corpus_fires_on_what_moves_findings(
+    filters: dict[str, list[str]], path: str
+) -> None:
+    assert _filter_matches(filters["corpus"], path), (
+        f"{path} can move the corpus-drift verdict, but `corpus` does not fire on it"
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "web/src/App.tsx",
+        "web/docs-site/docs/index.md",
+        "ags-wiki/start-here.md",
+        "rust-packages/laterite-node/src/lib.rs",
+        "rust-packages/laterite-ags4-forge/src/main.rs",
+    ],
+)
+def test_corpus_skips_what_cannot(filters: dict[str, list[str]], path: str) -> None:
+    assert not _filter_matches(filters["corpus"], path), (
+        f"{path} cannot move a finding over the vendored corpus, yet fires `corpus`"
     )
 
 

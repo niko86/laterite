@@ -76,6 +76,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       web: ${{ steps.filter.outputs.web }}
       prose: ${{ steps.filter.outputs.prose }}
+      corpus: ${{ steps.filter.outputs.corpus }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -315,6 +316,30 @@ jobs:
               # The mirror itself: it supplies the derived cadence every claim in
               # the tree is checked against, so editing it re-checks all of them.
               - 'external-authorities.json'
+            corpus:
+              # `corpus` = what can move the `corpus-drift` job's verdict (#1034):
+              # the validator's findings over the vendored fixtures, or the check
+              # itself. The engine is the validator plus its three path deps —
+              # `cargo tree -p laterite-ags4-validator` names no other laterite
+              # crate — and hostopts, which parses the `--dict-version` the
+              # baseline is captured under. corpus-qa's other deps (parity,
+              # censor, emit, cliutil) are off the findings path: they crawl,
+              # scrub and print, and a break in them is a compile error the
+              # `rust` job already reports.
+              - 'rust-packages/laterite-ags4-validator/**'
+              - 'rust-packages/laterite-ags4-parse/**'
+              - 'rust-packages/laterite-ags4-reference/**'
+              - 'rust-packages/laterite-ags4-types/**'
+              - 'rust-packages/laterite-ags4-hostopts/**'
+              # The harness, and the committed baseline that lives inside it.
+              - 'rust-packages/laterite-ags4-corpus-qa/**'
+              # The fixture corpus the baseline was frozen over.
+              - 'rust-packages/laterite-ags4-forge/vendor/pyags4-tests/**'
+              # A dependency bump can move a finding without touching a crate.
+              - 'rust-packages/Cargo.lock'
+              - 'tools/check_corpus_drift.py'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/build-accel/**'
 
   # Stated cadences vs the crons they claim to describe. Its own job rather than
   # a step in `python` because its inputs are every .md/.rs/.py/.yml in the tree:
@@ -1292,6 +1317,76 @@ jobs:
             --exclude laterite-py \
             --exclude laterite-node \
             --features laterite-ags4-emit/arrow,laterite-ags4-types/arrow,laterite/excel
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
+  # Finding-value drift (#1034): the validator's exact findings over the vendored
+  # python-ags4 corpus, against the baseline committed beside corpus-qa. The
+  # `rust`/`test` jobs prove the engine's own tests pass; neither can see a change
+  # that moves findings CONSISTENTLY, because no test pins the corpus-wide set.
+  # This does, so a PR that moves findings must re-freeze the baseline in the
+  # same PR, where the diff shows exactly which ones moved.
+  #
+  # Its own job and its own check name rather than a step in `test`: red here
+  # means "re-freeze or fix", a different conversation from a failing unit
+  # test, and the name is what says so on the PR. A NEW status-check context,
+  # so it gates nothing until the `main protection` ruleset lists it
+  # (.github/rulesets/main-protection.expected.json already does). Skipped on a
+  # PR whose paths cannot move it, which reports success like `rust` does.
+  corpus-drift:
+    needs: changes
+    # `!cancelled()` is load-bearing (see the rust job's note): a failed `needs`
+    # must not silently skip us, and `!= 'success'` means any non-answer runs.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.corpus == 'true') }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold (no-op off the pool). Only the corpus-qa binary and its
+      # deps are built, debug, sharing the cache the `test` job populates.
+      - uses: ./.github/actions/build-accel
+
+      - name: Build corpus-qa
+        working-directory: rust-packages
+        run: cargo build -p laterite-ags4-corpus-qa
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false
+
+      # The README's invariants: warnings ON, FYI ON, check_files OFF, dict
+      # auto. `--json` because the script reads both outputs; the exit code
+      # of `baseline --check` is captured rather than allowed to stop the step,
+      # so the summary line prints on a red run as well as a green one.
+      - name: Finding drift vs the committed baseline
+        shell: bash
+        run: |
+          set -uo pipefail
+          FIX=rust-packages/laterite-ags4-forge/vendor/pyags4-tests
+          BASE=rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json
+          QA="$RUNNER_TEMP/qa-drift"
+          qa() { cargo run -q --manifest-path rust-packages/Cargo.toml -p laterite-ags4-corpus-qa -- "$@"; }
+          qa --json crawl --root "$FIX" --all --corpus-dir "$QA" --no-input -q \
+            > "$RUNNER_TEMP/crawl.json" || exit $?
+          rc=0
+          qa --json baseline --check "$BASE" --show-warnings --show-fyi \
+            --no-check-files --corpus-dir "$QA" --no-input \
+            > "$RUNNER_TEMP/drift.json" || rc=$?
+          uv run --no-project python tools/check_corpus_drift.py \
+            --crawl "$RUNNER_TEMP/crawl.json" --drift "$RUNNER_TEMP/drift.json" \
+            --check-exit "$rc" --root "$FIX" --baseline "$BASE"
 
       - name: sccache stats
         if: always()

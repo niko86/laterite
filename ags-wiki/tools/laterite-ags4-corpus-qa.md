@@ -30,14 +30,17 @@ gather→check→cross-check), plus two added 2026-06-21:
   group, field_index, severity)` tuples only (no paths/filenames/finding
   text), so it's commit-safe. `--check` exits 1 on drift. It reuses
   `validate`'s `judge` verbatim, so the snapshot reflects the real tool.
-  The finding-drift gate for the [[reliquary|parser convergence]] — now
-  also **wired per-PR**: a committed baseline over the vendored corpus
-  (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`, regen
-  note beside it) is `--check`ed in the dev satellite's `compliance.yml`
-  gate <!-- cadence: compliance --> — that tree runs the compliance harness,
-  not this one — pinning the
-  engine's absolute finding VALUES where the sibling
-  floor-identity check only proves the surfaces agree with each other.
+  The finding-drift gate for the [[reliquary|parser convergence]], and
+  **wired per-PR here** (#1034): a committed baseline over the vendored
+  corpus (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`,
+  regen note beside it) is `--check`ed by the `corpus-drift` job in
+  `repo:.github/workflows/ci.yml`, path-filtered on the validator and its
+  deps, this crate, the fixtures and the lockfile, with
+  `repo:tools/check_corpus_drift.py` turning the two JSON outputs into the
+  verdict and an every-run summary line. It pins the engine's absolute
+  finding VALUES, which no cross-surface agreement check can see. (The dev
+  satellite's `compliance.yml` runs the same check against its own older
+  copy of this crate and its own baseline, so it never exercised this tree.)
 - **`censor`** — anonymise harvested files for sharing (gather →
   **clean** → check): per the generated `sensitive_headings.json` SSOT it
   pseudonymises IDs (refs intact), sets `PROJ_ID` to the file hash
