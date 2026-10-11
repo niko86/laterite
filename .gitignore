@@ -115,6 +115,7 @@ mutants.out.old/
 /site.xlsx
 /examples/merged.ags
 /examples/phase2.ags
+/examples/recode.json
 /examples/rev.ags
 /examples/sample_site_typo.ags
 /examples/sample_site_edition.ags
