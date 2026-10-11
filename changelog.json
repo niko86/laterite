@@ -26,6 +26,9 @@
     "fixed": [
       {
         "text": "**The crates.io facade `laterite` now publishes with its release, and a crate that moves a dependency its API exposes now takes a minor version (#1073).** The facade carries the product version, and nothing published it automatically: 0.14.1 reached crates.io only after a by-hand dispatch. The nightly now publishes it once a product release stamps it, as it already did for the engine crates. The check that stops a dependency floor stranding a published crate also skipped the facade, so it could fall behind its own engine crates unnoticed; it is checked now, and it warns that a product release is owed without failing the check. A crate whose public signatures use another laterite crate's types now takes a minor version, not a patch, when it moves to an incompatible version of that crate. This is what `laterite-ags4-validator` 0.19.2 should have been."
+      },
+      {
+        "text": "**`cut-release.sh` now applies the engine cut before it stamps the product.** The owed per-crate bumps and the coherence cascade the nightly applies now land in the release PR too, so a product release publishes a facade whose engine crates carry its fixes. `--plan` lists the engine bumps beside the product number."
       }
     ],
     "security": []
