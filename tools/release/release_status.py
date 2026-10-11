@@ -96,7 +96,7 @@ import tarfile
 import tomllib
 import urllib.error
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -542,8 +542,9 @@ TIERS = ("engine", "product")
 def release_tier(crate: str) -> str:
     """'engine' | 'product' | '?' from `[package.metadata.laterite].release_tier`.
 
-    The cut acts on `engine` crates only; the facade is `product` until it
-    reaches parity (dec-facade-parity) and then rides the product trains. An
+    The cut bumps `engine` crates only; the facade is `product` and rides the
+    product trains (dec-facade-parity) — the cut only publishes its stamp and
+    the coherence reading asks it, never bumps it (#1073). An
     unlabelled crate reads as '?' and the cut refuses to act on it — the guard
     test in tests/test_engine_cut.py is what makes the omission loud rather
     than silently tiered.
@@ -695,16 +696,107 @@ def code_changed_since(sha: str, crate: str) -> bool:
     )
 
 
+def crate_path(crate: str) -> str:
+    """How `crate` is spelled inside another crate's API snapshot."""
+    return crate.replace("-", "_") + "::"
+
+
+def snapshot_text(crate: str) -> str:
+    """Every committed snapshot line for `crate` — both of the facade's files."""
+    names = [f"{crate}.txt"]
+    if crate == cpa.FACADE:
+        names.append(cpa.FACADE_ALL_FEATURES_SNAPSHOT)
+    return "\n".join(
+        (SNAPSHOTS / n).read_text() for n in names if (SNAPSHOTS / n).is_file()
+    )
+
+
+def dep_requirements(crate_manifest_text: str, workspace_text: str) -> dict[str, str]:
+    """laterite dep -> the requirement the crate PUBLISHES for it.
+
+    `[dependencies]` only: a dev-dependency never reaches a consumer, and a
+    build-dependency cannot put its types in the crate's API. A `workspace =
+    true` dep publishes the workspace floor, which is where most of them live.
+    """
+    floors = workspace_floors(workspace_text)
+    deps = tomllib.loads(crate_manifest_text).get("dependencies", {})
+    out: dict[str, str] = {}
+    for name, spec in deps.items():
+        if not name.startswith("laterite"):
+            continue
+        if isinstance(spec, str):
+            out[name] = spec
+        elif isinstance(spec, dict) and isinstance(spec.get("version"), str):
+            out[name] = spec["version"]
+        elif isinstance(spec, dict) and spec.get("workspace") and name in floors:
+            out[name] = floors[name]
+    return out
+
+
+def _caret_line(req: str) -> tuple[int, ...]:
+    """The part of a requirement a caret holds fixed: 1.x, 0.y, or 0.0.z."""
+    major, minor, patch = version_key(req.strip().lstrip("^=").strip())[:3]
+    if major:
+        return (major,)
+    if minor:
+        return (0, minor)
+    return (0, 0, patch)
+
+
+def public_dep_moves(
+    snapshot: str, base: dict[str, str], head: dict[str, str]
+) -> list[str]:
+    """The deps whose requirement moved incompatibly AND that the API names (#1073).
+
+    The snapshot names a dep's types by their crate path but never its
+    version, so validator 0.19.2's move from `parse ^0.13` to `^0.14` read +0
+    -0 and was cut as a patch, while every signature naming a parse type had
+    become a different type for its consumers. A dep the snapshot does not
+    name is private: its move changes nothing a consumer can see.
+    """
+    return sorted(
+        f"{dep} {base[dep]} -> {req}"
+        for dep, req in head.items()
+        if dep in base
+        and _caret_line(base[dep]) != _caret_line(req)
+        and crate_path(dep) in snapshot
+    )
+
+
+def public_moves_since(since: str, crate: str) -> list[str]:
+    """`public_dep_moves` between the manifests at `since` and the working tree."""
+    if not since:
+        return []
+    rel = crate_manifest(crate).relative_to(ROOT)
+    base_crate = sh("git", "show", f"{since}:{rel}")
+    base_ws = sh("git", "show", f"{since}:{ENGINE_MANIFEST.relative_to(ROOT)}")
+    if not base_crate or not base_ws:
+        return []  # the crate did not exist there: nothing to have moved
+    try:
+        base = dep_requirements(base_crate, base_ws)
+    except tomllib.TOMLDecodeError:
+        return []
+    head = dep_requirements(
+        crate_manifest(crate).read_text(), ENGINE_MANIFEST.read_text()
+    )
+    return public_dep_moves(snapshot_text(crate), base, head)
+
+
 def required_part(
-    added: int, removed: int, code_changed: bool, deps_stale: bool
+    added: int,
+    removed: int,
+    code_changed: bool,
+    deps_stale: bool,
+    public_dep_moved: bool = False,
 ) -> str:
     """The 0.x part mapping (#806): breaking and additive both take a MINOR.
 
     Never 'major' — that is a one-way door to 1.0.0 and a human's to open. A
     stale pin takes a minor too: the moved types sit in the pinning crate's own
-    public signatures, so the re-pin is breaking for its consumers.
+    public signatures, so the re-pin is breaking for its consumers. The same
+    holds when the crate itself moves a dep its API names (#1073).
     """
-    if added or removed or deps_stale:
+    if added or removed or deps_stale or public_dep_moved:
         return "minor"
     if code_changed:
         return "patch"
@@ -752,7 +844,21 @@ def cut_action(
     `delta_unavailable` (#998) is the reason an API delta could not be
     measured on one toolchain. The counts then mean nothing, so even a patch
     owed for code movement would undersell an API change nobody could see.
+
+    The product-tier facade is never bumped here, but its stamp is still
+    publish-owed (#1073): only a product cut the maintainer merges stamps it,
+    which is the same human gate an engine stamp has. Without this, 0.14.1's
+    facade sat stamped and unpublished until someone dispatched by hand.
     """
+    if tier == "product":
+        if state == "unknown":
+            return "unconcluded", "the registry did not answer"
+        if state == "owed" and version_key(stamped) > version_key(live or "0"):
+            return (
+                "publish",
+                f"{stamped} is stamped by a product cut; the registry has {live}",
+            )
+        return "none", f"tier is {tier!r} — outside the engine cut"
     if tier != "engine":
         return "none", f"tier is {tier!r} — outside the engine cut"
     if state in ("unknown", "skipped"):
@@ -882,7 +988,8 @@ def collect(
         # it, so stale pins are only a fact about crates the registry already
         # has at their stamped version.
         stale = deps_behind(rows, live, floors) if state == "ok" else []
-        part = required_part(added, removed, code, bool(stale))
+        moves = public_moves_since(since, crate)
+        part = required_part(added, removed, code, bool(stale), bool(moves))
         action, why = cut_action(
             state, tier, live, version, part, baseline_kind, bool(stale), delta.note
         )
@@ -892,6 +999,10 @@ def collect(
                 reasons.append(f"API +{added} -{removed} since {live}")
             if stale:
                 reasons.append("published pins left behind: " + "; ".join(stale))
+            if moves:
+                reasons.append(
+                    "a dependency its API names moved incompatibly: " + "; ".join(moves)
+                )
             if code and not (added or removed):
                 reasons.append("code changed with no API movement")
             why = "; ".join(reasons)
@@ -948,6 +1059,8 @@ def render(s: Report) -> str:
             # can still be pinning versions the floors have left — a fact, not
             # an action, so it is said without being shouted as owed.
             verdicts.append("PINS BEHIND FLOORS")
+            if c.tier == "product":
+                verdicts.append("PRODUCT RELEASE OWED")  # its remedy (#1073)
         flag = f"   ->  {', '.join(verdicts)}" if verdicts else ""
         reg = f"crates.io {c.registry_latest}"
         measure = DELTA_TAG.get(c.api_delta_source, c.api_delta_source)
@@ -1091,12 +1204,19 @@ class Coherence:
 
     The gate prints it and the nightly cut's cascade (#1043) acts on it, so
     both read one derivation rather than the cascade re-deriving the debt.
+
+    `introduced` is engine-tier debt only — what the cascade bumps. The
+    product-tier facade's debt is `product` (#1073): it carries the product
+    number, so a `bump_crate.py` patch is not its remedy; a product release is.
+    `skipped` counts crates with no recognised tier, which nothing asks.
     """
 
     introduced: list[tuple[str, str]]
     standing: int
     unreachable: int
     asked: int
+    product: list[tuple[str, str]] = field(default_factory=list)
+    skipped: int = 0
 
 
 def coherence_reading(
@@ -1108,9 +1228,12 @@ def coherence_reading(
         workspace_floors(base_manifest_text) if base_manifest_text is not None else {}
     )
     introduced: list[tuple[str, str]] = []
-    standing = unreachable = asked = 0
+    product: list[tuple[str, str]] = []
+    standing = unreachable = asked = skipped = 0
     for crate in engine_crates():
-        if release_tier(crate) != "engine":
+        tier = release_tier(crate)
+        if tier not in TIERS:
+            skipped += 1
             continue
         rows = fetch(crate)
         if rows is None:
@@ -1129,8 +1252,12 @@ def coherence_reading(
             else set()
         )
         standing += len(set(now) & before)
-        introduced += ((crate, d) for d in now if d not in before)
-    return Coherence(introduced, standing, unreachable, asked)
+        new = [(crate, d) for d in now if d not in before]
+        if tier == "product":
+            product += new
+        else:
+            introduced += new
+    return Coherence(introduced, standing, unreachable, asked, product, skipped)
 
 
 def check_coherence(
@@ -1148,10 +1275,16 @@ def check_coherence(
     reading = coherence_reading(fetch, base_manifest_text)
     standing, unreachable, asked = reading.standing, reading.unreachable, reading.asked
     introduced = [f"{crate}: {d}" for crate, d in reading.introduced]
+    product = [f"{crate}: {d}" for crate, d in reading.product]
+    # "published crate(s)", not "engine": the product-tier facade is asked too
+    # (#1073), and an unlabelled crate is counted as skipped rather than vanishing.
     print(
-        f"coherence: {asked} published engine crate(s) asked, {unreachable} unreachable"
+        f"coherence: {asked} published crate(s) asked (engine + the product-tier "
+        f"facade), {unreachable} unreachable, {reading.skipped} skipped (no "
+        "recognised release tier)"
         + (
             f", {standing} standing stale pin(s) left to the nightly cut"
+            " (the facade's: to a product release)"
             if standing
             else ""
         )
@@ -1168,8 +1301,14 @@ def check_coherence(
         print("Bump them in this same PR:")
         for line in introduced:
             print(f"  {line}")
-        return 1
-    return 0
+    if product:
+        print()
+        print("this change strands the published facade's pins. The facade carries")
+        print("the product number, so bump_crate.py is not its remedy — a product")
+        print("release owed (tools/release/cut-release.sh) is:")
+        for line in product:
+            print(f"  {line} — product release owed")
+    return 1 if introduced or product else 0
 
 
 def main() -> int:

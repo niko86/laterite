@@ -444,7 +444,9 @@ jobs:
       # carries strands that crate — in-tree the laterite deps are path deps
       # and always unify, so no build, lint or test in this repo can see it;
       # the fault exists only in the shape of the published manifests. Reads
-      # the crates.io sparse index. Only debt this PR INTRODUCES relative to
+      # the crates.io sparse index. The product-tier facade is asked too
+      # (#1073); a stranded facade fails naming a product release owed, since
+      # bump_crate.py is not its remedy. Only debt this PR INTRODUCES relative to
       # main fails (standing debt is the nightly cut's to fix, and a gate that
       # reddens innocent PRs over it would get skipped); an unreachable
       # registry concludes nothing, says so, and fails nothing.

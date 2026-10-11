@@ -240,11 +240,24 @@ equivalent per-stamp PR review.
     pushed onto the cut branch by hand (#953: three patches; #1031: two
     rounds; #1065: three) and thrown away by the next nightly rebuild.
     `repo:tools/release/engine_cut.py`'s `--cascade` now runs the coherence
-    reading after the owed bumps, patches every crate it names, and repeats.
+    reading after the owed bumps, bumps every engine crate it names, and
+    repeats. ~~Each bump is a patch.~~ **Since #1073** it is a minor when the
+    crate's committed API snapshot names the moved dep — the same rule the
+    derivation now applies to any incompatible move of a dep the API names,
+    which a version-free snapshot showed as `+0 −0` (validator 0.19.2 was cut
+    a patch over `parse ^0.13` → `^0.14`).
     At most one round per published engine crate: a round that adds no new
     crate, or the limit, fails the job before the PR step. The cut PR lists
     the cascade apart from the owed bumps, each with the floor that caused it.
-  - **Publish dispatch is automatic nightly** for stamped-but-absent crates,
+  - **The facade is asked, never cascaded (#1073).** The coherence reading
+    skipped every non-engine crate, so a floor that stranded the facade's
+    published pins passed. It is asked now: the PR gate fails naming a
+    *product release owed*, and the cascade lists it in the cut PR body (the
+    tracker carries a standing one) without running `bump_crate.py` on it —
+    the facade carries the product number, which only a product cut moves.
+  - **Publish dispatch is automatic nightly** for stamped-but-absent crates —
+    the facade among them since #1073, once a product cut has stamped it;
+    before that its publish waited on a by-hand dispatch (0.14.1's did) —
     cancelling any stale pending run first — a pending approval publishes
     `main` as of *approval* time, so nightly re-dispatch bounds that staleness
     to one night. ~~The `crates` environment approval is unchanged.~~
