@@ -357,9 +357,11 @@ _TABLE: _Rules = [
 ]
 
 # Rule 16's translation needs the finding group, so it's a post-hook.
+# The optional tail is the 4.2 letter-case sentence (#1033): python-ags4 has no
+# such wording, so compat drops it with the rest of laterite's phrasing.
 _RULE_16_RE = re.compile(
     r'^Abbreviation "(?P<v>[^"]+)" under (?P<col>[A-Z0-9_]+) is not '
-    r"defined in the ABBR group\.?$"
+    r"defined in the ABBR group(?:\.?|\. Apart from letter case .*)$"
 )
 
 # Rule 8 final-form: python-ags4 appends a type-specific suffix on

@@ -539,6 +539,18 @@ impl<'a> AbbrLookup<'a> {
         self.defined.contains(&(hd, code))
     }
 
+    /// The codes the file defines under `hd` that equal `p` once letter case
+    /// is ignored, in sorted order. Empty for a part that passes as written.
+    pub(crate) fn case_matches(&self, hd: &str, p: &str) -> Vec<&'a str> {
+        if !self.fails(hd, p) {
+            return Vec::new();
+        }
+        let folded = p.to_lowercase();
+        self.codes_under(hd)
+            .filter(|c| c.to_lowercase() == folded)
+            .collect()
+    }
+
     /// Whether `p` breaches Rule 16 under `hd`. An empty part is not an
     /// abbreviation (`"A++B"`), so it is never one.
     pub(crate) fn fails(&self, hd: &str, p: &str) -> bool {
@@ -583,9 +595,14 @@ impl<'a> AbbrLookup<'a> {
 /// saying so (O-57). Any other failing part gets one naming the codes close to
 /// it, when there are any (O-61): the file's own ABBR codes for that heading
 /// first, then the edition's standard ones. Each is a separate finding rather
-/// than more words on the error: compat rewrites the error into python-ags4's
-/// wording with a regex anchored at the end of the string, so any suffix would
-/// silently drop it back to ours.
+/// than more words on the error, so the error reads the same in every mode.
+///
+/// The one exception is a 4.2+ file whose failing part matches a declared code
+/// apart from letter case (#1033). The lookup stays exact, because
+/// python-ags4 rejects the variant with a Rule 16 error and a clean verdict
+/// here would pass a file its importers refuse; but 4.2 says the ABBR list is
+/// not case-sensitive, so the error itself says why it still fires. It is a
+/// trailing sentence after the plain message, which compat's rewrite drops.
 fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mut Findings) {
     // Does the file use any PA column at all?
     let has_pa = parsed
@@ -603,6 +620,7 @@ fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mu
     let Some(lookup) = AbbrLookup::of(parsed) else {
         return; // malformed ABBR — Rule 10a/4 reports it
     };
+    let case_hint = abbr_list_is_case_insensitive(dict.version());
 
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
@@ -616,13 +634,12 @@ fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mu
                     if !lookup.fails(hd, p) {
                         continue;
                     }
-                    add(
-                        found,
-                        RULE_16,
-                        None,
-                        code,
-                        format!("Abbreviation {p:?} under {hd} is not defined in the ABBR group."),
-                    );
+                    let mut desc =
+                        format!("Abbreviation {p:?} under {hd} is not defined in the ABBR group.");
+                    if case_hint {
+                        push_case_hint(&mut desc, &lookup.case_matches(hd, p));
+                    }
+                    add(found, RULE_16, None, code, desc);
                     if !include_fyi {
                         continue;
                     }
@@ -651,6 +668,29 @@ fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mu
             }
         }
     }
+}
+
+/// Appends the 4.2 letter-case sentence to a Rule 16 error whose part matches
+/// `declared` apart from case; a no-op when nothing matches. The finding stays
+/// an error: this explains it, it does not excuse it (#1033). compat's
+/// `_RULE_16_RE` recognises the sentence by its opening words, so a reworded
+/// opening must change that regex too.
+fn push_case_hint(desc: &mut String, declared: &[&str]) {
+    let quoted: Vec<String> = declared.iter().map(|c| format!("{c:?}")).collect();
+    let Some((last, rest)) = quoted.split_last() else {
+        return;
+    };
+    let named = if rest.is_empty() {
+        last.clone()
+    } else {
+        format!("{} or {last}", rest.join(", "))
+    };
+    desc.push_str(&format!(
+        " Apart from letter case it matches the declared code {named}: AGS 4.2 \
+         reads the ABBR list without regard to case, but python-ags4 still \
+         rejects this spelling. fix and merge can rewrite it with recode, or \
+         with on_code_case where the standard list settles the spelling."
+    ));
 }
 
 /// The codes close to an undefined part `p` under `hd`, as the "did you mean"
@@ -1836,6 +1876,99 @@ mod tests {
         assert!(
             suggestion_fyis(&run(&trig_cond_fixture(&["UNDISTURBED"], "UNDISTRUBED"))).is_empty()
         );
+    }
+
+    /// The Rule 16 errors, as `(line, group, desc, severity)`, for a `LOCA_TYPE`
+    /// cell holding `value` with ABBR declaring each of `declared`, judged
+    /// against `edition` with every tier on.
+    fn loca_type_errors(
+        edition: DictVersion,
+        declared: &[&str],
+        value: &str,
+    ) -> Vec<(Option<u32>, String, String, Severity)> {
+        use std::fmt::Write as _;
+        let mut s = format!(
+            "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_TYPE\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+             \"DATA\",\"BH1\",{value:?}\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n"
+        );
+        for c in declared {
+            write!(s, "\"DATA\",\"LOCA_TYPE\",{c:?},\"d\"\r\n").expect("String write");
+        }
+        let pf = parse_str(&s).expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(edition),
+            &CheckOptions {
+                include_warnings: true,
+                include_fyi: true,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        f.get(RULE_16)
+            .map(|v| {
+                v.iter()
+                    .map(|x| (x.line, x.group.clone(), x.desc.clone(), x.severity))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    const CP_PLAIN: &str = "Abbreviation \"cp\" under LOCA_TYPE is not defined in the ABBR group.";
+
+    #[test]
+    fn rule_16_case_only_mismatch_under_4_2_names_the_declared_code() {
+        let errs = loca_type_errors(DictVersion::V4_2, &["CP"], "cp");
+        assert_eq!(errs.len(), 1, "still exactly one Rule 16 error: {errs:?}");
+        let (line, group, desc, severity) = &errs[0];
+        // The structural tuple is the plain finding's, untouched.
+        assert_eq!(
+            (*line, group.as_str(), *severity),
+            (None, "LOCA", Severity::Error)
+        );
+        assert!(
+            desc.starts_with(CP_PLAIN),
+            "the plain message leads, so compat can still read it: {desc}"
+        );
+        for needle in ["\"CP\"", "4.2", "python-ags4", "on_code_case", "recode"] {
+            assert!(desc.contains(needle), "missing {needle:?}: {desc}");
+        }
+    }
+
+    #[test]
+    fn rule_16_case_hint_names_every_declared_spelling() {
+        let errs = loca_type_errors(DictVersion::V4_2, &["CP", "Cp"], "cp");
+        assert_eq!(errs.len(), 1, "{errs:?}");
+        assert!(
+            errs[0].2.contains("\"CP\"") && errs[0].2.contains("\"Cp\""),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn rule_16_case_hint_absent_for_an_unrelated_code_under_4_2() {
+        let errs = loca_type_errors(DictVersion::V4_2, &["CP"], "zz");
+        let descs: Vec<&str> = errs.iter().map(|e| e.2.as_str()).collect();
+        assert_eq!(
+            descs,
+            vec!["Abbreviation \"zz\" under LOCA_TYPE is not defined in the ABBR group."]
+        );
+    }
+
+    #[test]
+    fn rule_16_case_hint_absent_before_4_2() {
+        // 4.0.x and 4.1 say nothing about ABBR case, so the message is the
+        // plain one there.
+        for edition in [DictVersion::V4_0_4, DictVersion::V4_1] {
+            let errs = loca_type_errors(edition, &["CP"], "cp");
+            let descs: Vec<&str> = errs.iter().map(|e| e.2.as_str()).collect();
+            assert_eq!(descs, vec![CP_PLAIN], "{edition:?}");
+        }
     }
 
     #[test]
