@@ -554,14 +554,49 @@ def _facade_world(monkeypatch, *, stamped: str = "0.14.1"):
     return _fetch_for({FACADE: [_row("0.14.1", [(PARSE, "^0.13.0")])]})
 
 
-def test_a_stranded_facade_fails_coherence_and_owes_a_product_release(
+def test_a_stranded_facade_warns_a_product_release_owed_without_failing(
     capsys, monkeypatch
 ):
-    """Before #1073 the reading skipped every non-engine crate, so this passed."""
+    """Before #1073 the reading skipped every non-engine crate and said nothing.
+
+    It warns rather than fails: with the public-dep minor rule in place, the
+    moved floor is a minor the facade's caret never resolves to, so the facade
+    is stale, not broken — and when to cut the product release is the
+    owner's call, not a merge gate's.
+    """
     fetch = _facade_world(monkeypatch)
-    assert rs.check_coherence(fetch, "BASE") == 1
+    assert rs.check_coherence(fetch, "BASE") == 0
     out = capsys.readouterr().out
     assert f"{FACADE}: {PARSE} ^0.13.0 left behind by floor 0.14.0" in out
+    assert "product release owed" in out
+
+
+def test_engine_stranding_still_fails_beside_a_warned_facade(capsys, monkeypatch):
+    """The facade's warning must not dilute the engine gate: a stranded engine
+    crate fails the run even when the facade is only warned about."""
+    monkeypatch.setattr(rs, "engine_crates", lambda: [FACADE, DIFF])
+    monkeypatch.setattr(
+        rs, "release_tier", lambda c: "product" if c == FACADE else "engine"
+    )
+    monkeypatch.setattr(
+        rs,
+        "version_of",
+        lambda *a: "0.14.1" if a[0].parent.name == FACADE else "0.11.0",
+    )
+    monkeypatch.setattr(
+        rs,
+        "workspace_floors",
+        lambda text=None: {PARSE: "0.13.0"} if text == "BASE" else {PARSE: "0.14.0"},
+    )
+    fetch = _fetch_for(
+        {
+            FACADE: [_row("0.14.1", [(PARSE, "^0.13.0")])],
+            DIFF: [_row("0.11.0", [(PARSE, "^0.13.0")])],
+        }
+    )
+    assert rs.check_coherence(fetch, "BASE") == 1
+    out = capsys.readouterr().out
+    assert f"{DIFF}: {PARSE} ^0.13.0" in out
     assert "product release owed" in out
 
 

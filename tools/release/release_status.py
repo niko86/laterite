@@ -1268,7 +1268,8 @@ def check_coherence(
     Fails (1) only on debt this tree INTRODUCES relative to the base manifest —
     standing debt is the nightly cut's to fix, and a gate that reddens every PR
     over someone else's debt is a gate that gets skipped. With no base, all
-    debt counts (the nightly's absolute reading). An unreachable registry
+    debt counts (the nightly's absolute reading). The facade's debt is printed
+    as a product release owed and never fails the run (#1073). An unreachable registry
     concludes nothing and fails nothing, out loud — the scope line prints on
     every run, pass or fail.
     """
@@ -1302,13 +1303,19 @@ def check_coherence(
         for line in introduced:
             print(f"  {line}")
     if product:
+        # Reported, never failed (#1073, the owner's call). #1068 broke because a
+        # PATCH carried an incompatible floor move that the facade's caret pin
+        # then resolved to. `public_dep_moves` now makes that move a minor, which
+        # the facade's caret never reaches, so a stranded facade is stale rather
+        # than broken. Its remedy is a product release, and when to cut one is a
+        # release decision, not something a merge gate should force.
         print()
-        print("this change strands the published facade's pins. The facade carries")
-        print("the product number, so bump_crate.py is not its remedy — a product")
-        print("release owed (tools/release/cut-release.sh) is:")
+        print("WARNING (does not fail): this change strands the published facade's")
+        print("pins. The facade carries the product number, so bump_crate.py is not")
+        print("its remedy — a product release owed (tools/release/cut-release.sh) is:")
         for line in product:
             print(f"  {line} — product release owed")
-    return 1 if introduced or product else 0
+    return 1 if introduced else 0
 
 
 def main() -> int:

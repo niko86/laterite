@@ -273,10 +273,12 @@ Two automations stand behind the by-hand flow above (#806). The **PR gate**
 past a pin some published crate carries fails the PR that moves it and names
 the crates to bump alongside — the #809 class, which no build or test can see
 because in-tree the laterite deps are path deps and always unify. The facade
-`laterite` is asked too (#1073): a floor that strands its published pins fails
-the PR as a **product release owed**, because the facade carries the product
-number and `bump_crate.py` is not its remedy (a product cut in the same PR
-re-stamps it and clears the check). The
+`laterite` is asked too (#1073): a floor that strands its published pins is
+reported as a **product release owed**, a warning that does not fail the PR.
+The facade carries the product number, so `bump_crate.py` is not its remedy.
+It does not fail because the incompatible move behind it is now forced to a
+minor, which the facade's caret pin never resolves to: the facade is stale,
+not broken, and when to cut the product release is the owner's decision. The
 **nightly cut** derives the owed set every night, tracks it on the
 `Engine release work owed` issue, dispatches the publish for anything stamped
 but absent from the registry, and opens the cut PR itself
