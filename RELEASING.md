@@ -151,7 +151,8 @@ git switch -c release/0.6.0
 tools/release/bump-version.sh product minor  # or: patch  ·  --new-version 0.6.0rc1
 #    (DRY_RUN=1 tools/release/bump-version.sh product minor  stamps + regenerates without committing)
 
-# 2. main is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
+# 2. main is PROTECTED → land the bump via a release PR (any merge style — step 3
+#    tags whatever commit lands on main; 0.13.0–0.14.1 were all squash-merged):
 git push -u origin release/0.6.0
 gh pr create -B main -t "release: 0.6.0" -b "version bump"   # merge once CI is green
 
