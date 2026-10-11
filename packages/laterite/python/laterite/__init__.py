@@ -115,9 +115,9 @@ Backend = Literal["polars", "pandas"]
 XnMode = Literal["string", "numeric"]
 
 #: How [`build_ags4`][laterite.build_ags4] handles findings on the emitted bytes:
-#: `"autofix"` (default — synthesise UNIT/TYPE/TRAN, reformat), `"report"` (emit
-#: unchanged + return findings), `"strict"` (raise on any violation). Matches the
-#: engine's `EmitMode`.
+#: `"autofix"` (default — apply safe fixes), `"report"` (emit unchanged + return
+#: findings), `"strict"` (raise on any violation). Matches the engine's `EmitMode`.
+#: Metadata synthesis is separate: `synthesise_metadata=` decides it in every mode.
 BuildMode = Literal["autofix", "report", "strict"]
 
 #: An AGS4 dictionary edition — the values accepted by every `dict_version=`
@@ -2468,7 +2468,9 @@ def build_ags4(
             shape (e.g. ``{"LOCA": {"LOCA_XTRA": "3DP"}}``).
         synthesise_metadata: Mint the mandatory metadata catalogs your data doesn't
             carry — UNIT and TYPE (derived from the data), and ABBR when PA picklist
-            codes are used. ``"autofix"`` mode only. A TRAN is minted only if you
+            codes are used. Honoured in every ``mode``: ``"report"`` writes your
+            groups unchanged and the minted ones after them, ``"strict"`` judges the
+            completed file. A TRAN is minted only if you
             also supply ``tran=TranStamp(...)`` (see below).
 
             **Off by default, deliberately.** Synthesis adds whole *groups* you

@@ -32,6 +32,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Changed
+
+- **`synthesise_metadata=True` now works in every `mode`, not only `autofix` (#1069).** In `report` and `strict` the flag was silently ignored: a stamped, opted-in build wrote no TRAN, UNIT or TYPE and returned Rule 14/15/17 for the very groups it had asked for, so there was no way to get the synthesised metadata without `autofix`'s value fixes. Now `report` writes your groups byte-for-byte as before and adds the synthesised ones after them, and `strict` judges the completed file, so a stamped data-only build passes. `autofix` is unchanged, synthesis is still off unless you ask for it, and a build without the flag is unaffected. Python `build_ags4`, Node `buildAgs4` and the browser build all follow.
+
 ## [0.14.1] — 2026-10-11
 
 ### Changed
