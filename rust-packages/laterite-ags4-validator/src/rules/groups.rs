@@ -676,6 +676,7 @@ fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mu
 /// `_RULE_16_RE` recognises the sentence by its opening words, so a reworded
 /// opening must change that regex too.
 fn push_case_hint(desc: &mut String, declared: &[&str]) {
+    use std::fmt::Write as _;
     let quoted: Vec<String> = declared.iter().map(|c| format!("{c:?}")).collect();
     let Some((last, rest)) = quoted.split_last() else {
         return;
@@ -685,12 +686,14 @@ fn push_case_hint(desc: &mut String, declared: &[&str]) {
     } else {
         format!("{} or {last}", rest.join(", "))
     };
-    desc.push_str(&format!(
+    write!(
+        desc,
         " Apart from letter case it matches the declared code {named}: AGS 4.2 \
          reads the ABBR list without regard to case, but python-ags4 still \
          rejects this spelling. fix and merge can rewrite it with recode, or \
          with on_code_case where the standard list settles the spelling."
-    ));
+    )
+    .expect("String write");
 }
 
 /// The codes close to an undefined part `p` under `hd`, as the "did you mean"
