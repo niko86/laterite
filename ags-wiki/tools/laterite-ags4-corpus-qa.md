@@ -31,7 +31,7 @@ gather→check→cross-check), plus two added 2026-06-21:
   text), so it's commit-safe. `--check` exits 1 on drift. It reuses
   `validate`'s `judge` verbatim, so the snapshot reflects the real tool.
   The finding-drift gate for the [[reliquary|parser convergence]], and
-  **wired per-PR here** (#1034): a committed baseline over the vendored
+  **wired into this repo's CI** (#1034): a committed baseline over the vendored
   corpus (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`,
   regen note beside it) is `--check`ed by the `corpus-drift` job in
   `repo:.github/workflows/ci.yml`, path-filtered on the validator and its

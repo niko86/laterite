@@ -52,7 +52,9 @@ def _finding(f: dict) -> str:
 def _names(sha: str, by_sha: dict[str, list[str]]) -> str:
     names = by_sha.get(sha)
     short = sha[:12]
-    return f"{', '.join(names)} ({short})" if names else f"{short} (no file in this crawl)"
+    return (
+        f"{', '.join(names)} ({short})" if names else f"{short} (no file in this crawl)"
+    )
 
 
 def report(
@@ -126,10 +128,14 @@ def report(
             lines.append(f"    dict: {fd['dict_change']}")
         lines.extend(f"    - {_finding(f)}" for f in fd.get("removed", []))
         lines.extend(f"    + {_finding(f)}" for f in fd.get("added", []))
-    for sha in drift.get("only_in_committed", []):
-        lines.append(f"\n  only in the baseline: {_names(sha, by_sha)}")
-    for sha in drift.get("only_in_current", []):
-        lines.append(f"\n  only in this crawl: {_names(sha, by_sha)}")
+    lines.extend(
+        f"\n  only in the baseline: {_names(sha, by_sha)}"
+        for sha in drift.get("only_in_committed", [])
+    )
+    lines.extend(
+        f"\n  only in this crawl: {_names(sha, by_sha)}"
+        for sha in drift.get("only_in_current", [])
+    )
     lines += [
         "",
         "If this change is intended, re-freeze the baseline in THIS PR (from the "
@@ -152,8 +158,12 @@ def report(
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--crawl", required=True, type=Path, help="crawl --json output")
-    ap.add_argument("--drift", required=True, type=Path, help="baseline --check --json output")
-    ap.add_argument("--check-exit", required=True, type=int, help="baseline --check exit code")
+    ap.add_argument(
+        "--drift", required=True, type=Path, help="baseline --check --json output"
+    )
+    ap.add_argument(
+        "--check-exit", required=True, type=int, help="baseline --check exit code"
+    )
     ap.add_argument("--root", required=True, help="the crawled fixture root")
     ap.add_argument("--baseline", required=True, help="the committed baseline path")
     args = ap.parse_args(argv)

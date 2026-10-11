@@ -17,13 +17,15 @@ Stdlib only, so it runs in the buildless subset beside the other tools tests.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from _tools import load_tool
 
 ROOT = "rust-packages/laterite-ags4-forge/vendor/pyags4-tests"
 BASE = "rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json"
 
-CRAWL = {
+CRAWL: dict[str, Any] = {
     "schema": 1,
     "root": ROOT,
     "selection": "all",
@@ -39,7 +41,7 @@ CRAWL = {
     ],
 }
 
-CLEAN = {
+CLEAN: dict[str, Any] = {
     "committed_files": 2,
     "current_files": 2,
     "only_in_committed": [],
@@ -47,7 +49,7 @@ CLEAN = {
     "changed": [],
 }
 
-DRIFT = {
+DRIFT: dict[str, Any] = {
     "committed_files": 2,
     "current_files": 2,
     "only_in_committed": [],
