@@ -32,6 +32,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-11
+
 ### Changed
 
 - **A KEY heading declared with a type other than the dictionary's is now a WARNING, shown by default.** The declared-type advisory (O-59) stays an FYI on any other heading; on a KEY heading it rides `Warning (Related to Rule 8)` and says so (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID.`). A KEY column typed its own way is where a child's TYPE row comes to differ from its parent's, and python-ags4's Rule 10c rejects that child on its TYPE line (O-52), so a producer now sees the cause without `--show-fyi`. The verdict does not move, and `--no-warnings` hides it. Native surfaces only, as before: `laterite.compat` withholds both labels.
@@ -539,7 +541,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/niko86/laterite/releases/tag/v0.14.1
 [0.14.0]: https://github.com/niko86/laterite/releases/tag/v0.14.0
 [0.13.0]: https://github.com/niko86/laterite/releases/tag/v0.13.0
 [0.12.0]: https://github.com/niko86/laterite/releases/tag/v0.12.0
