@@ -299,7 +299,8 @@ export interface EmitOptions {
   types?: Record<string, Record<string, string>>;
   /** Mint the mandatory metadata catalogs your data doesn't carry — UNIT and
    *  TYPE (derived from the data), and ABBR when PA picklist codes are used.
-   *  `"autofix"` mode only. Default **false**. `TRAN` is NOT among them: pass
+   *  Honoured in every `mode` (`"report"` writes your groups unchanged and the
+   *  minted ones after them). Default **false**. `TRAN` is NOT among them: pass
    *  `tran` to state one.
    *
    *  Off by default on purpose: synthesis adds whole *groups* you never wrote,

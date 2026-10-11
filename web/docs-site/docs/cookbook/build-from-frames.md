@@ -41,11 +41,12 @@ transmission details.
     letting a half-stamp become a Rule 10b finding. Pass nothing and Rule 14
     reports the gap instead.
 
-    **Gotcha:** synthesis is independent of `mode`, and only `mode="autofix"` (the
-    default) honours it. `mode="report"` emits unmodified and hands you the findings;
-    `mode="strict"` is a hard gate that *rejects* the build outright if the output
-    violates any error-severity rule, so a data-only build under `strict` raises
-    rather than emitting. The emitter also writes **only the headings you supply**,
+    **Gotcha:** synthesis is independent of `mode`: `synthesise_metadata=True` adds
+    the missing groups in every mode. `mode="report"` writes your groups unmodified,
+    adds the synthesised ones after them and hands you the findings;
+    `mode="strict"` is a hard gate that *rejects* the build outright if the
+    completed output still violates any error-severity rule, so a data-only build
+    under `strict` without the opt-in raises rather than emitting. The emitter also writes **only the headings you supply**,
     never inventing data columns, so a sparse frame builds clean rather than padding
     out the full dictionary.
 

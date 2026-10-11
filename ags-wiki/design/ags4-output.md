@@ -274,6 +274,34 @@ no group ahead, so there only an earlier DICT can key one. The judged doors
 take it (Python `row_order=`, Node and wasm `{ rowOrder }`); merge passes
 `MergeOpts::row_order` through. The unchecked doors stay `Input`.
 
+## Update (2026-10-11): synthesis follows the opt-in in every mode (#1069)
+
+**Reverses the "`report`/`strict` are unchanged" line of the 2026-06-25
+update.** That gate dates from when synthesis was on by default, so it kept two
+modes free of groups nobody had asked for. The 2026-07-24 opt-in moved the
+decision to the caller, and the gate then did nothing but ignore it: a stamped,
+opted-in `report` build wrote no TRAN/UNIT/TYPE and returned Rule 14/15/17 for
+the groups the caller had requested. A downstream producer hit exactly that.
+It wanted the minted metadata without AutoFix's value fixes, and no mode gave
+it both.
+
+`synthesise_metadata` now decides alone (`EmitStream::new`). In every mode the
+minted groups are written after the caller's, so:
+
+| mode | opted in |
+|---|---|
+| `Report` | caller's groups byte-for-byte as without the flag, minted ones after, findings on the completed file |
+| `Strict` | judges the completed file, so a stamped data-only build passes |
+| `AutoFix` | unchanged |
+
+The opt-in itself stands: off by default, on the 2026-07-24 agency grounds. The
+unchecked doors are unaffected. They never arm synthesis, which is now held by
+their explicit `synthesise_metadata: false`, not by being Report-shaped.
+Pinned by `report_mode_synthesises_when_asked_and_leaves_the_data_as_given` and
+`strict_mode_judges_the_synthesised_file_when_asked` in the emit crate, and
+`test_synthesise_metadata_mints_the_missing_catalogs_when_asked` in the
+wheel's emit tests.
+
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
 The typed-graph walk used to emit *every declared heading* of each class (null →

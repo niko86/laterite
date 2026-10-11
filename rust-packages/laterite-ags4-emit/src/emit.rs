@@ -259,8 +259,12 @@ pub struct EmitOpts {
     /// only the caller can know.
     pub tran: Option<TranStamp>,
     /// Mint the mandatory metadata catalogs (UNIT / TYPE / TRAN / ABBR) the
-    /// input doesn't carry. `AutoFix` only — `Strict`/`Report` always show or
-    /// reject the gaps rather than filling them.
+    /// input doesn't carry, in every mode (#1069). The opt-in is the caller's
+    /// decision, so `mode` doesn't second-guess it: `Report` writes the
+    /// caller's groups unchanged and the minted ones after them, `Strict`
+    /// judges the completed file, `AutoFix` additionally applies its fixes.
+    /// (Until #1069 this was `AutoFix` only — a rule from when synthesis was
+    /// on by default, which left the opt-in silently inert in two modes.)
     ///
     /// **Off by default, and opt-in by design.** Synthesis adds whole GROUPS
     /// the caller never wrote; that is the sort of unexpected magic a caller
@@ -618,14 +622,14 @@ fn dict_cell(row: &[String], i: Option<usize>) -> &str {
 
 impl<'a> EmitStream<'a> {
     pub(crate) fn new(opts: &'a EmitOpts, dict: &'a Dictionary<'a>) -> Self {
-        // AutoFix only: a data-only build (notably a typed PROJ graph, which
-        // can't reach the parentless root-metadata groups) still yields a
-        // valid file — mint UNIT/TYPE (derived from the data) and ABBR (when
-        // PA codes are used) for whichever are absent, plus TRAN when the
-        // caller stamped one. PROJ is never synthesized (real project
-        // identity), so a missing PROJ stays a Rule 13 finding.
-        let synth = (opts.mode == EmitMode::AutoFix && opts.synthesise_metadata)
-            .then(SynthAccumulator::default);
+        // The opt-in alone decides, whatever the mode (#1069): a data-only
+        // build (notably a typed PROJ graph, which can't reach the parentless
+        // root-metadata groups) still yields a valid file — mint UNIT/TYPE
+        // (derived from the data) and ABBR (when PA codes are used) for
+        // whichever are absent, plus TRAN when the caller stamped one. PROJ
+        // is never synthesized (real project identity), so a missing PROJ
+        // stays a Rule 13 finding.
+        let synth = opts.synthesise_metadata.then(SynthAccumulator::default);
         EmitStream {
             builder: ParsedFileBuilder::new(),
             opts,
@@ -751,9 +755,9 @@ impl<'a> EmitStream<'a> {
 /// stream (#858): no mode dispatch ever happens (`finish_unchecked` has no
 /// judge to hand it to), no TRAN stamping and no catalog synthesis — both
 /// are judge-era conveniences whose absence Report would have REPORTED, and
-/// unchecked has nothing to report with. Report-shaped so the synth
-/// accumulator never arms and the assembly is the judged Report door's,
-/// bit for bit.
+/// unchecked has nothing to report with. `synthesise_metadata: false` is
+/// what keeps the synth accumulator from arming (since #1069 the mode no
+/// longer does), so the assembly is the judged Report door's, bit for bit.
 pub(crate) fn unchecked_opts(edition: DictVersion) -> EmitOpts {
     EmitOpts {
         mode: EmitMode::Report,
@@ -2433,9 +2437,76 @@ mod tests {
         );
     }
 
+    /// Synthesis follows the opt-in, not the mode (#1069). A caller who asks
+    /// for the derived groups gets them in Report too — without `AutoFix`'s
+    /// value fixes, which is the combination the issue could not reach — and
+    /// the caller's own groups are written exactly as Report writes them.
+    #[test]
+    fn report_mode_synthesises_when_asked_and_leaves_the_data_as_given() {
+        let plain = emit_ags4(
+            &[proj(), loca()],
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..EmitOpts::default()
+            },
+        )
+        .unwrap();
+        let asked = emit_ags4(
+            &[proj(), loca()],
+            &EmitOpts {
+                mode: EmitMode::Report,
+                synthesise_metadata: true,
+                tran: Some(stamp()),
+                ..EmitOpts::default()
+            },
+        )
+        .unwrap();
+        let text = String::from_utf8(asked.bytes.clone()).unwrap();
+        for g in ["TRAN", "UNIT", "TYPE"] {
+            assert!(
+                text.contains(&format!("\"GROUP\",\"{g}\"")),
+                "opted-in Report should synthesise the {g} group, got:\n{text}"
+            );
+        }
+        // Synthesised groups are written last, so the caller's groups are a
+        // byte-for-byte prefix of the opted-in output: nothing was fixed.
+        assert!(
+            asked.bytes.starts_with(&plain.bytes),
+            "Report must write the caller's groups unchanged before the synthesised ones"
+        );
+        assert!(asked.applied.is_empty() && asked.fixes_applied == 0);
+        let errors = asked
+            .findings
+            .values()
+            .flatten()
+            .filter(|f| f.severity == Severity::Error)
+            .count();
+        assert_eq!(errors, 0, "findings:\n{:?}", asked.findings);
+    }
+
+    /// Strict judges the file synthesis completed, so an opted-in, stamped
+    /// data-only build passes rather than being rejected for the very groups
+    /// the caller asked to have minted (#1069).
+    #[test]
+    fn strict_mode_judges_the_synthesised_file_when_asked() {
+        let r = emit_ags4(
+            &[proj(), loca()],
+            &EmitOpts {
+                mode: EmitMode::Strict,
+                synthesise_metadata: true,
+                tran: Some(stamp()),
+                ..EmitOpts::default()
+            },
+        );
+        let r = r.expect("opted-in Strict should accept the synthesised file");
+        let text = String::from_utf8(r.bytes).unwrap();
+        assert!(text.contains("\"GROUP\",\"TRAN\""), "got:\n{text}");
+    }
+
     #[test]
     fn report_mode_does_not_synthesize() {
-        // Report mode leaves the file as given — a missing TRAN is not minted.
+        // Without the opt-in, Report leaves the file as given — a missing
+        // TRAN is not minted (the flag, not the mode, decides: #1069).
         let r = emit_ags4(
             &[proj()],
             &EmitOpts {
@@ -2454,9 +2525,9 @@ mod tests {
     #[test]
     fn strict_mode_rejects_error_findings_and_accepts_a_clean_file() {
         // Pins the Strict gate: `count(severity == Error)` and `errors > 0`.
-        // Strict does NOT synthesize the mandatory metadata groups (AutoFix
-        // does), so a genuinely clean fixture must carry PROJ + TRAN + the
-        // UNIT/TYPE catalogs itself (mirroring `synthesise_metadata`).
+        // Without the opt-in nothing is synthesised, so a genuinely clean
+        // fixture must carry PROJ + TRAN + the UNIT/TYPE catalogs itself
+        // (mirroring `synthesise_metadata`).
         let strict = EmitOpts {
             mode: EmitMode::Strict,
             ..Default::default()

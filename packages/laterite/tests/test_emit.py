@@ -340,12 +340,23 @@ def test_synthesise_metadata_mints_the_missing_catalogs_when_asked():
     assert "Acme Ground Engineering" in res.text
     assert "TBC" not in res.text and "1900-01-01" not in res.text
 
-    # Report mode never synthesises, opted in or not — it reports, it doesn't fix.
-    rep = laterite.build_ags4(
-        {"PROJ": _proj(), "LOCA": loca}, mode="report", synthesise_metadata=True
+    # The opt-in decides, not the mode (#1069): report synthesises too, writing
+    # the caller's groups unchanged (no autofix value fixes) and the minted
+    # ones after them, so the plain report build is a byte prefix of it.
+    frames = {"PROJ": _proj(), "LOCA": loca}
+    plain = laterite.build_ags4(frames, mode="report")
+    rep = laterite.build_ags4(frames, mode="report", synthesise_metadata=True, **_TRAN)
+    assert {"TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=rep.bytes).groups)
+    assert rep.bytes.startswith(plain.bytes)
+    assert not rep.findings
+    assert "TRAN" not in laterite.read(data=plain.bytes).groups
+
+    # strict judges the file synthesis completed, so it passes instead of
+    # rejecting the build for the groups the caller asked to have minted.
+    strict = laterite.build_ags4(
+        frames, mode="strict", synthesise_metadata=True, **_TRAN
     )
-    assert "TRAN" not in laterite.read(data=rep.bytes).groups
-    assert rep.findings
+    assert "TRAN" in laterite.read(data=strict.bytes).groups
 
 
 def test_synthesis_is_off_by_default():

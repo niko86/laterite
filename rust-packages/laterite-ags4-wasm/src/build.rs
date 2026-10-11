@@ -567,7 +567,8 @@ fn build_ipc_core(
 ///   data-only build reports Rule 14/15/17 rather than silently filling them.
 /// * `synthesise_metadata` — `None`/`false` (default) | `true` to mint the
 ///   mandatory UNIT/TYPE/ABBR catalogs a data-only build is missing, clearing
-///   Rule 15/17. Only meaningful under `"autofix"`. This is the browser twin of
+///   Rule 15/17, in every mode (`"report"` writes the caller's groups unchanged
+///   and the minted ones after them). This is the browser twin of
 ///   Python's `synthesise_metadata=` and Node's `{ synthesiseMetadata }`.
 /// * `tran_issue` / `tran_date` / `tran_producer` / `tran_recipient` /
 ///   `tran_status` — the transmission this file represents. Supply them and
