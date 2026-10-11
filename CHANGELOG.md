@@ -32,6 +32,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-11
+
 ### Changed
 
 - **A KEY heading declared with a type other than the dictionary's is now a WARNING, shown by default.** The declared-type advisory (O-59) stays an FYI on any other heading; on a KEY heading it rides `Warning (Related to Rule 8)` and says so (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is ID.`). A KEY column typed its own way is where a child's TYPE row comes to differ from its parent's, and python-ags4's Rule 10c rejects that child on its TYPE line (O-52), so a producer now sees the cause without `--show-fyi`. The verdict does not move, and `--no-warnings` hides it. Native surfaces only, as before: `laterite.compat` withholds both labels.
@@ -41,6 +43,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **The wheel's `lat` no longer dies with a `UnicodeEncodeError` on a non-UTF-8 console.** On Windows a cp1252 console or pipe gave the launcher a cp1252 output stream, and the guide's first `→` killed `lat --help` and `lat --readme` before a new user saw a line of it; a finding or error carrying such a character went the same way. `main()` now puts both output streams on UTF-8 with the policy of Python's UTF-8 mode (the default from 3.15, PEP 686), so the launcher emits the same bytes as the Rust binary whatever the console says. Only the Python `lat` was affected: the binary and the Node launcher write bytes.
 - **Line numbers are right after a quoted field that spans a newline (#1052).** Such a field stays one row (O-47), but every line after it was reported one short per newline it held: a finding on a TYPE row pointed at the UNIT row above. Lines are now the physical lines an editor shows and python-ags4 reports, on every surface: findings, fixes, the group, heading, unit, type and data row lines, `get_line_numbers`, and `laterite.compat`'s duplicate-group and ragged-row messages. The spanning row itself is reported where it starts, as before, and `--fix` still edits the right row. `total_lines` is unchanged and is documented as what it always was: the number of records, which is fewer than the last line number after a spanning field. The parse leaf adds `numbered_line_spans`, which pairs each record with its physical start line.
+- **`cargo add laterite` compiles again (#1068).** The 0.14.0 Rust crate pins `laterite-ags4-parse ^0.13` and `laterite-ags4-validator ^0.19.1`, and validator 0.19.2 moved to parse 0.14 inside a patch release, so a fresh build resolved two copies of the parse crate and failed with `ValidatorError: From<ParseError>` not satisfied. 0.14.1 depends on parse 0.14 and validator 0.20 throughout. Only a new resolve was affected: a project whose `Cargo.lock` already held validator 0.19.1 kept building.
 
 ## [0.14.0] — 2026-10-08
 
@@ -538,7 +541,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/niko86/laterite/releases/tag/v0.14.1
 [0.14.0]: https://github.com/niko86/laterite/releases/tag/v0.14.0
 [0.13.0]: https://github.com/niko86/laterite/releases/tag/v0.13.0
 [0.12.0]: https://github.com/niko86/laterite/releases/tag/v0.12.0
