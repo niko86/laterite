@@ -22,6 +22,9 @@
       },
       {
         "text": "**Line numbers are right after a quoted field that spans a newline (#1052).** Such a field stays one row (O-47), but every line after it was reported one short per newline it held: a finding on a TYPE row pointed at the UNIT row above. Lines are now the physical lines an editor shows and python-ags4 reports, on every surface: findings, fixes, the group, heading, unit, type and data row lines, `get_line_numbers`, and `laterite.compat`'s duplicate-group and ragged-row messages. The spanning row itself is reported where it starts, as before, and `--fix` still edits the right row. `total_lines` is unchanged and is documented as what it always was: the number of records, which is fewer than the last line number after a spanning field. The parse leaf adds `numbered_line_spans`, which pairs each record with its physical start line."
+      },
+      {
+        "text": "**`cargo add laterite` compiles again (#1068).** The 0.14.0 Rust crate pins `laterite-ags4-parse ^0.13` and `laterite-ags4-validator ^0.19.1`, and validator 0.19.2 moved to parse 0.14 inside a patch release, so a fresh build resolved two copies of the parse crate and failed with `ValidatorError: From<ParseError>` not satisfied. 0.14.1 depends on parse 0.14 and validator 0.20 throughout. Only a new resolve was affected: a project whose `Cargo.lock` already held validator 0.19.1 kept building."
       }
     ],
     "security": []
