@@ -240,11 +240,30 @@ equivalent per-stamp PR review.
     pushed onto the cut branch by hand (#953: three patches; #1031: two
     rounds; #1065: three) and thrown away by the next nightly rebuild.
     `repo:tools/release/engine_cut.py`'s `--cascade` now runs the coherence
-    reading after the owed bumps, patches every crate it names, and repeats.
+    reading after the owed bumps, bumps every engine crate it names, and
+    repeats. ~~Each bump is a patch.~~ **Since #1073** it is a minor when the
+    crate's committed API snapshot names the moved dep — the same rule the
+    derivation now applies to any incompatible move of a dep the API names,
+    which a version-free snapshot showed as `+0 −0` (validator 0.19.2 was cut
+    a patch over `parse ^0.13` → `^0.14`).
     At most one round per published engine crate: a round that adds no new
     crate, or the limit, fails the job before the PR step. The cut PR lists
     the cascade apart from the owed bumps, each with the floor that caused it.
-  - **Publish dispatch is automatic nightly** for stamped-but-absent crates,
+  - **The facade is asked, never cascaded (#1073).** The coherence reading
+    skipped every non-engine crate, so a floor that stranded the facade's
+    published pins passed without a word. It is asked now. The PR gate
+    *warns* of a *product release owed* and does not fail. The cascade lists
+    it in the cut PR body (the tracker carries a standing one) and never runs
+    `bump_crate.py` on it, because the facade carries the product number,
+    which only a product cut moves. It warns rather than fails by the owner's
+    decision. #1068 broke because a *patch* carried an incompatible floor move
+    that the facade's caret then resolved to. The public-dep rule above makes
+    that move a minor, which the caret never reaches, so a stranded facade is
+    stale, not broken, and when to cut the product release is a release
+    decision, not something a merge gate should force.
+  - **Publish dispatch is automatic nightly** for stamped-but-absent crates —
+    the facade among them since #1073, once a product cut has stamped it;
+    before that its publish waited on a by-hand dispatch (0.14.1's did) —
     cancelling any stale pending run first — a pending approval publishes
     `main` as of *approval* time, so nightly re-dispatch bounds that staleness
     to one night. ~~The `crates` environment approval is unchanged.~~

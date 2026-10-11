@@ -384,7 +384,10 @@ jobs:
           # next. The loop and its stop rules live in engine_cut.py, where they
           # are tested; a stuck cascade exits non-zero here, so no PR opens.
           uv run --no-project python tools/release/engine_cut.py --cascade > /tmp/cascade.txt
-          if [ ! -s /tmp/bumps.txt ] && [ ! -s /tmp/cascade.txt ]; then
+          # Asked of the tree, not of the two files: the cascade also prints a
+          # stranded facade's owed product release (#1073), which bumps nothing
+          # and must not open a PR on its own — the tracker carries that one.
+          if git diff --quiet -- rust-packages; then
             echo "no bumps owed"
             echo "any=false" >> "$GITHUB_OUTPUT"
             exit 0

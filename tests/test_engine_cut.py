@@ -402,7 +402,7 @@ class _World:
                 return debt
         return []
 
-    def bump(self, crate: str) -> None:
+    def bump(self, crate: str, part: str = "patch") -> None:
         self.bumped.append(crate)
 
 
@@ -512,7 +512,7 @@ def test_a_stuck_cascade_exits_4_with_no_pr_body(capsys, monkeypatch):
     debt = [(CORE, f"{REF} ^0.15.0 left behind by floor 0.16.0")]
     reading = rs.Coherence(introduced=debt, standing=0, unreachable=0, asked=1)
     monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
-    monkeypatch.setattr(ec, "_bump_patch", lambda crate: None)
+    monkeypatch.setattr(ec, "_bump", lambda crate, part: None)
     monkeypatch.setattr(ec, "cascade_limit", lambda: 12)
     monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
     assert ec.main() == ec.EXIT_CASCADE_STUCK
@@ -529,5 +529,211 @@ def test_the_cascade_reports_its_scope_every_round(capsys, monkeypatch):
     monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
     assert ec.main() == 0
     err = capsys.readouterr().err
-    assert "9 published engine crate(s) asked, 3 unreachable" in err
+    assert "9 published crate(s) asked, 3 unreachable" in err
     assert "concluding nothing" in err
+
+
+# --- #1073: the facade is asked, never cascaded; public deps take a minor ---
+
+PARSE, FACADE = "laterite-ags4-parse", "laterite"
+
+
+def _facade_world(monkeypatch, *, stamped: str = "0.14.1"):
+    """The 0.19.2 situation: parse's floor moved 0.13 -> 0.14 while the
+    published facade still pins `^0.13.0`."""
+    monkeypatch.setattr(rs, "engine_crates", lambda: [FACADE])
+    monkeypatch.setattr(
+        rs, "release_tier", lambda c: "product" if c == FACADE else "engine"
+    )
+    monkeypatch.setattr(rs, "version_of", lambda *a: stamped)
+    monkeypatch.setattr(
+        rs,
+        "workspace_floors",
+        lambda text=None: {PARSE: "0.13.0"} if text == "BASE" else {PARSE: "0.14.0"},
+    )
+    return _fetch_for({FACADE: [_row("0.14.1", [(PARSE, "^0.13.0")])]})
+
+
+def test_a_stranded_facade_warns_a_product_release_owed_without_failing(
+    capsys, monkeypatch
+):
+    """Before #1073 the reading skipped every non-engine crate and said nothing.
+
+    It warns rather than fails: with the public-dep minor rule in place, the
+    moved floor is a minor the facade's caret never resolves to, so the facade
+    is stale, not broken — and when to cut the product release is the
+    owner's call, not a merge gate's.
+    """
+    fetch = _facade_world(monkeypatch)
+    assert rs.check_coherence(fetch, "BASE") == 0
+    out = capsys.readouterr().out
+    assert f"{FACADE}: {PARSE} ^0.13.0 left behind by floor 0.14.0" in out
+    assert "product release owed" in out
+
+
+def test_engine_stranding_still_fails_beside_a_warned_facade(capsys, monkeypatch):
+    """The facade's warning must not dilute the engine gate: a stranded engine
+    crate fails the run even when the facade is only warned about."""
+    monkeypatch.setattr(rs, "engine_crates", lambda: [FACADE, DIFF])
+    monkeypatch.setattr(
+        rs, "release_tier", lambda c: "product" if c == FACADE else "engine"
+    )
+    monkeypatch.setattr(
+        rs,
+        "version_of",
+        lambda *a: "0.14.1" if a[0].parent.name == FACADE else "0.11.0",
+    )
+    monkeypatch.setattr(
+        rs,
+        "workspace_floors",
+        lambda text=None: {PARSE: "0.13.0"} if text == "BASE" else {PARSE: "0.14.0"},
+    )
+    fetch = _fetch_for(
+        {
+            FACADE: [_row("0.14.1", [(PARSE, "^0.13.0")])],
+            DIFF: [_row("0.11.0", [(PARSE, "^0.13.0")])],
+        }
+    )
+    assert rs.check_coherence(fetch, "BASE") == 1
+    out = capsys.readouterr().out
+    assert f"{DIFF}: {PARSE} ^0.13.0" in out
+    assert "product release owed" in out
+
+
+def test_the_facade_is_asked_and_counted_in_the_scope_line(capsys, monkeypatch):
+    fetch = _facade_world(monkeypatch)
+    reading = rs.coherence_reading(fetch, None)
+    assert reading.introduced == []  # never the cascade's to bump
+    assert reading.product == [(FACADE, f"{PARSE} ^0.13.0 left behind by floor 0.14.0")]
+    assert reading.asked == 1
+    rs.check_coherence(fetch, None)
+    assert "1 published crate(s) asked" in capsys.readouterr().out
+
+
+def test_a_facade_stamped_ahead_is_not_stranded(monkeypatch):
+    """A product cut in the same PR re-stamps it, and its fresh floors ride along."""
+    fetch = _facade_world(monkeypatch, stamped="0.15.0")
+    assert rs.check_coherence(fetch, "BASE") == 0
+
+
+def test_the_cascade_never_bumps_the_facade_and_reports_it(capsys, monkeypatch):
+    debt = [(FACADE, f"{PARSE} ^0.13.0 left behind by floor 0.14.0")]
+    reading = rs.Coherence(
+        introduced=[], standing=0, unreachable=0, asked=1, product=debt
+    )
+    bumped: list[str] = []
+    monkeypatch.setattr(rs, "coherence_reading", lambda fetch, base: reading)
+    monkeypatch.setattr(ec, "_bump", lambda crate, part: bumped.append(crate))
+    monkeypatch.setattr(ec, "cascade_limit", lambda: 12)
+    monkeypatch.setattr(ec.sys, "argv", ["engine_cut.py", "--cascade"])
+    assert ec.main() == 0
+    assert bumped == []
+    out = capsys.readouterr().out
+    assert "product release owed" in out
+    assert f"{FACADE}: {PARSE} ^0.13.0 left behind by floor 0.14.0" in out
+
+
+def test_a_cascade_bump_whose_api_names_the_moved_dep_is_a_minor():
+    """The cascade forms a verdict too: patching a crate whose public API names
+    the moved dep would leave next night's cut owing a minor on top of it."""
+    world = _World([(set(), [(VAL, f"{PARSE} ^0.13.0 left behind by floor 0.14.0")])])
+    parts: dict[str, str] = {}
+
+    def bump(crate: str, part: str) -> None:
+        parts[crate] = part
+        world.bump(crate)
+
+    snap = "pub fn x(&laterite_ags4_parse::ParsedFile)"
+    applied = ec.cascade(
+        world.stranded,
+        bump,
+        limit=12,
+        part=lambda crate, because: ec.cascade_part(snap, because),
+    )
+    assert parts == {VAL: "minor"}
+    assert applied[0].part == "minor"
+    assert ec.cascade_part("pub fn y()", applied[0].because) == "patch"
+
+
+# Gap 2: an incompatible move of a dependency the crate's API names.
+
+
+def test_a_public_dep_moved_incompatibly_is_named():
+    snap = "impl From<laterite_ags4_parse::ParseError> for laterite_ags4_validator::E"
+    moves = rs.public_dep_moves(snap, {PARSE: "^0.13.0"}, {PARSE: "^0.14.0"})
+    assert len(moves) == 1
+    assert PARSE in moves[0]
+    assert rs.required_part(0, 0, False, False, bool(moves)) == "minor"
+    # The same move, code changed, would have been cut as a patch before.
+    assert rs.required_part(0, 0, True, False, bool(moves)) == "minor"
+
+
+def test_a_private_dep_move_keeps_todays_verdict():
+    snap = "pub fn laterite_ags4_validator::validate(&str)"
+    moves = rs.public_dep_moves(snap, {PARSE: "^0.13.0"}, {PARSE: "^0.14.0"})
+    assert moves == []
+    assert rs.required_part(0, 0, True, False, bool(moves)) == "patch"
+
+
+@pytest.mark.parametrize(
+    ("base", "head", "moved"),
+    [
+        ("0.13.0", "0.14.0", True),
+        ("^0.13.0", "^0.14.0", True),
+        ("0.13.0", "0.13.4", False),  # compatible under caret
+        ("1.2.0", "1.9.0", False),
+        ("1.2.0", "2.0.0", True),
+    ],
+)
+def test_an_incompatible_move_is_a_caret_break(base, head, moved):
+    snap = "laterite_ags4_parse::X"
+    assert bool(rs.public_dep_moves(snap, {PARSE: base}, {PARSE: head})) is moved
+
+
+def test_dep_requirements_resolve_workspace_floors():
+    crate = (
+        "[dependencies]\n"
+        "laterite-ags4-parse = { workspace = true }\n"
+        'laterite-transport = { version = "0.12.0" }\n'
+        'serde = "1"\n'
+        "[dev-dependencies]\n"
+        "laterite-ags4-emit = { workspace = true }\n"
+    )
+    ws = (
+        "[workspace.dependencies]\n"
+        'laterite-ags4-parse = { path = "p", version = "0.14.0" }\n'
+        'laterite-ags4-emit = { path = "e", version = "0.20.0" }\n'
+    )
+    assert rs.dep_requirements(crate, ws) == {
+        PARSE: "0.14.0",
+        "laterite-transport": "0.12.0",
+    }
+
+
+# Gap 3: a facade stamped ahead of crates.io is publish-owed.
+
+
+def test_a_facade_stamped_ahead_of_the_registry_is_publish_owed():
+    action, _ = act(tier="product", state="owed", stamped="0.14.2", live="0.14.1")
+    assert action == "publish"
+    status = _status(
+        _crate(crate=FACADE, tier="product", version="0.14.2", cut_action="publish")
+    )
+    assert ec.publish_owed(status) == [FACADE]
+    assert ec.tokens(status) == [f"{FACADE}:publish-0.14.2"]
+
+
+def test_a_facade_level_with_the_registry_is_not_publish_owed():
+    assert act(tier="product", stamped="0.14.1", live="0.14.1")[0] == "none"
+
+
+def test_a_stranded_facade_is_a_tracker_item_not_a_bump():
+    status = _status(
+        _crate(
+            crate=FACADE,
+            tier="product",
+            deps_behind=[f"{PARSE} ^0.13.0 left behind by floor 0.14.0"],
+        )
+    )
+    assert ec.tokens(status) == [f"{FACADE}:product-release-owed"]
+    assert ec.bumps(status) == []

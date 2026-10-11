@@ -75,7 +75,8 @@ The same derivation runs nightly as the **engine cut** (#806): anything owed
 opens (and keeps current) an `Engine release work owed` tracking issue — an
 issue a human sees, where the step summary that recorded emit 0.12.0's missing
 publish was a summary nobody read — and a stamped-but-unpublished crate gets
-the publish dispatched automatically, any stale queued run cancelled first.
+the publish dispatched automatically, any stale queued run cancelled first —
+the facade `laterite` included, once a product cut has stamped it (#1073).
 The dispatched run executes unattended: since 2026-09-03 the `crates`
 environment carries no required reviewer, so the human gate on a publish is
 the PR merge that put the stamp on `main`, not a second click on the run.
@@ -271,7 +272,13 @@ Two automations stand behind the by-hand flow above (#806). The **PR gate**
 (`release_status.py --check-coherence`, in ci.yml's repo-gates): a floor moved
 past a pin some published crate carries fails the PR that moves it and names
 the crates to bump alongside — the #809 class, which no build or test can see
-because in-tree the laterite deps are path deps and always unify. The
+because in-tree the laterite deps are path deps and always unify. The facade
+`laterite` is asked too (#1073): a floor that strands its published pins is
+reported as a **product release owed**, a warning that does not fail the PR.
+The facade carries the product number, so `bump_crate.py` is not its remedy.
+It does not fail because the incompatible move behind it is now forced to a
+minor, which the facade's caret pin never resolves to: the facade is stale,
+not broken, and when to cut the product release is the owner's decision. The
 **nightly cut** derives the owed set every night, tracks it on the
 `Engine release work owed` issue, dispatches the publish for anything stamped
 but absent from the registry, and opens the cut PR itself
@@ -312,8 +319,12 @@ actually install.
 
 The facade crate `laterite` is published by the same tool and carries the
 **product** number (since parity — dec-facade-parity phase 8, 2026-09-04),
-stamped by `bump-version.sh product`: publish it to crates.io as part of the
-product release, at the release's version.
+stamped by `bump-version.sh product`. Once that product cut is on `main`, the
+nightly cut sees the facade stamped ahead of crates.io and dispatches
+`publish-crates.yml` for it like any engine crate (#1073) — a by-hand dispatch
+is only for not wanting to wait. The nightly never *stamps* it: a stranded
+facade is reported (the release tracker, and the cut PR body) as a product
+release owed.
 
 A retired convention, kept for the record: while the facade sat on its own
 `0.1.x`, its changelog entries had to name that number in the prose, because

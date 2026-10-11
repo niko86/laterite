@@ -444,7 +444,11 @@ jobs:
       # carries strands that crate — in-tree the laterite deps are path deps
       # and always unify, so no build, lint or test in this repo can see it;
       # the fault exists only in the shape of the published manifests. Reads
-      # the crates.io sparse index. Only debt this PR INTRODUCES relative to
+      # the crates.io sparse index. The product-tier facade is asked too
+      # (#1073); a stranded facade is WARNED as a product release owed and never
+      # fails the PR — once a public dep's incompatible move is forced to a minor,
+      # the facade's caret never resolves to it, so it is stale rather than broken,
+      # and when to cut the product release is the owner's call. Only debt this PR INTRODUCES relative to
       # main fails (standing debt is the nightly cut's to fix, and a gate that
       # reddens innocent PRs over it would get skipped); an unreachable
       # registry concludes nothing, says so, and fails nothing.

@@ -40,6 +40,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **`synthesise_metadata=True` now works in every `mode`, not only `autofix` (#1069).** In `report` and `strict` the flag was silently ignored: a stamped, opted-in build wrote no TRAN, UNIT or TYPE and returned Rule 14/15/17 for the very groups it had asked for, so there was no way to get the synthesised metadata without `autofix`'s value fixes. Now `report` writes your groups byte-for-byte as before and adds the synthesised ones after them, and `strict` judges the completed file, so a stamped data-only build passes. `autofix` is unchanged, synthesis is still off unless you ask for it, and a build without the flag is unaffected. Python `build_ags4`, Node `buildAgs4` and the browser build all follow.
 
+### Fixed
+
+- **The crates.io facade `laterite` now publishes with its release, and a crate that moves a dependency its API exposes now takes a minor version (#1073).** The facade carries the product version, and nothing published it automatically: 0.14.1 reached crates.io only after a by-hand dispatch. The nightly now publishes it once a product release stamps it, as it already did for the engine crates. The check that stops a dependency floor stranding a published crate also skipped the facade, so it could fall behind its own engine crates unnoticed; it is checked now, and it warns that a product release is owed without failing the check. A crate whose public signatures use another laterite crate's types now takes a minor version, not a patch, when it moves to an incompatible version of that crate. This is what `laterite-ags4-validator` 0.19.2 should have been.
+
 ## [0.14.1] — 2026-10-11
 
 ### Changed

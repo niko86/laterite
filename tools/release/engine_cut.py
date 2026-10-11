@@ -19,11 +19,13 @@ The modes map one-to-one onto the job's steps:
 * `--publish-owed` — the crates whose stamp should be on the registry and is
   not; any output means "cancel any stale queued run and dispatch a fresh one".
 * `--render`  — the human report + the cut view, for the step summary.
-* `--cascade` — after the owed bumps are applied, patch every crate whose
-  published pins the moved floors left behind, round by round until the
-  coherence check is clean (#1043). Prints the PR body's cascade section;
-  exits 4, naming the crates still owed, when the loop stops making progress.
-  It reads the tree as it stands, so it takes no snapshot file.
+* `--cascade` — after the owed bumps are applied, bump every engine crate whose
+  published pins the moved floors left behind (a patch, or a minor when its
+  API names the moved dep), round by round until the coherence check is clean
+  (#1043). Prints the PR body's cascade section, plus any product release the
+  stranded facade owes — never bumped here (#1073); exits 4, naming the crates
+  still owed, when the loop stops making progress. It reads the tree as it
+  stands, so it takes no snapshot file.
 """
 
 from __future__ import annotations
@@ -60,6 +62,10 @@ def tokens(status: rs.Report) -> list[str]:
             out.append(f"{c.crate}:publish-{c.version}")
         elif c.cut_action == "human":
             out.append(f"{c.crate}:human")
+        elif c.tier == "product" and c.deps_behind:
+            # The facade's stranded pins (#1073): no cut act pays them, so the
+            # tracker is where the owed product release stays visible.
+            out.append(f"{c.crate}:product-release-owed")
     return out
 
 
@@ -81,11 +87,24 @@ def unconcluded(status: rs.Report) -> list[str]:
 
 @dataclass(frozen=True)
 class CascadeBump:
-    """One patch the coherence cascade applied, and the moved floor behind it."""
+    """One bump the coherence cascade applied, and the moved floor behind it."""
 
     crate: str
     round: int
     because: tuple[str, ...]
+    part: str = "patch"
+
+
+def cascade_part(snapshot: str, because: tuple[str, ...] | list[str]) -> str:
+    """'minor' when the stranded crate's API names a dep whose floor moved (#1073).
+
+    A stranded pin is by construction an incompatible move, so this is
+    `rs.public_dep_moves`' rule applied at cascade time: a patch here would
+    leave the next night's cut owing a minor on top of it. Each reason
+    starts with the moved dep's name (`rs.deps_behind` writes them).
+    """
+    deps = [reason.split(" ", 1)[0] for reason in because]
+    return "minor" if any(rs.crate_path(d) in snapshot for d in deps) else "patch"
 
 
 class CascadeStuck(Exception):
@@ -107,10 +126,14 @@ def cascade_limit() -> int:
 
 def cascade(
     stranded: Callable[[], list[tuple[str, str]]],
-    bump: Callable[[str], None],
+    bump: Callable[[str, str], None],
     limit: int,
+    part: Callable[[str, tuple[str, ...]], str] = lambda crate, because: "patch",
 ) -> list[CascadeBump]:
-    """Patch every crate the coherence check names until it names none (#1043).
+    """Bump every crate the coherence check names until it names none (#1043).
+
+    `part` picks each bump's part from the crate and its reasons — a patch,
+    unless the crate's API names the moved dep (#1073).
 
     A patch moves the bumped crate's own floor, which can strand the crates
     pinning IT — #1031 walked two such rounds by hand, and the nightly rebuild
@@ -137,28 +160,44 @@ def cascade(
         if not new:
             raise CascadeStuck(demanded, f"round {round_no} added no new crate")
         for crate in new:
-            bump(crate)
+            because = tuple(reasons[crate])
+            chosen = part(crate, because)
+            bump(crate, chosen)
             bumped.add(crate)
-            applied.append(CascadeBump(crate, round_no, tuple(reasons[crate])))
+            applied.append(CascadeBump(crate, round_no, because, chosen))
     raise AssertionError("unreachable: the loop returns or raises")
 
 
-def render_cascade(applied: list[CascadeBump]) -> str:
-    """The cut PR body's cascade section: kept apart from the owed bumps."""
-    if not applied:
-        return ""
-    lines = [
-        "coherence cascade (#1043) — patches, each because a moved floor left "
-        "its published pins behind:"
-    ]
-    lines.extend(
-        f"  {b.crate} patch   (round {b.round}: {'; '.join(b.because)})"
-        for b in applied
-    )
+def render_cascade(
+    applied: list[CascadeBump], product: list[tuple[str, str]] | None = None
+) -> str:
+    """The cut PR body's cascade section: kept apart from the owed bumps.
+
+    `product` is the facade's stranded pins (#1073), which the cascade never
+    bumps — they are listed as the product release they owe instead.
+    """
+    lines: list[str] = []
+    if applied:
+        lines.append(
+            "coherence cascade (#1043) — bumps, each because a moved floor left "
+            "its published pins behind:"
+        )
+        lines.extend(
+            f"  {b.crate} {b.part}   (round {b.round}: {'; '.join(b.because)})"
+            for b in applied
+        )
+    if product:
+        if lines:
+            lines.append("")
+        lines.append(
+            "product release owed (#1073) — the facade's published pins are left "
+            "behind; bump_crate.py is not its remedy, tools/release/cut-release.sh is:"
+        )
+        lines.extend(f"  {crate}: {reason}" for crate, reason in product)
     return "\n".join(lines)
 
 
-def _bump_patch(crate: str) -> None:
+def _bump(crate: str, part: str) -> None:
     # bump_crate.py, not a hand edit: it moves every spelling of the version
     # and regenerates the lock, which is what the PR then carries.
     subprocess.run(
@@ -166,7 +205,7 @@ def _bump_patch(crate: str) -> None:
             sys.executable,
             str(Path(__file__).with_name("bump_crate.py")),
             crate,
-            "patch",
+            part,
         ],
         check=True,
     )
@@ -177,25 +216,33 @@ def main() -> int:
         # Absolute reading (no base): standing debt is the cut's to fix too.
         # The registry does not move mid-run, so each crate is asked once.
         fetch = functools.cache(rs.fetch_index)
+        # The last reading's facade debt: the cascade never bumps it, but the
+        # PR body names the product release it owes (#1073).
+        product: list[tuple[str, str]] = []
 
         def stranded() -> list[tuple[str, str]]:
             reading = rs.coherence_reading(fetch, None)
+            product[:] = reading.product
             # Every round, clean or not: a registry that answered for nobody
             # would otherwise read as "nothing stranded" and open the PR.
             print(
-                f"cascade: {reading.asked} published engine crate(s) asked, "
-                f"{reading.unreachable} unreachable"
+                f"cascade: {reading.asked} published crate(s) asked, "
+                f"{reading.unreachable} unreachable, {reading.skipped} skipped "
+                "(no recognised release tier)"
                 + (" — concluding nothing for those" if reading.unreachable else ""),
                 file=sys.stderr,
             )
             return reading.introduced
 
+        def part(crate: str, because: tuple[str, ...]) -> str:
+            return cascade_part(rs.snapshot_text(crate), because)
+
         try:
-            applied = cascade(stranded, _bump_patch, cascade_limit())
+            applied = cascade(stranded, _bump, cascade_limit(), part)
         except CascadeStuck as stuck:
             print(f"cascade stuck: {stuck}", file=sys.stderr)
             return EXIT_CASCADE_STUCK
-        text = render_cascade(applied)
+        text = render_cascade(applied, product)
         if text:
             print(text)
         return 0
