@@ -302,15 +302,22 @@ class ApiDelta(NamedTuple):
 
 
 def net_delta(lines: list[str]) -> tuple[int, int, list[str]]:
-    """Net `+pub`/`-pub` lines: added, removed, and the removed lines' text.
+    """Net `pub` and `impl` lines: added, removed, and the removed lines' text.
 
     Net, not raw: a line removed and re-added verbatim is not a change to the
     surface. Shared by the snapshot text diff and `cargo public-api diff`,
     which lists a changed item as a `-`/`+` pair, so the two measures count
     alike.
+
+    `impl` lines count because a method-less impl (`Copy`, `Eq`, `Error`, the
+    auto traits) has no `pub fn` line to stand for it, so adding one was cut
+    as a patch where the 0.x mapping wants a minor (#1023). An impl WITH
+    methods is now counted twice, which cannot move a verdict: the mapping
+    only asks whether anything was added or removed.
     """
-    added = {ln[1:] for ln in lines if ln.startswith("+pub")}
-    removed = {ln[1:] for ln in lines if ln.startswith("-pub")}
+    api = ("pub", "impl")
+    added = {ln[1:] for ln in lines if ln[:1] == "+" and ln[1:].startswith(api)}
+    removed = {ln[1:] for ln in lines if ln[:1] == "-" and ln[1:].startswith(api)}
     net_add, net_rm = added - removed, removed - added
     return len(net_add), len(net_rm), sorted(net_rm)
 
