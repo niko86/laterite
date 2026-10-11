@@ -1,0 +1,11 @@
+ABBR_HDNG,ABBR_CODE,ABBR_DESC
+LOCA_TYPE,SA,Shell and auger boring
+LOCA_TYPE,RC,Rotary cored borehole
+SAMP_TYPE,U,Undisturbed sample - open drive
+SAMP_TYPE,B,Bulk disturbed sample
+merged 2 files → examples/merged.ags (7099 bytes)
+ABBR_HDNG,ABBR_CODE,ABBR_DESC
+LOCA_TYPE,CP,Cable percussion boring
+LOCA_TYPE,RC,Rotary cored borehole
+SAMP_TYPE,U,Undisturbed sample - open drive
+SAMP_TYPE,B,Bulk disturbed sample

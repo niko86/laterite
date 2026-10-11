@@ -32,6 +32,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Added
+
+- **The merge cookbook documents `row_order`, `dict_rows`, `on_code_case` and `recode` (#1053).** The four options the 2026-10-06 queue added to every merge surface (#1008, #1010, #1011) had no page of their own: `row_order` and `on_code_case` appeared nowhere on the docs site, `dict_rows` only in the divergences reference and `recode` only in the browser API reference. `cookbook/merge-deliveries` now carries a section for each, saying when the option is needed in terms of what the deliveries contain, what the default is, and what each mode does to the merged file, with the Python and Node spellings beside each CLI form. Every CLI example is a gated script with a committed output, on the pattern the page's first example set: each derives a second delivery whose one difference is the thing the option is about (a borehole whose ID sorts mid-list, a `DICT` row restating `LOCA_GL`, a `cp` where the standard list says `CP`, an `SA` where the other delivery says `CP`), and the output shows the effect itself (the row where it sorts, the group list without `DICT`, the rewrite the warning names, the `ABBR` list before and after) rather than a summary that would read the same without the flag.
+
 ### Changed
 
 - **`synthesise_metadata=True` now works in every `mode`, not only `autofix` (#1069).** In `report` and `strict` the flag was silently ignored: a stamped, opted-in build wrote no TRAN, UNIT or TYPE and returned Rule 14/15/17 for the very groups it had asked for, so there was no way to get the synthesised metadata without `autofix`'s value fixes. Now `report` writes your groups byte-for-byte as before and adds the synthesised ones after them, and `strict` judges the completed file, so a stamped data-only build passes. `autofix` is unchanged, synthesis is still off unless you ask for it, and a build without the flag is unaffected. Python `build_ags4`, Node `buildAgs4` and the browser build all follow.

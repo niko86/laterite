@@ -1,0 +1,7 @@
+merged 2 files → examples/merged.ags (7099 bytes)
+  warning [abbr_code_case]: ABBR codes under LOCA_TYPE differ only by letter case: "CP" (input 0), "cp" (input 1); rewritten to "CP"
+ABBR_HDNG,ABBR_CODE,ABBR_DESC
+LOCA_TYPE,CP,Cable percussion boring
+LOCA_TYPE,RC,Rotary cored borehole
+SAMP_TYPE,U,Undisturbed sample - open drive
+SAMP_TYPE,B,Bulk disturbed sample

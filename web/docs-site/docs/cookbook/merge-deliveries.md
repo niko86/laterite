@@ -146,6 +146,192 @@ padding `3SF` to `5SF` would assert two digits the instrument never resolved.
     different UNITs for one heading, merge refuses in **every** mode, `promote`
     included. Reconcile the `UNIT` row at source.
 
+## Write the rows in KEY order
+
+Merged rows are written in the order they were first seen: every row of the
+first delivery, then the rows only the second delivery has, and so on. A
+borehole the later delivery adds therefore lands after the earlier delivery's
+last row, wherever its ID would sort. `row_order` chooses the order instead.
+
+| mode                | what order the merged rows are written in                                                                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `input` _(default)_ | first-seen order across the deliveries                                                                                                                                                         |
+| `key`               | each group sorted by its KEY headings: numeric columns by value, the rest in natural order (`BH2` before `BH10`), blanks last. `TRAN`, `TYPE`, `UNIT`, `ABBR` and `DICT` stay as given         |
+
+Sorting happens after the deliveries are reconciled, so it never changes which
+row wins, and the revisions and warnings are the same in both modes.
+
+=== "CLI"
+
+    Here the second delivery adds a borehole, `BH03A`, beside `BH03`. In input
+    order it would be written after `BH14`; `--row-order key` puts it where its
+    ID sorts:
+
+    ```bash
+    --8<-- "cli/merge_row_order.sh:cmd"
+    ```
+
+    ```text
+    --8<-- "cli/merge_row_order.out"
+    ```
+
+=== "Python"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```python
+    res = laterite.merge("phase1.ags", "phase2.ags", row_order="key")
+    ```
+
+=== "Node"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```js
+    const res = merge(["phase1.ags", "phase2.ags"], { rowOrder: "key" });
+    ```
+
+## Prune DICT rows that restate the standard
+
+Some exporters write a `DICT` row for every heading in the file, standard
+headings included. Merge unions the deliveries' `DICT` groups like any other
+group, so those rows pile up. `dict_rows` decides what to keep.
+
+| mode               | what happens to the merged `DICT`                                                                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keep` _(default)_ | the unioned rows are written as reconciled                                                                                                                                                                                                                                                 |
+| `prune`            | every row that restates a group or heading the edition's standard dictionary already defines is dropped, and so is every row defining a group or heading the merged file does not contain. `DICT` is written after the other groups, and left out when no row remains |
+
+Pruning never adds a finding.
+
+=== "CLI"
+
+    Here the second delivery carries a `DICT` group whose one row restates
+    `LOCA_GL`, a standard heading. With `--dict-rows prune` nothing of it
+    survives, so the merged file's group list has no `DICT`:
+
+    ```bash
+    --8<-- "cli/merge_dict_rows.sh:cmd"
+    ```
+
+    ```text
+    --8<-- "cli/merge_dict_rows.out"
+    ```
+
+=== "Python"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```python
+    res = laterite.merge("phase1.ags", "phase2.ags", dict_rows="prune")
+    ```
+
+=== "Node"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```js
+    const res = merge(["phase1.ags", "phase2.ags"], { dictRows: "prune" });
+    ```
+
+## Settle a code's letter case
+
+`ABBR` codes are matched exactly, so `CP` and `cp` under one heading are two
+codes to the validator, while many importers key the list ignoring case and
+reject the pair as a duplicate. When two deliveries spell one code in different
+letter case, merge warns in every mode (`abbr_code_case`), and `on_code_case`
+decides whether it also settles the spelling.
+
+| mode               | what the merged file does with the set                                                                                                                                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keep` _(default)_ | every spelling is left as written                                                                                                                                                                                                                          |
+| `standard`         | the set is rewritten to the edition's standard code when exactly one standard code matches it ignoring case, in the `ABBR` rows and in every `PA` cell under that heading. A set with no standard match, or with several, is left as written |
+
+The rewrite happens before the deliveries are reconciled, so a settled case
+difference is not a revision. A rewrite that would give two rows the same KEY is
+refused (exit `6` / `MergeConflictError`).
+
+=== "CLI"
+
+    Here the second delivery writes `BH01`'s `LOCA_TYPE`, and the `ABBR` row
+    defining it, as `cp` where the first delivery and the standard list say
+    `CP`. `--on-code-case standard` rewrites both, so the `ABBR` list carries
+    one row and `BH01` is not reported as revised:
+
+    ```bash
+    --8<-- "cli/merge_on_code_case.sh:cmd"
+    ```
+
+    ```text
+    --8<-- "cli/merge_on_code_case.out"
+    ```
+
+=== "Python"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```python
+    res = laterite.merge("phase1.ags", "phase2.ags", on_code_case="standard")
+    ```
+
+=== "Node"
+
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```js
+    const res = merge(["phase1.ags", "phase2.ags"], { onCodeCase: "standard" });
+    ```
+
+## Rename a code
+
+When a delivery uses its own code for something the standard list already
+names (`SA` for a cable-percussion borehole the other delivery codes `CP`), the
+two are different codes to merge: the later delivery's value wins each row it
+appears in, and the `ABBR` list carries both. `recode` names the rewrite
+outright, as `{heading: {from_code: to_code}}`. There is no default; without a
+mapping nothing is renamed.
+
+A mapping applies to the `ABBR` rows and to every `PA` cell under that heading.
+It runs before the deliveries are reconciled, so a renamed code is not a
+revision, and before `on_code_case`, so it wins for the codes it names. A
+heading no delivery types `PA`, or a code no delivery uses under it, is refused
+(exit `5` / `BadDictError`). So is a rewrite that would give two rows the same
+KEY (exit `6` / `MergeConflictError`): renaming a `SAMP_TYPE` code, which is
+part of `SAMP`'s KEY, can make one delivery's sample match the other's, and
+merge refuses rather than lose a row.
+
+=== "CLI"
+
+    `--recode` takes a JSON file. Here the second delivery codes its
+    cable-percussion boreholes `SA`; the mapping sends `SA` to `CP`, and the
+    `ABBR` list before and after shows the rename:
+
+    ```bash
+    --8<-- "cli/merge_recode.sh:cmd"
+    ```
+
+    ```text
+    --8<-- "cli/merge_recode.out"
+    ```
+
+=== "Python"
+
+    <!-- doc-snippet: skip — both inputs are seeded from one fixture that never uses `SA`, so the mapping is refused -->
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```python
+    res = laterite.merge(
+        "phase1.ags", "phase2.ags", recode={"LOCA_TYPE": {"SA": "CP"}},
+    )
+    ```
+
+=== "Node"
+
+    <!-- doc-snippet: skip — both inputs are seeded from one fixture that never uses `SA`, so the mapping is refused -->
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
+    ```js
+    const res = merge(["phase1.ags", "phase2.ags"], {
+      recode: { LOCA_TYPE: { SA: "CP" } },
+    });
+    ```
+
+The accepted values of every mode above are the ones `lat merge --help` prints
+(see the [CLI reference](../reference/cli.md)); an unknown value is refused
+before any work, with a message listing them.
+
 **One caveat everywhere:** identity is KEY-based, so _correcting_ a KEY value
 (a `LOCA_ID` typo `BH1` → `BH01`) reads as a different row, not an edit; both
 persist. Fix KEY typos in the source before merging.
