@@ -23,17 +23,24 @@
 # tree (bare `path` deps, no version), and the registry is only what
 # `laterite-duckdb` and direct Rust consumers see.
 #
-# WHAT IT DOES NOT DO — same as `bump-version.sh`, for the same reasons:
-#   * No tag, no push. The bump lands on `main` via a reviewed release PR; the
-#     publish tags are cut after it merges. See RELEASING.md.
-#   * No publish. The registries are append-only and the publishes are
-#     environment-gated on purpose. This prints the sequence; a human runs it.
-#   * It does not touch `laterite-duckdb`. Separate repo, downstream of the
-#     crates.io index; printed as a follow-up, never done.
+# TWO STEPS, because crates.io and the tags can only take what is on `main`:
+#   1. On a release branch: the engine cut + the product stamp, as commits for a
+#      reviewed release PR. No tag, no push.
+#   2. After that PR merges, on `main` with `--ship`: every product tag, on the
+#      release commit. The tags start every publish: `v*` builds PyPI and
+#      dispatches crates.io (the engine crates the cut stamped + the facade),
+#      `node-v*` / `wasm-v*` build npm — all in release.yml. A tag that already
+#      exists is skipped, so a re-run after a partial failure finishes the job.
+#
+# WHAT IT STILL DOES NOT DO:
+#   * Approve anything. The `pypi` / `npm` environments stay a human's click.
+#   * Touch `laterite-duckdb`. Separate repo, downstream of the crates.io index;
+#     printed as a follow-up, never done.
 #
 # Usage:
-#   tools/release/cut-release.sh 0.12.0           # stamp the product
+#   tools/release/cut-release.sh 0.12.0           # step 1: stamp (release branch)
 #   tools/release/cut-release.sh 0.12.0 --plan    # print the plan and stop
+#   tools/release/cut-release.sh 0.12.0 --ship    # step 2: every tag (merged main)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -44,13 +51,15 @@ die() {
   exit 1
 }
 
-[ "$#" -ge 1 ] || die "usage: cut-release.sh <version> [--plan]  (see header)"
+[ "$#" -ge 1 ] || die "usage: cut-release.sh <version> [--plan|--ship]  (see header)"
 
 VERSION="$1"; shift
 PLAN_ONLY=0
+SHIP=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --plan) PLAN_ONLY=1 ;;
+    --ship) SHIP=1 ;;
     --skip) die "--skip is gone with the engine tier (#781) — engine crates bump per-crate via bump_crate.py" ;;
     *) die "unknown argument '$1'" ;;
   esac
@@ -64,6 +73,48 @@ echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([a-z0-9.]*)?$' \
   || die "'$VERSION' does not look like a version (expected e.g. 0.12.0)"
 
 branch="$(git branch --show-current)"
+
+# --- step 2: ship the merged release. ----------------------------------------
+if [ "$SHIP" -eq 1 ]; then
+  [ "$branch" = "main" ] || die "--ship runs on main, after the release PR merges"
+  [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
+  git fetch -q origin main
+  head="$(git rev-parse HEAD)"
+  [ "$head" = "$(git rev-parse origin/main)" ] \
+    || die "main is not origin/main — 'git pull --ff-only' first"
+  # The tags must sit on the release commit itself, never on a later merge.
+  case "$(git log -1 --format=%s)" in
+    "release: $VERSION"*) ;;
+    *) die "main's head is not the merged 'release: $VERSION' commit — tag that commit by hand, or ship before anything else merges" ;;
+  esac
+  facade="$(sed -n 's/^version = "\(.*\)"/\1/p' rust-packages/laterite/Cargo.toml | head -1)"
+  [ "$facade" = "$VERSION" ] || die "the facade is stamped $facade, not $VERSION"
+
+  for tag in "v$VERSION" "node-v$VERSION" "wasm-v$VERSION"; do
+    if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+      echo "tag $tag: already on origin, skipped"
+      continue
+    fi
+    case "$tag" in
+      # v* / node-v* are releases, cut server-side (lightweight, so they match
+      # the release.yml triggers). The target is the full SHA: the API refuses
+      # an abbreviated one.
+      v*|node-v*) gh release create "$tag" --target "$head" --title "$tag" --generate-notes ;;
+      # --no-sign: tag.gpgsign would make a bare 'git tag' a signed annotated tag.
+      wasm-v*) git tag --no-sign "$tag" "$head" && git push origin "$tag" ;;
+    esac
+    echo "tag $tag: cut on $head"
+  done
+
+  echo
+  echo "=== left for a human ==="
+  echo "  1. Approve the 'pypi' / 'npm' environments on the release runs:"
+  echo "       gh run list --workflow release.yml --limit 6"
+  echo "  2. The DuckDB extension (its own repo) pins ENGINE crates — update its"
+  echo "     pins once crates.io shows the new versions, then cut it on its own number."
+  exit 0
+fi
+
 [ "$branch" != "main" ] || die "refuse to cut on main — 'git switch -c release/$VERSION' first"
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 
@@ -118,11 +169,11 @@ tools/release/bump-version.sh product --new-version "$VERSION"
 
 cat <<EOF
 
-=== engine crates ===
+=== after the release PR merges ===
 
-  The engine cut above stamped every crate owed a bump. After the release PR
-  merges, each crate (and the facade) ahead of the registry is published by the
-  nightly's publish dispatch (#1073), or at once with:
-    gh workflow run publish-crates.yml --ref main -f execute=true
+  On the merged main, one command cuts every product tag; the tags publish
+  PyPI, npm and crates.io (the engine crates and the facade):
+    git switch main && git pull --ff-only
+    tools/release/cut-release.sh $VERSION --ship
 
 EOF
