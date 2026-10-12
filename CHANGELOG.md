@@ -32,6 +32,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-10-12
+
 ### Added
 
 - **The merge cookbook documents `row_order`, `dict_rows`, `on_code_case` and `recode` (#1053).** The four options the 2026-10-06 queue added to every merge surface (#1008, #1010, #1011) had no page of their own: `row_order` and `on_code_case` appeared nowhere on the docs site, `dict_rows` only in the divergences reference and `recode` only in the browser API reference. `cookbook/merge-deliveries` now carries a section for each, saying when the option is needed in terms of what the deliveries contain, what the default is, and what each mode does to the merged file, with the Python and Node spellings beside each CLI form. Every CLI example is a gated script with a committed output, on the pattern the page's first example set: each derives a second delivery whose one difference is the thing the option is about (a borehole whose ID sorts mid-list, a `DICT` row restating `LOCA_GL`, a `cp` where the standard list says `CP`, an `SA` where the other delivery says `CP`), and the output shows the effect itself (the row where it sorts, the group list without `DICT`, the rewrite the warning names, the `ABBR` list before and after) rather than a summary that would read the same without the flag.
@@ -556,7 +558,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/niko86/laterite/releases/tag/v0.15.0
 [0.14.1]: https://github.com/niko86/laterite/releases/tag/v0.14.1
 [0.14.0]: https://github.com/niko86/laterite/releases/tag/v0.14.0
 [0.13.0]: https://github.com/niko86/laterite/releases/tag/v0.13.0
