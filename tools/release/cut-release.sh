@@ -8,6 +8,13 @@
 # whenever a bump lands. So there is no engine tier left for this script to
 # stamp, and no `--skip` to choose: a product cut is the only cut there is.
 #
+# It does apply the ENGINE CUT first, though: the owed per-crate bumps and the
+# coherence cascade, exactly as the nightly does. The surfaces compile engine
+# source, but the crates.io facade this script stamps resolves its engine deps
+# from the REGISTRY — so a product cut over an engine fix that was never bumped
+# ships a facade that cannot see the fix. Leaving those bumps to a later nightly
+# made every release two PRs and a day long, and was easy to forget.
+#
 # What survives from #716 is the shape a release decision should have: the
 # release_status report in front of the stamp, the guardrails, and the ordered
 # follow-ups. What does NOT survive is worth naming: this script used to print
@@ -64,16 +71,43 @@ branch="$(git branch --show-current)"
 echo "=== what is unreleased ==="
 uv run --no-sync python tools/release/release_status.py
 echo
+# The same reading the nightly cut takes (nightly.yml), so the two cannot
+# disagree about what is owed.
+status_json="$(mktemp)"; bumps_txt="$(mktemp)"
+trap 'rm -f "$status_json" "$bumps_txt"' EXIT
+uv run --no-sync python tools/release/release_status.py --json > "$status_json"
+uv run --no-sync python tools/release/engine_cut.py --bumps "$status_json" > "$bumps_txt"
+
 echo "=== what this will stamp ==="
 printf '  %-8s -> %s\n' "product" "$VERSION"
-echo "  (engine crates are NOT stamped here — each bumps per-crate when it"
-echo "   changes, and any crate ahead of the registry publishes on the next"
-echo "   publish_crates.py run)"
+if [ -s "$bumps_txt" ]; then
+  while read -r crate part; do
+    printf '  %-8s -> %s %s\n' "engine" "$crate" "$part"
+  done < "$bumps_txt"
+  echo "  (then the coherence cascade, which may bump the crates pinning those)"
+else
+  echo "  (no engine bump owed; the coherence cascade still runs)"
+fi
 echo
 
 if [ "$PLAN_ONLY" -eq 1 ]; then
   echo "cut-release: --plan given, stopping before any stamp."
   exit 0
+fi
+
+# --- the engine cut, committed on its own so bump-version.sh (which refuses a
+#     dirty tree) stamps the product on top of it.
+while read -r crate part; do
+  echo "--- bump_crate.py $crate $part"
+  uv run --no-sync python tools/release/bump_crate.py "$crate" "$part"
+done < "$bumps_txt"
+echo "--- engine_cut.py --cascade"
+uv run --no-sync python tools/release/engine_cut.py --cascade
+if git diff --quiet -- rust-packages; then
+  echo "engine cut: nothing owed"
+else
+  git add -A
+  git commit -m "release: engine cut for $VERSION"
 fi
 
 # --- stamp. bump-version.sh owns the commit and prints the tag/publish
@@ -84,14 +118,11 @@ tools/release/bump-version.sh product --new-version "$VERSION"
 
 cat <<EOF
 
-=== engine crates, separately (see RELEASING.md) ===
+=== engine crates ===
 
-  Any engine crate whose tree version is ahead of the registry publishes with:
-    uv run --no-sync python tools/publish_crates.py            # rehearsal
-    uv run --no-sync python tools/publish_crates.py --execute
-  then approve the 'crates' environment on the run. A crate whose content
-  changed but whose version did not will be SKIPPED by version identity —
-  bump it first (tools/release/bump_crate.py <crate> <part>), or its
-  registry copy silently stays stale (#781 records this trap).
+  The engine cut above stamped every crate owed a bump. After the release PR
+  merges, each crate (and the facade) ahead of the registry is published by the
+  nightly's publish dispatch (#1073), or at once with:
+    gh workflow run publish-crates.yml --ref main -f execute=true
 
 EOF

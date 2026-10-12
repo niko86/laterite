@@ -92,8 +92,15 @@ tools/release/cut-release.sh 0.12.0            # prints the plan, then stamps
 tools/release/cut-release.sh 0.12.0 --plan     # print the plan and stop
 ```
 
-One command, one `release: X` commit, the product tier only — engine crates are
-never stamped by a product cut. The old two-tier `cut-release.sh` and its
+One command. It first applies the **engine cut** — the owed per-crate bumps and
+the coherence cascade, the same reading the nightly takes — as a `release: engine
+cut for X` commit when anything was owed, then stamps the product as `release: X`.
+The engine cut is in the product cut because the crates.io facade resolves its
+engine deps from the registry: a product release over an engine fix that was never
+bumped would publish a facade that cannot see the fix. `--plan` lists the engine
+bumps beside the product number. After the release PR merges, the nightly's
+publish dispatch ships every crate stamped ahead of crates.io, the facade
+included (#1073). The old two-tier `cut-release.sh` and its
 `--skip engine` escape hatch are gone with the lockstep: skipping the engine
 existed to avoid burning eleven lockstep versions on a browser-only fix, and
 per-crate versioning dissolves the dilemma — a browser-only fix simply bumps no
