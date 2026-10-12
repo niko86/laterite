@@ -476,6 +476,26 @@ jobs:
             "$venv/bin/python" tools/wheel_smoke.py
           done
 
+  crates-publish:
+    # The crates.io half of a `v*` release: the engine crates the cut stamped and
+    # the facade. It publishes from publish-crates.yml, not here, because that
+    # file is what crates.io's trusted publisher is bound to — and all three of
+    # its guards (its own ref check, the `crates` environment's branch policy,
+    # publish_crates.py's preflight) require `main`, which a tag ref is not. So
+    # the tag dispatches it on main, the same call the nightly makes (#1073).
+    # The release commit IS main's head when the tags are cut; the publish skips
+    # any version crates.io already has, so a re-dispatch is harmless.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
+    name: crates.io (dispatch publish-crates)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # dispatch publish-crates.yml
+    steps:
+      - name: dispatch publish-crates (execute=true) on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish-crates.yml --repo "$GITHUB_REPOSITORY" --ref main -f execute=true
+
   pypi-publish:
     # Trusted-publishing flow (no API token). The PyPI trusted publisher
     # is configured against this repo + this workflow + the `pypi`

@@ -9,7 +9,11 @@
     "changed": [],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists."
+      }
+    ],
     "security": []
   },
   "releases": [

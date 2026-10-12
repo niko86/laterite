@@ -98,9 +98,13 @@ cut for X` commit when anything was owed, then stamps the product as `release: X
 The engine cut is in the product cut because the crates.io facade resolves its
 engine deps from the registry: a product release over an engine fix that was never
 bumped would publish a facade that cannot see the fix. `--plan` lists the engine
-bumps beside the product number. After the release PR merges, the nightly's
-publish dispatch ships every crate stamped ahead of crates.io, the facade
-included (#1073). The old two-tier `cut-release.sh` and its
+bumps beside the product number. After the release PR merges, run
+`tools/release/cut-release.sh X --ship` on the merged `main`: it cuts every
+product tag on the release commit, skipping one that exists. The tags publish
+everything — the `v*` release run builds PyPI **and** dispatches
+`publish-crates.yml`, which ships every crate stamped ahead of crates.io, the
+facade included, exactly as PyPI and npm ship from their tags. The nightly's
+publish dispatch (#1073) is the safety net. The old two-tier `cut-release.sh` and its
 `--skip engine` escape hatch are gone with the lockstep: skipping the engine
 existed to avoid burning eleven lockstep versions on a browser-only fix, and
 per-crate versioning dissolves the dilemma — a browser-only fix simply bumps no
@@ -164,8 +168,10 @@ tools/release/bump-version.sh product minor  # or: patch  ·  --new-version 0.6.
 git push -u origin release/0.6.0
 gh pr create -B main -t "release: 0.6.0" -b "version bump"   # merge once CI is green
 
-# 3. On the merged main, cut EVERY product tag — release.yml builds + publishes from them:
-git switch main && git pull
+# 3. On the merged main, cut EVERY product tag — the tags publish PyPI, npm AND crates.io:
+git switch main && git pull --ff-only
+tools/release/cut-release.sh 0.6.0 --ship
+#    which is, by hand (release.yml builds + publishes from the tags):
 gh release create v0.6.0      --title v0.6.0      --generate-notes   # wheels + sdist → PyPI, CLI → GH release
 gh release create node-v0.6.0 --title node-v0.6.0 --generate-notes   # npm addon + @laterite/native-*
 git tag --no-sign wasm-v0.6.0 && git push origin wasm-v0.6.0          # npm @laterite/ags4-wasm (browser)
