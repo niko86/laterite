@@ -5,35 +5,46 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [
-      {
-        "text": "**The merge cookbook documents `row_order`, `dict_rows`, `on_code_case` and `recode` (#1053).** The four options the 2026-10-06 queue added to every merge surface (#1008, #1010, #1011) had no page of their own: `row_order` and `on_code_case` appeared nowhere on the docs site, `dict_rows` only in the divergences reference and `recode` only in the browser API reference. `cookbook/merge-deliveries` now carries a section for each, saying when the option is needed in terms of what the deliveries contain, what the default is, and what each mode does to the merged file, with the Python and Node spellings beside each CLI form. Every CLI example is a gated script with a committed output, on the pattern the page's first example set: each derives a second delivery whose one difference is the thing the option is about (a borehole whose ID sorts mid-list, a `DICT` row restating `LOCA_GL`, a `cp` where the standard list says `CP`, an `SA` where the other delivery says `CP`), and the output shows the effect itself (the row where it sorts, the group list without `DICT`, the rewrite the warning names, the `ABBR` list before and after) rather than a summary that would read the same without the flag."
-      },
-      {
-        "text": "**A pull request that moves the validator's findings over the vendored python-ags4 corpus now has to re-freeze the baseline in the same PR (#1034).** A new `corpus-drift` CI job crawls the vendored fixtures and runs corpus-qa's `baseline --check` against the committed `pyags4-vendor` baseline whenever a PR touches the validator or its parse / reference / types deps, `laterite-ags4-hostopts`, corpus-qa, the fixtures or the lockfile. On drift it fails, names each moved fixture with its added and removed findings, and prints the re-freeze command; every run, pass or fail, prints one line saying how many files it checked and how many it skipped or found on only one side. Until now nothing in this repo ran the check, so a finding change merged green and the baseline went stale until someone ran it by hand. Nothing a consumer installs changes."
-      }
-    ],
-    "changed": [
-      {
-        "text": "**`synthesise_metadata=True` now works in every `mode`, not only `autofix` (#1069).** In `report` and `strict` the flag was silently ignored: a stamped, opted-in build wrote no TRAN, UNIT or TYPE and returned Rule 14/15/17 for the very groups it had asked for, so there was no way to get the synthesised metadata without `autofix`'s value fixes. Now `report` writes your groups byte-for-byte as before and adds the synthesised ones after them, and `strict` judges the completed file, so a stamped data-only build passes. `autofix` is unchanged, synthesis is still off unless you ask for it, and a build without the flag is unaffected. Python `build_ags4`, Node `buildAgs4` and the browser build all follow."
-      },
-      {
-        "text": "**A 4.2 Rule 16 error now says when the value matches a declared ABBR code apart from letter case (#1033).** The lookup stays exact in every edition, so `cp` against a declared `CP` is still one Rule 16 error, on the same line, group and severity, because python-ags4 rejects the variant. On a file judged against 4.2, which reads the ABBR list without regard to case, the message gains a sentence naming the declared code, saying python-ags4 still rejects the spelling, and pointing to `fix`/`merge`'s `recode` and `on_code_case`. 4.0.x and 4.1 messages are unchanged, and `laterite.compat` keeps python-ags4's wording."
-      }
-    ],
+    "added": [],
+    "changed": [],
     "deprecated": [],
     "removed": [],
-    "fixed": [
-      {
-        "text": "**The crates.io facade `laterite` now publishes with its release, and a crate that moves a dependency its API exposes now takes a minor version (#1073).** The facade carries the product version, and nothing published it automatically: 0.14.1 reached crates.io only after a by-hand dispatch. The nightly now publishes it once a product release stamps it, as it already did for the engine crates. The check that stops a dependency floor stranding a published crate also skipped the facade, so it could fall behind its own engine crates unnoticed; it is checked now, and it warns that a product release is owed without failing the check. A crate whose public signatures use another laterite crate's types now takes a minor version, not a patch, when it moves to an incompatible version of that crate. This is what `laterite-ags4-validator` 0.19.2 should have been."
-      },
-      {
-        "text": "**`cut-release.sh` now applies the engine cut before it stamps the product.** The owed per-crate bumps and the coherence cascade the nightly applies now land in the release PR too, so a product release publishes a facade whose engine crates carry its fixes. `--plan` lists the engine bumps beside the product number."
-      }
-    ],
+    "fixed": [],
     "security": []
   },
   "releases": [
+    {
+      "version": "0.15.0",
+      "date": "2026-10-12",
+      "summary": "",
+      "added": [
+        {
+          "text": "**The merge cookbook documents `row_order`, `dict_rows`, `on_code_case` and `recode` (#1053).** The four options the 2026-10-06 queue added to every merge surface (#1008, #1010, #1011) had no page of their own: `row_order` and `on_code_case` appeared nowhere on the docs site, `dict_rows` only in the divergences reference and `recode` only in the browser API reference. `cookbook/merge-deliveries` now carries a section for each, saying when the option is needed in terms of what the deliveries contain, what the default is, and what each mode does to the merged file, with the Python and Node spellings beside each CLI form. Every CLI example is a gated script with a committed output, on the pattern the page's first example set: each derives a second delivery whose one difference is the thing the option is about (a borehole whose ID sorts mid-list, a `DICT` row restating `LOCA_GL`, a `cp` where the standard list says `CP`, an `SA` where the other delivery says `CP`), and the output shows the effect itself (the row where it sorts, the group list without `DICT`, the rewrite the warning names, the `ABBR` list before and after) rather than a summary that would read the same without the flag."
+        },
+        {
+          "text": "**A pull request that moves the validator's findings over the vendored python-ags4 corpus now has to re-freeze the baseline in the same PR (#1034).** A new `corpus-drift` CI job crawls the vendored fixtures and runs corpus-qa's `baseline --check` against the committed `pyags4-vendor` baseline whenever a PR touches the validator or its parse / reference / types deps, `laterite-ags4-hostopts`, corpus-qa, the fixtures or the lockfile. On drift it fails, names each moved fixture with its added and removed findings, and prints the re-freeze command; every run, pass or fail, prints one line saying how many files it checked and how many it skipped or found on only one side. Until now nothing in this repo ran the check, so a finding change merged green and the baseline went stale until someone ran it by hand. Nothing a consumer installs changes."
+        }
+      ],
+      "changed": [
+        {
+          "text": "**`synthesise_metadata=True` now works in every `mode`, not only `autofix` (#1069).** In `report` and `strict` the flag was silently ignored: a stamped, opted-in build wrote no TRAN, UNIT or TYPE and returned Rule 14/15/17 for the very groups it had asked for, so there was no way to get the synthesised metadata without `autofix`'s value fixes. Now `report` writes your groups byte-for-byte as before and adds the synthesised ones after them, and `strict` judges the completed file, so a stamped data-only build passes. `autofix` is unchanged, synthesis is still off unless you ask for it, and a build without the flag is unaffected. Python `build_ags4`, Node `buildAgs4` and the browser build all follow."
+        },
+        {
+          "text": "**A 4.2 Rule 16 error now says when the value matches a declared ABBR code apart from letter case (#1033).** The lookup stays exact in every edition, so `cp` against a declared `CP` is still one Rule 16 error, on the same line, group and severity, because python-ags4 rejects the variant. On a file judged against 4.2, which reads the ABBR list without regard to case, the message gains a sentence naming the declared code, saying python-ags4 still rejects the spelling, and pointing to `fix`/`merge`'s `recode` and `on_code_case`. 4.0.x and 4.1 messages are unchanged, and `laterite.compat` keeps python-ags4's wording."
+        }
+      ],
+      "deprecated": [],
+      "removed": [],
+      "fixed": [
+        {
+          "text": "**The crates.io facade `laterite` now publishes with its release, and a crate that moves a dependency its API exposes now takes a minor version (#1073).** The facade carries the product version, and nothing published it automatically: 0.14.1 reached crates.io only after a by-hand dispatch. The nightly now publishes it once a product release stamps it, as it already did for the engine crates. The check that stops a dependency floor stranding a published crate also skipped the facade, so it could fall behind its own engine crates unnoticed; it is checked now, and it warns that a product release is owed without failing the check. A crate whose public signatures use another laterite crate's types now takes a minor version, not a patch, when it moves to an incompatible version of that crate. This is what `laterite-ags4-validator` 0.19.2 should have been."
+        },
+        {
+          "text": "**`cut-release.sh` now applies the engine cut before it stamps the product.** The owed per-crate bumps and the coherence cascade the nightly applies now land in the release PR too, so a product release publishes a facade whose engine crates carry its fixes. `--plan` lists the engine bumps beside the product number."
+        }
+      ],
+      "security": []
+    },
     {
       "version": "0.14.1",
       "date": "2026-10-11",
