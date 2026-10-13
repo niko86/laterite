@@ -27,7 +27,7 @@
 # share the container's 8 GB cap and measure each other.
 #
 # Cadence: weekly by owner decision (2026-09-04) — the cron below, chosen
-# clear of parity's Sunday-03:00 slot and the nightly's daily 04:00 so the
+# clear of parity's Sunday-03:29 slot and the nightly's daily 04:17 so the
 # pool's measurement slot is quiet. A scheduled run is a `check` of `main`
 # with the default rungs (the input fallbacks below); dispatch remains for
 # seeds, re-checks, and off-cycle runs.
@@ -35,8 +35,8 @@ name: perf-ratio
 
 on:
   schedule:
-    # Saturdays, 02:00 UTC.
-    - cron: "0 2 * * 6"
+    # Saturdays, 02:47 UTC.
+    - cron: "47 2 * * 6"
   workflow_dispatch:
     inputs:
       mode:

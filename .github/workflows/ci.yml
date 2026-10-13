@@ -40,7 +40,7 @@ on:
   # ubuntu-latest below (like the other nightlies) so it doesn't depend on the
   # self-hosted pool being up overnight.
   schedule:
-    - cron: "0 5 * * *" # 05:00 UTC daily (nightly.yml runs at 04:00)
+    - cron: "23 5 * * *" # 05:23 UTC daily (nightly.yml runs at 04:17; both off the hour)
 
 # Cancel previous runs on the same ref when a new commit lands —
 # keeps the free-tier minute budget under control.
