@@ -30,7 +30,7 @@ The whole failure class here is a **conflation**, so the vocabulary comes first:
 
 | term | workflow | where | cadence | what it does |
 | --- | --- | --- | --- | --- |
-| **oracle run** | `parity.yml` | this repo | weekly (Sun 03:00) | python-ags4's own suite vs `laterite.compat`. No matrix. |
+| **oracle run** | `parity.yml` | this repo | weekly (Sun 03:29) | python-ags4's own suite vs `laterite.compat`. No matrix. |
 | **matrix report** | `compliance-report.yml` | dev satellite | on-demand (`workflow_dispatch`) | six read surfaces over a corpus, byte-identical findings. |
 
 They share a subject (are we still right?) and nothing else. Calling the matrix

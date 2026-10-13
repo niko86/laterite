@@ -28,7 +28,7 @@ name: nightly
 
 on:
   schedule:
-    - cron: "0 4 * * *" # 04:00 UTC daily
+    - cron: "17 4 * * *" # 04:17 UTC daily — off the hour: GitHub delays `schedule` most at :00
   workflow_dispatch: # the manual "run heavy" button
 
 # Don't cancel a slow night if the next trigger lands — let it finish (a

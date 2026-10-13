@@ -25,12 +25,12 @@ name: parity
 on:
   workflow_dispatch:
   schedule:
-    # Sundays, 03:00 UTC. Weekly rather than monthly (cadence: historical=monthly)
+    # Sundays, 03:29 UTC. Weekly rather than monthly (cadence: historical=monthly)
     # since the `dropin-surface` job joined: a month is a long time to be unaware
     # that upstream grew a public function our drop-in doesn't have. Both
     # scheduled jobs are cheap (no wheel build, no Rust), so the extra cadence
     # costs close to nothing.  cadence: parity
-    - cron: "0 3 * * 0"
+    - cron: "29 3 * * 0"
   # Per-PR regression gate (#190).  cadence: parity-pr
   # NO trigger-level `paths:` — that is what made
   # this un-requireable (laterite-dev#556): a required check behind a trigger filter never
