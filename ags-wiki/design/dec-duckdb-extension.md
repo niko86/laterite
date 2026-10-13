@@ -418,6 +418,16 @@ single-source stay in the monorepo).
   `duckdb/community-extensions#2079`/`v0.4.1` community-PR reference above predates this and likely
   needs its own re-check (not verified in this pass). musl status unverified.
 
+  **Update (2026-10-12): two of the three wasm variants.** `wasm_threads` built
+  and published but never loaded: every `wasm_threads` extension build — DuckDB's
+  own core extensions included — declares a non-shared memory, which duckdb-wasm's
+  threads runtime refuses (duckdb/extension-ci-tools#391). The extension's
+  `description.yml` now excludes it alongside `linux_amd64_musl`, so `wasm_mvp`
+  and `wasm_eh` are the published variants (laterite-duckdb#50, #65), and the
+  extension's CI loads `wasm_eh` in a real browser as well as both node bundles.
+  Since 0.15.0 the extension takes the product number and its CI compares the
+  shared SQL functions against `laterite==X` (laterite-duckdb#57).
+
 ## Diagram
 
 ```mermaid
