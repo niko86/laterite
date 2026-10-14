@@ -32,6 +32,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Changed
+
+- **Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at.
+
 ### Fixed
 
 - **A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists.

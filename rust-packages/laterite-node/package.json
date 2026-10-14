@@ -9,7 +9,10 @@
     "url": "git+https://github.com/niko86/laterite.git",
     "directory": "rust-packages/laterite-node"
   },
-  "homepage": "https://github.com/niko86/laterite#readme",
+  "homepage": "https://docs.laterite.dev/",
+  "bugs": {
+    "url": "https://github.com/niko86/laterite/issues"
+  },
   "keywords": [
     "ags4",
     "ags",

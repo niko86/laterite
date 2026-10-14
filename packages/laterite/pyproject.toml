@@ -59,6 +59,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/niko86/laterite"
+Documentation = "https://docs.laterite.dev/"
 Repository = "https://github.com/niko86/laterite"
 Issues = "https://github.com/niko86/laterite/issues"
 Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"

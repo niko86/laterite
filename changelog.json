@@ -6,7 +6,11 @@
   "unreleased": {
     "summary": "",
     "added": [],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at."
+      }
+    ],
     "deprecated": [],
     "removed": [],
     "fixed": [
