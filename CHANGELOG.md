@@ -39,6 +39,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Fixed
 
 - **A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists.
+- **The nightly `docs-vs-released-duckdb` gate no longer fails on a NULL `_id`.** Since extension 0.15.0 a group the file's own DICT declares with no KEY heading reads with a NULL `_id`; the checker's JSON schema could not represent that and failed the whole run before comparing anything. It now parses the null, ignores it on a non-registry group (the reference mints no ids there), and reports it as a mismatch on a registry group.
 
 ## [0.15.0] — 2026-10-12
 

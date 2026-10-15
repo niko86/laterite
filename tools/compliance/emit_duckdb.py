@@ -68,7 +68,9 @@ def group_key_rows(con: Any, path: str, group: str) -> list:
     """The sorted `[_id, _parent_id]` rows of one group via `read_ags`.
 
     `_parent_id` is NULL for a root group -> serialized as JSON null, matching
-    the rust reference's `Option<String>::None`. Sorted so the list is a
+    the rust reference's `Option<String>::None`. `_id` is NULL too for a group
+    the file's DICT declares with no KEY heading (the extension's keyless
+    answer); the checker decides what that means per group. Sorted so the list is a
     canonical set representation both sides compare by value."""
     esc_p = path.replace("'", "''")
     esc_g = group.replace("'", "''")
