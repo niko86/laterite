@@ -86,11 +86,18 @@ struct FixtureParse {
     groups: Vec<GroupParse>,
 }
 
+/// One `[_id, _parent_id]` row as duckdb reports it.
+type DuckIdRow = (Option<String>, Option<String>);
+
 #[derive(Debug, Deserialize)]
 struct GroupParse {
     group: String,
-    /// `[[_id, _parent_id], …]` — `_parent_id` is JSON null for a root group.
-    ids: Vec<(String, Option<String>)>,
+    /// `[[_id, _parent_id], …]` — `_parent_id` is JSON null for a root group,
+    /// and `_id` is null too for a group the file's DICT declares with no KEY
+    /// heading (the extension's documented keyless answer, since 0.15.0).
+    /// Such a group is non-registry, so the reference has nothing to compare
+    /// it against; on a registry group a null `_id` is a mismatch.
+    ids: Vec<DuckIdRow>,
 }
 
 /// The reference key-set per registry group: `code -> sorted [(id, parent)]`.
@@ -276,7 +283,7 @@ fn compare(
 
         // duckdb's registry groups keyed by trimmed code (non-registry groups
         // aren't in the reference, so they're ignored here, not failed).
-        let duck_groups: BTreeMap<&str, &Vec<(String, Option<String>)>> =
+        let duck_groups: BTreeMap<&str, &Vec<DuckIdRow>> =
             fp.groups.iter().map(|g| (g.group.trim(), &g.ids)).collect();
 
         for (code, ref_ids) in &refr.groups {
@@ -293,9 +300,24 @@ fn compare(
                     )),
                 },
                 Some(duck_ids) => {
+                    // A registry group always has a KEY tuple, so the reference
+                    // minted every id; a NULL from duckdb is a divergence in its
+                    // own right, reported before the set comparison would hide
+                    // it among "differs".
+                    let null_ids = duck_ids.iter().filter(|(id, _)| id.is_none()).count();
+                    if null_ids > 0 {
+                        r.mismatches.push(format!(
+                            "{} / {}: duckdb returned a NULL _id for {null_ids} row(s) of a registry group",
+                            fp.fixture, code
+                        ));
+                        continue;
+                    }
                     // duckdb's list is already sorted (emit_duckdb sorts it), but
                     // sort defensively so the comparison is order-independent.
-                    let mut d = (*duck_ids).clone();
+                    let mut d: Vec<(String, Option<String>)> = duck_ids
+                        .iter()
+                        .map(|(id, parent)| (id.clone().unwrap(), parent.clone()))
+                        .collect();
                     d.sort();
                     if &d == ref_ids {
                         r.groups_agree += 1;
@@ -454,7 +476,10 @@ mod tests {
             .filter(|(g, _)| Some(g.as_str()) != drop_group)
             .map(|(g, ids)| GroupParse {
                 group: g.clone(),
-                ids: ids.clone(),
+                ids: ids
+                    .iter()
+                    .map(|(id, parent)| (Some(id.clone()), parent.clone()))
+                    .collect(),
             })
             .collect();
         DuckParse {
@@ -477,7 +502,10 @@ mod tests {
             .iter()
             .map(|(g, ids)| GroupParse {
                 group: g.clone(),
-                ids: ids.clone(),
+                ids: ids
+                    .iter()
+                    .map(|(id, parent)| (Some(id.clone()), parent.clone()))
+                    .collect(),
             })
             .collect();
         DuckParse {
@@ -506,11 +534,35 @@ mod tests {
     fn bites_when_an_id_differs() {
         // Flip one character of one `_id` — a corrupted read must be caught.
         let mut duck = duck_matching();
-        let bad = &mut duck.parses[0].groups[0].ids[0].0;
+        let bad = duck.parses[0].groups[0].ids[0].0.as_mut().unwrap();
         let last = bad.pop().unwrap();
         bad.push(if last == 'a' { 'b' } else { 'a' });
         let r = run(&duck);
         assert_eq!(r.mismatches.len(), 1, "a flipped _id must disagree");
+    }
+
+    // What the live gate hit the night laterite_ags4 0.15.0 went live: a group
+    // only the file's DICT declares, with no KEY heading, reads with a NULL
+    // `_id` (the extension's documented keyless answer). The reference never
+    // mints ids for a non-registry group, so there is nothing to compare — the
+    // record must parse and the group be ignored, not fail the whole run.
+    #[test]
+    fn a_null_id_in_a_declared_non_registry_group_is_ignored() {
+        let json = r#"{"version":"0.15.0","parses":[{"fixture":"a.ags","read_error":null,
+            "groups":[{"group":"TEST","n_rows":1,"ids":[[null,null]]}]}]}"#;
+        let duck: DuckParse = serde_json::from_str(json).expect("a NULL _id must deserialize");
+        assert_eq!(duck.parses[0].groups[0].ids[0], (None, None));
+    }
+
+    #[test]
+    fn bites_when_a_registry_group_has_a_null_id() {
+        // The same NULL on a registry group is a real divergence: the reference
+        // minted an id and duckdb did not.
+        let mut duck = duck_matching();
+        duck.parses[0].groups[0].ids[0].0 = None;
+        let r = run(&duck);
+        assert_eq!(r.mismatches.len(), 1, "{:?}", r.mismatches);
+        assert!(r.mismatches[0].contains("NULL _id"), "{:?}", r.mismatches);
     }
 
     #[test]
