@@ -55,7 +55,9 @@ describe("join-mode SELECT", () => {
   it("aliases the base table and joins on the qualified key pair", () => {
     const sql = selectSql(opts());
     expect(sql).toContain('FROM "LOCA" t0');
-    expect(sql).toContain('LEFT JOIN "SAMP" t1 ON t0."LOCA_ID" = t1."LOCA_ID"');
+    expect(sql).toContain(
+      'LEFT JOIN "SAMP" t1 ON t0."LOCA_ID" IS NOT DISTINCT FROM t1."LOCA_ID"',
+    );
   });
 
   it("defaults the base alias to t0 and honours an explicit one", () => {
@@ -68,7 +70,9 @@ describe("join-mode SELECT", () => {
     );
     expect(aliased).toContain('FROM "LOCA" base');
     expect(aliased).toContain("base.*");
-    expect(aliased).toContain('base."LOCA_ID" = t1."LOCA_ID"');
+    expect(aliased).toContain(
+      'base."LOCA_ID" IS NOT DISTINCT FROM t1."LOCA_ID"',
+    );
   });
 
   it("expands to the base table's star when no columns are picked", () => {

@@ -554,8 +554,37 @@ describe("selectSql — join mode", () => {
       `SELECT c."LOCA_ID" AS "LOCA_ID", c."SAMP_ID" AS "SAMP_ID",` +
         ` p."LOCA_ID" AS "p_LOCA_ID", p."LOCA_TYPE" AS "LOCA_TYPE"\n` +
         `FROM "SAMP" c\n` +
-        `LEFT JOIN "LOCA" p ON c."LOCA_ID" = p."LOCA_ID"\n` +
+        `LEFT JOIN "LOCA" p ON c."LOCA_ID" IS NOT DISTINCT FROM p."LOCA_ID"\n` +
         `LIMIT 100`,
+    );
+  });
+
+  it("joins each KEY pair null-safe, so a blank optional KEY still matches (#1100)", () => {
+    // A blank SAMP_ID reads as NULL; `NULL = NULL` is never true, so a plain
+    // equi-join would find no parent for any child row.
+    const join: JoinSpec = {
+      table: "SAMP",
+      alias: "p",
+      kind: "LEFT",
+      leftAlias: "c",
+      on: [
+        { left: "LOCA_ID", right: "LOCA_ID" },
+        { left: "SAMP_ID", right: "SAMP_ID" },
+      ],
+    };
+    const s = selectSql({
+      table: "LLPL",
+      alias: "c",
+      joins: [join],
+      select: [{ alias: "c", col: "LOCA_ID" }],
+      columns: [],
+      conditions: [],
+      orderDir: "ASC",
+      limit: 100,
+    });
+    expect(s).toContain(
+      `ON c."LOCA_ID" IS NOT DISTINCT FROM p."LOCA_ID"` +
+        ` AND c."SAMP_ID" IS NOT DISTINCT FROM p."SAMP_ID"`,
     );
   });
 
@@ -616,7 +645,7 @@ describe("selectSql — join mode", () => {
       limit: 100,
     });
     expect(s).toContain(
-      `LEFT JOIN "GEOL" g ON t."LOCA_ID" = g."LOCA_ID"` +
+      `LEFT JOIN "GEOL" g ON t."LOCA_ID" IS NOT DISTINCT FROM g."LOCA_ID"` +
         ` AND t."SPEC_DPTH" >= g."GEOL_TOP" AND t."SPEC_DPTH" < g."GEOL_BASE"`,
     );
   });
@@ -672,7 +701,9 @@ describe("chartSql — join mode", () => {
     expect(s).toContain(
       `SELECT t."SPEC_DPTH" AS x, t."TREL_MNUM" AS y, g."GEOL_LEG" AS c`,
     );
-    expect(s).toContain(`LEFT JOIN "GEOL" g ON t."LOCA_ID" = g."LOCA_ID"`);
+    expect(s).toContain(
+      `LEFT JOIN "GEOL" g ON t."LOCA_ID" IS NOT DISTINCT FROM g."LOCA_ID"`,
+    );
     expect(s).toContain(
       `t."SPEC_DPTH" >= g."GEOL_TOP" AND t."SPEC_DPTH" < g."GEOL_BASE"`,
     );
