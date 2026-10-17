@@ -123,9 +123,11 @@ and the host DuckDB writes the file (a plain queryable `.duckdb`, *not* `.ags5db
   (functional) (`repo:packages/laterite/python/laterite/__init__.py`); Node
   `AgsFile.toDuckdb(path)` + top-level `toDuckdb()`
   (`repo:rust-packages/laterite-node/ts/ags4-file.ts`); and the browser's Explore
-  **DuckDB** download (`repo:web/src/lib/duck.ts`). All three `ATTACH` the target and
-  copy each group in with a per-group CTAS, so every table carries `_id`/`_parent_id`
-  — the persisted store joins and version-diffs by `_id`, byte-identical to the
+  **DuckDB** download (`repo:web/src/lib/duck.ts`). Each writes one CTAS per group:
+  Node and the browser `ATTACH` the target and copy from their engine's tables, while
+  Python opens the target directly and writes each group from its keyed Arrow table,
+  one at a time, never loading the handle's own engine (#1095). Every table carries
+  `_id`/`_parent_id` — the persisted store joins and version-diffs by `_id`, byte-identical to the
   extension's `read_ags`/`load_ags`. They **refuse to overwrite** and (native) return
   `{path, tables_written, rows_written}`. The `lat` CLI stays DuckDB-free; the
   SQL-user path to a `.duckdb` is the extension's `load_ags` into a file-backed

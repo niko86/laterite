@@ -701,6 +701,13 @@ class Ags4File:
         con = self._engine()
         if code in self._registered:
             return
+        self._create_table(con, code)
+        self._registered.add(code)
+
+    def _create_table(self, con: duckdb.DuckDBPyConnection, code: str) -> None:
+        """CTAS group ``code`` into ``con`` as a native table from its keyed Arrow
+        table, with the ``xn`` projection applied. The Arrow table lives only for
+        this call, so a caller looping over groups holds one at a time."""
         table = self._p["_handle"].table_for(code, self._content_hash)
         if table is None:
             raise KeyError(f"group {code!r} not in file")
@@ -711,7 +718,6 @@ class Ags4File:
             con.execute(f'CREATE TABLE "{code}" AS SELECT {select} FROM "{tmp}"')
         finally:
             con.unregister(tmp)
-        self._registered.add(code)
 
     def _xn_select(self, con: duckdb.DuckDBPyConnection, tmp: str, code: str) -> str:
         """The projection for ``xn="numeric"``: ``* REPLACE (...)`` casting this
@@ -1252,27 +1258,29 @@ class Ags4File:
                 f"{path} exists; to_duckdb writes a fresh database (remove it first)"
             )
         codes = list(self._p["group_order"] if groups is None else groups)
-        con = self._engine()
+        # KeyError if a named group isn't in the file, before any file is created.
         for code in codes:
-            self._register(code)  # KeyError if a named group isn't in the file
-        # ATTACH the on-disk db and copy each in-memory group table into it. A
-        # per-group CTAS (not `COPY FROM DATABASE`) so a caller-`register()`ed frame
-        # can't leak in, and so `groups=` selects/orders exactly. The path is
-        # single-quote-escaped: DuckDB's ATTACH takes no bind parameter for it.
-        escaped = str(path).replace("'", "''")
-        con.execute(f"ATTACH '{escaped}' AS _lat_out")
+            self._g(code)
+        import duckdb
+
+        # Write each group straight from its keyed Arrow table into a connection
+        # of the target file's own. Staging through the handle's engine would hold
+        # a native copy of every group at once and leave them all on the handle
+        # afterwards (#1095); this way one group's Arrow table is alive at a time
+        # and the handle's engine is never touched — a caller-`register()`ed frame
+        # lives there, so it can't leak in. A per-group CTAS (not
+        # `COPY FROM DATABASE`) so `groups=` selects/orders exactly.
+        con = duckdb.connect(str(path))
         rows = 0
         try:
             for code in codes:
-                con.execute(f'CREATE TABLE _lat_out."{code}" AS SELECT * FROM "{code}"')
+                self._create_table(con, code)
                 # count(*) always yields one row; the guard is for the type checker,
                 # since DuckDBPyConnection.fetchone() is typed Optional.
-                count_row = con.execute(
-                    f'SELECT count(*) FROM _lat_out."{code}"'
-                ).fetchone()
+                count_row = con.execute(f'SELECT count(*) FROM "{code}"').fetchone()
                 rows += count_row[0] if count_row is not None else 0
         finally:
-            con.execute("DETACH _lat_out")
+            con.close()
         return {"path": path, "tables_written": len(codes), "rows_written": rows}
 
     @property
@@ -2103,11 +2111,8 @@ def to_duckdb(
     if isinstance(source, Ags4File):
         return source.to_duckdb(output, groups=groups)
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
-    handle = read(path=p, text=txt, data=raw)
-    try:
-        return handle.to_duckdb(output, groups=groups)
-    finally:
-        handle.close()  # free the intermediate handle's DuckDB engine
+    # The write never spins up the handle's engine (#1095), so there is none to close.
+    return read(path=p, text=txt, data=raw).to_duckdb(output, groups=groups)
 
 
 def from_excel(
