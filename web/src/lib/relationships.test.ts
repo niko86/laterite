@@ -246,7 +246,7 @@ describe("relExamples", () => {
     expect(names).toContain("TREG ⋈ SAMP");
     const samp = ex.find((e) => e.name === "SAMP ⋈ LOCA")!;
     expect(samp.sql).toContain('LEFT JOIN "LOCA" p');
-    expect(samp.sql).toContain('c."LOCA_ID" = p."LOCA_ID"');
+    expect(samp.sql).toContain('c."LOCA_ID" IS NOT DISTINCT FROM p."LOCA_ID"');
   });
 });
 

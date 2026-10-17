@@ -44,8 +44,10 @@ export interface QualifiedCol {
   as?: string;
 }
 
-/** One joined table. `on` is the equi-join column pairs (leftAlias.left =
- *  alias.right). `range`, when set, ADDS a half-open depth band
+/** One joined table. `on` is the KEY column pairs, each matched null-safe
+ *  (`leftAlias.left IS NOT DISTINCT FROM alias.right`): a blank optional KEY
+ *  such as `SAMP_ID` reads as NULL, and `NULL = NULL` would drop the parent of
+ *  every child row (#1100). `range`, when set, ADDS a half-open depth band
  *  `baseAlias.baseCol >= alias.top AND baseAlias.baseCol < alias.base` — the
  *  GEOL stratum case. `kind` defaults LEFT so unmatched base rows survive. */
 export interface JoinSpec {
@@ -63,7 +65,8 @@ function fromJoins(table: string, alias: string, joins: JoinSpec[]): string {
   for (const j of joins) {
     const preds = [
       ...j.on.map(
-        (p) => `${j.leftAlias}.${q(p.left)} = ${j.alias}.${q(p.right)}`,
+        (p) =>
+          `${j.leftAlias}.${q(p.left)} IS NOT DISTINCT FROM ${j.alias}.${q(p.right)}`,
       ),
       ...(j.range
         ? [
