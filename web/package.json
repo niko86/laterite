@@ -24,6 +24,8 @@
     "build:wasm-full": "wasm-pack build ../rust-packages/laterite-ags4-wasm --target web --release --out-dir \"$PWD/src/wasm-full\" --out-name ags4_wasm_full",
     "build:wasm-tokenizer": "wasm-pack build ../rust-packages/laterite-ags4-tokenizer-wasm --target web --release --out-dir \"$PWD/src/wasm-tokenizer\"",
     "build:wasm:all": "npm run build:wasm && npm run build:wasm-full && npm run build:wasm-tokenizer",
+    "build:wasm-full:types": "npm run build:wasm-full -- --no-opt",
+    "build:wasm:lint": "npm run build:wasm && npm run build:wasm-full:types && npm run build:wasm-tokenizer",
     "check:wasm-tokenizer-size": "node scripts/check-wasm-tokenizer-size.mjs",
     "check:wasm-tier1": "node ../tools/release/check-wasm-tier1.mjs src/wasm",
     "preview": "vite preview",
