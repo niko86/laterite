@@ -190,3 +190,10 @@ def test_by_id_does_not_narrow_a_single_result_query():
     q = h.query("SELECT * FROM LLPL").at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
     with pytest.raises(TypeError, match='by="_id"'):
         q.frame()
+
+
+def test_by_id_without_a_base_names_the_missing_base():
+    h = lat.read(text=AGS)
+    q = h.at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
+    with pytest.raises(TypeError, match="no base"):
+        q.frame()

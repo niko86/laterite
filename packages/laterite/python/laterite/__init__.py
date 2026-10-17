@@ -1565,17 +1565,17 @@ class AgsQuery:
         / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
         the base's columns narrow it, and ``.select()`` projects."""
         p = self._parent
-        if any(by is not None for _, by, _ in self._filters):
-            raise TypeError(
-                '.at(…, by="_id") narrows the multi-group q[code] / q.frames() only — '
-                "a .query() base names no group to tell `_id` from `_parent_id` by. "
-                "Filter the base on _id / _parent_id with .filter() instead."
-            )
         if self._base is None:
             raise TypeError(
                 "no base to run — start a single-result query with .query('SELECT … "
                 "FROM …'), or use the multi-group accessors q[code] / q.frames() "
                 "after .at()."
+            )
+        if any(by is not None for _, by, _ in self._filters):
+            raise TypeError(
+                '.at(…, by="_id") narrows the multi-group q[code] / q.frames() only — '
+                "a .query() base names no group to tell `_id` from `_parent_id` by. "
+                "Filter the base on _id / _parent_id with .filter() instead."
             )
         p._register_all()
         engine = p._engine()
