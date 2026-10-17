@@ -44,7 +44,8 @@
     "sync-icons": "node scripts/sync-icons.mjs",
     "sync-docs-tokens": "node scripts/sync-docs-tokens.mjs",
     "check:docs-tokens": "node scripts/sync-docs-tokens.mjs --check",
-    "check:no-emoji": "node scripts/check-no-emoji.mjs"
+    "check:no-emoji": "node scripts/check-no-emoji.mjs",
+    "check:sync-assets": "node scripts/check-sync-assets.mjs"
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",

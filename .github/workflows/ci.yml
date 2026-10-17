@@ -1103,6 +1103,23 @@ jobs:
       - name: web — install
         working-directory: web
         run: npm ci
+      # The committed copies sync-assets refreshes on every dev and build (the
+      # dictionary, samples, sensitive headings, rules catalogue, icons) must
+      # already match their sources at the locked versions (#1106). Nothing
+      # compared them, so a build quietly rewrote the icons and nobody
+      # committed the result. The check runs the script itself and fails,
+      # naming the paths, on any change to the working tree.
+      #
+      # HERE, like the docs-token check below, because this job already ran
+      # `npm ci` in web/, so the step costs no runner of its own: a separate
+      # hosted job would repeat the install to save nothing on the pool. Its
+      # trigger is right too, since `node` watches the sources under
+      # rust-packages/ and `web` watches the scripts and the lockfile. It runs
+      # BEFORE the wasm build so drift fails without waiting for it, and while
+      # the tree is still clean, which the check requires.
+      - name: web — sync-assets leaves the committed copies unchanged
+        working-directory: web
+        run: npm run check:sync-assets
       # `build:wasm:lint`, not `build:wasm:all`: the same three builds, except
       # the full engine skips wasm-opt (`build:wasm-full:types`, #1115). This
       # job only reads the full engine's `.d.ts`, which wasm-bindgen writes
