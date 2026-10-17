@@ -68,6 +68,12 @@ single borehole's whole story, not one group at a time.
     and rides the same **optional peer** as `sql()` (`npm i @duckdb/node-api`);
     `close()` releases the connection when you're done.
 
+    The key rules match Python. `at()` throws when no group in the file carries
+    the key column, and a `null` value warns. `at("SAMP", ids, { by: "_id" })`
+    keeps the `SAMP` rows whose `_id` is in `ids`, plus the rows of its direct
+    children whose `_parent_id` is. Then `table(code)` rejects for a group no
+    filter reaches.
+
 === "DuckDB"
 
     ```sql
