@@ -163,10 +163,12 @@ a silent permanent skip is how it stays that way.
 
 `repo:tests/test_stated_cadences_faithful.py` (root pytest suite —
 `uv run pytest tests/ -q`), `repo:tools/check_external_authorities.py` (invoked
-from the **satellite's** CI, never locally-required), and the `cadence` job in
-`repo:.github/workflows/ci.yml`, which is its own job on a `prose` paths filter
-rather than a step in `python`: its inputs are every `.md`/`.rs`/`.py`/`.yml` in
-the tree, and folding it in would make a README typo pay for a wheel build.
+from the **satellite's** CI, never locally-required). In
+`repo:.github/workflows/ci.yml` it runs in the unconditional, buildless
+`repo-gates` job, so there is no paths filter to keep wide enough for inputs
+that are every `.md`/`.rs`/`.py`/`.yml` in the tree, and no wheel build to pay
+for. It used to have its own `cadence` job on a `prose` filter, retired in #1114
+as strictly subsumed.
 
 ## Relationship to other components
 

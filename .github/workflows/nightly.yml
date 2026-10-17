@@ -1137,8 +1137,8 @@ jobs:
       # inifile from the rootdir whatever interpreter is running it, and this
       # ephemeral env has no pytest-benchmark — so pytest exits 4 on an
       # unrecognised argument before it collects a single test, and a leg that
-      # never ran reads as a leg that found something. ci.yml's `cadence` and
-      # `repo-gates` jobs carry the same neutraliser and explain the trap in
+      # never ran reads as a leg that found something. ci.yml's `repo-gates`
+      # job carries the same neutraliser and explains the trap in
       # place; `-p no:benchmark` is how you reproduce a clean runner locally,
       # where a cached plugin hides it.
       - name: Docs SQL examples run against the community-published extension

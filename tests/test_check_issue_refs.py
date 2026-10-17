@@ -318,7 +318,7 @@ def _pytest_paths(run: str) -> list[str]:
     """The path arguments of every pytest invocation in a `run:` block.
 
     Enough of a parser to tell "the whole root suite" from "one file in it":
-    `cadence` runs `pytest tests/test_stated_cadences_faithful.py` and does not
+    a job running `pytest tests/test_stated_cadences_faithful.py` does not
     collect this module, so it does not need the history.
     """
     paths = []

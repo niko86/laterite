@@ -100,6 +100,12 @@ only thing that shows the claim is not stale:
                           first the #786 way: a planted `_matches` inversion on
                           `.rs` paths produced 14136 mismatches. `dot: true`,
                           as above.
+  #1114 (prose dropped) 1871 paths x 56 patterns = 104776 pairs, exact agreement
+                        — the `prose` filter left with the `cadence` job it
+                          fed; its test runs in the unfiltered `repo-gates`.
+                          Falsified first the #786 way: a planted `_matches`
+                          inversion on `.rs` paths produced 12768 mismatches.
+                          `dot: true`, as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are
@@ -111,6 +117,7 @@ count is the one thing kept honest about the present.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -395,6 +402,33 @@ def test_repo_gates_is_unconditional() -> None:
     )
 
 
+RULESET = REPO / ".github" / "rulesets" / "main-protection.expected.json"
+
+
+def test_repo_gates_is_required() -> None:
+    """...and its verdict must block a merge, or the gates above only advise.
+
+    `repo-gates` is the only job running ruff and the render-drift gates. Left
+    out of the ruleset, a red run is one more check on a mergeable PR (#1114).
+    The snapshot is what nightly's `ruleset-drift` holds the live ruleset to,
+    so listing it here is the half of the requirement the tree can carry.
+    Being unconditional (above) is what lets it be required: a skippable
+    required context would leave a PR pending, never red.
+    """
+    ruleset = json.loads(RULESET.read_text(encoding="utf-8"))
+    contexts = {
+        check["context"]
+        for rule in ruleset["rules"]
+        if rule["type"] == "required_status_checks"
+        for check in rule["parameters"]["required_status_checks"]
+    }
+    assert "repo-gates" in contexts, (
+        f"{RULESET.relative_to(REPO)} does not require `repo-gates`, so a PR "
+        f"with a ruff violation or a stale render can merge. Required: "
+        f"{sorted(contexts)}"
+    )
+
+
 @pytest.mark.parametrize("path", BUILDLESS_SSOTS)
 def test_buildless_ssots_need_no_heavy_job(
     filters: dict[str, list[str]], path: str
@@ -664,8 +698,9 @@ BUILDLESS_TOOLS = [
     "tools/release/trusted_publishing.py",  # no CI job at all — run by hand, once
     # The first tools added after `code` stopped listing `tools/**` (#271's
     # measurement harnesses). Under the old glob a bench script nobody runs in
-    # CI bought a cargo build, the cdylib, pytest and a wheel smoke; these fire
-    # only the cheap stdlib `cadence` job, which is the narrowing working.
+    # CI bought a cargo build, the cdylib, pytest and a wheel smoke; now they
+    # fire no filtered job, and `repo-gates` lints them, which is the
+    # narrowing working.
     "tools/bench-cert-parse-share.py",
     "tools/bench-cert-python-routes.py",
     "tools/xcheck/emit_py.py",  # nightly.yml, which has no path filter
