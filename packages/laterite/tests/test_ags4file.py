@@ -594,6 +594,112 @@ def test_free_to_duckdb_requires_an_output_path():
         laterite.to_duckdb(text=_RELATED_SRC)
 
 
+# --- to_duckdb streams into the file, leaving the engine alone (#1095) ----
+#
+# The write used to load every group into the handle's in-memory engine and
+# copy each table across. The store it wrote is the contract pinned here: the
+# same tables, types and keyed rows as the handle's relational layer, in both
+# `xn` modes. FRAC carries XN headings, so the numeric mode's TRY_CAST shows.
+
+_STORE_SRC = _RELATED_SRC + "\r\n".join(
+    [
+        '"GROUP","FRAC"',
+        '"HEADING","LOCA_ID","FRAC_FI","FRAC_IMAX"',
+        '"UNIT","","",""',
+        '"TYPE","ID","XN","XN"',
+        '"DATA","BH01","12.5","3.0"',
+        '"DATA","BH02","NP","7.25"',
+        "",
+    ]
+)
+
+
+def _write_store(spelling: str, xn: str, out: Path, groups=None) -> dict:
+    handle = laterite.read(text=_STORE_SRC, xn=xn)
+    if spelling == "fluent":
+        return handle.to_duckdb(out, groups=groups)
+    return laterite.to_duckdb(handle, out, groups=groups)
+
+
+@pytest.mark.parametrize("xn", ["string", "numeric"])
+@pytest.mark.parametrize("spelling", ["fluent", "free"])
+def test_to_duckdb_store_matches_the_relational_layer(tmp_path, spelling, xn):
+    out = tmp_path / "store.duckdb"
+    stats = _write_store(spelling, xn, out)
+    assert stats["tables_written"] == 4
+    assert stats["rows_written"] == 1 + 3 + 4 + 2
+    mem = laterite.read(text=_STORE_SRC, xn=xn).connection
+    got = duckdb.connect(str(out), read_only=True)
+    try:
+        tables = "SELECT table_name FROM duckdb_tables() ORDER BY 1"
+        assert got.execute(tables).fetchall() == [
+            ("FRAC",),
+            ("LOCA",),
+            ("PROJ",),
+            ("SAMP",),
+        ]
+        for code in ("PROJ", "LOCA", "SAMP", "FRAC"):
+            describe = f'SELECT column_name, column_type FROM (DESCRIBE "{code}")'
+            assert got.execute(describe).fetchall() == mem.execute(describe).fetchall()
+            rows = f'SELECT * FROM "{code}" ORDER BY ALL'
+            assert got.execute(rows).fetchall() == mem.execute(rows).fetchall(), code
+            keys = f'SELECT sum(hash(_id)), sum(hash(_parent_id)) FROM "{code}"'
+            assert got.execute(keys).fetchone() == mem.execute(keys).fetchone(), code
+        frac = dict(
+            got.execute(
+                'SELECT column_name, column_type FROM (DESCRIBE "FRAC")'
+            ).fetchall()
+        )
+        assert frac["FRAC_FI"] == ("VARCHAR" if xn == "string" else "DOUBLE")
+    finally:
+        got.close()
+
+
+@pytest.mark.parametrize("xn", ["string", "numeric"])
+@pytest.mark.parametrize("spelling", ["fluent", "free"])
+def test_to_duckdb_leaves_a_fresh_handle_without_an_engine(tmp_path, spelling, xn):
+    handle = laterite.read(text=_STORE_SRC, xn=xn)
+    if spelling == "fluent":
+        handle.to_duckdb(tmp_path / "out.duckdb")
+    else:
+        laterite.to_duckdb(handle, tmp_path / "out.duckdb")
+    assert handle._con is None
+    assert handle._registered == set()
+
+
+@pytest.mark.parametrize("spelling", ["fluent", "free"])
+def test_to_duckdb_leaves_the_engine_as_it_found_it(tmp_path, spelling):
+    handle = laterite.read(text=_STORE_SRC)
+    handle.sql('SELECT * FROM "LOCA"').fetchall()
+    handle.register("MINE", pl.DataFrame({"x": [1]}))
+    before = handle._con.execute(
+        "SELECT database_name FROM duckdb_databases()"
+    ).fetchall()
+    out = tmp_path / "out.duckdb"
+    if spelling == "fluent":
+        handle.to_duckdb(out)
+    else:
+        laterite.to_duckdb(handle, out)
+    assert handle._registered == {"LOCA"}
+    shown = {r[0] for r in handle._con.execute("SHOW TABLES").fetchall()}
+    assert shown == {"LOCA", "MINE"}
+    after = handle._con.execute(
+        "SELECT database_name FROM duckdb_databases()"
+    ).fetchall()
+    assert after == before
+    # The caller's frame stays the caller's: it is not written to the store.
+    with duckdb.connect(str(out), read_only=True) as got:
+        names = {r[0] for r in got.execute("SHOW TABLES").fetchall()}
+    assert names == {"PROJ", "LOCA", "SAMP", "FRAC"}
+
+
+def test_to_duckdb_unknown_group_writes_no_file(tmp_path):
+    out = tmp_path / "x.duckdb"
+    with pytest.raises(KeyError, match="not in file"):
+        laterite.read(text=_STORE_SRC).to_duckdb(out, groups=["LOCA", "NOPE"])
+    assert not out.exists()
+
+
 # --- structure-preserving round-trip property -----------------------------
 #
 # .text must reconstruct a file whose group set and per-group heading lists
