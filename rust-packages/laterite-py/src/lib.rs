@@ -237,16 +237,63 @@ fn validate(
         });
     }
 
+    let io_err = |p: &str, e: &std::io::Error| {
+        let kind = if e.kind() == std::io::ErrorKind::NotFound {
+            "not_found"
+        } else {
+            "io"
+        };
+        (3, kind.to_string(), format!("{p}: {e}"))
+    };
+    let stale = |label: &str| {
+        (
+            4,
+            "stale_cert".to_string(),
+            format!(
+                "the certificate does not match {label} (size / SHA-256 differ) \
+                 — the file changed under it; rebuild it with \
+                 read(...).validate().certify()"
+            ),
+        )
+    };
+
+    // A path with a cert goes through the door that reads the file itself (#1097): the
+    // size settles a cert of another size before a byte is read, and a cert that
+    // vouches is checked against a hash taken as the file streams, so the file is
+    // never held. Strictness travels with it, so a stale named cert still raises
+    // before the engine runs.
+    if let (Some(p), Some(c)) = (path, cert) {
+        let file = std::fs::File::open(Path::new(p)).map_err(|e| io_err(p, &e))?;
+        let out = laterite_ags4_trust::check_reader(laterite_ags4_trust::ReaderRequest {
+            file,
+            opts: &opts,
+            cert: Some(c),
+            world: WorldScope::OnDisk(std::path::PathBuf::from(p)),
+            compat: None,
+            named: strict_cert,
+        })
+        .map_err(|e| match e {
+            laterite_ags4_trust::ReaderError::Io(e) => io_err(p, &e),
+            laterite_ags4_trust::ReaderError::StaleCert => stale(p),
+            laterite_ags4_trust::ReaderError::Validate(e) => map_err(&e),
+        })?;
+        if !out.certified {
+            count_engine_run();
+        }
+        return Ok(Checked {
+            file: p.to_string(),
+            dict_version: out.dict_version.as_str().to_string(),
+            resolution: out.resolution.as_str().to_string(),
+            findings: out.findings,
+            certified: out.certified,
+            revalidate_reason: out.revalidate_reason.map(|r| r.as_str().to_string()),
+            measured: None,
+        });
+    }
+
     // Bytes, whatever door they came through — a certificate is a statement about bytes.
     let (label, bytes, world) = if let Some(p) = path {
-        let b = std::fs::read(Path::new(p)).map_err(|e| {
-            let kind = if e.kind() == std::io::ErrorKind::NotFound {
-                "not_found"
-            } else {
-                "io"
-            };
-            (3, kind.to_string(), format!("{p}: {e}"))
-        })?;
+        let b = std::fs::read(Path::new(p)).map_err(|e| io_err(p, &e))?;
         (
             p.to_string(),
             b,
@@ -277,15 +324,7 @@ fn validate(
     if strict_cert {
         if let Some(c) = cert {
             if !c.is_fresh_for(&bytes) {
-                return Err((
-                    4,
-                    "stale_cert".to_string(),
-                    format!(
-                        "the certificate does not match {label} (size / SHA-256 differ) \
-                         — the file changed under it; rebuild it with \
-                         read(...).validate().certify()"
-                    ),
-                ));
+                return Err(stale(&label));
             }
         }
     }

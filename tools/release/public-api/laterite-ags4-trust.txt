@@ -31,6 +31,26 @@ impl core::marker::Unpin for laterite_ags4_trust::MintError
 impl core::marker::UnsafeUnpin for laterite_ags4_trust::MintError
 impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::MintError
 impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::MintError
+pub enum laterite_ags4_trust::ReaderError
+pub laterite_ags4_trust::ReaderError::Io(core::io::error::Error)
+pub laterite_ags4_trust::ReaderError::StaleCert
+pub laterite_ags4_trust::ReaderError::Validate(laterite_ags4_validator::error::ValidatorError)
+impl core::convert::From<core::io::error::Error> for laterite_ags4_trust::ReaderError
+pub fn laterite_ags4_trust::ReaderError::from(core::io::error::Error) -> Self
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_trust::ReaderError
+pub fn laterite_ags4_trust::ReaderError::from(laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::error::Error for laterite_ags4_trust::ReaderError
+impl core::fmt::Debug for laterite_ags4_trust::ReaderError
+pub fn laterite_ags4_trust::ReaderError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_trust::ReaderError
+pub fn laterite_ags4_trust::ReaderError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_trust::ReaderError
+impl core::marker::Send for laterite_ags4_trust::ReaderError
+impl core::marker::Sync for laterite_ags4_trust::ReaderError
+impl core::marker::Unpin for laterite_ags4_trust::ReaderError
+impl core::marker::UnsafeUnpin for laterite_ags4_trust::ReaderError
+impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::ReaderError
+impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::ReaderError
 pub struct laterite_ags4_trust::Measurement
 impl core::clone::Clone for laterite_ags4_trust::Measurement
 pub fn laterite_ags4_trust::Measurement::clone(&self) -> Self
@@ -70,6 +90,20 @@ impl core::marker::Unpin for laterite_ags4_trust::Outcome
 impl core::marker::UnsafeUnpin for laterite_ags4_trust::Outcome
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Outcome
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Outcome
+pub struct laterite_ags4_trust::ReaderRequest<'a, F>
+pub laterite_ags4_trust::ReaderRequest::cert: core::option::Option<&'a laterite_ags4_core::index::Sidecar>
+pub laterite_ags4_trust::ReaderRequest::compat: core::option::Option<alloc::string::String>
+pub laterite_ags4_trust::ReaderRequest::file: F
+pub laterite_ags4_trust::ReaderRequest::named: bool
+pub laterite_ags4_trust::ReaderRequest::opts: &'a laterite_ags4_validator::CheckOptions
+pub laterite_ags4_trust::ReaderRequest::world: laterite_ags4_validator::world::WorldScope
+impl<'a, F> core::marker::Freeze for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::marker::Freeze
+impl<'a, F> core::marker::Send for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::marker::Send
+impl<'a, F> core::marker::Sync for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::marker::Sync
+impl<'a, F> core::marker::Unpin for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::marker::Unpin
+impl<'a, F> core::marker::UnsafeUnpin for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::marker::UnsafeUnpin
+impl<'a, F> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::panic::unwind_safe::RefUnwindSafe
+impl<'a, F> core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::ReaderRequest<'a, F> where F: core::panic::unwind_safe::UnwindSafe
 pub struct laterite_ags4_trust::Request<'a>
 pub laterite_ags4_trust::Request::bytes: &'a [u8]
 pub laterite_ags4_trust::Request::cert: core::option::Option<&'a laterite_ags4_core::index::Sidecar>
@@ -86,6 +120,7 @@ impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Request<'
 pub fn laterite_ags4_trust::check(laterite_ags4_trust::Request<'_>) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_trust::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_trust::check_parsed_measured(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_trust::Outcome, core::option::Option<laterite_ags4_trust::Measurement>), laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_trust::check_reader<F: alloc::io::read::Read + core::io::seek::Seek>(laterite_ags4_trust::ReaderRequest<'_, F>) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_trust::ReaderError>
 pub fn laterite_ags4_trust::engine_id(core::option::Option<alloc::string::String>) -> laterite_ags4_core::index::EngineId
 pub fn laterite_ags4_trust::mint(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_trust::MintError>
 pub fn laterite_ags4_trust::mint_measured(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>, &laterite_ags4_parse::ParsedFile, &laterite_ags4_trust::Measurement) -> laterite_ags4_trust::Minted

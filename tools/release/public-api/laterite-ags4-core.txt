@@ -410,12 +410,14 @@ pub laterite_ags4_core::index::Sidecar::order: alloc::vec::Vec<alloc::string::St
 pub laterite_ags4_core::index::Sidecar::validation: laterite_ags4_core::index::ValidationStamp
 pub laterite_ags4_core::index::Sidecar::version: u32
 impl laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::answers(&self, &laterite_ags4_core::index::Question, &laterite_ags4_core::index::EngineId) -> laterite_ags4_core::index::Decision
 pub fn laterite_ags4_core::index::Sidecar::assemble(&[u8], laterite_ags4_core::index::ValidationStamp) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::Sidecar::assemble_from_parsed(&[u8], &laterite_ags4_parse::ParsedFile, laterite_ags4_core::index::ValidationStamp) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::Sidecar::decide(&self, &[u8], &laterite_ags4_core::index::Question, &laterite_ags4_core::index::EngineId) -> laterite_ags4_core::index::Decision
 pub fn laterite_ags4_core::index::Sidecar::from_json(&[u8]) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
 pub fn laterite_ags4_core::index::Sidecar::index(&self) -> laterite_ags4_core::index::GroupIndex
 pub fn laterite_ags4_core::index::Sidecar::is_fresh_for(&self, &[u8]) -> bool
+pub fn laterite_ags4_core::index::Sidecar::is_fresh_for_reader<R: alloc::io::read::Read>(&self, R) -> core::io::error::Result<bool>
 pub fn laterite_ags4_core::index::Sidecar::is_fresh_for_remote(&self, u64, core::option::Option<&str>, core::option::Option<&str>) -> laterite_ags4_core::index::RemoteFreshness
 pub fn laterite_ags4_core::index::Sidecar::size_matches(&self, u64) -> bool
 pub fn laterite_ags4_core::index::Sidecar::to_json(&self) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>

@@ -11,6 +11,9 @@
       },
       {
         "text": "**`laterite-ags4-trust`: `check_parsed_measured` and `mint_measured` (#1096).** The first is `check_parsed` that also returns an opaque `Measurement` for a run with every tier on and no world check. The second mints from that measurement when it answers the mint's question for the same parse, and otherwise runs the engine as `mint` does. It returns a `Minted` carrying the result and whether the engine ran."
+      },
+      {
+        "text": "**`laterite-ags4-trust`: `check_reader` (#1097), and `laterite-ags4-core`: `Sidecar::is_fresh_for_reader` and `Sidecar::answers`.** `check_reader` is `check` for a file it reads itself: a certificate of another size is settled before any byte is read, and one that would vouch is checked against a hash taken as the file streams, so the file is never held. Same verdict and `revalidate_reason` as `check`. `ReaderRequest::named` makes a stale certificate the error `ReaderError::StaleCert`. `is_fresh_for_reader` is `is_fresh_for` over a stream; `answers` is `decide` without the format, size and content gates."
       }
     ],
     "changed": [
@@ -34,6 +37,9 @@
       },
       {
         "text": "**`certify()` after `validate(fyi=True)` runs the rules once (#1096).** `Ags4File.certify()` and `certify_bytes()` mint from the handle's latest report when that run had every tier on, used the same edition, dictionary and encoding, and had no `check_files`, instead of validating again. The report is the engine's own output on this handle, not a verdict the caller passes in, and it is used only if the source still parses exactly as the handle read it. Otherwise `certify()` validates as before. A report with errors still refuses with the same error, and the certificate is the same either way."
+      },
+      {
+        "text": "**`validate(path, index=…)` no longer holds the whole file to check the certificate (#1097).** A certificate of another size is reported stale before the file is read. When the certificate vouches, the SHA-256 is computed as the file streams, so the check's memory no longer grows with the file. The file is read whole only when the rules have to run. Verdicts and `revalidate_reason` are unchanged."
       }
     ],
     "deprecated": [],

@@ -793,6 +793,40 @@ impl Sidecar {
             && self.file.sha256 == sha256_hex(bytes)
     }
 
+    /// [`Sidecar::is_fresh_for`] over a stream (#1097): the bytes are hashed as they
+    /// are read, through one fixed-size buffer, instead of being held whole. A cert
+    /// that vouches never needs the bytes for anything else, so holding a 100 MB file
+    /// to compute a 32-byte digest was the whole of that call's memory.
+    ///
+    /// The size is counted from what the reader actually yields, not taken from file
+    /// metadata, so a file that grew or shrank after it was stat'd is still caught.
+    /// Reading stops as soon as the count passes the certified size: the answer is
+    /// already "stale", and the rest of the file cannot change it.
+    pub fn is_fresh_for_reader<R: std::io::Read>(&self, mut reader: R) -> std::io::Result<bool> {
+        use sha2::{Digest, Sha256};
+
+        if self.version != SIDECAR_VERSION {
+            return Ok(false);
+        }
+        let mut hasher = Sha256::new();
+        let mut buf = vec![0u8; STREAM_CHUNK];
+        let mut seen: u64 = 0;
+        loop {
+            let n = match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(e),
+            };
+            seen += n as u64;
+            if seen > self.file.size {
+                return Ok(false);
+            }
+            hasher.update(&buf[..n]);
+        }
+        Ok(seen == self.file.size && self.file.sha256 == hex(&hasher.finalize()))
+    }
+
     /// Cheap size-only freshness pre-check — for a remote source where re-hashing
     /// would mean re-downloading. Necessary but not sufficient; pair it with an
     /// ETag/Last-Modified check at the call site.
@@ -825,6 +859,8 @@ impl Sidecar {
     ///    the same forcing.
     /// 6. **tiers** — for errors, and for warnings/FYI iff asked: measured, and clean.
     ///
+    /// Gates 4 to 6 need no bytes, and are [`Sidecar::answers`].
+    ///
     /// Note what is **not** here. There is no clause about Rule 20's on-disk `FILE/`
     /// tree, because there is no field about it, because a certificate cannot speak for
     /// the state of a directory it does not hash. World checks run live, every time,
@@ -832,7 +868,6 @@ impl Sidecar {
     #[must_use]
     pub fn decide(&self, bytes: &[u8], q: &Question, engine: &EngineId) -> Decision {
         use RevalidateReason as R;
-        let v = &self.validation;
 
         if self.version != SIDECAR_VERSION {
             return Decision::Revalidate(R::FormatVersion);
@@ -843,6 +878,26 @@ impl Sidecar {
         if self.file.sha256 != sha256_hex(bytes) {
             return Decision::Revalidate(R::ContentChanged);
         }
+        self.answers(q, engine)
+    }
+
+    /// [`Sidecar::decide`]'s gates from 4 on: could this certificate answer `q` for
+    /// `engine`, **if** the bytes are the ones it certifies? Reads no bytes.
+    ///
+    /// `decide` is format, size and content, then this — so over bytes that pass the
+    /// first three, the two return the same thing. It exists so a caller holding a
+    /// file it has not read yet can learn whether a matching hash would be enough
+    /// (#1097). If it would, the file can be hashed as a stream and never held; if
+    /// not, the engine needs the bytes anyway and they may as well be read once.
+    ///
+    /// It is not a verdict on its own. `Vouched` here means "vouched, given matching
+    /// bytes", and the reason a caller reports must still come from `decide`'s order:
+    /// a changed file is `ContentChanged` even when its cert also measured a dirty tier.
+    #[must_use]
+    pub fn answers(&self, q: &Question, engine: &EngineId) -> Decision {
+        use RevalidateReason as R;
+        let v = &self.validation;
+
         if v.validator != engine.validator || v.compat != engine.compat {
             return Decision::Revalidate(R::DifferentValidator);
         }
@@ -948,16 +1003,25 @@ impl Sidecar {
 
 /// Hex-encode the SHA-256 of `bytes` — the sidecar's staleness fingerprint.
 fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    hex(&Sha256::digest(bytes))
+}
+
+/// Lowercase hex, the form a sidecar records its SHA-256 in.
+fn hex(digest: &[u8]) -> String {
     use std::fmt::Write;
 
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(bytes);
-    let mut out = String::with_capacity(64);
+    let mut out = String::with_capacity(digest.len() * 2);
     for b in digest {
         let _ = write!(out, "{b:02x}");
     }
     out
 }
+
+/// How much of a file [`Sidecar::is_fresh_for_reader`] holds at once. Large enough
+/// that the per-read syscall is noise next to the hashing, small enough that the
+/// buffer is nothing next to the file.
+const STREAM_CHUNK: usize = 64 * 1024;
 
 #[cfg(test)]
 mod tests {
@@ -1664,6 +1728,89 @@ mod tests {
             sc.decide(&same_len, &errors_only(), &e),
             Decision::Revalidate(RevalidateReason::ContentChanged)
         );
+    }
+
+    /// Hands out one byte per `read`, so a streamed hash has to carry its state
+    /// across many small reads rather than seeing the file in one piece.
+    struct OneByteAtATime<'a>(&'a [u8]);
+
+    impl std::io::Read for OneByteAtATime<'_> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            match (self.0.split_first(), buf.first_mut()) {
+                (Some((b, rest)), Some(slot)) => {
+                    *slot = *b;
+                    self.0 = rest;
+                    Ok(1)
+                }
+                _ => Ok(0),
+            }
+        }
+    }
+
+    #[test]
+    fn the_streamed_freshness_check_agrees_with_the_whole_bytes_one() {
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
+
+        let mut longer = bytes.to_vec();
+        longer.push(b'\n');
+        let shorter = &bytes[..bytes.len() - 1];
+        let mut same_len = bytes.to_vec();
+        let mid = same_len.len() / 2;
+        same_len[mid] ^= 0xFF;
+
+        for (what, candidate) in [
+            ("the certified bytes", bytes),
+            ("one byte longer", &longer[..]),
+            ("one byte shorter", shorter),
+            ("the same length, one byte changed", &same_len[..]),
+        ] {
+            let whole = sc.is_fresh_for(candidate);
+            let streamed = sc.is_fresh_for_reader(OneByteAtATime(candidate)).unwrap();
+            let cursor = sc
+                .is_fresh_for_reader(std::io::Cursor::new(candidate))
+                .unwrap();
+            assert_eq!(streamed, whole, "{what}: one byte per read");
+            assert_eq!(cursor, whole, "{what}: whole buffers");
+        }
+        assert!(sc.is_fresh_for_reader(OneByteAtATime(bytes)).unwrap());
+    }
+
+    #[test]
+    fn answers_is_decide_once_the_bytes_are_known_to_match() {
+        // `decide` is format, size and content, then `answers`. Over the certified
+        // bytes the first three pass, so the two must agree on every question.
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
+        let e = asking_engine();
+        let moved = EngineId {
+            fingerprint: "ffffffffffffffff".into(),
+            ..asking_engine()
+        };
+        let questions = [
+            errors_only(),
+            Question {
+                want_warnings: true,
+                ..errors_only()
+            },
+            Question {
+                want_fyi: true,
+                ..errors_only()
+            },
+            Question {
+                forced_edition: Some("4.2".into()),
+                ..errors_only()
+            },
+            Question {
+                encoding: "windows-1252".into(),
+                ..errors_only()
+            },
+        ];
+        for q in &questions {
+            for engine in [&e, &moved] {
+                assert_eq!(sc.answers(q, engine), sc.decide(bytes, q, engine), "{q:?}");
+            }
+        }
     }
 
     #[test]

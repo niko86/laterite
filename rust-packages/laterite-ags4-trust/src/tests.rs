@@ -897,3 +897,167 @@ fn a_measurement_with_errors_refuses_as_the_mint_does() {
         .expect_err("errors are not certifiable");
     assert_eq!(reused.to_string(), fresh.to_string());
 }
+
+// --- a file the door reads only as far as it must (#1097) --------------------
+
+/// A file in memory that counts the bytes it hands out, so a test can see how much of
+/// it a check actually read.
+struct Watched<'a> {
+    inner: std::io::Cursor<&'a [u8]>,
+    read: u64,
+}
+
+impl<'a> Watched<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Watched {
+            inner: std::io::Cursor::new(bytes),
+            read: 0,
+        }
+    }
+}
+
+impl std::io::Read for Watched<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.read += n as u64;
+        Ok(n)
+    }
+}
+
+impl std::io::Seek for Watched<'_> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.inner.seek(pos)
+    }
+}
+
+fn from_reader(
+    file: &mut Watched<'_>,
+    opts: &CheckOptions,
+    cert: &Sidecar,
+    named: bool,
+) -> Result<Outcome, ReaderError> {
+    check_reader(ReaderRequest {
+        file,
+        opts,
+        cert: Some(cert),
+        world: WorldScope::None,
+        compat: None,
+        named,
+    })
+}
+
+#[test]
+fn a_named_cert_for_a_file_of_another_size_is_stale_before_a_byte_is_read() {
+    let (bytes, cert) = minted(CLEAN_WITH_ATTACHMENT);
+    let mut longer = bytes.clone();
+    longer.extend_from_slice(b"\r\n");
+    let mut file = Watched::new(&longer);
+
+    let err = from_reader(&mut file, &errors_only(), &cert, true).expect_err("stale");
+    assert!(matches!(err, ReaderError::StaleCert), "{err:?}");
+    assert_eq!(file.read, 0, "the size alone settled it");
+}
+
+#[test]
+fn a_named_cert_for_changed_content_is_stale_before_the_engine_runs() {
+    let (bytes, cert) = minted(CLEAN_WITH_ATTACHMENT);
+    let mut tampered = bytes.clone();
+    let i = tampered.len() - 6;
+    tampered[i] = b'X';
+    let mut file = Watched::new(&tampered);
+
+    let err = from_reader(&mut file, &errors_only(), &cert, true).expect_err("stale");
+    assert!(matches!(err, ReaderError::StaleCert), "{err:?}");
+    assert_eq!(file.read, tampered.len() as u64, "read once, to hash it");
+}
+
+#[test]
+fn a_vouched_cert_reads_the_file_once() {
+    let (bytes, cert) = minted(CLEAN_WITH_ATTACHMENT);
+    let mut file = Watched::new(&bytes);
+
+    let out = from_reader(&mut file, &errors_only(), &cert, true).expect("checks");
+    assert!(out.certified);
+    assert_eq!(count(&out.findings), 0);
+    assert_eq!(out.dict_version.as_str(), "4.2");
+    assert_eq!(file.read, bytes.len() as u64);
+}
+
+#[test]
+fn a_cert_that_cannot_answer_reads_the_file_once() {
+    // The engine needs the bytes, so the door reads them whole and hashes those,
+    // rather than streaming a hash and then reading the file again.
+    let (bytes, cert) = minted(CLEAN_WITH_A_WARNING);
+    let mut file = Watched::new(&bytes);
+
+    let out = from_reader(&mut file, &with_tiers(true, false), &cert, true).expect("checks");
+    assert!(!out.certified);
+    assert_eq!(
+        out.revalidate_reason,
+        Some(RevalidateReason::TierNotClean(Tier::Warnings))
+    );
+    assert!(count(&out.findings) > 0);
+    assert_eq!(file.read, bytes.len() as u64);
+}
+
+#[test]
+fn the_reader_door_reaches_the_verdict_check_reaches() {
+    for text in [CLEAN_WITH_ATTACHMENT, CLEAN_WITH_A_WARNING] {
+        let (bytes, cert) = minted(text);
+        let mut longer = bytes.clone();
+        longer.extend_from_slice(b"\r\n");
+        let shorter = bytes[..bytes.len() - 2].to_vec();
+        let mut tampered = bytes.clone();
+        let i = tampered.len() - 6;
+        tampered[i] = b'X';
+
+        for candidate in [&bytes, &longer, &shorter, &tampered] {
+            for opts in [
+                errors_only(),
+                with_tiers(true, false),
+                with_tiers(true, true),
+                read_as("windows-1252"),
+            ] {
+                let want = check(Request {
+                    bytes: candidate,
+                    opts: &opts,
+                    cert: Some(&cert),
+                    world: WorldScope::None,
+                    compat: None,
+                })
+                .expect("checks");
+                let mut file = Watched::new(candidate);
+                let got = from_reader(&mut file, &opts, &cert, false).expect("checks");
+                assert_eq!(got.certified, want.certified);
+                assert_eq!(got.revalidate_reason, want.revalidate_reason);
+                assert_eq!(got.dict_version, want.dict_version);
+                assert_eq!(got.resolution, want.resolution);
+                assert_eq!(got.findings, want.findings);
+            }
+        }
+    }
+}
+
+#[test]
+fn the_reader_door_still_runs_the_world_check_under_a_vouched_cert() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let ags = dir.path().join("delivery.ags");
+    let (bytes, cert) = minted(CLEAN_WITH_ATTACHMENT);
+    std::fs::write(&ags, &bytes).expect("write"); // no FILE/ tree beside it
+    let cf = CheckOptions {
+        check_files: true,
+        ..CheckOptions::default()
+    };
+
+    let out = check_reader(ReaderRequest {
+        file: std::fs::File::open(&ags).expect("open"),
+        opts: &cf,
+        cert: Some(&cert),
+        world: WorldScope::OnDisk(ags.clone()),
+        compat: None,
+        named: true,
+    })
+    .expect("checks");
+    assert!(out.certified, "the content is still vouched for");
+    assert!(out.findings.contains_key(RULE_20), "{:?}", out.findings);
+}

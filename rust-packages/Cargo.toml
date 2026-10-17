@@ -121,7 +121,7 @@ repository = "https://github.com/niko86/laterite"
 # must equal THAT crate's own `version` — per crate, not one shared number.
 # `test_engine_dependency_versions_match_engine` asserts the equality, and
 # `bump_crate.py` rewrites the pair together so it cannot drift by hand.
-laterite-ags4-core = { path = "laterite-ags4-core", version = "0.17.2", default-features = false }
+laterite-ags4-core = { path = "laterite-ags4-core", version = "0.17.3", default-features = false }
 laterite-ags4-diff = { path = "laterite-ags4-diff", version = "0.14.2" }
 laterite-ags4-emit = { path = "laterite-ags4-emit", version = "0.20.4" }
 laterite-ags4-excel = { path = "laterite-ags4-excel", version = "0.15.1" }
