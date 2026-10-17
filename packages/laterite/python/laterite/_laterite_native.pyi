@@ -8875,6 +8875,7 @@ def run_check(
     dict_replace: Any = ...,
     cert: Any = ...,
     strict_cert: Any = ...,
+    retained: Any = ...,
 ) -> Any: ...
 def staged_write(path: Any, data: Any) -> Any: ...
 def transport_lock(

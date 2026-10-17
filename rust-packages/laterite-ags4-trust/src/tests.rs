@@ -718,3 +718,55 @@ fn a_cert_minted_through_another_decoder_does_not_answer() {
     .expect("validates");
     assert!(same.certified, "same bytes, same decoder, same question");
 }
+
+// --- a caller that already holds the parse -----------------------------------
+
+#[test]
+fn a_held_parse_reaches_the_same_verdict_as_the_bytes() {
+    // The whole contract of `check_parsed`: it is `check` minus the parse, so for every
+    // tier and decoder it must say exactly what `check` says over the same bytes.
+    for (text, opts) in [
+        (CLEAN_WITH_A_WARNING, with_tiers(true, true)),
+        (OMEGA_IN_PROJ_NAME, errors_only()),
+        (OMEGA_IN_PROJ_NAME, read_as("windows-1252")),
+    ] {
+        let bytes = text.as_bytes();
+        let parsed = parse_bytes(bytes, opts.encoding).expect("parses");
+        let held = check_parsed(&parsed, &opts, WorldScope::None).expect("checks");
+        let fresh = check(Request {
+            bytes,
+            opts: &opts,
+            cert: None,
+            world: WorldScope::None,
+            compat: None,
+        })
+        .expect("checks");
+        assert_eq!(
+            format!("{:?}", held.findings),
+            format!("{:?}", fresh.findings)
+        );
+        assert_eq!(held.dict_version, fresh.dict_version);
+        assert_eq!(held.resolution, fresh.resolution);
+        assert!(!held.certified);
+        assert!(held.revalidate_reason.is_none());
+    }
+}
+
+#[test]
+fn a_held_parse_still_runs_the_world_check_and_still_refuses_one_with_no_world() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let ags = dir.path().join("delivery.ags");
+    let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
+    std::fs::write(&ags, bytes).expect("write"); // no FILE/ tree beside it
+    let cf = CheckOptions {
+        check_files: true,
+        ..CheckOptions::default()
+    };
+    let parsed = parse_bytes(bytes, cf.encoding).expect("parses");
+
+    let out = check_parsed(&parsed, &cf, WorldScope::OnDisk(ags)).expect("checks");
+    assert!(out.findings.contains_key(RULE_20), "{:?}", out.findings);
+
+    let err = check_parsed(&parsed, &cf, WorldScope::None).expect_err("must refuse");
+    assert!(matches!(err, ValidatorError::WorldCheckRequiresSource));
+}

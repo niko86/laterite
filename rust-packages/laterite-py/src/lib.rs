@@ -168,6 +168,10 @@ fn validate(
     // Same distinction `read` already draws, one layer down so the check can use
     // bytes that are already in hand instead of reading the file a second time.
     strict_cert: bool,
+    // The parse a read handle already holds of this source, under this decoder
+    // (#1090). Used only when no cert is offered: a cert is checked against BYTES,
+    // and the parse alone cannot show it any.
+    retained: Option<&laterite_ags4_parse::ParsedFile>,
 ) -> Result<Checked, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -186,6 +190,27 @@ fn validate(
         check_files,
         encoding: enc,
     };
+
+    if let (Some(parsed), None) = (retained, cert) {
+        let (label, world) = match (path, text) {
+            (Some(p), _) => (
+                p.to_string(),
+                WorldScope::OnDisk(std::path::PathBuf::from(p)),
+            ),
+            (None, Some(_)) => ("<text>".to_string(), WorldScope::None),
+            (None, None) => ("<bytes>".to_string(), WorldScope::None),
+        };
+        let out =
+            laterite_ags4_trust::check_parsed(parsed, &opts, world).map_err(|e| map_err(&e))?;
+        return Ok(Checked {
+            file: label,
+            dict_version: out.dict_version.as_str().to_string(),
+            resolution: out.resolution.as_str().to_string(),
+            findings: out.findings,
+            certified: out.certified,
+            revalidate_reason: None,
+        });
+    }
 
     // Bytes, whatever door they came through — a certificate is a statement about bytes.
     let (label, bytes, world) = if let Some(p) = path {
@@ -305,7 +330,7 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None, strict_cert=false))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None, strict_cert=false, retained=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -336,6 +361,10 @@ fn run_check<'py>(
     // Private to the native ABI — neither `validate()` nor `Ags4File.validate()`
     // exposes it. It records WHICH door the cert came through; see `validate`.
     strict_cert: bool,
+    // A read handle's `_handle`: validate the parse it already holds rather than
+    // parsing the source again (#1090). The caller vouches it was parsed from this
+    // source under this `encoding`.
+    retained: Option<PyRef<'py, Reading>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     // Release the GIL for the whole parse+validate compute (pure Rust, touches no
     // Python) so concurrent validators actually parallelise across cores instead
@@ -344,6 +373,7 @@ fn run_check<'py>(
     // closure captures owned data (`Sidecar: Clone`, cheap: the byte index +
     // hashes, not the file).
     let cert_inner = cert.as_ref().map(|c| c.inner.clone());
+    let retained = retained.as_ref().map(|r| &r.parsed);
     let outcome = py.detach(|| {
         validate(
             path.as_deref(),
@@ -359,6 +389,7 @@ fn run_check<'py>(
             dict_replace,
             cert_inner.as_ref(),
             strict_cert,
+            retained,
         )
     });
     match outcome {
@@ -384,42 +415,7 @@ fn run_check<'py>(
             // passed no cert always sees `None`; a certified read also sees `None`.
             d.set_item("revalidate_reason", revalidate_reason)?;
 
-            let mut count = 0usize;
-            let items = PyList::empty(py);
-            for (rule, fs) in &found {
-                for f in fs {
-                    count += 1;
-                    let o = PyDict::new(py);
-                    o.set_item("rule", rule)?;
-                    o.set_item("line", f.line)?;
-                    o.set_item("group", &f.group)?;
-                    o.set_item("desc", &f.desc)?;
-                    // Additively surface the rich location/severity fields
-                    // when set away from default — existing readers keyed on
-                    // line/group/desc are unaffected. Target/Severity render
-                    // as their lowercase serde names; char_span as a 2-tuple.
-                    let loc = &f.location;
-                    if loc.target != Target::Line {
-                        o.set_item("target", target_str(loc.target))?;
-                    }
-                    if let Some(fi) = loc.field_index {
-                        o.set_item("field_index", fi)?;
-                    }
-                    if let Some(h) = &loc.heading {
-                        o.set_item("heading", h)?;
-                    }
-                    if let Some(dr) = loc.data_row {
-                        o.set_item("data_row", dr)?;
-                    }
-                    if let Some((a, b)) = loc.char_span {
-                        o.set_item("char_span", (a, b))?;
-                    }
-                    if f.severity != Severity::Error {
-                        o.set_item("severity", severity_str(f.severity))?;
-                    }
-                    items.append(o)?;
-                }
-            }
+            let count: usize = found.values().map(Vec::len).sum();
             // `count` is what the report SHOWS; the verdict is what it
             // CONCLUDES (#321). Both are emitted so the Python layer never has
             // to re-derive either — `Report.is_valid` reads `valid`, not
@@ -431,11 +427,74 @@ fn run_check<'py>(
             d.set_item("fyi", verdict.fyi)?;
             d.set_item("valid", verdict.is_valid())?;
             d.set_item("exit_code", verdict.exit_code())?;
-            d.set_item("findings", items)?;
-            d.set_item("json", findings_json(&file, &found))?;
-            d.set_item("ndjson", findings_ndjson(&found))?;
+            // The finding list and both serialisations are built on ask, not here
+            // (#1089): a file with one finding per line would otherwise hold all
+            // three at once — a Python dict per finding plus two whole-report
+            // strings — whether or not the caller ever reads them.
+            d.set_item("_found", CheckedFindings { file, found })?;
             Ok(d)
         }
+    }
+}
+
+/// A validation's findings, held natively until the Python `Report` asks for them
+/// in one of its three shapes (#1089). Nothing is cached: each call renders anew,
+/// so a caller who reads one shape never also holds the other two.
+#[pyclass(frozen)]
+struct CheckedFindings {
+    file: String,
+    found: Findings,
+}
+
+#[pymethods]
+impl CheckedFindings {
+    /// One `{rule, line, group, desc, …}` dict per finding, in rule order.
+    fn items<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+        let items = PyList::empty(py);
+        for (rule, fs) in &self.found {
+            for f in fs {
+                let o = PyDict::new(py);
+                o.set_item("rule", rule)?;
+                o.set_item("line", f.line)?;
+                o.set_item("group", &f.group)?;
+                o.set_item("desc", &f.desc)?;
+                // Additively surface the rich location/severity fields
+                // when set away from default — existing readers keyed on
+                // line/group/desc are unaffected. Target/Severity render
+                // as their lowercase serde names; char_span as a 2-tuple.
+                let loc = &f.location;
+                if loc.target != Target::Line {
+                    o.set_item("target", target_str(loc.target))?;
+                }
+                if let Some(fi) = loc.field_index {
+                    o.set_item("field_index", fi)?;
+                }
+                if let Some(h) = &loc.heading {
+                    o.set_item("heading", h)?;
+                }
+                if let Some(dr) = loc.data_row {
+                    o.set_item("data_row", dr)?;
+                }
+                if let Some((a, b)) = loc.char_span {
+                    o.set_item("char_span", (a, b))?;
+                }
+                if f.severity != Severity::Error {
+                    o.set_item("severity", severity_str(f.severity))?;
+                }
+                items.append(o)?;
+            }
+        }
+        Ok(items)
+    }
+
+    /// Byte-identical to `lat validate --json`.
+    fn json(&self) -> String {
+        findings_json(&self.file, &self.found)
+    }
+
+    /// Byte-identical to `lat validate --ndjson`.
+    fn ndjson(&self) -> String {
+        findings_ndjson(&self.found)
     }
 }
 
@@ -1175,6 +1234,13 @@ impl Reading {
         String::from_utf8(out).expect("AGS4 re-emit is valid UTF-8")
     }
 
+    /// The source line of each DATA row of `code`, or `None` if `code` isn't in
+    /// the file — read off the retained parse when asked, not held per group.
+    fn line_numbers(&self, code: &str) -> Option<Vec<u32>> {
+        let g = self.parsed.groups.get(code)?;
+        Some(g.rows.iter().map(|r| r.line).collect())
+    }
+
     /// Build ONE group's typed Arrow table on demand. The read path is
     /// per-group lazy: `read()` / `scan()` only pay for the groups actually
     /// touched, so a 69-group file you query two groups of builds two
@@ -1570,10 +1636,9 @@ fn parse_arrow(
         gd.set_item("headings", g.headings.clone())?;
         gd.set_item("units", g.units.clone())?;
         gd.set_item("types", g.types.clone())?;
-        gd.set_item(
-            "line_numbers",
-            g.rows.iter().map(|r| r.line).collect::<Vec<_>>(),
-        )?;
+        // No eager line-number list either (#1094): one Python int per DATA row,
+        // held for the handle's life, for a method few callers touch —
+        // `Reading::line_numbers` reads it off the retained parse on ask.
         // No eager Arrow table here: the read path is per-group lazy — the
         // typed table is built on first touch via `Reading::table_for` (the
         // `_handle` below), so this loop only crosses cheap metadata.

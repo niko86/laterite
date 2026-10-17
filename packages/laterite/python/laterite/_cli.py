@@ -337,18 +337,19 @@ def _run_validate(args: argparse.Namespace) -> int:
     n = r["count"]
     code = r["exit_code"]
 
+    found = r["_found"]
     if args.json:
-        active = r["json"] + "\n"
+        active = found.json() + "\n"
     elif args.ndjson:
-        active = r["ndjson"]
+        active = found.ndjson()
     else:
-        active = _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
+        active = _plain(r["file"], found.items(), n, r["dict_version"], r["resolution"])
 
     if args.json_out:
         with Path(args.json_out).open("w", encoding="utf-8", newline="") as fh:
-            fh.write(r["json"] + "\n")
+            fh.write(found.json() + "\n")
         sys.stdout.write(
-            _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
+            _plain(r["file"], found.items(), n, r["dict_version"], r["resolution"])
         )  # tee: plain still to stdout
         return code
 

@@ -68,6 +68,24 @@ def test_validate_text_and_to_json_is_rust_shaped():
     assert all(k.startswith("AGS Format Rule ") for k in doc["findings"])
 
 
+def test_report_holds_findings_natively_and_renders_them_on_ask():
+    # A file with one finding per line held a Python dict per finding plus both
+    # whole-report strings, read or not (#1089). The report keeps the native
+    # findings; each shape is rendered when asked for, and agrees with the others.
+    src = (
+        '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_FDEP"\r\n'
+        '"UNIT","","m"\r\n"TYPE","ID","2DP"\r\n"DATA","BH1","x"\r\n'
+    )
+    rep = laterite.validate(text=src)
+    assert not {"findings", "json", "ndjson"} & set(rep._r)
+    n = rep.count
+    assert n > 0
+    assert rep.findings.height == n
+    assert sum(map(len, rep.by_rule().values())) == n
+    assert len(rep.to_ndjson().splitlines()) == n
+    assert sum(map(len, json.loads(rep.to_json())["findings"].values())) == n
+
+
 def test_not_ags4_raises_mapped_exception():
     with pytest.raises(laterite.NotAgs4Error):
         laterite.read(text="definitely not ags4")

@@ -35,6 +35,9 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Changed
 
 - **Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at.
+- **`Ags4File.validate()` no longer parses the file a second time.** It judges the parse `read()` already holds, so validating a handle costs the rule pass and little more memory. It therefore reports on the bytes the handle was read from, even if the file has changed on disk since. Passing an `encoding=` other than `read()`'s, or offering a certificate, still reads the source again.
+- **A keyed frame no longer goes through DuckDB.** `table(code, keys=True)`, `ags[code]` on a `read(keys=True)` handle, and the default `xn="string"` mode build the frame straight from Arrow, as the unkeyed read already did, so fetching a group no longer leaves a DuckDB copy of it on the handle until `close()`. `sql()`, `.at()` and `.connection` load groups into the engine as before.
+- **A `Report` builds its findings on request.** The finding list, `to_json()` and `to_ndjson()` are rendered when called rather than held by every report, so a file with very many findings no longer costs memory for shapes nobody reads. Each call renders anew; keep the result if you need it twice. `read()` likewise no longer keeps a per-group list of line numbers; `line_numbers(code)` builds it when called.
 
 ### Fixed
 
