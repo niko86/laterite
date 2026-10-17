@@ -126,6 +126,26 @@ fn tier_count(c: TierCoverage) -> Option<u32> {
     }
 }
 
+/// Rule-engine runs through this module's validate and mint doors, process-wide.
+///
+/// It exists so a test can see a run that happens entirely in Rust: the mint reuses a
+/// handle's Report instead of running the engine again (#1096), and neither a Python
+/// mock nor a timing can show that the run was skipped. It counts the two doors that
+/// question is about and nothing else: `fix_file`, `diff_files` and the compat shim run
+/// the engine without it.
+static ENGINE_RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn count_engine_run() {
+    ENGINE_RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// How many times the validate and mint doors have run the rule engine in this process.
+/// A test hook; see [`ENGINE_RUNS`] for what it does not count.
+#[pyfunction]
+fn engine_runs() -> u64 {
+    ENGINE_RUNS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// What a validation produced, plus whether a certificate stood in for the rule engine.
 struct Checked {
     file: String,
@@ -137,6 +157,9 @@ struct Checked {
     /// If a certificate was offered and NOT used, the stable token for why (the core
     /// `RevalidateReason::as_str`). `None` when no cert was offered, or it was vouched.
     revalidate_reason: Option<String>,
+    /// This run as a mint can reuse it (#1096): `Some` only when the engine ran over the
+    /// handle's retained parse with every tier on and no world check.
+    measured: Option<laterite_ags4_trust::Measurement>,
 }
 
 /// Run the validator from a path, in-memory text, or raw bytes — through the ONE door.
@@ -200,8 +223,9 @@ fn validate(
             (None, Some(_)) => ("<text>".to_string(), WorldScope::None),
             (None, None) => ("<bytes>".to_string(), WorldScope::None),
         };
-        let out =
-            laterite_ags4_trust::check_parsed(parsed, &opts, world).map_err(|e| map_err(&e))?;
+        let (out, measured) = laterite_ags4_trust::check_parsed_measured(parsed, &opts, world)
+            .map_err(|e| map_err(&e))?;
+        count_engine_run();
         return Ok(Checked {
             file: label,
             dict_version: out.dict_version.as_str().to_string(),
@@ -209,6 +233,7 @@ fn validate(
             findings: out.findings,
             certified: out.certified,
             revalidate_reason: None,
+            measured,
         });
     }
 
@@ -273,6 +298,9 @@ fn validate(
         compat: None,
     })
     .map_err(|e| map_err(&e))?;
+    if !out.certified {
+        count_engine_run();
+    }
 
     Ok(Checked {
         file: label,
@@ -281,6 +309,9 @@ fn validate(
         findings: out.findings,
         certified: out.certified,
         revalidate_reason: out.revalidate_reason.map(|r| r.as_str().to_string()),
+        // These bytes were read for this call, so no parse a mint holds is the one this
+        // run judged. A certified run did not run the engine at all.
+        measured: None,
     })
 }
 
@@ -402,6 +433,7 @@ fn run_check<'py>(
                 findings: found,
                 certified,
                 revalidate_reason,
+                measured,
             } = checked;
             let d = PyDict::new(py);
             d.set_item("ok", true)?;
@@ -431,7 +463,14 @@ fn run_check<'py>(
             // (#1089): a file with one finding per line would otherwise hold all
             // three at once — a Python dict per finding plus two whole-report
             // strings — whether or not the caller ever reads them.
-            d.set_item("_found", CheckedFindings { file, found })?;
+            d.set_item(
+                "_found",
+                CheckedFindings {
+                    file,
+                    found,
+                    measured,
+                },
+            )?;
             Ok(d)
         }
     }
@@ -440,10 +479,16 @@ fn run_check<'py>(
 /// A validation's findings, held natively until the Python `Report` asks for them
 /// in one of its three shapes (#1089). Nothing is cached: each call renders anew,
 /// so a caller who reads one shape never also holds the other two.
+///
+/// It also carries the run's `Measurement`, when there is one, for `Sidecar.mint` to
+/// reuse (#1096). It stays native for the same reason the trust crate keeps the
+/// type's fields private: Python cannot build one, so the mint cannot be handed counts
+/// the engine did not produce.
 #[pyclass(frozen)]
 struct CheckedFindings {
     file: String,
     found: Findings,
+    measured: Option<laterite_ags4_trust::Measurement>,
 }
 
 #[pymethods]
@@ -1411,9 +1456,17 @@ impl PySidecar {
     /// It refuses a file with ERRORS (warnings are recorded, not fatal — a delivery may
     /// legitimately carry them). Raises `ValueError` on an uncertifiable or unparseable
     /// file.
+    ///
+    /// `retained` + `measured` are a read handle's parse and the findings of its latest
+    /// validation. They are not a verdict a caller asserts: `measured` is the engine's own
+    /// output, which Python cannot construct. The trust crate reuses it instead of running
+    /// the rules again only if that run answered this mint's question, over `retained`,
+    /// and `data` still parses to `retained` (#1096). Otherwise the rules run as before.
     #[staticmethod]
-    #[pyo3(signature = (data, checked_at, dict_version=None, encoding=None, compat=None, dict_path=None, dict_bytes=None, dict_replace=false))]
+    #[pyo3(signature = (data, checked_at, dict_version=None, encoding=None, compat=None, dict_path=None, dict_bytes=None, dict_replace=false, retained=None, measured=None))]
     #[allow(clippy::too_many_arguments)]
+    // PyO3 boundary: an optional pyclass argument arrives as an owned `PyRef`.
+    #[allow(clippy::needless_pass_by_value)]
     fn mint(
         data: &[u8],
         checked_at: String,
@@ -1423,6 +1476,8 @@ impl PySidecar {
         dict_path: Option<&str>,
         dict_bytes: Option<&[u8]>,
         dict_replace: bool,
+        retained: Option<PyRef<'_, Reading>>,
+        measured: Option<PyRef<'_, CheckedFindings>>,
     ) -> PyResult<Self> {
         let over = parse_dv(dict_version).map_err(pyo3::exceptions::PyValueError::new_err)?;
         let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -1442,8 +1497,30 @@ impl PySidecar {
             encoding: enc,
             ..CheckOptions::default()
         };
-        let inner = laterite_ags4_trust::mint(data, &opts, checked_at, compat)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        let prior = retained
+            .as_deref()
+            .zip(measured.as_deref().and_then(|m| m.measured.as_ref()));
+        let minted = if let Some((reading, m)) = prior {
+            let out = laterite_ags4_trust::mint_measured(
+                data,
+                &opts,
+                checked_at,
+                compat,
+                &reading.parsed,
+                m,
+            );
+            if out.engine_ran {
+                count_engine_run();
+            }
+            out.result
+        } else {
+            let minted = laterite_ags4_trust::mint(data, &opts, checked_at, compat);
+            if !matches!(minted, Err(laterite_ags4_trust::MintError::Validate(_))) {
+                count_engine_run();
+            }
+            minted
+        };
+        let inner = minted.map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
 
@@ -1823,6 +1900,7 @@ fn engine_fingerprint() -> &'static str {
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_version, m)?)?;
     m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(engine_runs, m)?)?;
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
     m.add_function(wrap_pyfunction!(staged_write, m)?)?;

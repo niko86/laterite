@@ -770,3 +770,130 @@ fn a_held_parse_still_runs_the_world_check_and_still_refuses_one_with_no_world()
     let err = check_parsed(&parsed, &cf, WorldScope::None).expect_err("must refuse");
     assert!(matches!(err, ValidatorError::WorldCheckRequiresSource));
 }
+
+// --- a mint that reuses the caller's own engine run (#1096) ------------------
+
+/// The parse of `text`, and the full-tier engine run over it.
+fn measured(text: &str, opts: &CheckOptions) -> (ParsedFile, Measurement) {
+    let parsed = parse_bytes(text.as_bytes(), opts.encoding).expect("parses");
+    let (_, m) = check_parsed_measured(&parsed, opts, WorldScope::None).expect("checks");
+    (
+        parsed,
+        m.expect("a full-tier run with no world is a measurement"),
+    )
+}
+
+#[test]
+fn a_reused_measurement_mints_the_certificate_mint_makes() {
+    for text in [CLEAN_WITH_ATTACHMENT, CLEAN_WITH_A_WARNING] {
+        let (parsed, m) = measured(text, &with_tiers(true, true));
+        let bytes = text.as_bytes();
+        let reused = mint_measured(bytes, &errors_only(), AT.to_string(), None, &parsed, &m);
+        assert!(!reused.engine_ran, "the measurement should have stood in");
+        let fresh = mint(bytes, &errors_only(), AT.to_string(), None).expect("mints");
+        assert_eq!(reused.result.expect("mints"), fresh);
+    }
+}
+
+#[test]
+fn a_narrower_run_or_one_that_looked_at_the_world_is_not_a_measurement() {
+    let parsed =
+        parse_bytes(CLEAN_WITH_A_WARNING.as_bytes(), errors_only().encoding).expect("parses");
+    for opts in [
+        with_tiers(false, true),
+        with_tiers(true, false),
+        errors_only(),
+    ] {
+        let (_, m) = check_parsed_measured(&parsed, &opts, WorldScope::None).expect("checks");
+        assert!(m.is_none(), "{opts:?} did not measure every tier");
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let world = CheckOptions {
+        check_files: true,
+        ..with_tiers(true, true)
+    };
+    let scope = WorldScope::OnDisk(dir.path().join("x.ags"));
+    let (_, m) = check_parsed_measured(&parsed, &world, scope).expect("checks");
+    assert!(m.is_none(), "a world check's findings are not content");
+}
+
+#[test]
+fn a_measurement_under_another_question_is_not_reused() {
+    let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
+    let forced = CheckOptions {
+        dict_version: Some(DictVersion::V4_2),
+        ..with_tiers(true, true)
+    };
+    let cp1252 = CheckOptions {
+        include_warnings: true,
+        include_fyi: true,
+        ..read_as("windows-1252")
+    };
+    // Measured under one edition, decoder or engine; minted under another.
+    let cases = [
+        (forced, None),
+        (cp1252, None),
+        (with_tiers(true, true), Some("1.0.0".to_string())),
+    ];
+    for (measure_opts, compat) in cases {
+        let parsed = parse_bytes(bytes, measure_opts.encoding).expect("parses");
+        let (_, m) =
+            check_parsed_measured(&parsed, &measure_opts, WorldScope::None).expect("checks");
+        let m = m.expect("full tiers");
+        let out = mint_measured(bytes, &errors_only(), AT.to_string(), compat, &parsed, &m);
+        assert!(out.engine_ran, "measured under {measure_opts:?}");
+        out.result.expect("still mints");
+    }
+}
+
+#[test]
+fn a_measurement_of_another_parse_is_not_reused() {
+    // Same bytes, so the two parses are equal, but the measurement was taken on the other.
+    let full = with_tiers(true, true);
+    let (_, m) = measured(CLEAN_WITH_ATTACHMENT, &full);
+    let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
+    let other = parse_bytes(bytes, full.encoding).expect("parses");
+    let out = mint_measured(bytes, &errors_only(), AT.to_string(), None, &other, &m);
+    assert!(out.engine_ran);
+}
+
+#[test]
+fn bytes_that_no_longer_parse_to_the_judged_parse_are_validated_again() {
+    // The file changed on disk between the read and the certify: the measurement is of
+    // what WAS there, and says nothing about these bytes, which have an error.
+    let (parsed, m) = measured(CLEAN_WITH_ATTACHMENT, &with_tiers(true, true));
+    let now = CLEAN_WITH_ATTACHMENT
+        .split("\"GROUP\",\"TRAN\"")
+        .next()
+        .expect("prefix");
+    let out = mint_measured(
+        now.as_bytes(),
+        &errors_only(),
+        AT.to_string(),
+        None,
+        &parsed,
+        &m,
+    );
+    assert!(out.engine_ran);
+    assert!(matches!(out.result, Err(MintError::NotCertifiable { .. })));
+}
+
+#[test]
+fn a_measurement_with_errors_refuses_as_the_mint_does() {
+    let bad = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\"UNIT\",\"\"\r\n\
+               \"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n";
+    let (parsed, m) = measured(bad, &with_tiers(true, true));
+    let out = mint_measured(
+        bad.as_bytes(),
+        &errors_only(),
+        AT.to_string(),
+        None,
+        &parsed,
+        &m,
+    );
+    assert!(!out.engine_ran, "the refusal is the measurement's");
+    let reused = out.result.expect_err("errors are not certifiable");
+    let fresh = mint(bad.as_bytes(), &errors_only(), AT.to_string(), None)
+        .expect_err("errors are not certifiable");
+    assert_eq!(reused.to_string(), fresh.to_string());
+}

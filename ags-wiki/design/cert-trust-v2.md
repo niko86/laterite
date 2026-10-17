@@ -408,7 +408,13 @@ Nine risks, none hidden:
 9. **`certify()`'s contract changes** on the Python and Node libraries: it now runs
    its own check instead of vouching for a prior `validate()`. A user-visible
    behaviour and cost change, justified by the fact that the old contract is the
-   exact mechanism by which bug 4 and the stale-profile bug existed.
+   exact mechanism by which bug 4 and the stale-profile bug existed. #1096 took back
+   the cost without the old contract. A Python handle's mint may reuse the handle's
+   own last engine run, but only as an opaque `Measurement` the trust crate built
+   (`check_parsed_measured` / `mint_measured`). It is reused only if that run had
+   every tier on and the same question, was taken on that same parse, and the bytes
+   being minted still parse equal to it. Neither bug can come back through it: no
+   count crosses from Python, and a narrower run yields no measurement at all.
 
 ## 8. Implementation plan (ordered; each step is its own PR)
 

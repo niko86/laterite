@@ -47,6 +47,7 @@
 //! unclassified knob is a future false clean.
 
 use std::fmt::Write as _;
+use std::sync::{Arc, Weak};
 
 use laterite_ags4_core::error::CliError;
 // Re-exported so a surface can name a decision, a reason or a tier without also taking
@@ -55,7 +56,7 @@ pub use laterite_ags4_core::index::{
     CustomDictRef, Decision, ENGINE_IDENTITY, EditionInput, EngineId, Question, RevalidateReason,
     Sidecar, Tier, TierCoverage, ValidationStamp,
 };
-use laterite_ags4_parse::parse_bytes;
+use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{
     CheckOptions, DictResolution, DictVersion, Findings, ValidatorError, WorldScope,
     check_parsed_with_dict, findings, overlay, world,
@@ -257,19 +258,92 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
 /// `parsed` must be `parse_bytes(bytes, opts.encoding)` of the file being judged;
 /// a parse under another decoder answers a different question.
 pub fn check_parsed(
-    parsed: &laterite_ags4_parse::ParsedFile,
+    parsed: &ParsedFile,
     opts: &CheckOptions,
     world: WorldScope,
 ) -> Result<Outcome, ValidatorError> {
-    let (_, world) = split_options(opts, world)?;
+    check_parsed_measured(parsed, opts, world).map(|(outcome, _)| outcome)
+}
+
+/// [`check_parsed`], also returning the run as a [`Measurement`] when it asked everything
+/// a mint asks: both tiers on, and no world check. A later [`mint_measured`] over the
+/// same parse can then mint from it instead of running the engine a second time (#1096).
+///
+/// `None` for any narrower run. Such a run did not measure what a certificate records,
+/// so it has nothing for one to reuse.
+pub fn check_parsed_measured(
+    parsed: &ParsedFile,
+    opts: &CheckOptions,
+    world: WorldScope,
+) -> Result<(Outcome, Option<Measurement>), ValidatorError> {
+    let (question, world) = split_options(opts, world)?;
     let (found, dv, res) = check_parsed_with_dict(parsed, opts, &world)?;
-    Ok(Outcome {
+    // A world check's findings sit in the same map as the content ones, and a
+    // certificate is a statement about content alone. So a run that looked at the
+    // world is not something a certificate can be minted from.
+    let measurement = (question.want_warnings
+        && question.want_fyi
+        && matches!(world, WorldScope::None))
+    .then(|| Measurement {
+        question,
+        engine: engine_id(None),
+        judged: Arc::downgrade(&parsed.text),
+        tally: Tally::of(&found, dv, res),
+    });
+    let outcome = Outcome {
         findings: found,
         dict_version: dv,
         resolution: res,
         certified: false,
         revalidate_reason: None,
-    })
+    };
+    Ok((outcome, measurement))
+}
+
+/// A verdict the rule engine reached on one parse, under a mint's full question.
+///
+/// It exists so that validate-then-certify runs the engine once (#1096). Its fields are
+/// private and only [`check_parsed_measured`] builds one, which it does by running the
+/// engine. So holding a `Measurement` means the engine ran, and [`mint_measured`] taking
+/// one does not reopen what [`mint`] closed: a caller still cannot hand a mint a count
+/// the engine did not produce.
+///
+/// It names the parse it judged by identity, not by content: a weak reference to that
+/// parse's text buffer. So it does not keep the buffer alive, and a parse that merely
+/// landed at the same address does not match. (A `ParsedFile` clone shares the buffer, so
+/// this stops a measurement being offered for the wrong parse by accident, not by a Rust
+/// author set on it. The same limit applies to every guard in this crate.)
+#[derive(Debug, Clone)]
+pub struct Measurement {
+    /// The question that run answered: tiers, edition, decoder, custom dictionary.
+    question: Question,
+    /// The engine that answered it.
+    engine: EngineId,
+    /// The parse it judged, as a weak handle on its [`ParsedFile::text`].
+    judged: Weak<String>,
+    tally: Tally,
+}
+
+/// The counts a certificate records, and the edition they were reached under.
+#[derive(Debug, Clone, Copy)]
+struct Tally {
+    dict_version: DictVersion,
+    resolution: DictResolution,
+    errors: u32,
+    warnings: u32,
+    fyi: u32,
+}
+
+impl Tally {
+    fn of(found: &Findings, dict_version: DictVersion, resolution: DictResolution) -> Self {
+        Tally {
+            dict_version,
+            resolution,
+            errors: count_of(found, findings::Severity::Error),
+            warnings: count_of(found, findings::Severity::Warning),
+            fyi: count_of(found, findings::Severity::Fyi),
+        }
+    }
 }
 
 /// **Mint a certificate** for `bytes` — but only after validating them here.
@@ -294,26 +368,158 @@ pub fn mint(
     checked_at: String,
     compat: Option<String>,
 ) -> Result<Sidecar, MintError> {
+    let full = mint_options(opts);
+    let parsed = parse_bytes(bytes, full.encoding).map_err(ValidatorError::from)?;
+    let tally = run_engine(&parsed, &full)?;
+    seal(bytes, &parsed, &full, tally, checked_at, compat)
+}
+
+/// What [`mint_measured`] did: the certificate or the reason there is none, and whether
+/// the rule engine ran to reach that verdict.
+#[derive(Debug)]
+pub struct Minted {
+    /// What [`mint`] would have returned for the same bytes and options.
+    pub result: Result<Sidecar, MintError>,
+    /// `false` when the measurement stood in for the engine, or when the mint failed
+    /// before reaching a verdict at all.
+    pub engine_ran: bool,
+}
+
+/// [`mint`], reusing `measurement` instead of running the engine when it already answers
+/// this mint's question for these bytes (#1096).
+///
+/// `judged` is the parse the caller ran [`check_parsed_measured`] on. The measurement
+/// stands in for the engine only if all of these hold:
+///
+/// * it answered the question this mint asks: both tiers, and the same edition, decoder
+///   and custom dictionary;
+/// * it came from the engine this mint would stamp;
+/// * it was taken on `judged` itself, not on some other parse;
+/// * `bytes` parse to a `ParsedFile` equal to `judged`.
+///
+/// The last condition is what makes the verdict true of `bytes`. A verdict is a function
+/// of the parse and the options alone, so an equal parse under the same question gets the
+/// same verdict. It also catches a file that changed on disk after it was read. Whenever
+/// a condition fails, this mints exactly as [`mint`] does. Either way the stamp is built
+/// by the same code from the same counts, so the certificate is the one [`mint`] makes.
+pub fn mint_measured(
+    bytes: &[u8],
+    opts: &CheckOptions,
+    checked_at: String,
+    compat: Option<String>,
+    judged: &ParsedFile,
+    measurement: &Measurement,
+) -> Minted {
+    let full = mint_options(opts);
+    let parsed = match parse_bytes(bytes, full.encoding) {
+        Ok(p) => p,
+        Err(e) => {
+            return Minted {
+                result: Err(ValidatorError::from(e).into()),
+                engine_ran: false,
+            };
+        }
+    };
+    let reusable = match split_options(&full, WorldScope::None) {
+        Ok((question, _)) => {
+            measurement.question == question
+                && measurement.engine == engine_id(compat.clone())
+                && measurement
+                    .judged
+                    .upgrade()
+                    .is_some_and(|text| Arc::ptr_eq(&text, &judged.text))
+                && same_parse(&parsed, judged)
+        }
+        Err(_) => false,
+    };
+    let tally = if reusable {
+        Ok(measurement.tally)
+    } else {
+        run_engine(&parsed, &full)
+    };
+    match tally {
+        Ok(tally) => Minted {
+            result: seal(bytes, &parsed, &full, tally, checked_at, compat),
+            engine_ran: !reusable,
+        },
+        Err(e) => Minted {
+            result: Err(e),
+            engine_ran: !reusable,
+        },
+    }
+}
+
+/// The options a mint validates under, whatever the caller asked for.
+fn mint_options(opts: &CheckOptions) -> CheckOptions {
     // Both tiers, always. A cert that measured only errors can still be used — it just
     // can't answer a `--show-warnings` request (`TierNotMeasured`) — but there is no
     // reason to mint a weaker cert than we can, and a caller cannot ask us to.
-    let full = CheckOptions {
+    CheckOptions {
         include_warnings: true,
         include_fyi: true,
         // The mint is CONTENT-only by construction. Even if the caller was doing an
         // on-disk check, its result has no business in a certificate.
         check_files: false,
         ..opts.clone()
-    };
-    let parsed = parse_bytes(bytes, full.encoding).map_err(ValidatorError::from)?;
-    let (found, dv, res) = check_parsed_with_dict(&parsed, &full, &WorldScope::None)?;
+    }
+}
 
-    let errors = count_of(&found, findings::Severity::Error);
+fn run_engine(parsed: &ParsedFile, full: &CheckOptions) -> Result<Tally, MintError> {
+    let (found, dv, res) = check_parsed_with_dict(parsed, full, &WorldScope::None)?;
+    Ok(Tally::of(&found, dv, res))
+}
+
+/// Do two parses say the same thing? The destructure is exhaustive on purpose, as in
+/// [`split_options`]: a field added to `ParsedFile` stops this compiling until someone
+/// decides whether it is compared. A field left out here would be one a rule could read
+/// and a reused verdict would not cover.
+fn same_parse(a: &ParsedFile, b: &ParsedFile) -> bool {
+    let ParsedFile {
+        text,
+        groups,
+        group_order,
+        group_records,
+        raw_lines,
+        line_byte_offsets,
+        total_lines,
+        has_bom,
+        total_bytes,
+        byte_offsets_source_true,
+    } = a;
+    *total_bytes == b.total_bytes
+        && *total_lines == b.total_lines
+        && *has_bom == b.has_bom
+        && *byte_offsets_source_true == b.byte_offsets_source_true
+        && *group_order == b.group_order
+        && *group_records == b.group_records
+        && *raw_lines == b.raw_lines
+        && *line_byte_offsets == b.line_byte_offsets
+        && *groups == b.groups
+        && **text == *b.text
+}
+
+/// Build the certificate from a verdict. [`mint`] and [`mint_measured`] both end here,
+/// which is why a reused verdict mints the same certificate as a fresh one.
+fn seal(
+    bytes: &[u8],
+    parsed: &ParsedFile,
+    full: &CheckOptions,
+    tally: Tally,
+    checked_at: String,
+    compat: Option<String>,
+) -> Result<Sidecar, MintError> {
+    let Tally {
+        dict_version: dv,
+        resolution: res,
+        errors,
+        warnings,
+        fyi,
+    } = tally;
     if errors > 0 {
         return Err(MintError::NotCertifiable { errors });
     }
 
-    let edition = match opts.dict_version {
+    let edition = match full.dict_version {
         // Forced: only a request forcing the same edition may be answered from this.
         Some(d) => EditionInput::Forced {
             edition: d.as_str().to_string(),
@@ -340,21 +546,18 @@ pub fn mint(
         // The custom overlay this verdict was reached against (laterite-dev#568), so a later
         // request supplying a different (or no) dict revalidates rather than trusting a
         // cert minted under another dictionary.
-        custom_dict: opts.custom_dict.as_ref().map(custom_dict_record),
-        // Measured, all three, because we just ran all three. This is the only place a
-        // ValidationStamp is built from a real engine result.
+        custom_dict: full.custom_dict.as_ref().map(custom_dict_record),
+        // Measured, all three, because the engine ran all three: just now, or in the
+        // run a `Measurement` records. This is the only place a ValidationStamp is
+        // built from a real engine result.
         errors: TierCoverage::Measured { count: errors },
-        warnings: TierCoverage::Measured {
-            count: count_of(&found, findings::Severity::Warning),
-        },
-        fyi: TierCoverage::Measured {
-            count: count_of(&found, findings::Severity::Fyi),
-        },
+        warnings: TierCoverage::Measured { count: warnings },
+        fyi: TierCoverage::Measured { count: fyi },
     };
     // Reuse the parse we already did to validate — its source-true byte offsets
     // are exactly what the index needs, so certifying does not walk the file a
     // second time (#5, ~14% of a mint on a 25 MB file).
-    Sidecar::assemble_from_parsed(bytes, &parsed, stamp)
+    Sidecar::assemble_from_parsed(bytes, parsed, stamp)
         .map_err(|e: CliError| MintError::NotIndexable(e.to_string()))
 }
 
