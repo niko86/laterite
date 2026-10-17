@@ -315,6 +315,66 @@ def test_sql_one_liner_survives_unbound_handle():
     assert len(df) == 3
 
 
+# --- sql() / relation() register only the groups the statement names (#1092) --
+#
+# Registering a group copies it into DuckDB, so registering all of them for a
+# one-table query costs what the whole file costs. These hold the narrowing, and
+# the fallback that keeps every statement's result what it was before it.
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        lambda f: f.sql("SELECT LOCA_ID FROM LOCA").fetchall(),
+        lambda f: f.query("SELECT LOCA_ID FROM LOCA").relation().fetchall(),
+    ],
+    ids=["sql", "relation"],
+)
+def test_a_one_group_statement_registers_only_that_group(run):
+    f = laterite.read(text=_RELATED_SRC)
+    assert sorted(run(f)) == [("BH01",), ("BH02",), ("BH03",)]
+    assert f._registered == {"LOCA"}
+
+
+def test_sql_matches_a_group_named_in_any_case():
+    # DuckDB resolves identifiers case-insensitively, so `loca` reads LOCA.
+    f = laterite.read(text=_RELATED_SRC)
+    assert f.sql("select count(*) from loca").fetchone()[0] == 3
+    assert f._registered == {"LOCA"}
+
+
+def test_relation_registers_groups_its_filter_names_but_not_its_at_params():
+    # The `.at()` values are bound as `?` parameters, which DuckDB's table-name
+    # extraction refuses; a group named only inside a `.filter()` must still load.
+    f = laterite.read(text=_RELATED_SRC)
+    q = (
+        f.query("SELECT LOCA_ID FROM LOCA")
+        .filter("LOCA_ID IN (SELECT LOCA_ID FROM SAMP WHERE SAMP_REF <> 'S4')")
+        .at("LOCA", ["BH01", "BH03"])
+    )
+    assert q.relation().fetchall() == [("BH01",)]
+    assert f._registered == {"LOCA", "SAMP"}
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # DuckDB's extraction fails on a USING join...
+        "SELECT s.SAMP_REF FROM SAMP s JOIN LOCA l USING (LOCA_ID) ORDER BY 1",
+        # ...and finds no group in a catalog query, whose answer depends on what
+        # is registered.
+        "SELECT table_name FROM duckdb_tables() ORDER BY 1",
+    ],
+    ids=["using-join", "catalog"],
+)
+def test_a_statement_whose_groups_cannot_be_told_registers_every_group(sql):
+    narrowed = laterite.read(text=_RELATED_SRC)
+    seeded = laterite.read(text=_RELATED_SRC)
+    # The old behaviour, reached through `.connection`, which still seeds all.
+    assert narrowed.sql(sql).fetchall() == seeded.connection.sql(sql).fetchall()
+    assert narrowed._registered == {"PROJ", "LOCA", "SAMP"}
+
+
 def test_connection_exposes_raw_duckdb_seeded_with_groups():
     f = laterite.read(text=_NUMERIC_SRC)
     con = f.connection

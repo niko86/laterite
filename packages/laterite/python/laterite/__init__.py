@@ -738,6 +738,28 @@ class Ags4File:
         for code in self._p["group_order"]:
             self._register(code)
 
+    def _register_referenced(self, query: str) -> None:
+        """Register the groups ``query`` names, so a one-table query on a big file
+        copies one table into DuckDB rather than all of them (#1092).
+
+        DuckDB's own table-name extraction does the reading, so CTEs, subqueries,
+        quoting and case are its parser's business, not a regex's. It refuses some
+        valid SQL (``JOIN … USING``, several statements, ``?`` parameters), and a
+        catalog query such as ``SHOW TABLES`` names no group yet answers from what
+        is registered. Either way every group is registered, as before, so no
+        statement's result depends on this narrowing."""
+        import duckdb
+
+        try:
+            names = {n.casefold() for n in self._engine().get_table_names(query)}
+        except duckdb.Error:
+            names = set()
+        codes = [c for c in self._p["group_order"] if c.casefold() in names]
+        if not codes:
+            self._register_all()
+        for code in codes:
+            self._register(code)
+
     def _materialize(self, rel: duckdb.DuckDBPyRelation) -> Any:
         # polars via the Arrow capsule (pl.DataFrame(rel)) and pandas via
         # DuckDB's NumPy .df() are BOTH pyarrow-free; rel.pl() and
@@ -818,9 +840,13 @@ class Ags4File:
         ``ags.sql("SELECT * FROM LOCA JOIN SAMP USING (LOCA_ID) WHERE ...")`` —
         returning a **DuckDB relation**. The WHERE/SELECT push into the engine
         (filter a big file down before materialising); finish with ``.df()`` /
-        ``pl.DataFrame(rel)`` or chain more SQL. A query may reference any
-        group, so this registers them all."""
-        self._register_all()
+        ``pl.DataFrame(rel)`` or chain more SQL. Only the groups the statement
+        names are loaded into the engine; one DuckDB cannot read that way
+        (``JOIN … USING``, several statements, a catalog query) loads them all.
+        SQL chained onto the returned relation that names a group the statement
+        didn't needs a fresh ``ags.sql()`` (or ``ags.connection``, which loads
+        every group)."""
+        self._register_referenced(query)
         return self._engine().sql(query)
 
     def at(
@@ -1622,12 +1648,18 @@ class AgsQuery:
                 "a .query() base names no group to tell `_id` from `_parent_id` by. "
                 "Filter the base on _id / _parent_id with .filter() instead."
             )
-        p._register_all()
+        preds = [f"({pred})" for pred in self._predicates]
+        # The groups come from the base and the predicates only: the `.at()` key
+        # clause names no table, and its `?` parameters would make DuckDB's
+        # table-name extraction refuse the statement and load every group.
+        p._register_referenced(
+            f"SELECT * FROM ({self._base}) AS _q WHERE {' AND '.join(preds) or 'TRUE'}"
+        )
         engine = p._engine()
         cols = set(engine.sql(self._base).columns)  # schema only — doesn't execute
         key_where, params = self._key_where(None, cols)
         clauses = [key_where] if key_where != "TRUE" else []
-        clauses.extend(f"({pred})" for pred in self._predicates)
+        clauses.extend(preds)
         where = " AND ".join(clauses) if clauses else "TRUE"
         sel = ", ".join(f'"{c}"' for c in self._projection) if self._projection else "*"
         return engine.sql(
