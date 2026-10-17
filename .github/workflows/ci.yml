@@ -6,7 +6,8 @@
 # pushes, schedules and dispatches run on the warm `laterite-linux` pool
 # (sccache-on-NFS, switched on by ./.github/actions/build-accel), so the
 # redundant per-job compiles are cache hits rather than cold rebuilds. Every
-# `runs-on` below is that same fork-routing ternary.
+# `runs-on` below is that same fork-routing ternary, except `changes` and
+# `publish-gates`, which run on ubuntu-latest unconditionally (each says why).
 #
 # The Python job needs the compiled PyO3 cdylib, so it `needs: rust` to fail
 # fast — no point spending build minutes on Python if the Rust build is red.
@@ -65,8 +66,15 @@ jobs:
   # "empty step conclusion + missing log" runner deaths). Web tests have their
   # own paths filter in e2e.yml. On NON-PR events (push to release/**, manual
   # dispatch) the heavy jobs always run — the gate only filters pull_requests.
+  #
+  # NOT the fork-routing ternary: ubuntu-latest on every event, like
+  # `publish-gates`. Every job but the buildless `repo-gates` `needs:` this
+  # one, so its queue time is the run's start time. It does no compiling, so
+  # the pool's sccache buys it nothing, and on the two-runner pool it queued
+  # 501 s behind other PRs' builds on run 39035620402 and stalled every job in
+  # the run, hosted ones included (#1113).
   changes:
-    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read   # dorny/paths-filter reads the PR's changed files
@@ -530,7 +538,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    # NOT the fork-routing ternary every other job uses — ubuntu-latest
+    # NOT the fork-routing ternary the pool-routed jobs use — ubuntu-latest
     # unconditionally, which is the one job here that needs it.
     #
     # `cargo-public-api` publishes no prebuilt binaries, so taiki-e/install-action

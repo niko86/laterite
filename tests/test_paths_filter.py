@@ -570,6 +570,22 @@ def test_consumers_declare_the_dependency(workflow: dict) -> None:
     )
 
 
+def test_changes_runs_hosted_on_every_event(workflow: dict) -> None:
+    """`changes` must not queue on the self-hosted pool.
+
+    Every `ci.yml` job but `repo-gates` waits on it, so its queue time is the
+    run's start time. It does no compiling, so the warm pool buys it nothing,
+    and on the two-runner pool it waited behind other PRs' builds and stalled
+    every job in the run, hosted ones included (#1113). The fork-routing
+    ternary would put it back on the pool for every same-repo PR.
+    """
+    runs_on = workflow["jobs"]["changes"]["runs-on"]
+    assert runs_on == "ubuntu-latest", (
+        f"`changes` runs on {runs_on!r}. It gates every other job, so it must "
+        "run on `ubuntu-latest` for every event, not queue behind the pool"
+    )
+
+
 def test_declared_outputs_are_wired_to_real_filters(
     declared: dict[str, str], filters: dict[str, list[str]]
 ) -> None:
