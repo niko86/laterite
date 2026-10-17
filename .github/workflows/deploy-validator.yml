@@ -160,20 +160,21 @@ jobs:
       # that would ship a second copy of the whole documentation inside the app
       # Worker.
       #
-      # `uv sync --group docs` builds the local working-tree `laterite` wheel +
-      # installs mkdocs-material + mkdocstrings (the API reference introspects the
-      # installed wheel) + gen-files/literate-nav (the group catalogue). The Rust
-      # toolchain is already present (wasm-pack installed it above; the host
-      # target builds the PyO3 wheel). Non-strict on purpose: a docs link nit must
+      # `uv sync --group docs` installs mkdocs-material + mkdocstrings (the API
+      # reference introspects the installed package) + gen-files/literate-nav
+      # (the group catalogue); `maturin develop` builds the local working-tree
+      # `laterite` into the venv. The Rust toolchain is already present
+      # (wasm-pack installed it above; the host target builds the PyO3 module). Non-strict on purpose: a docs link nit must
       # never block the deploy — the PR-time `docs` job (ci.yml) is the strict gate.
       - name: Set up uv (docs build)
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Build docs
         run: |
-          uv sync --group docs
-          # uv sync installs laterite editable but does NOT build the PyO3 cdylib;
-          # mkdocstrings' runtime import + the catalogue generator need it built +
-          # co-located, so run maturin develop (same as the ci.yml docs job).
+          uv sync --group docs --no-install-workspace
+          # Dependencies only: a plain `uv sync` builds laterite through its
+          # maturin backend, and the develop below would rebuild it (#1117).
+          # mkdocstrings' runtime import + the catalogue generator need laterite
+          # installed with its PyO3 cdylib co-located, which maturin develop does.
           (cd packages/laterite && uv run --no-sync maturin develop --uv)
           cd web/docs-site && uv run --no-sync mkdocs build
 
