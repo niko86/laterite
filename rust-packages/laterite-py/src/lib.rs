@@ -1241,6 +1241,36 @@ impl Reading {
         Some(g.rows.iter().map(|r| r.line).collect())
     }
 
+    /// `{group: parent}` for every group in the file that names a parent —
+    /// the group its `_parent_id` hashes into, resolved exactly as
+    /// `table_for` keys it: the registry for a standard group, the file's own
+    /// `DICT_PGRP` for a file-declared one (`-`/blank = none). `.at(…,
+    /// by="_id")` reads this to know which groups are direct children, so a
+    /// declared child of a standard group is narrowed, not passed through.
+    fn parents(&self) -> std::collections::HashMap<String, String> {
+        let reg = laterite_ags4_core::registry::registry();
+        // The DICT walk only when a group the registry lacks needs it.
+        let mut fd = None;
+        self.parsed
+            .groups
+            .keys()
+            .filter_map(|code| {
+                let parent = match reg.get(code) {
+                    Some(desc) => desc.parent.clone(),
+                    None => fd
+                        .get_or_insert_with(|| {
+                            laterite_ags4_core::effective_dict::FileDict::from_parsed(&self.parsed)
+                        })
+                        .parent(code)
+                        .map(str::to_string),
+                };
+                parent
+                    .filter(|p| !p.is_empty() && p != "-")
+                    .map(|p| (code.clone(), p))
+            })
+            .collect()
+    }
+
     /// Build ONE group's typed Arrow table on demand. The read path is
     /// per-group lazy: `read()` / `scan()` only pay for the groups actually
     /// touched, so a 69-group file you query two groups of builds two

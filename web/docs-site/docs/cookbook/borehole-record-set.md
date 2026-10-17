@@ -24,6 +24,18 @@ single borehole's whole story, not one group at a time.
     `SAMP` (samples), `LLPL` (Atterberg limits). That way you know what's coming
     before you materialise anything.
 
+    If no group in the file carries the key column, `.at()` raises `ValueError`
+    instead of handing back every row. `GEOL` has no `GEOL_ID`, so
+    `.at("GEOL", ...)` raises. Where the ID heading is optional or blank (as
+    `SAMP_ID` often is), filter on row identity instead.
+    `ags.at("SAMP", ids, by="_id")` keeps the `SAMP` rows whose `_id` is in
+    `ids`, plus the rows of its direct children (`LLPL`, …) whose `_parent_id`
+    is. Read the ids off `ags.table("SAMP", keys=True)`. See
+    [content-addressed keys](../concepts/content-addressed-keys.md). Once a
+    query filters by `_id`, asking it for a group no filter reaches (`LOCA`,
+    or a grandchild) raises rather than returning every row. Passing `None` to
+    `.at("SAMP", ...)` warns, because a blank `SAMP_ID` matches no row.
+
     Then call `.frames()` to materialise the record set as `{group_code: frame}`:
 
     ```python
