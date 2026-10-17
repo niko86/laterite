@@ -60,6 +60,7 @@ impl<'a> core::marker::UnsafeUnpin for laterite_ags4_trust::Request<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Request<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Request<'a>
 pub fn laterite_ags4_trust::check(laterite_ags4_trust::Request<'_>) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_trust::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_trust::engine_id(core::option::Option<alloc::string::String>) -> laterite_ags4_core::index::EngineId
 pub fn laterite_ags4_trust::mint(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_trust::MintError>
 pub fn laterite_ags4_trust::split_options(&laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_core::index::Question, laterite_ags4_validator::world::WorldScope), laterite_ags4_validator::error::ValidatorError>

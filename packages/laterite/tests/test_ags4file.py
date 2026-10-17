@@ -148,6 +148,64 @@ def test_line_numbers_are_ints_and_match_row_count(clean):
     assert lines == sorted(lines)
 
 
+def test_line_numbers_are_read_off_the_parse_not_held_per_group(clean):
+    # One Python int per DATA row, held for the handle's life, for a method few
+    # callers touch (#1094) — read() no longer builds them.
+    assert all("line_numbers" not in g for g in clean._p["groups"].values())
+    assert clean.line_numbers("TYPE") == clean.line_numbers("TYPE")
+
+
+# --- validate(): the handle judges the parse it holds (#1090) ----------------
+
+_MULTI = Path(__file__).parent / "fixtures" / "multi_finding.ags"
+
+
+def test_handle_validate_does_not_read_the_file_again(tmp_path):
+    # Delete the file between read() and .validate(): a second read would raise.
+    p = tmp_path / "f.ags"
+    p.write_bytes(_CLEAN.read_bytes())
+    h = laterite.read(str(p))
+    p.unlink()
+    rep = h.validate().report
+    assert rep.is_valid
+    assert rep.file == str(p)
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        _CLEAN.read_bytes(),
+        _MULTI.read_bytes(),
+        _MULTI.read_bytes().replace(b"\r\n", b"\n"),
+    ],
+    ids=["clean", "multi", "multi-lf"],
+)
+def test_handle_validate_matches_validating_the_file(tmp_path, src):
+    # The held parse must reach the verdict a fresh parse of the bytes does — the
+    # raw-byte rules (Rule 2a's line endings) included.
+    p = tmp_path / "f.ags"
+    p.write_bytes(src)
+    held = laterite.read(str(p)).validate(fyi=True).report
+    fresh = laterite.validate(str(p), fyi=True)
+    assert held.to_json() == fresh.to_json()
+    assert (held.is_valid, held.dict_version, held.resolution) == (
+        fresh.is_valid,
+        fresh.dict_version,
+        fresh.resolution,
+    )
+
+
+def test_handle_validate_reparses_under_a_different_encoding(tmp_path):
+    # A decoder other than read()'s is a different question, so it needs the
+    # source again — shown by deleting it.
+    p = tmp_path / "f.ags"
+    p.write_bytes(_CLEAN.read_bytes())
+    h = laterite.read(str(p))
+    p.unlink()
+    with pytest.raises(FileNotFoundError):
+        h.validate(encoding="cp1252")
+
+
 # --- table / __getitem__ ---------------------------------------------------
 
 
@@ -213,22 +271,33 @@ def test_read_rejects_unknown_backend():
         laterite.read(text=_NUMERIC_SRC, backend="arrow")
 
 
-def test_frame_reads_bypass_engine_keyed_path_spins_it_up():
-    # The engine is lazy AND the default frame path is engine-free: read() spins
-    # up nothing, and a plain keys-stripped frame read goes Arrow -> frame
-    # directly (the fast path), never touching DuckDB — the content-addressed
-    # keys it would strip anyway are simply not built. Only the keyed/relational
-    # path (keys=True, .sql(), .connection, .at()) loads groups as native DuckDB
-    # tables. A fresh handle (not the shared module-scoped `clean`, whose engine
-    # other tests populate).
+def test_frame_reads_bypass_engine_only_sql_spins_it_up():
+    # The engine is lazy AND every default-mode frame read is engine-free: read()
+    # spins up nothing, and a frame read goes Arrow -> frame directly whether or
+    # not it shows the keys. Only the relational path (.sql(), .connection,
+    # .at()) loads groups as native DuckDB tables — a keyed frame used to as well,
+    # and kept a DuckDB copy of every group fetched for the handle's life (#1091).
+    # A fresh handle (not the shared module-scoped `clean`, whose engine other
+    # tests populate).
     f = laterite.read(str(_CLEAN))
     assert f._con is None  # read() did not create the engine
     _ = f["PROJ"]  # fast frame path...
     assert f._con is None  # ...touches no engine
-    _ = f.table("PROJ", keys=True)  # a keyed frame needs the relational engine
-    assert f._con is not None and "PROJ" in f._registered
-    _ = f.sql('SELECT * FROM "TRAN"')  # .sql() registers the rest
+    _ = f.table("PROJ", keys=True)  # ...and nor does a keyed frame
+    assert f._con is None
+    _ = f.sql('SELECT * FROM "TRAN"')  # .sql() is what spins it up
     assert "TRAN" in f._registered
+
+
+@pytest.mark.parametrize("code", ["PROJ", "LOCA", "SAMP"])
+def test_keyed_frame_matches_the_engine_table(code):
+    # The keyed fast path must hand back exactly what the engine path did: the
+    # same columns, dtypes and values, `_id`/`_parent_id` included.
+    f = laterite.read(text=_RELATED_SRC)
+    fast = f.table(code, keys=True)
+    via_engine = pl.DataFrame(f.sql(f'SELECT * FROM "{code}"'))
+    assert fast.schema == via_engine.schema
+    assert fast.equals(via_engine)
 
 
 def test_sql_returns_a_duckdb_relation_with_pushdown():

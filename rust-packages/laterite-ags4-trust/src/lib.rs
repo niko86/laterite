@@ -247,6 +247,31 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
     })
 }
 
+/// [`check`] for a caller that already holds the parse — a read handle validating
+/// what it read, which would otherwise pay for a second parse of the same bytes.
+///
+/// There is no certificate parameter, and that is the point: a certificate is a
+/// statement about bytes, and a caller holding only a parse has no bytes to show
+/// it. A caller with a cert to offer goes through [`check`].
+///
+/// `parsed` must be `parse_bytes(bytes, opts.encoding)` of the file being judged;
+/// a parse under another decoder answers a different question.
+pub fn check_parsed(
+    parsed: &laterite_ags4_parse::ParsedFile,
+    opts: &CheckOptions,
+    world: WorldScope,
+) -> Result<Outcome, ValidatorError> {
+    let (_, world) = split_options(opts, world)?;
+    let (found, dv, res) = check_parsed_with_dict(parsed, opts, &world)?;
+    Ok(Outcome {
+        findings: found,
+        dict_version: dv,
+        resolution: res,
+        certified: false,
+        revalidate_reason: None,
+    })
+}
+
 /// **Mint a certificate** for `bytes` — but only after validating them here.
 ///
 /// Note what this function does NOT take: any finding count, any verdict, any claim

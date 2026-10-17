@@ -56,7 +56,10 @@ path, so a bytes/text caller physically cannot request a world check (it gets
 
 In: a `Request` (bytes/text/path source, an optional certificate, the requested
 `WorldScope`, options split by `split_options`). Out: an `Outcome` from `check`,
-or a minted `Sidecar` from `mint` (`MintError` on failure). `engine_id` exposes
+or a minted `Sidecar` from `mint` (`MintError` on failure). `check_parsed` is
+`check` for a caller that already holds the parse (a read handle validating what
+it read) — and takes no certificate, because a cert is checked against bytes the
+parse alone cannot show it. `engine_id` exposes
 the engine identity (`ENGINE_FINGERPRINT`, optionally with a compat tag) that a
 certificate's freshness is judged against.
 

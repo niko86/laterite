@@ -891,7 +891,7 @@ def check_file(
             {"line": line, "group": group, "desc": desc}
         )
 
-    for f in r["findings"]:
+    for f in r["_found"].items():
         # O-59: the declared-type advisory stays native-only at both tiers —
         # the FYI, and the warning a KEY heading's departure rides. Real files
         # depart from the dictionary's types often, so in the drop-in it would

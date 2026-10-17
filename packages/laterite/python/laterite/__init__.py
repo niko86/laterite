@@ -434,7 +434,7 @@ class Report:
 
         The within-line character span (``char_span``) is editor-oriented and lives on
         [`by_rule`][laterite.Report.by_rule] / [`to_json`][laterite.Report.to_json] / [`to_ndjson`][laterite.Report.to_ndjson], not this flat frame."""
-        items = self._r["findings"]
+        items = self._r["_found"].items()
         return pl.DataFrame(
             {
                 "rule": pl.Series([f["rule"] for f in items], dtype=pl.String),
@@ -468,7 +468,7 @@ class Report:
         by default) and whatever location fields the finding pins (``target``,
         ``heading``, ``field_index``, ``data_row``, ``char_span``)."""
         out: dict[str, list[dict]] = {}
-        for f in self._r["findings"]:
+        for f in self._r["_found"].items():
             # Pass every field through verbatim except `rule` (it's the dict key);
             # normalise `severity` so callers can read it unconditionally.
             item = {k: v for k, v in f.items() if k != "rule"}
@@ -478,13 +478,15 @@ class Report:
 
     def to_json(self) -> str:
         """``{file, findings:{"AGS Format Rule N":[{line,group,desc}]}}`` —
-        byte-identical to ``lat validate --json``."""
-        return self._r["json"]
+        byte-identical to ``lat validate --json``. Rendered on each call, not held
+        by the report — keep the string if you need it twice."""
+        return self._r["_found"].json()
 
     def to_ndjson(self) -> str:
         """One flat ``{rule,line,group,desc}`` per line — byte-identical to
-        ``lat validate --ndjson``."""
-        return self._r["ndjson"]
+        ``lat validate --ndjson``. Rendered on each call, like
+        [`to_json`][laterite.Report.to_json]."""
+        return self._r["_found"].ndjson()
 
     def __repr__(self) -> str:
         # What the repr states is what the report HOLDS, so it counts findings
@@ -503,7 +505,8 @@ class Ags4File:
 
     - ``ags["LOCA"]`` → one group materialised to the handle's backend
       (**polars** by default, **pandas** if ``read(..., backend="pandas")``);
-      both pyarrow-free. Groups load into the engine on first touch.
+      both pyarrow-free, built straight from Arrow (the engine only steps in
+      under ``xn="numeric"``). Groups load into the engine on first query.
     - ``ags.sql("SELECT … WHERE …")`` → a **DuckDB relation** — cross-group
       joins + filter pushdown; finish with ``.df()`` / ``pl.DataFrame(rel)``.
     - ``ags.connection`` → the raw duckdb connection (every engine feature).
@@ -662,7 +665,8 @@ class Ags4File:
         """The source line number of each DATA row of group ``code`` — what validator
         findings point back at (raises ``KeyError`` if the group is not in the file).
         Pure metadata — no engine spin-up."""
-        return list(self._g(code)["line_numbers"])
+        self._g(code)  # the KeyError for a group not in the file
+        return self._p["_handle"].line_numbers(code)
 
     def __contains__(self, code: str) -> bool:
         return code in self._p["groups"]
@@ -749,16 +753,17 @@ class Ags4File:
         ``keys=True`` (or ``read(..., keys=True)`` for the handle default) to keep
         them. The relational ``.sql()`` layer carries them regardless."""
         want = self._keys if keys is None else keys
-        # Fast frame path: a keys-stripped frame in the default xn="string" mode
-        # needs neither the content-addressed keys nor the SQL engine. Build the
-        # un-keyed typed Arrow (`with_keys=False` skips the dominant `group_row_ids`
-        # keying) and go straight Arrow → frame, skipping BOTH that keying and the
-        # per-group DuckDB CTAS. The shared SQL `_con` is deliberately NOT touched
-        # here, so a later `.sql()` still registers correctly-keyed tables — no
-        # un-keyed table can leak into a JOIN. xn="numeric" (rare, non-default)
-        # needs the engine's TRY_CAST, so it falls through to the keyed path below.
-        if not want and self._xn == "string":
-            table = self._p["_handle"].table_for(code, self._content_hash, False)
+        # Fast frame path: a frame in the default xn="string" mode needs no SQL
+        # engine. Build the typed Arrow — keyed only when the frame shows the keys
+        # (`with_keys=False` skips the dominant `group_row_ids` keying) — and go
+        # straight Arrow → frame, skipping the per-group DuckDB CTAS, which would
+        # otherwise hold a copy of every group fetched for the handle's life
+        # (#1091). The shared SQL `_con` is deliberately NOT touched here, so a
+        # later `.sql()` still registers correctly-keyed tables — no un-keyed
+        # table can leak into a JOIN. xn="numeric" (rare, non-default) needs the
+        # engine's TRY_CAST, so it falls through to the engine path below.
+        if self._xn == "string":
+            table = self._p["_handle"].table_for(code, self._content_hash, want)
             if table is None:
                 raise KeyError(f"group {code!r} not in file")
             return materialize(frame_from_arrow(table), self._backend)
@@ -946,6 +951,15 @@ class Ags4File:
             path, txt, data = self._src
         else:
             path, txt, data = None, self.text, None
+        # The handle already holds the parse of this source; parsing it again cost
+        # as much as the read did (#1090). Only a different decoder needs a fresh
+        # parse: an `encoding=` other than read()'s, or any encoding on a `text=`
+        # read, which read() parsed as UTF-8 whatever it was told.
+        same_parse = (
+            self._src is not None
+            and encoding in (None, self._encoding)
+            and (txt is None or self._encoding is None)
+        )
         r = _run_check(
             path,
             txt,
@@ -962,6 +976,7 @@ class Ags4File:
             # Never strict here — see the module-level door's comment: a cert
             # this handle inherited from `read(index=)` was asserted THERE.
             strict_cert=False,
+            retained=self._p["_handle"] if same_parse else None,
         )
         self._report = Report(raise_for(r))
         return self
@@ -1537,6 +1552,7 @@ def _run_check(
     dict_replace: bool,
     cert: Any,
     strict_cert: bool,
+    retained: Any = None,
 ) -> dict:
     """The one piece of plumbing under BOTH validate doors (#927).
 
@@ -1564,6 +1580,7 @@ def _run_check(
         dict_replace=dict_replace,
         cert=cert,
         strict_cert=strict_cert,
+        retained=retained,
     )
 
 
