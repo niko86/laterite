@@ -24,7 +24,11 @@
         "text": "**The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings."
       }
     ],
-    "security": []
+    "security": [
+      {
+        "text": "**`rust_xlsxwriter` moves to 0.100, which writes XLSX through `zip` 9.** Three `zip` 8 advisories (RUSTSEC-2026-0367, -0368, -0369) cover archive extraction to disk. `calamine` still needs `zip` 8 to read XLSX, but it only reads entries in memory and never calls the affected `extract()`, so `cargo deny` now lists the three IDs as documented exceptions until `calamine` moves to `zip` 9."
+      }
+    ]
   },
   "releases": [
     {

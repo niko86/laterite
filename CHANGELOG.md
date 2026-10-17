@@ -42,6 +42,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 - **The nightly `docs-vs-released-duckdb` gate no longer fails on a NULL `_id`.** Since extension 0.15.0 a group the file's own DICT declares with no KEY heading reads with a NULL `_id`; the checker's JSON schema could not represent that and failed the whole run before comparing anything. It now parses the null, ignores it on a non-registry group (the reference mints no ids there), and reports it as a mismatch on a registry group.
 - **The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings.
 
+### Security
+
+- **`rust_xlsxwriter` moves to 0.100, which writes XLSX through `zip` 9.** Three `zip` 8 advisories (RUSTSEC-2026-0367, -0368, -0369) cover archive extraction to disk. `calamine` still needs `zip` 8 to read XLSX, but it only reads entries in memory and never calls the affected `extract()`, so `cargo deny` now lists the three IDs as documented exceptions until `calamine` moves to `zip` 9.
+
 ## [0.15.0] — 2026-10-12
 
 ### Added
