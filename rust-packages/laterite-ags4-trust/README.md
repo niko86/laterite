@@ -71,6 +71,9 @@ automatically rather than being trusted on a version number that did not move.
 existing one may be relied on. `mint_measured` is `mint` for a caller that has just
 validated the same parse with every tier on: it reuses that run's counts instead of
 running the rules again, and it still runs them itself if anything differs.
+`check_reader` is `check` for a file it reads itself, only as far as the
+decision needs: a certificate of another size is settled before any byte is
+read, and one that vouches is checked against a hash taken as the file streams.
 
 Part of the [laterite](https://github.com/niko86/laterite) AGS4 toolchain.
 

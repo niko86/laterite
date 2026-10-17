@@ -65,7 +65,13 @@ check; `mint_measured` mints from that measurement instead of running the engine
 again, but only if it answered the mint's question over that same parse and the
 bytes still parse equal to it (#1096). Otherwise it mints as `mint` does. Only
 the engine run builds a `Measurement`, so a caller still cannot hand the mint a
-verdict. `engine_id` exposes
+verdict. `check_reader` is `check` for a file the door reads itself (#1097): a
+certificate of another size is settled before any byte is read, one that would
+vouch (`Sidecar::answers`) is checked by hashing the file as it streams
+(`Sidecar::is_fresh_for_reader`), and anything else reads the file whole, once,
+for the engine. Same verdict and `revalidate_reason` as `check`; `named` makes a
+stale cert an error raised before the engine runs. `laterite-py`'s path door uses
+it; `lat`, Node and the facade still read the file whole and call `check`. `engine_id` exposes
 the engine identity (`ENGINE_FINGERPRINT`, optionally with a compat tag) that a
 certificate's freshness is judged against.
 

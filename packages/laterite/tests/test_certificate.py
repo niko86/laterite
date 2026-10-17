@@ -400,6 +400,48 @@ def test_validate_raises_on_a_stale_cert(tmp_path):
         lat.validate(src, index=cert, warnings=False)
 
 
+def test_a_vouched_validate_reaches_the_verdict_without_the_engine(tmp_path):
+    """The path door hashes the file as it streams instead of reading it whole
+    (#1097). The memory that saves is measured in the trust crate's
+    `tests/reader_memory.rs`; here, the answer must not move, and the engine must
+    still not run."""
+    src = _write(tmp_path)
+    cert = lat.read(src).certify()
+    plain = lat.validate(src, warnings=False)
+
+    before = _engine_runs()
+    rep = lat.validate(src, index=cert, warnings=False)
+    assert _engine_runs() == before, "a vouched cert ran the engine"
+    assert rep.certified and rep.revalidate_reason is None
+    assert (rep.is_valid, rep.count, rep.dict_version, rep.resolution) == (
+        plain.is_valid,
+        plain.count,
+        plain.dict_version,
+        plain.resolution,
+    )
+
+
+def test_the_path_door_reports_why_a_cert_did_not_answer(tmp_path):
+    """Each reason a cert is declined still comes out under its own name, with the
+    streamed hash in front of it: size before content, content before the tiers."""
+    warned = _write(tmp_path, name="warned.ags", text=CLEAN.replace('"4.2"', '"4.9"'))
+    cert = lat.read(warned).certify()
+    rep = lat.validate(warned, index=cert)
+    assert not rep.certified and rep.warnings > 0
+    assert rep.revalidate_reason == "tier_not_clean_warnings"
+
+    src = _write(tmp_path)
+    handle = lat.read(src, index=lat.read(src).certify())
+    original = src.read_bytes()
+
+    src.write_bytes(original + b"\r\n")
+    assert handle.validate(warnings=False).report.revalidate_reason == "size_changed"
+
+    i = original.rindex(b"P1")
+    src.write_bytes(original[:i] + b"P2" + original[i + 2 :])
+    assert handle.validate(warnings=False).report.revalidate_reason == "content_changed"
+
+
 def test_a_stale_cert_raises_before_the_engine_runs(tmp_path):
     """...and it must raise EARLY.
 

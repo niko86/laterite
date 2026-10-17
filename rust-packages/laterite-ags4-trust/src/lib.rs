@@ -222,14 +222,7 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
             world::run(&parsed, &world, &mut found);
         }
 
-        let (dv, res) = edition_of(cert)?;
-        return Ok(Outcome {
-            findings: found,
-            dict_version: dv,
-            resolution: res,
-            certified: true,
-            revalidate_reason: None,
-        });
+        return vouched(cert, found);
     }
 
     // No usable cert: the engine runs. Content and world both, through the validator's
@@ -246,6 +239,164 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
             _ => None,
         },
     })
+}
+
+/// The outcome of a vouched certificate: no content findings, and the edition the cert
+/// was judged under. `found` holds whatever the world check found, if one ran.
+fn vouched(cert: &Sidecar, found: Findings) -> Result<Outcome, ValidatorError> {
+    let (dv, res) = edition_of(cert)?;
+    Ok(Outcome {
+        findings: found,
+        dict_version: dv,
+        resolution: res,
+        certified: true,
+        revalidate_reason: None,
+    })
+}
+
+/// [`Request`] for a file that has not been read yet: a path's door (#1097).
+///
+/// [`check`] takes the bytes, so a path's caller used to read the whole file first,
+/// even when the certificate vouched and nothing would look at the bytes but a hash.
+/// Here the door reads the file itself, and only as far as the decision needs.
+pub struct ReaderRequest<'a, F> {
+    /// The file. It is measured by seeking to its end and read from its start.
+    pub file: F,
+    /// As [`Request::opts`].
+    pub opts: &'a CheckOptions,
+    /// As [`Request::cert`].
+    pub cert: Option<&'a Sidecar>,
+    /// As [`Request::world`].
+    pub world: WorldScope,
+    /// As [`Request::compat`].
+    pub compat: Option<String>,
+    /// The caller named this certificate as the one for this file, so a cert whose
+    /// size or SHA-256 does not match is an error ([`ReaderError::StaleCert`]), and is
+    /// raised before the engine runs. Otherwise it is only a hint, and a stale one
+    /// revalidates as [`check`] does.
+    pub named: bool,
+}
+
+/// Why [`check_reader`] has no [`Outcome`].
+#[derive(Debug)]
+pub enum ReaderError {
+    /// The file could not be measured or read.
+    Io(std::io::Error),
+    /// [`ReaderRequest::named`] was set, and the certificate is not for these bytes.
+    StaleCert,
+    /// As [`check`]'s error.
+    Validate(ValidatorError),
+}
+
+impl std::fmt::Display for ReaderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReaderError::Io(e) => write!(f, "{e}"),
+            ReaderError::StaleCert => {
+                f.write_str("the certificate does not match the file (size / SHA-256 differ)")
+            }
+            ReaderError::Validate(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for ReaderError {}
+
+impl From<std::io::Error> for ReaderError {
+    fn from(e: std::io::Error) -> Self {
+        ReaderError::Io(e)
+    }
+}
+
+impl From<ValidatorError> for ReaderError {
+    fn from(e: ValidatorError) -> Self {
+        ReaderError::Validate(e)
+    }
+}
+
+/// [`check`], reading the file only as far as the decision needs (#1097).
+///
+/// Same verdict, same `revalidate_reason`, as [`check`] over the file's bytes. What
+/// changes is what is read and what is held:
+///
+/// * a certificate of another size is settled by the file's length, before a byte is
+///   read;
+/// * a certificate that would vouch for matching bytes, with no world check asked, is
+///   checked by hashing the file as it streams. If it matches, the bytes are never
+///   held, so the memory a vouched check costs does not grow with the file;
+/// * anything else needs the engine, which needs the bytes, so they are read whole,
+///   once, and handed to [`check`].
+///
+/// The only file read twice is a stale one offered as a hint: hashed as a stream,
+/// found not to match, then read again for the engine.
+///
+/// A file that cannot seek (a pipe) is read whole, as [`check`]'s caller always did.
+pub fn check_reader<F: std::io::Read + std::io::Seek>(
+    req: ReaderRequest<'_, F>,
+) -> Result<Outcome, ReaderError> {
+    let ReaderRequest {
+        mut file,
+        opts,
+        cert,
+        world,
+        compat,
+        named,
+    } = req;
+
+    let size = match file.seek(std::io::SeekFrom::End(0)) {
+        Ok(n) => {
+            file.rewind()?;
+            Some(n)
+        }
+        Err(_) => None,
+    };
+
+    if let (Some(c), Some(size)) = (cert, size) {
+        // `decide`'s first two gates, format and size, read nothing.
+        let sized = c.version == laterite_ags4_core::index::SIDECAR_VERSION && c.size_matches(size);
+        if named && !sized {
+            return Err(ReaderError::StaleCert);
+        }
+        if sized && only_the_hash_is_left(c, opts, &world, compat.as_deref()) {
+            if c.is_fresh_for_reader(&mut file)? {
+                return Ok(vouched(c, Findings::new())?);
+            }
+            if named {
+                return Err(ReaderError::StaleCert);
+            }
+            file.rewind()?;
+        }
+    }
+
+    let mut bytes = Vec::with_capacity(size.and_then(|n| usize::try_from(n).ok()).unwrap_or(0));
+    file.read_to_end(&mut bytes)?;
+    if named && cert.is_some_and(|c| !c.is_fresh_for(&bytes)) {
+        return Err(ReaderError::StaleCert);
+    }
+    Ok(check(Request {
+        bytes: &bytes,
+        opts,
+        cert,
+        world,
+        compat,
+    })?)
+}
+
+/// Would `cert` vouch for this request, given bytes that match it? Only then is a
+/// streamed hash the whole of the work. A world check needs the parse, and any other
+/// answer needs the engine; both need the bytes.
+fn only_the_hash_is_left(
+    cert: &Sidecar,
+    opts: &CheckOptions,
+    world: &WorldScope,
+    compat: Option<&str>,
+) -> bool {
+    match split_options(opts, world.clone()) {
+        Ok((question, WorldScope::None)) => {
+            cert.answers(&question, &engine_id(compat.map(str::to_string))) == Decision::Vouched
+        }
+        _ => false,
+    }
 }
 
 /// [`check`] for a caller that already holds the parse — a read handle validating
