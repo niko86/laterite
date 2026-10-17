@@ -1081,6 +1081,14 @@ class Ags4File:
         fatal — a delivery may legitimately carry them, and a certificate that counted
         them honestly can still answer an errors-only question.
 
+        A prior ``validate()`` on this handle is not needed, but it is not wasted either.
+        If the handle's latest [`report`][laterite.Ags4File.report] came from a run with
+        every tier on (``validate(fyi=True)``), with the same edition, dictionary and
+        encoding as this mint and no ``check_files``, the mint uses that run's counts
+        instead of running the rules a second time. That only happens when the source
+        bytes still parse exactly as the handle read them. If not, or if the report
+        asked less, ``certify`` validates as above. The certificate is the same either way.
+
         Pass ``dict_version=`` to certify against a forced edition; by default it uses the
         edition of the last [`validate`][laterite.validate] on this handle (or auto-resolves
         from ``TRAN_AGS``). ``dictionary=`` / ``dict_replace=`` certify against a custom
@@ -1138,7 +1146,8 @@ class Ags4File:
     ) -> builtins.bytes:
         """Mint this file's ``.ags.idx`` validity **certificate** and return its bytes
         in memory — the filesystem-free twin of [`certify`][laterite.Ags4File.certify].
-        Same behaviour (it runs the validation itself, refuses a file with errors, and
+        Same behaviour (it runs the validation itself unless a matching every-tier
+        ``validate()`` on this handle already did, refuses a file with errors, and
         records the warning/FYI counts it measured) and the same output, so the bytes
         interop with ``read(index=...)``, the CLI ``--index``, and the browser cert.
 
@@ -1168,6 +1177,12 @@ class Ags4File:
         wins, else the one the last [`validate`][laterite.validate] on this handle used,
         else auto-resolution from ``TRAN_AGS``. The custom ``--dict`` overlay follows the
         same rule — an explicit ``dictionary=`` wins, else the last validate's.
+
+        The handle's latest [`report`][laterite.Ags4File.report] goes along with its parse,
+        and the native mint decides whether it can stand in for the rules (#1096). It can
+        only if that run had every tier on, judged this handle's parse under the same
+        edition, dictionary and decoder, and the source bytes still parse the same. Python
+        only passes the engine's own native findings object along; it cannot build one.
         """
         from datetime import UTC, datetime
 
@@ -1188,6 +1203,8 @@ class Ags4File:
                 dict_path=dict_path,
                 dict_bytes=dict_bytes,
                 dict_replace=dict_replace,
+                retained=self._p.get("_handle"),
+                measured=None if self._report is None else self._report._r["_found"],
             )
         except ValueError as e:
             # The native mint refuses an error-carrying file. Surface it as the library's

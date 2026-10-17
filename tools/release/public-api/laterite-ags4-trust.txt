@@ -31,6 +31,30 @@ impl core::marker::Unpin for laterite_ags4_trust::MintError
 impl core::marker::UnsafeUnpin for laterite_ags4_trust::MintError
 impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::MintError
 impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::MintError
+pub struct laterite_ags4_trust::Measurement
+impl core::clone::Clone for laterite_ags4_trust::Measurement
+pub fn laterite_ags4_trust::Measurement::clone(&self) -> Self
+impl core::fmt::Debug for laterite_ags4_trust::Measurement
+pub fn laterite_ags4_trust::Measurement::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_trust::Measurement
+impl core::marker::Send for laterite_ags4_trust::Measurement
+impl core::marker::Sync for laterite_ags4_trust::Measurement
+impl core::marker::Unpin for laterite_ags4_trust::Measurement
+impl core::marker::UnsafeUnpin for laterite_ags4_trust::Measurement
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Measurement
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Measurement
+pub struct laterite_ags4_trust::Minted
+pub laterite_ags4_trust::Minted::engine_ran: bool
+pub laterite_ags4_trust::Minted::result: core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_trust::MintError>
+impl core::fmt::Debug for laterite_ags4_trust::Minted
+pub fn laterite_ags4_trust::Minted::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_trust::Minted
+impl core::marker::Send for laterite_ags4_trust::Minted
+impl core::marker::Sync for laterite_ags4_trust::Minted
+impl core::marker::Unpin for laterite_ags4_trust::Minted
+impl core::marker::UnsafeUnpin for laterite_ags4_trust::Minted
+impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Minted
+impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Minted
 pub struct laterite_ags4_trust::Outcome
 pub laterite_ags4_trust::Outcome::certified: bool
 pub laterite_ags4_trust::Outcome::dict_version: laterite_ags4_reference::dict::dict_data::DictVersion
@@ -61,6 +85,8 @@ impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Reques
 impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Request<'a>
 pub fn laterite_ags4_trust::check(laterite_ags4_trust::Request<'_>) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_trust::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_trust::check_parsed_measured(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_trust::Outcome, core::option::Option<laterite_ags4_trust::Measurement>), laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_trust::engine_id(core::option::Option<alloc::string::String>) -> laterite_ags4_core::index::EngineId
 pub fn laterite_ags4_trust::mint(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_trust::MintError>
+pub fn laterite_ags4_trust::mint_measured(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>, &laterite_ags4_parse::ParsedFile, &laterite_ags4_trust::Measurement) -> laterite_ags4_trust::Minted
 pub fn laterite_ags4_trust::split_options(&laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_core::index::Question, laterite_ags4_validator::world::WorldScope), laterite_ags4_validator::error::ValidatorError>

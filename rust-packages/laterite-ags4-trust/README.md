@@ -68,7 +68,9 @@ different identity, so certificates minted by the older one stop being honoured
 automatically rather than being trusted on a version number that did not move.
 
 `mint` issues a certificate for a file that passes; `check` decides whether an
-existing one may be relied on.
+existing one may be relied on. `mint_measured` is `mint` for a caller that has just
+validated the same parse with every tier on: it reuses that run's counts instead of
+running the rules again, and it still runs them itself if anything differs.
 
 Part of the [laterite](https://github.com/niko86/laterite) AGS4 toolchain.
 

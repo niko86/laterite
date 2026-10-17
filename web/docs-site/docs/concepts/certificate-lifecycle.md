@@ -16,7 +16,9 @@ single rule.
 ```
 
 `certify()` runs the validation itself, every tier on, and refuses a file with
-rule errors. It writes
+rule errors. In Python, a handle whose last `validate()` already ran every tier
+(`fyi=True`) under the same edition, dictionary and encoding hands that run to
+the mint instead, so the rules run once. It writes
 `<path>.ags.idx` next to the file. Re-reading with `index=` hands that cert back;
 because the file's content hash still matches the one baked into the cert,
 `validate()` returns immediately and `report.certified` is `True` instead of

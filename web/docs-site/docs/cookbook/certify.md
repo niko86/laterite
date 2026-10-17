@@ -17,7 +17,9 @@ skip the rule engine.
 
     `.certify()` **runs the validation itself**, with every severity tier on,
     and records what the rules actually returned. No prior
-    [`.validate()`](../learn/validate.md) is needed. It writes
+    [`.validate()`](../learn/validate.md) is needed. If you validate first
+    anyway, with every tier on (`.validate(fyi=True)`), `.certify()` mints from
+    that run rather than running the rules a second time. It writes
     `<path>.ags.idx` next to the file: a validity certificate (the verdict plus
     a hash of the bytes it vouches for) and a byte-offset index of every group.
 

@@ -59,7 +59,13 @@ In: a `Request` (bytes/text/path source, an optional certificate, the requested
 or a minted `Sidecar` from `mint` (`MintError` on failure). `check_parsed` is
 `check` for a caller that already holds the parse (a read handle validating what
 it read) — and takes no certificate, because a cert is checked against bytes the
-parse alone cannot show it. `engine_id` exposes
+parse alone cannot show it. `check_parsed_measured` is `check_parsed` that also
+returns the run as an opaque `Measurement` when it had every tier on and no world
+check; `mint_measured` mints from that measurement instead of running the engine
+again, but only if it answered the mint's question over that same parse and the
+bytes still parse equal to it (#1096). Otherwise it mints as `mint` does. Only
+the engine run builds a `Measurement`, so a caller still cannot hand the mint a
+verdict. `engine_id` exposes
 the engine identity (`ENGINE_FINGERPRINT`, optionally with a compat tag) that a
 certificate's freshness is judged against.
 

@@ -184,6 +184,141 @@ def test_certify_bytes_needs_no_prior_validate_but_still_refuses_a_dirty_file(tm
         h.certify_bytes()
 
 
+# --- mint from the handle's own Report (#1096) -------------------------------
+#
+# `validate()` then `certify()` used to run the rule engine twice. The mint now takes the
+# handle's latest Report instead of running again, but only when that Report answered the
+# question the mint would ask (every tier on, same edition / dictionary / decoder, no
+# world check), and only when the bytes it mints over still parse to the very parse that
+# Report judged.
+#
+# The seam is a counter of rule-engine runs kept in the native module. The run this saves
+# happens inside Rust, so a Python mock cannot see whether it happened, and timing it
+# would be flaky. The counter counts exactly what the acceptance criterion names.
+
+
+def _engine_runs() -> int:
+    return lat._laterite_native.engine_runs()
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """Pin the mint's `checked_at`, so two certs over one file can be compared byte for
+    byte. `_mint` imports `datetime` when it is called, so patching the module attribute
+    reaches it."""
+    import datetime as dt
+
+    class _Frozen(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 1, 1, tzinfo=tz)
+
+    monkeypatch.setattr(dt, "datetime", _Frozen)
+
+
+def test_the_engine_run_counter_sees_a_mint(tmp_path):
+    # The positive control: without it, a counter that saw nothing would make every
+    # "ran once" below pass.
+    src = _write(tmp_path)
+    h = lat.read(src)
+    before = _engine_runs()
+    h.certify()
+    assert _engine_runs() - before == 1
+
+
+def test_validate_then_certify_runs_the_engine_once(tmp_path):
+    src = _write(tmp_path)
+    before = _engine_runs()
+    out = lat.read(src).validate(fyi=True).certify()
+    assert _engine_runs() - before == 1, "certify() ran the rules again"
+    assert out.exists()
+
+
+def test_certify_bytes_reuses_the_report_too(tmp_path):
+    src = _write(tmp_path)
+    before = _engine_runs()
+    assert lat.read(src).validate(fyi=True).certify_bytes()
+    assert _engine_runs() - before == 1
+
+
+@pytest.mark.parametrize(
+    ("validate_kw", "certify_kw"),
+    [
+        ({"warnings": False, "fyi": True}, {}),  # no warning tier
+        ({}, {}),  # the default run leaves out FYI
+        ({"fyi": True, "check_files": True}, {}),  # a world check rode along
+        ({"fyi": True, "dict_version": "4.1"}, {"dict_version": "4.2"}),  # edition
+        ({"fyi": True, "encoding": "cp1252"}, {}),  # decoder
+    ],
+    ids=["warnings-off", "fyi-off", "check-files", "edition", "encoding"],
+)
+def test_a_report_that_asked_less_is_not_reused(tmp_path, validate_kw, certify_kw):
+    src = _write(tmp_path)
+    h = lat.read(src).validate(**validate_kw)
+    before = _engine_runs()
+    h.certify(**certify_kw)
+    assert _engine_runs() - before == 1, "the mint trusted a Report that asked less"
+
+
+def test_a_certified_report_is_not_reused(tmp_path):
+    # A Report a certificate answered is that certificate's verdict, not this handle's
+    # engine run, so the mint does not mint from it.
+    src = _write(tmp_path)
+    cert = lat.read(src).certify(tmp_path / "first.idx")
+    h = lat.read(src, index=cert).validate(fyi=True)
+    assert h.report.certified
+    before = _engine_runs()
+    h.certify(tmp_path / "second.idx")
+    assert _engine_runs() - before == 1
+
+
+# CLEAN with an edition this build does not bundle: no error, one warning, so the
+# recorded tier counts are not all zero.
+WITH_WARNING = CLEAN.replace('"Draft","4.2"', '"Draft","4.9.9"')
+
+
+@pytest.mark.parametrize("text", [CLEAN, WITH_WARNING], ids=["clean", "warning"])
+def test_a_reused_report_mints_the_same_certificate(tmp_path, frozen_clock, text):
+    # Compared as JSON, not as bytes: the `groups` index serialises from a hash map, so
+    # its keys come out in a different order from one mint to the next even when
+    # nothing is reused. Every value, the clock included, must match.
+    import json
+
+    src = _write(tmp_path, text=text)
+    reused = lat.read(src).validate(fyi=True).certify_bytes()
+    alone = lat.read(src).certify_bytes()
+    assert json.loads(reused) == json.loads(alone)
+    if text is WITH_WARNING:
+        sc = lat._laterite_native.Sidecar.from_json(reused)
+        assert sc.errors == 0 and sc.warnings, "the fixture must carry a warning"
+
+
+def test_a_reused_report_with_errors_still_refuses(tmp_path):
+    dirty = CLEAN.split('"GROUP","TRAN"')[0]  # PROJ only → error findings
+    src = _write(tmp_path, text=dirty)
+    with pytest.raises(Ags4Error) as alone:
+        lat.read(src).certify_bytes()
+    h = lat.read(src).validate(fyi=True)
+    before = _engine_runs()
+    with pytest.raises(Ags4Error) as reused:
+        h.certify_bytes()
+    assert _engine_runs() - before == 0, "the refusal came from the Report"
+    assert str(reused.value) == str(alone.value)
+
+
+def test_a_file_changed_since_validate_is_validated_again(tmp_path):
+    # The Report judged the bytes read() parsed. certify() reads the file again, so if
+    # the file changed in between, the Report says nothing about what is now there.
+    src = _write(tmp_path)
+    h = lat.read(src).validate(fyi=True)
+    assert h.report.is_valid
+    src.write_bytes(CLEAN.split('"GROUP","TRAN"')[0].encode())  # now has errors
+    before = _engine_runs()
+    with pytest.raises(Ags4Error, match="cannot certify"):
+        h.certify()
+    assert _engine_runs() - before == 1
+
+
 # --- consume (validate-skip) -----------------------------------------------
 
 
