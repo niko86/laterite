@@ -209,7 +209,10 @@ icon set that 404s offline is a validator full of unlabelled buttons.
 `repo:web/scripts/sync-icons.mjs` refreshes a committed working set from
 `lucide-static` and fails on an icon that upstream renamed or one vendored but no
 longer named, so the set cannot drift from the package it came from in either
-direction.
+direction. The CONTENT could, until #1106: the script rewrites each file on every
+build, and nothing compared the rewrite with what was committed, so the icons sat
+on an older `lucide-static` than the lockfile pinned. `repo:web/scripts/check-sync-assets.mjs`
+now runs in CI and fails when `sync-assets` changes any committed file.
 
 ### Four calls the page forced (#395–#400)
 
