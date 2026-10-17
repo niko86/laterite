@@ -274,12 +274,14 @@ jobs:
           ( cd ../ags-python-library && git checkout "${PYTHON_AGS4_VERSION}" )
 
       - name: uv sync
-        run: uv sync --all-extras
+        run: uv sync --all-extras --no-install-workspace
 
-      # uv sync installs the workspace packages editable but does NOT compile the
-      # PyO3 cdylib (_laterite_native). Without this the oracle's
-      # `import laterite.compat` fails with a missing-_laterite_native
-      # ImportError and pytest collects 0 tests → "0 passed" → false regression.
+      # The sync above installs dependencies only; a plain `uv sync` would build
+      # laterite through its maturin backend and this step would rebuild it
+      # (#1117). `maturin develop --uv` installs laterite and its PyO3 cdylib
+      # (_laterite_native). Without it the oracle's `import laterite.compat`
+      # fails with an ImportError and pytest collects 0 tests → "0 passed" →
+      # false regression.
       # (Same step ci.yml's python job runs; parity was missing it — the broken
       # `git checkout v1.2.0` clone masked it until that was fixed.)
       - name: Build native extensions (maturin develop)

@@ -887,8 +887,11 @@ jobs:
           enable-cache: false
       - name: Install Python 3.14 via uv
         run: uv python install 3.14
+      # --no-install-workspace: a plain `uv sync` builds and installs laterite
+      # through its maturin backend, and the step below rebuilds it, so that
+      # first build was thrown away (#1117). `maturin develop --uv` installs it.
       - name: uv sync (deps + maturin into the venv)
-        run: uv sync --all-extras
+        run: uv sync --all-extras --no-install-workspace
       # Build the debug abi3 cdylib into packages/laterite/python/laterite/ —
       # byte-identical to the `maturin develop` the python/docs jobs used to run
       # (same maturin from the venv, same 3.14 interpreter), so the artefact they
@@ -1426,11 +1429,13 @@ jobs:
       - name: Download prebuilt cdylib
         # The _laterite_native .so that build-ext compiled once. uv sync
         # above installed laterite EDITABLE (import resolves to the package's
-        # python/ source tree) but did not build the extension; dropping the
-        # prebuilt .so into that same tree makes `import laterite` work with
-        # exactly the layout `maturin develop` used to produce — one extension,
-        # nothing recompiled, so no editable-vs-wheel shadowing. A missing
-        # artefact (build-ext failed) 404s here → this required job goes red.
+        # python/ source tree), and it DID compile the extension through the
+        # maturin backend, a build this job then discards. The prebuilt .so goes
+        # into that source tree, so `import laterite` loads build-ext's extension
+        # with exactly the layout `maturin develop` produces — no editable-vs-wheel
+        # shadowing. The sync still installs laterite because the tests read
+        # its distribution metadata (#1117). A missing artefact (build-ext
+        # failed) 404s here → this required job goes red.
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: laterite-cdylib
@@ -1646,13 +1651,13 @@ jobs:
         run: uv python install 3.12
 
       # Put the build backend (`maturin` + linux `patchelf`, both in the `dev`
-      # dependency-group) on PATH. Plain `uv sync` — NOT --all-extras: the wheel
-      # build needs only the backend, and `uv sync` installs the workspace editable
-      # WITHOUT compiling the cdylib (see the `python` job), so the single compile
-      # is the `maturin build` below, not doubled. The runtime test extras get
+      # dependency-group) on PATH. NOT --all-extras: the wheel build needs only
+      # the backend. --no-install-workspace because a plain `uv sync` compiles
+      # laterite itself through the maturin backend (#1117); without it the
+      # single compile is the `maturin build` below. The runtime test extras get
       # installed into the ISOLATED smoke venvs from the built wheel instead.
       - name: uv sync (build backend into the venv)
-        run: uv sync
+        run: uv sync --no-install-workspace
 
       # The artefact users receive: the RELEASE abi3 wheel (one cp312-abi3 wheel
       # per platform), built ONCE into dist/ and reused across all three venvs.
@@ -1730,12 +1735,13 @@ jobs:
         run: uv python install 3.14
       - name: Build the working-tree wheel + docs deps
         run: uv sync --group docs
-      # `uv sync` installs laterite EDITABLE but does NOT build the PyO3 cdylib
-      # (same gotcha the python job documents) — so mkdocstrings' runtime import
-      # AND the group-catalogue generator need `_laterite_native` co-located in
-      # the package source tree. Download the prebuilt .so (from build-ext) into
-      # that tree instead of recompiling it with `maturin develop`. A missing
-      # artefact (build-ext failed) 404s here → this required job goes red.
+      # `uv sync` installs laterite EDITABLE and compiles the PyO3 cdylib through
+      # the maturin backend (#1117). mkdocstrings' runtime import AND the
+      # group-catalogue generator load `_laterite_native` from the package source
+      # tree, so the prebuilt .so (from build-ext) is downloaded into it and the
+      # uv build is discarded; the docs describe the extension the python job
+      # tests. A missing artefact (build-ext failed) 404s here → this required
+      # job goes red.
       - name: Download prebuilt cdylib
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:

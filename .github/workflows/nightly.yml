@@ -1298,8 +1298,10 @@ jobs:
         run: uv python install 3.14
       # --all-extras pulls the [compat] extra (pandas): the python-compat leg
       # drives compat.dataframe_to_AGS4, which needs it.
+      # --no-install-workspace: the maturin develop below installs laterite, so
+      # letting uv build it too only threw that build away (#1117).
       - name: uv sync (deps + maturin)
-        run: uv sync --all-extras
+        run: uv sync --all-extras --no-install-workspace
       # python + python-compat + cli legs: the PyO3 cdylib into the source tree.
       - name: Build python-laterite (maturin develop)
         run: (cd packages/laterite && uv run --no-sync maturin develop --uv)
