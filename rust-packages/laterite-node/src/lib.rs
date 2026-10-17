@@ -175,6 +175,38 @@ impl Reading {
         })
     }
 
+    /// `{group: parent}` for every group in the file that names a parent —
+    /// the group its `_parent_id` hashes into, resolved exactly as `table_ipc`
+    /// keys it: the registry for a standard group, the file's own `DICT_PGRP`
+    /// for a file-declared one (`-`/blank = none). `at(…, { by: "_id" })`
+    /// reads it to tell direct children apart. = laterite-py's
+    /// `Reading::parents`.
+    #[napi]
+    #[must_use]
+    pub fn parents(&self) -> std::collections::HashMap<String, String> {
+        let reg = laterite_ags4_core::registry::registry();
+        // The DICT walk only when a group the registry lacks needs it.
+        let mut fd = None;
+        self.parsed
+            .groups
+            .keys()
+            .filter_map(|code| {
+                let parent = match reg.get(code) {
+                    Some(desc) => desc.parent.clone(),
+                    None => fd
+                        .get_or_insert_with(|| {
+                            laterite_ags4_core::effective_dict::FileDict::from_parsed(&self.parsed)
+                        })
+                        .parent(code)
+                        .map(str::to_string),
+                };
+                parent
+                    .filter(|p| !p.is_empty() && p != "-")
+                    .map(|p| (code.clone(), p))
+            })
+            .collect()
+    }
+
     /// One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
     /// correctly typed. The Node analog of the pyo3-arrow capsule: the typed
     /// columns come from the one shared emitter (`laterite_ags4_types::arrow_cols`), the

@@ -1288,7 +1288,7 @@ export function fromExcel(
 }
 
 export { Ags4File } from "./ags4-file";
-export { AgsSubset, type Filter } from "./subset";
+export { AgsSubset, type AtBy, type AtOptions, type Filter } from "./subset";
 export type { DuckdbStats, QueryOptions, Row } from "./duckdb";
 export { BuildResult, BuildSaved, type BuildFinding } from "./build-result";
 export { FixResult, type AppliedFix, type SkippedRewrite } from "./fix-result";

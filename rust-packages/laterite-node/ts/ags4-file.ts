@@ -30,7 +30,13 @@ import type { FixResult } from "./fix-result";
 import type { ExcelStats, GroupMeta } from "./native";
 import { Reading, Sidecar, parseArrow, runCheck } from "./native";
 import { Report } from "./report";
-import { AgsSubset, type Filter } from "./subset";
+import {
+  AgsSubset,
+  type AtOptions,
+  atFilter,
+  type Filter,
+  keyColumn,
+} from "./subset";
 
 /** The source a handle was read from — retained so the chained `validate`/`fix`/
  * `diff` verbs re-run against the TRUE bytes (matching original line numbers),
@@ -83,6 +89,9 @@ export class Ags4File {
   readonly #framesKeyless = new Map<string, Table>();
   // The DuckDB engine — created lazily on first sql()/at()/connection.
   #engine: DuckEngine | null = null;
+  // {group: the parent its `_parent_id` hashes into}, read once on the first
+  // `at(…, { by: "_id" })` — the only caller that needs parentage.
+  #parents: Record<string, string> | null = null;
   // Memoised AGS4 re-emit (the `text`/`bytes` getters; the emit is O(size)).
   #text?: string;
   #bytes?: Buffer;
@@ -556,13 +565,41 @@ export class Ags4File {
    * returns a view whose `table(code)` yields only the rows whose `{group}_ID`
    * is in `values`. Chain to narrow (`.at("SAMP", […])`); `sub.groups` is the
    * related groups, `sub.frames()` pulls them all. Groups carrying none of the
-   * keys pass through. For any other predicate, use `sql("… WHERE …")`.
+   * keys pass through. Throws when no group in the file carries `{group}_ID`
+   * (`GEOL` has none), so a loop over files checks `has(group)` first. A `null`
+   * value warns: a blank ID reads as null, which matches no row.
+   *
+   * `{ by: "_id" }` keys on row identity instead, for a group whose `{group}_ID`
+   * is optional or absent: `ags.at("SAMP", ids, { by: "_id" })` keeps the SAMP
+   * rows whose `_id` is in `ids` and the rows of SAMP's **direct** children whose
+   * `_parent_id` is. Then `table(code)` rejects for a group no filter reaches,
+   * rather than hand it back whole. For any other predicate, use
+   * `sql("… WHERE …")`.
    *
    * @param group The parent group whose `{group}_ID` key drives the filter.
    * @param values The id values to keep (empty matches nothing).
-   * @returns An `AgsSubset` view; further `.at()` calls accumulate filters. */
-  at(group: string, values: Iterable<unknown>): AgsSubset {
-    return new AgsSubset(this, [[`${group}_ID`, [...values]]]);
+   * @param opts `{ by: "_id" }` filters the synthetic row identity.
+   * @returns An `AgsSubset` view; further `.at()` calls accumulate filters.
+   * @throws {Ags4Error} No group in the file carries `{group}_ID`; with
+   *   `{ by: "_id" }`, neither `group` nor a direct child of it is in the file. */
+  at(
+    group: string,
+    values: Iterable<unknown>,
+    opts: AtOptions = {},
+  ): AgsSubset {
+    return new AgsSubset(this, [atFilter(this, group, values, opts.by)]);
+  }
+
+  /** @internal — the group `code`'s `_parent_id` hashes into, if any. */
+  _parentOf(code: string): string | undefined {
+    this.#parents ??= this.#reading.parents();
+    return this.#parents[code];
+  }
+
+  /** @internal — the relational table's columns: the headings plus the
+   * synthetic `_id`/`_parent_id`, which a keyless group lacks. */
+  _columns(code: string): Set<string> {
+    return new Set(this.#rawTable(code).schema.fields.map((f) => f.name));
   }
 
   /** The raw `@duckdb/node-api` connection — every engine feature — seeded with
@@ -582,14 +619,30 @@ export class Ags4File {
     filters: Filter[],
     opts: QueryOptions = {},
   ): Promise<Row[] | Table> {
+    const cols = this._columns(code);
+    const reached = filters.map((f) => keyColumn(this, f, code, cols));
+    // A heading filter's pass-through is old, tested behaviour (PROJ after
+    // `at("LOCA", …)`). An identity filter asks for the rows at one entity, so
+    // a group it cannot reach handed back whole would mix every borehole's
+    // rows into the answer (laterite-py #1093).
+    if (
+      reached.every((k) => k === undefined) &&
+      filters.some(([, by]) => by !== undefined)
+    ) {
+      throw new Ags4Error(
+        `no at() filter reaches ${code}: a { by: "_id" } filter narrows its ` +
+          `group and that group's direct children only — add an at() that ` +
+          `reaches ${code}, or read it from the file`,
+      );
+    }
     const engine = await this.#getEngine();
     await this.#register(code, engine);
-    const cols = new Set(this.headings(code));
     const clauses: string[] = [];
     const params: unknown[] = [];
-    for (const [key, values] of filters) {
-      if (!cols.has(key)) continue;
-      if (values.length === 0) {
+    for (const [i, [, , values]] of filters.entries()) {
+      const key = reached[i];
+      if (key === undefined) continue;
+      if (values.length === 0 || !cols.has(key)) {
         clauses.push("FALSE"); // an empty selection matches nothing
       } else {
         clauses.push(
@@ -602,10 +655,7 @@ export class Ags4File {
     // Strip the synthetic key columns from this FRAME surface (the engine table
     // keeps them for joins; the `.at()` accessor returns AGS data). A passthrough
     // group has none, so a plain `*`. (#303)
-    const keyed = this.#rawTable(code).schema.fields.some(
-      (f) => f.name === "_id",
-    );
-    const select = keyed ? "* EXCLUDE (_id, _parent_id)" : "*";
+    const select = cols.has("_id") ? "* EXCLUDE (_id, _parent_id)" : "*";
     const sql = `SELECT ${select} FROM ${quoteId(code)} WHERE ${where}`;
     return opts.arrow
       ? engine.queryArrow(sql, params)

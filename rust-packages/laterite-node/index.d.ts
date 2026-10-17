@@ -26,6 +26,15 @@ export declare class Reading {
    */
   meta(code: string): GroupMeta | null
   /**
+   * `{group: parent}` for every group in the file that names a parent —
+   * the group its `_parent_id` hashes into, resolved exactly as `table_ipc`
+   * keys it: the registry for a standard group, the file's own `DICT_PGRP`
+   * for a file-declared one (`-`/blank = none). `at(…, { by: "_id" })`
+   * reads it to tell direct children apart. = laterite-py's
+   * `Reading::parents`.
+   */
+  parents(): Record<string, string>
+  /**
    * One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
    * correctly typed. The Node analog of the pyo3-arrow capsule: the typed
    * columns come from the one shared emitter (`laterite_ags4_types::arrow_cols`), the
