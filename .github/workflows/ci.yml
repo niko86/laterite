@@ -1111,9 +1111,18 @@ jobs:
       - name: web — install
         working-directory: web
         run: npm ci
+      # `build:wasm:lint`, not `build:wasm:all`: the same three builds, except
+      # the full engine skips wasm-opt (`build:wasm-full:types`, #1115). This
+      # job only reads the full engine's `.d.ts`, which wasm-bindgen writes
+      # before wasm-opt runs, so the pass changes nothing here. It was the
+      # longest part of the job, and it can't be cached the way the compile is.
+      # Built both ways, the `.d.ts` files were byte-identical.
+      # Tier 1 stays optimized because the tier-1 ceiling step below measures
+      # `src/wasm`. Deploy and e2e still run `build:wasm:all`.
+      # tests/test_wasm_opt_scope.py keeps `--no-opt` to this one build.
       - name: web — build wasm bindings (generates the .d.ts the type-aware rules need)
         working-directory: web
-        run: npm run build:wasm:all
+        run: npm run build:wasm:lint
       - name: web — eslint + prettier
         working-directory: web
         run: |
@@ -1169,7 +1178,7 @@ jobs:
         run: python3 tools/check_doc_types.py --leg wasm
 
       # The SLIM wasm (#330) — the artifact npm actually gets, which the step
-      # above does NOT build: `build:wasm:all` builds the app's two engines,
+      # above does NOT build: `build:wasm:lint` builds the app's two engines,
       # tier 1 and the full one, and npm's is neither. Built and checked here rather than only
       # in release.yml for the reason prepare-wasm-package.sh's header records
       # about the npm notice guard: a publish-path check whose first execution
