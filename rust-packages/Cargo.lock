@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.17.2"
+version = "0.17.3"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
