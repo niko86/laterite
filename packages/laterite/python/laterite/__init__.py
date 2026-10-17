@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import warnings as _warnings
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Self, overload
@@ -839,7 +840,7 @@ class Ags4File:
         is optional or absent: ``ags.at("SAMP", ids, by="_id")`` keeps the SAMP rows
         whose ``_id`` is in ``ids`` and the rows of SAMP's **direct** children whose
         ``_parent_id`` is. For a richer predicate, ``.query("SELECT …").filter("…")``."""
-        return AgsQuery(self).at(group, values, by=by)
+        return AgsQuery(self)._add_at(group, values, by)
 
     def query(self, sql: str) -> AgsQuery:
         """Start a lazy, chainable query over the file's groups by clean name — the
@@ -1402,9 +1403,16 @@ class AgsQuery:
         values), unlike the SQL-fragment ``.filter()``.
 
         ``by="_id"`` keys on row identity: ``group``'s own rows by ``_id``, and the rows
-        of its **direct** children by ``_parent_id`` (grandchildren pass through, like
-        any group the filter doesn't reach). It narrows ``q[code]`` / ``.frames()``
-        only — a ``.query()`` base names no group to tell the two columns apart by.
+        of its **direct** children by ``_parent_id``. Once a query carries one,
+        ``q[code]`` raises for a group no filter reaches (a grandchild, the parent, a
+        sibling) rather than hand it back whole, and ``.groups`` leaves out a child
+        with no ids, none of whose rows can be "at" one. It narrows ``q[code]`` /
+        ``.frames()`` only — a ``.query()`` base names no group to tell the two
+        columns apart by.
+
+        A ``None`` in ``values`` under the default ``by`` warns: a blank ``{group}_ID``
+        reads as null, which ``IN`` never matches, so the rows it stands for can only
+        be reached with ``by="_id"``.
 
         Args:
             group: The parent group code whose ``{group}_ID`` key column is filtered
@@ -1423,6 +1431,12 @@ class AgsQuery:
                 narrow nothing, and used to hand back every row unremarked (#1093). With
                 ``by="_id"``: neither ``group`` nor any direct child of it is in the file.
         """
+        return self._add_at(group, values, by)
+
+    def _add_at(self, group: str, values: Iterable[object], by: str | None) -> AgsQuery:
+        # Both public `.at()`s call this directly, so one `stacklevel` lands the
+        # warning on the caller's line from either.
+        values = list(values)
         p = self._parent
         if by is None:
             key = f"{group}_ID"
@@ -1432,6 +1446,14 @@ class AgsQuery:
                     f"filter nothing — check {group!r} in the file first, or key on "
                     'row identity with by="_id"'
                 )
+            if any(v is None for v in values):
+                _warnings.warn(
+                    f"a None in .at({group!r}, …) matches no row: a blank {key} reads "
+                    f'as null, which IN never matches — key on row identity with by="_id" '
+                    "to reach those rows",
+                    UserWarning,
+                    stacklevel=3,
+                )
         elif by == "_id":
             if not any(g == group or p._parent_of(g) == group for g in p.groups):
                 raise ValueError(
@@ -1440,7 +1462,7 @@ class AgsQuery:
                 )
         else:
             raise ValueError(f'.at() by= takes "_id" or None (got {by!r})')
-        return self._with(filters=[*self._filters, (group, by, list(values))])
+        return self._with(filters=[*self._filters, (group, by, values)])
 
     def filter(self, predicate: str) -> AgsQuery:
         """Add a SQL ``WHERE`` fragment to the single-result relation (e.g.
@@ -1515,32 +1537,55 @@ class AgsQuery:
                 params.extend(values)
         return (" AND ".join(clauses) if clauses else "TRUE"), params
 
+    def _columns(self, code: str) -> set[str]:
+        # The table's own columns, not the headings: `by="_id"` filters the
+        # synthetic `_id`/`_parent_id`, which a keyless group lacks.
+        p = self._parent
+        p._register(code)
+        return set(p._engine().table(code).columns)
+
     @property
     def groups(self) -> list[str]:
-        """The related groups — those at least one ``.at()`` filter reaches."""
+        """The related groups — those at least one ``.at()`` filter reaches with a
+        column to filter on (a ``by="_id"`` child that carries no ids is left out)."""
         self._guard_fanout()
         p = self._parent
-        return [
-            g
-            for g in p.groups
-            if any(
-                self._key_column(group, by, g, set(p.headings(g)))
-                for group, by, _ in self._filters
-            )
-        ]
+        out = []
+        for g in p.groups:
+            headings = set(p.headings(g))
+            for group, by, _ in self._filters:
+                key = self._key_column(group, by, g, headings)
+                if key is not None and (by is None or key in self._columns(g)):
+                    out.append(g)
+                    break
+        return out
 
     def __contains__(self, code: str) -> bool:
         return code in self._parent
 
     def __getitem__(self, code: str) -> Any:
-        """``code`` filtered by every applicable ``.at()`` key (groups carrying none
-        of the keys pass through), materialised to the handle's backend."""
+        """``code`` filtered by every applicable ``.at()`` key, materialised to the
+        handle's backend. A group carrying none of the keys passes through — unless a
+        ``by="_id"`` filter is present, when it raises ``ValueError`` instead."""
         self._guard_fanout()
         p = self._parent
-        p._register(code)
-        # The table's own columns, not the headings: `by="_id"` filters the
-        # synthetic `_id`/`_parent_id`, which a keyless group lacks.
-        where, params = self._key_where(code, set(p._engine().table(code).columns))
+        cols = self._columns(code)
+        reached = [
+            self._key_column(group, by, code, cols) for group, by, _ in self._filters
+        ]
+        # A heading filter's pass-through is old, tested behaviour (PROJ after
+        # `.at("LOCA", …)`). An identity filter asks for the rows at one entity,
+        # so a group it cannot reach handed back whole would mix every
+        # borehole's rows into the answer (#1093).
+        if all(k is None for k in reached) and any(
+            by is not None for _, by, _ in self._filters
+        ):
+            raise ValueError(
+                f'no .at() filter reaches {code}: a by="_id" filter narrows its '
+                "group and that group's direct children only — add an .at() that "
+                f"reaches {code}, or read it from the file"
+            )
+        where, params = self._key_where(code, cols)
         # Strip the synthetic _id/_parent_id for the frame unless the handle was
         # read(keys=True) — same default as the direct accessor (#303).
         select = "*" if p._keys else p._frame_select(code)

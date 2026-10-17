@@ -12,8 +12,9 @@ from __future__ import annotations
 import laterite as lat
 import pytest
 
-# SAMP_ID left blank (it is optional); LLPL and a DICT-declared XSMP hang off
-# SAMP; GEOL carries no GEOL_ID and is a child of LOCA, not SAMP.
+# SAMP_ID left blank (it is optional); LLPL, a DICT-declared XSMP and a
+# DICT-declared keyless XNKY hang off SAMP; GEOL carries no GEOL_ID and is a
+# child of LOCA, not SAMP.
 AGS = "\r\n".join(
     [
         '"GROUP","PROJ"',
@@ -33,6 +34,8 @@ AGS = "\r\n".join(
         '"DATA","HEADING","XSMP","SAMP_TYPE","KEY","PA","","",""',
         '"DATA","HEADING","XSMP","SAMP_ID","KEY","ID","","",""',
         '"DATA","HEADING","XSMP","XSMP_REF","KEY","X","","",""',
+        '"DATA","GROUP","XNKY","","","","Keyless sample child","","SAMP"',
+        '"DATA","HEADING","XNKY","XNKY_TXT","OTHER","X","","",""',
         "",
         '"GROUP","LOCA"',
         '"HEADING","LOCA_ID"',
@@ -72,6 +75,12 @@ AGS = "\r\n".join(
         '"DATA","BH01","1.00","1","U","","x1"',
         '"DATA","BH02","1.00","1","U","","x2"',
         "",
+        '"GROUP","XNKY"',
+        '"HEADING","XNKY_TXT"',
+        '"UNIT",""',
+        '"TYPE","X"',
+        '"DATA","no identity"',
+        "",
     ]
 )
 
@@ -108,6 +117,24 @@ def test_at_on_a_heading_some_group_carries_still_filters():
     assert q["LLPL"].height == 0
 
 
+def test_at_a_none_value_warns_toward_by_id():
+    # A blank ID reads as null, which IN never matches: the rows exist, the
+    # filter cannot reach them.
+    with pytest.warns(UserWarning, match='by="_id"'):
+        lat.read(text=AGS).at("SAMP", [None])
+
+
+def test_at_a_none_value_warns_from_a_chain_too():
+    with pytest.warns(UserWarning, match='by="_id"'):
+        lat.read(text=AGS).at("LOCA", ["BH01"]).at("SAMP", [None])
+
+
+def test_at_without_a_none_value_does_not_warn(recwarn):
+    lat.read(text=AGS).at("SAMP", ["S1"])
+    lat.read(text=AGS).at("SAMP", [None], by="_id")
+    assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+
+
 # --- by="_id": the group's own rows, then its direct children --------------
 
 
@@ -126,19 +153,28 @@ def test_by_id_reaches_a_dict_declared_child():
     assert q["XSMP"]["XSMP_REF"].to_list() == ["x1"]
 
 
-def test_by_id_groups_are_the_group_and_its_direct_children():
+def test_by_id_groups_are_the_group_and_its_keyed_direct_children():
+    # XNKY is a direct child but carries no ids, so no row of it can be "at" one.
     h = lat.read(text=AGS)
     q = h.at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
     assert q.groups == ["SAMP", "LLPL", "XSMP"]
     assert set(q.frames()) == {"SAMP", "LLPL", "XSMP"}
 
 
-def test_by_id_leaves_unrelated_groups_unfiltered():
+def test_by_id_a_keyless_child_asked_for_by_name_has_no_rows():
     h = lat.read(text=AGS)
     q = h.at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
-    # LOCA is SAMP's parent and GEOL its sibling: neither is "at" a sample.
-    assert q["LOCA"].height == 2
-    assert q["GEOL"].height == 2
+    assert q["XNKY"].height == 0
+
+
+def test_by_id_raises_on_a_group_no_filter_reaches():
+    # LOCA is SAMP's parent and GEOL its sibling: handing either back whole
+    # would mix every borehole into "the rows at this sample".
+    h = lat.read(text=AGS)
+    q = h.at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
+    for code in ("LOCA", "GEOL"):
+        with pytest.raises(ValueError, match=code):
+            _ = q[code]
 
 
 def test_by_id_does_not_reach_grandchildren_through_the_parent():
@@ -149,7 +185,20 @@ def test_by_id_does_not_reach_grandchildren_through_the_parent():
     q = h.at("LOCA", [bh01], by="_id")
     assert q.groups == ["LOCA", "GEOL", "SAMP"]
     assert q["SAMP"].height == 2
-    assert q["LLPL"].height == 4
+    with pytest.raises(ValueError, match="LLPL"):
+        _ = q["LLPL"]
+
+
+def test_by_id_with_a_heading_filter_reaches_what_either_reaches():
+    h = lat.read(text=AGS)
+    q = h.at("LOCA", ["BH01"]).at("SAMP", [_samp_id(h, "BH01", 1.0)], by="_id")
+    assert q["GEOL"].height == 1  # reached by the LOCA_ID filter
+    with pytest.raises(ValueError, match="PROJ"):
+        _ = q["PROJ"]  # reached by neither
+
+
+def test_heading_filters_alone_still_pass_unreached_groups_through():
+    assert lat.read(text=AGS).at("LOCA", ["BH01"])["PROJ"].height == 1
 
 
 def test_by_id_chains_with_a_heading_filter():
