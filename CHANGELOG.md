@@ -32,6 +32,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Added
+
+- **`.at()` can filter on row identity: `ags.at("SAMP", ids, by="_id")` (#1093).** It keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child group the file's own DICT declares. Use it where `{group}_ID` is optional or absent: a blank `SAMP_ID` made `.at("SAMP", …)` miss the children, and only raw SQL could reach them. It applies to `q[code]` and `q.frames()`. On a `.query()` base it raises, because that SQL names no group to tell `_id` from `_parent_id` by.
+
 ### Changed
 
 - **Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at.
@@ -44,6 +48,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 - **A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists.
 - **The nightly `docs-vs-released-duckdb` gate no longer fails on a NULL `_id`.** Since extension 0.15.0 a group the file's own DICT declares with no KEY heading reads with a NULL `_id`; the checker's JSON schema could not represent that and failed the whole run before comparing anything. It now parses the null, ignores it on a non-registry group (the reference mints no ids there), and reports it as a mismatch on a registry group.
 - **The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings.
+- **`.at(group, …)` raises `ValueError` when no group in the file carries `{group}_ID` (#1093).** It used to filter nothing and return every row. `.at("GEOL", ["BH01"])` gave every borehole's geology, because no AGS group has a `GEOL_ID`. Code that loops over files should check `group in ags` first.
 
 ### Security
 

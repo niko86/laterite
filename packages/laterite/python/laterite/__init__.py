@@ -528,6 +528,7 @@ class Ags4File:
         "_last_dict_version",
         "_last_dictionary",
         "_p",
+        "_parents",
         "_registered",
         "_report",
         "_src",
@@ -586,6 +587,9 @@ class Ags4File:
         self._content_hash: bool = content_hash
         self._con = None  # lazy DuckDB engine (first group access / sql / connection)
         self._registered: set[str] = set()  # groups loaded into _con
+        # {group: the parent its `_parent_id` hashes into}, read once on the first
+        # `.at(…, by="_id")` — the only caller that needs parentage.
+        self._parents: dict[str, str] | None = None
         # The (path, text, data) this handle was read from — lets chainable
         # `.validate()` run the rule engine on the ORIGINAL source (matching line
         # numbers), not a re-emit. None for a synthesised handle (falls back to emit).
@@ -670,6 +674,11 @@ class Ags4File:
 
     def __contains__(self, code: str) -> bool:
         return code in self._p["groups"]
+
+    def _parent_of(self, code: str) -> str | None:
+        if self._parents is None:
+            self._parents = self._p["_handle"].parents()
+        return self._parents.get(code)
 
     # --- the Python-owned DuckDB engine --------------------------------------
     #
@@ -813,15 +822,24 @@ class Ags4File:
         self._register_all()
         return self._engine().sql(query)
 
-    def at(self, group: str, values: Iterable[object]) -> AgsQuery:
+    def at(
+        self, group: str, values: Iterable[object], *, by: Literal["_id"] | None = None
+    ) -> AgsQuery:
         """Filter to a parent entity's records — ``ags.at("LOCA", ["BH01", "BH02"])``
         returns an [`AgsQuery`][laterite.AgsQuery] whose ``sub[code]`` yields only the rows of each
         group whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``, materialising
         only the matching rows (explore a huge file without a huge frame). Chain to
         narrow further (``.at("SAMP", […])``); ``sub.groups`` is the related groups and
         ``sub.frames()`` pulls them all at once. Groups carrying none of the keys pass
-        through unfiltered. For a richer predicate, ``.query("SELECT …").filter("…")``."""
-        return AgsQuery(self, filters=[(f"{group}_ID", list(values))])
+        through unfiltered. Raises ``ValueError`` when no group in the file carries
+        ``{group}_ID`` (``GEOL`` has none) — so a loop over files checks
+        ``group in ags`` first.
+
+        ``by="_id"`` keys on row identity instead, for a group whose ``{group}_ID``
+        is optional or absent: ``ags.at("SAMP", ids, by="_id")`` keeps the SAMP rows
+        whose ``_id`` is in ``ids`` and the rows of SAMP's **direct** children whose
+        ``_parent_id`` is. For a richer predicate, ``.query("SELECT …").filter("…")``."""
+        return AgsQuery(self).at(group, values, by=by)
 
     def query(self, sql: str) -> AgsQuery:
         """Start a lazy, chainable query over the file's groups by clean name — the
@@ -1348,13 +1366,15 @@ class AgsQuery:
         self,
         parent: Ags4File,
         *,
-        filters: list[tuple[str, list]] | None = None,
+        filters: list[tuple[str, str | None, list]] | None = None,
         base: str | None = None,
         predicates: list[str] | None = None,
         projection: list[str] | None = None,
     ) -> None:
         self._parent = parent
-        self._filters = filters or []  # [(key_col, [values])] — .at(), parameterised IN
+        # [(group, by, [values])] — .at(), parameterised IN; by is None ({group}_ID)
+        # or "_id" (the group's `_id`, its direct children's `_parent_id`).
+        self._filters = filters or []
         self._base = base  # a .query() SQL string, or None
         self._predicates = predicates or []  # SQL WHERE fragments — .filter()
         self._projection = projection  # [col, ...] — .select(), or None
@@ -1371,7 +1391,9 @@ class AgsQuery:
         state.update(changes)
         return AgsQuery(self._parent, **state)
 
-    def at(self, group: str, values: Iterable[object]) -> AgsQuery:
+    def at(
+        self, group: str, values: Iterable[object], *, by: Literal["_id"] | None = None
+    ) -> AgsQuery:
         """Add a parent-entity key filter — ``.at("LOCA", ["BH01", "BH02"])`` keeps only
         rows whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``. Filters accumulate
         with AND, and a group that doesn't carry a given filter's key column passes
@@ -1379,16 +1401,46 @@ class AgsQuery:
         once. The value list is bound as a parameterised ``IN`` (no SQL injection on the
         values), unlike the SQL-fragment ``.filter()``.
 
+        ``by="_id"`` keys on row identity: ``group``'s own rows by ``_id``, and the rows
+        of its **direct** children by ``_parent_id`` (grandchildren pass through, like
+        any group the filter doesn't reach). It narrows ``q[code]`` / ``.frames()``
+        only — a ``.query()`` base names no group to tell the two columns apart by.
+
         Args:
             group: The parent group code whose ``{group}_ID`` key column is filtered
                 (e.g. ``"LOCA"``).
             values: The key values to keep — any iterable; an empty selection matches
                 no rows.
+            by: ``None`` (the default) filters ``{group}_ID``; ``"_id"`` filters the
+                synthetic row identity, for a group whose ``{group}_ID`` is optional
+                (``SAMP_ID``) or absent (``GEOL``).
 
         Returns:
             AgsQuery: A new query with the added filter (the builder is immutable).
+
+        Raises:
+            ValueError: No group in the file carries ``{group}_ID`` — the filter would
+                narrow nothing, and used to hand back every row unremarked (#1093). With
+                ``by="_id"``: neither ``group`` nor any direct child of it is in the file.
         """
-        return self._with(filters=[*self._filters, (f"{group}_ID", list(values))])
+        p = self._parent
+        if by is None:
+            key = f"{group}_ID"
+            if not any(key in p.headings(g) for g in p.groups):
+                raise ValueError(
+                    f"no group in this file carries {key}, so .at({group!r}, …) would "
+                    f"filter nothing — check {group!r} in the file first, or key on "
+                    'row identity with by="_id"'
+                )
+        elif by == "_id":
+            if not any(g == group or p._parent_of(g) == group for g in p.groups):
+                raise ValueError(
+                    f"neither {group} nor any direct child of it is in this file, so "
+                    f'.at({group!r}, …, by="_id") would filter nothing'
+                )
+        else:
+            raise ValueError(f'.at() by= takes "_id" or None (got {by!r})')
+        return self._with(filters=[*self._filters, (group, by, list(values))])
 
     def filter(self, predicate: str) -> AgsQuery:
         """Add a SQL ``WHERE`` fragment to the single-result relation (e.g.
@@ -1431,15 +1483,32 @@ class AgsQuery:
                 "key filters."
             )
 
-    def _key_where(self, cols: set[str]) -> tuple[str, list]:
-        """The accumulated ``.at()`` filters as a WHERE clause + params, keeping only
-        those whose key column is present in ``cols`` (others pass through)."""
+    def _key_column(
+        self, group: str, by: str | None, code: str | None, cols: set[str]
+    ) -> str | None:
+        """The column one ``.at()`` filter narrows ``code`` on, or ``None`` where it
+        passes through. A ``by="_id"`` filter reaches ``code`` by parentage, not by
+        the columns present: a related group that carries no ids (a keyless declared
+        group) is still reached, and none of its rows can be "at" an id."""
+        if by is None:
+            key = f"{group}_ID"
+            return key if key in cols else None
+        if code == group:
+            return "_id"
+        if code is not None and self._parent._parent_of(code) == group:
+            return "_parent_id"
+        return None
+
+    def _key_where(self, code: str | None, cols: set[str]) -> tuple[str, list]:
+        """The accumulated ``.at()`` filters on ``code`` as a WHERE clause + params,
+        keeping only those that reach it (others pass through)."""
         clauses: list[str] = []
         params: list = []
-        for key, values in self._filters:
-            if key not in cols:
+        for group, by, values in self._filters:
+            key = self._key_column(group, by, code, cols)
+            if key is None:
                 continue
-            if not values:
+            if not values or key not in cols:
                 clauses.append("FALSE")  # an empty selection matches nothing
             else:
                 clauses.append(f'"{key}" IN ({", ".join("?" * len(values))})')
@@ -1448,11 +1517,17 @@ class AgsQuery:
 
     @property
     def groups(self) -> list[str]:
-        """The related groups — those carrying at least one ``.at()`` filter's key."""
+        """The related groups — those at least one ``.at()`` filter reaches."""
         self._guard_fanout()
         p = self._parent
-        keys = {k for k, _ in self._filters}
-        return [g for g in p.groups if keys.intersection(p.headings(g))]
+        return [
+            g
+            for g in p.groups
+            if any(
+                self._key_column(group, by, g, set(p.headings(g)))
+                for group, by, _ in self._filters
+            )
+        ]
 
     def __contains__(self, code: str) -> bool:
         return code in self._parent
@@ -1463,7 +1538,9 @@ class AgsQuery:
         self._guard_fanout()
         p = self._parent
         p._register(code)
-        where, params = self._key_where(set(p.headings(code)))
+        # The table's own columns, not the headings: `by="_id"` filters the
+        # synthetic `_id`/`_parent_id`, which a keyless group lacks.
+        where, params = self._key_where(code, set(p._engine().table(code).columns))
         # Strip the synthetic _id/_parent_id for the frame unless the handle was
         # read(keys=True) — same default as the direct accessor (#303).
         select = "*" if p._keys else p._frame_select(code)
@@ -1488,6 +1565,12 @@ class AgsQuery:
         / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
         the base's columns narrow it, and ``.select()`` projects."""
         p = self._parent
+        if any(by is not None for _, by, _ in self._filters):
+            raise TypeError(
+                '.at(…, by="_id") narrows the multi-group q[code] / q.frames() only — '
+                "a .query() base names no group to tell `_id` from `_parent_id` by. "
+                "Filter the base on _id / _parent_id with .filter() instead."
+            )
         if self._base is None:
             raise TypeError(
                 "no base to run — start a single-result query with .query('SELECT … "
@@ -1497,7 +1580,7 @@ class AgsQuery:
         p._register_all()
         engine = p._engine()
         cols = set(engine.sql(self._base).columns)  # schema only — doesn't execute
-        key_where, params = self._key_where(cols)
+        key_where, params = self._key_where(None, cols)
         clauses = [key_where] if key_where != "TRUE" else []
         clauses.extend(f"({pred})" for pred in self._predicates)
         where = " AND ".join(clauses) if clauses else "TRUE"
@@ -1526,7 +1609,12 @@ class AgsQuery:
         bits: list[str] = []
         if self._filters:
             bits.append(
-                "at[" + ", ".join(f"{k} in {v!r}" for k, v in self._filters) + "]"
+                "at["
+                + ", ".join(
+                    f"{g}_ID in {v!r}" if by is None else f"{g}.{by} in {v!r}"
+                    for g, by, v in self._filters
+                )
+                + "]"
             )
         if self._base:
             bits.append(f"query={self._base!r}")

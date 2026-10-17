@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**`.at()` can filter on row identity: `ags.at(\"SAMP\", ids, by=\"_id\")` (#1093).** It keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child group the file's own DICT declares. Use it where `{group}_ID` is optional or absent: a blank `SAMP_ID` made `.at(\"SAMP\", …)` miss the children, and only raw SQL could reach them. It applies to `q[code]` and `q.frames()`. On a `.query()` base it raises, because that SQL names no group to tell `_id` from `_parent_id` by."
+      }
+    ],
     "changed": [
       {
         "text": "**Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at."
@@ -31,6 +35,9 @@
       },
       {
         "text": "**The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings."
+      },
+      {
+        "text": "**`.at(group, …)` raises `ValueError` when no group in the file carries `{group}_ID` (#1093).** It used to filter nothing and return every row. `.at(\"GEOL\", [\"BH01\"])` gave every borehole's geology, because no AGS group has a `GEOL_ID`. Code that loops over files should check `group in ags` first."
       }
     ],
     "security": [
