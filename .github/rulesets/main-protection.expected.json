@@ -79,6 +79,10 @@
             "context": "python"
           },
           {
+            "context": "repo-gates",
+            "integration_id": 15368
+          },
+          {
             "context": "rust"
           },
           {
