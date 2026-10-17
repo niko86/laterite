@@ -531,6 +531,57 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # The Node version CEILING (#1116). ci.yml's `node` job runs vitest once per
+  # PR, on Node 22 — the declared floor (`engines.node` >=22) — with coverage.
+  # This re-proves the top of that range, Node 24, once a day, so the floor and
+  # the tested ceiling are both real. It used to be a second vitest step in the
+  # PR job, over the same addon; the trade, accepted in #1116, is that a
+  # Node-24-only break surfaces here within a day rather than on the PR. It
+  # reaches the tracking issue like every other leg (`notify`'s `needs`).
+  #
+  # Built exactly as the PR job builds it — napi debug + tsup, under Node 22 —
+  # and only THEN switched to 24. One napi build serves both majors because the
+  # addon is Node-API (ABI-stable across major versions); that portability is the
+  # property under test, so building under 24 would test the wrong thing.
+  #
+  # A job of its own, not a matrix over ci.yml's `node`: that is a REQUIRED check
+  # context in the ruleset, and a matrix renames it to `node (22)` / `node (24)`,
+  # so the requirement would reference a context nothing reports and every PR
+  # would pend forever. Pool runner + build-accel, so the napi build hits the
+  # same warm sccache as the PR job.
+  node-24:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rust-packages/laterite-node
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+      - uses: ./.github/actions/build-accel
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+      - name: npm ci
+        run: npm ci
+      - name: Build (napi debug + tsup dist)
+        run: npm run build:debug
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+      # No coverage: the per-PR Node 22 run owns the Codecov `node` report.
+      - name: vitest on Node 24 (same addon, built under 22)
+        run: |
+          node --version
+          npm test
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # Does the LIVE docs site work against the wheel a reader can actually install?
   #
   # Every other docs gate runs against the working-tree cdylib, so all of them
@@ -1492,6 +1543,7 @@ jobs:
       - links
       - engine-cut
       - wheel-smoke
+      - node-24
       - docs-vs-released-wheel
       - docs-example-headers
       - docs-vs-released-npm
