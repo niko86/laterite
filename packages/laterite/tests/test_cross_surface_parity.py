@@ -196,14 +196,6 @@ _WASM: dict[str, tuple[str, dict[str, str]]] = {
                 "Python-only: walks FILE/ on disk. The wasm sandbox has no "
                 "filesystem, so there is nothing for the browser to check."
             ),
-            "max_per_rule": (
-                "wasm-only: clips how many findings per rule CROSS the "
-                "wasm→JS boundary, so an interactive view of a pathologically "
-                "dirty file moves thousands of rows instead of millions. Every "
-                "rule still runs over every line and the reported totals stay "
-                "uncapped. A library caller has no boundary to protect and no "
-                "counterpart should be invented."
-            ),
         },
     ),
     "build": (

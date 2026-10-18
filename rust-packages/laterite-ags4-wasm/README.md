@@ -123,7 +123,6 @@ const report = validate(bytes);
 const report = validate(bytes, {
   dictVersion: "4.1.1",   // "auto" (or omitted) reads the file's TRAN_AGS
   fyi: true,
-  maxPerRule: 50,         // clip what CROSSES the boundary; totals stay true
   maxFindingsPerRule: 1000, // the ENGINE keeps 1000 per rule; totals stay true
 });
 
@@ -143,8 +142,8 @@ write a parser expecting one to be the other.
 Two things to get right. **`error` is not a finding** — it means the input wasn't
 validatable (wrong format, unsupported edition), no rules ran, and every other
 field is empty; branch on it before reading `findings`. And when you pass
-`max_per_rule`, each rule group's `items` is clipped but its `total` is not, so
-render "showing N of `total`" rather than reporting the clipped length.
+`maxFindingsPerRule`, each rule group's `items` is clipped but its `total` is not,
+so render "showing N of `total`" rather than reporting the clipped length.
 
 ### Reading typed data
 

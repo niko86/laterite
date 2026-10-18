@@ -148,12 +148,13 @@ export type {
   RowDelta,
 } from "../wasm/ags4_wasm";
 
-/** Per-rule serialization cap for the interactive UI. The engine still
- *  finds every violation; this only bounds how many rows per rule cross
- *  the wasm→JS boundary, so a pathologically dirty file stays in the tens
- *  of thousands of serialized rows, not the full millions. The download
- *  path passes `null` (uncapped). Tunable here without a wasm rebuild. */
-export const DEFAULT_MAX_PER_RULE = 10_000;
+/** Per-rule findings cap for the interactive UI (#1089). The engine still
+ *  counts every violation, so the totals stay true; past the cap a rule keeps
+ *  no more findings, so a pathologically dirty file holds the cap's worth in
+ *  the engine and across the wasm→JS boundary, not the full millions. The
+ *  download path passes `null` (uncapped). Tunable here without a wasm
+ *  rebuild. */
+export const DEFAULT_MAX_FINDINGS_PER_RULE = 10_000;
 
 /** Bundled sample files served from public/samples/ (copied from the
  *  validator's test fixtures). Loaded via fetch under the deploy base. */

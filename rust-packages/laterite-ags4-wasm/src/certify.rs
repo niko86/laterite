@@ -10,7 +10,7 @@ use laterite_ags4_validator::CheckOptions;
 use wasm_bindgen::prelude::*;
 
 /// `certify`'s named options — `ValidateOptions`' dictionary half plus the
-/// clock. No `warnings`/`fyi`/`maxPerRule`: the mint measures every tier itself
+/// clock. No `warnings`/`fyi`/`maxFindingsPerRule`: the mint measures every tier itself
 /// and reports counts, so there is nothing for a caller to include or exclude.
 #[cfg(feature = "certify")]
 #[cfg_attr(test, derive(serde::Serialize))]

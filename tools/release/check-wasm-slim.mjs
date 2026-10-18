@@ -91,8 +91,16 @@ const EXPECTED_CLASSES = {
 // only the gated `merge` export reached — so slim now carries it, along with
 // the Rule 16 near-miss suggestions. The raise is the smallest round step that
 // clears the artifact that change produced.
+//
+// Raised again, the RAW ceiling only, in #1089 (also an owner decision): the
+// per-rule findings cap is real engine code on the ungated validate path — the
+// collector that keeps a rule's first N findings and counts the rest, the
+// `truncated` map it builds, and the browser report that carries it. A `twiggy`
+// diff of named builds against main confirmed that is where the growth sits, not a
+// duplicated dependency. The raise is that growth plus a modest margin; gzip
+// still clears its own ceiling and was left alone.
 const MAX_GZIP_BYTES = 870 * 1024; // slim 757.3 (2026-08-16)
-const MAX_RAW_BYTES = 2150 * 1024; // slim 1868.9 (2026-08-16)
+const MAX_RAW_BYTES = 2180 * 1024; // slim 1868.9 (2026-08-16)
 
 checkWasmArtifact({
   label: "wasm-slim",

@@ -268,8 +268,20 @@ mod tests {
         // Nothing close: list what IS accepted rather than guessing.
         let msg = unknown_key(ValidateOptions::KEYS, "wibble").expect("unknown must not pass");
         assert!(msg.contains("expected one of"), "{msg}");
-        assert!(msg.contains("maxPerRule"), "list the real keys: {msg}");
+        assert!(
+            msg.contains("maxFindingsPerRule"),
+            "list the real keys: {msg}"
+        );
         assert!(!msg.contains("did you mean"), "no false suggestion: {msg}");
+
+        // A removed key is refused, not silently ignored: `maxPerRule` (gone in
+        // #1089) would otherwise run uncapped where its caller asked for a cap.
+        let msg = unknown_key(ValidateOptions::KEYS, "maxPerRule")
+            .expect("the removed maxPerRule must be refused");
+        assert!(
+            msg.contains("maxFindingsPerRule"),
+            "name its replacement: {msg}"
+        );
     }
 
     // ---------------------------------------------------------------

@@ -50,7 +50,12 @@
       }
     ],
     "deprecated": [],
-    "removed": [],
+    "removed": [
+      {
+        "text": "**Breaking: the browser package's `maxPerRule` option is gone (#1089).** `validate(bytes, { maxFindingsPerRule: N })` replaces it. `maxPerRule` clipped only what crossed into JavaScript, after the engine had kept every finding, so a dirty file still filled the engine's memory. `maxFindingsPerRule` stops a rule keeping findings past the cap and only counts the rest, so memory stays bounded and the totals stay true. Passing `maxPerRule` is now refused as an unknown option, with the accepted options listed.",
+        "breaking": true
+      }
+    ],
     "fixed": [
       {
         "text": "**A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists."

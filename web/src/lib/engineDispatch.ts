@@ -83,7 +83,7 @@ export interface ValidateReq {
   includeFyi: boolean;
   encoding: EncodingOpt;
   /** `null` = uncapped (the full-report download path). */
-  maxPerRule: number | null;
+  maxFindingsPerRule: number | null;
   /** When set, gzip the JSON in-worker and return bytes, not the object —
    *  keeps the multi-hundred-MB string off the main thread (Phase: download). */
   gzip?: boolean;
@@ -554,7 +554,7 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
       warnings: true,
       fyi: req.includeFyi,
       encoding: req.encoding,
-      maxPerRule: req.maxPerRule ?? undefined,
+      maxFindingsPerRule: req.maxFindingsPerRule ?? undefined,
       dictionary: req.dictBytes ?? undefined,
       dictReplace: req.dictReplace ?? false,
     });

@@ -56,7 +56,9 @@ encoding, max_per_rule)` → a `ValidationReport` JS object; it replicates
 filesystem). The SolidJS app lives in `repo:web/`; deploy via
 `repo:.github/workflows/deploy-validator.yml`
 (`wasm-pack build … --target web`). Commit `f349d39`; the `max_per_rule`
-arg + worker plumbing landed in Phase 1.5.
+arg + worker plumbing landed in Phase 1.5. (#1089 later replaced `max_per_rule`
+with the engine-side `maxFindingsPerRule`; the phases below record what shipped
+at the time.)
 
 ## Phase 1.5 — performance + UX hardening ✅
 A pathologically dirty AGS4 file can produce **millions** of findings; the

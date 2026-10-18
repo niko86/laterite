@@ -14,6 +14,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 | version | change |
 |---|---|
 | [Unreleased](#unreleased) | `laterite-ags4-validator` 0.21 caps findings in the engine (#1089). |
+| [Unreleased](#unreleased) | the browser package's `maxPerRule` option is gone (#1089). |
 | [0.14.0](#0140--2026-10-08) | the browser package's `compute_fixes` takes an options object |
 | [0.13.0](#0130--2026-09-30) | the parse leaf's cells are spans over one retained decoded buffer. |
 | [0.13.0](#0130--2026-09-30) | core’s read projection hands out spans behind accessors — `AgsGroup`’s public fields are gone. |
@@ -51,6 +52,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 - **`certify()` after `validate(fyi=True)` runs the rules once (#1096).** `Ags4File.certify()` and `certify_bytes()` mint from the handle's latest report when that run had every tier on, used the same edition, dictionary and encoding, and had no `check_files`, instead of validating again. The report is the engine's own output on this handle, not a verdict the caller passes in, and it is used only if the source still parses exactly as the handle read it. Otherwise `certify()` validates as before. A report with errors still refuses with the same error, and the certificate is the same either way.
 - **`validate(path, index=…)` no longer holds the whole file to check the certificate (#1097).** A certificate of another size is reported stale before the file is read. When the certificate vouches, the SHA-256 is computed as the file streams, so the check's memory no longer grows with the file. The file is read whole only when the rules have to run. Verdicts and `revalidate_reason` are unchanged.
 - **Breaking: `laterite-ags4-validator` 0.21 caps findings in the engine (#1089).** `CheckOptions` gains `max_findings_per_rule` and is now `#[non_exhaustive]`: build it from `CheckOptions::default()` and set fields, since a struct literal no longer compiles outside the crate. `check_parsed`, `check_parsed_with_dict` and `check_file_with_dict` return `findings::Collected` (the kept `findings` plus the `truncated` map) where they returned `Findings`. `Verdict::of` takes the `Truncated` map as a second argument, and `findings_json`, `findings_json_value` and `findings_ndjson` take it too. Rule functions take any `findings::Sink`, which a plain `Findings` map still is. `check_file` keeps its signature and always keeps every finding. `laterite-ags4-trust` 0.19 adds `Outcome::truncated`. `laterite-ags4-emit` 0.20.5 and `laterite-ags4-hostopts` 0.3.4 ride along, because their published pins froze `^0.20`.
+
+### Removed
+
+- **Breaking: the browser package's `maxPerRule` option is gone (#1089).** `validate(bytes, { maxFindingsPerRule: N })` replaces it. `maxPerRule` clipped only what crossed into JavaScript, after the engine had kept every finding, so a dirty file still filled the engine's memory. `maxFindingsPerRule` stops a rule keeping findings past the cap and only counts the rest, so memory stays bounded and the totals stay true. Passing `maxPerRule` is now refused as an unknown option, with the accepted options listed.
 
 ### Fixed
 

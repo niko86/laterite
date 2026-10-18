@@ -264,9 +264,9 @@ diagnostic — `unlabelled` is also the chip every fix wears while the labelling
 badge alone can never tell you the engines disagreed. It buys the same thing
 `severityOf` bought: a fabricated tier reads exactly like a real one, and a
 missing label doesn't. The join also leans on the report being **uncapped** —
-`max_per_rule` can serialise a rule with a true `total` and zero items, and an
+`maxFindingsPerRule` can serialise a rule with a true `total` and zero items, and an
 empty group puts nothing in the index — which is why FixPane passes
-`maxPerRule: null` and why capping that second pass for performance would
+`maxFindingsPerRule: null` and why capping that second pass for performance would
 reintroduce the arm rather than merely slim the payload. Checked
 empirically as well as structurally — a throwaway fix-vs-report differential
 over the private corpus, the repo's own fixtures, and synthetic files for the
