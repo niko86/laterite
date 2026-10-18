@@ -586,6 +586,23 @@ def test_changes_runs_hosted_on_every_event(workflow: dict) -> None:
     )
 
 
+@pytest.mark.parametrize("job", ["node", "ts-lint"])
+def test_ts_jobs_run_hosted_on_every_event(workflow: dict, job: str) -> None:
+    """`node` and `ts-lint` must not queue on the self-hosted pool.
+
+    On the two-runner pool they waited longer for a runner than their cold
+    hosted build costs, and they held a runner `rust` and `python` were
+    queued for. Neither is the job a run waits on last, so hosted costs a PR
+    nothing. The fork-routing ternary would put them back on the pool for
+    every same-repo PR.
+    """
+    runs_on = workflow["jobs"][job]["runs-on"]
+    assert runs_on == "ubuntu-latest", (
+        f"`{job}` runs on {runs_on!r}. It must run on `ubuntu-latest` for every "
+        "event, so it doesn't hold a pool runner `rust` and `python` wait for"
+    )
+
+
 def test_declared_outputs_are_wired_to_real_filters(
     declared: dict[str, str], filters: dict[str, list[str]]
 ) -> None:
