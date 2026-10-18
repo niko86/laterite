@@ -106,10 +106,8 @@ fn a_vouched_check_holds_a_buffer_not_the_file() {
     // The positive control: the same file, but a question the cert cannot answer, so
     // the engine runs and the bytes must be read whole. If the instrument cannot see
     // that, it cannot see the absence of it either.
-    let warnings = CheckOptions {
-        include_warnings: true,
-        ..CheckOptions::default()
-    };
+    let mut warnings = CheckOptions::default();
+    warnings.include_warnings = true;
     let (out, engine_peak) = peak_during(|| {
         check_reader(ReaderRequest {
             file: std::io::Cursor::new(&bytes[..]),

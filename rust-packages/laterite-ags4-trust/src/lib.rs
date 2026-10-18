@@ -42,9 +42,9 @@
 //!    certificate branch. A vouched cert short-circuits the content engine and nothing
 //!    else.
 //!
-//! And when someone adds a new knob to `CheckOptions`, [`split_options`] stops
-//! compiling until they say which kind it is. That compile error is the point: an
-//! unclassified knob is a future false clean.
+//! And when someone adds a new knob to `CheckOptions`, the validator stops compiling
+//! until they list it, beside a pointer to [`split_options`], which says which kind it
+//! is. That compile error is the point: an unclassified knob is a future false clean.
 
 use std::fmt::Write as _;
 use std::sync::{Arc, Weak};
@@ -57,6 +57,7 @@ pub use laterite_ags4_core::index::{
     Sidecar, Tier, TierCoverage, ValidationStamp,
 };
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
+use laterite_ags4_validator::findings::{Collected, Collector, Truncated};
 use laterite_ags4_validator::{
     CheckOptions, DictResolution, DictVersion, Findings, ValidatorError, WorldScope,
     check_parsed_with_dict, findings, overlay, world,
@@ -97,8 +98,13 @@ pub struct Request<'a> {
 /// What a [`check`] produced, and — honestly — how.
 #[derive(Debug)]
 pub struct Outcome {
-    /// Content findings ∪ world findings.
+    /// Content findings ∪ world findings — at most `max_findings_per_rule` per rule
+    /// when the request set a cap.
     pub findings: Findings,
+    /// The rules a per-rule cap cut, with what each kept and found (#1089). Empty when
+    /// nothing was cut. Every count of this outcome is `findings` plus what this says
+    /// was not kept: hand both to `Verdict::of`.
+    pub truncated: Truncated,
     /// The dictionary the file was judged against.
     pub dict_version: DictVersion,
     /// How that dictionary was chosen (forced / exact / guessed / fallback).
@@ -115,12 +121,13 @@ pub struct Outcome {
 /// Split `CheckOptions` into the question a certificate could answer (CONTENT) and the
 /// world a check is allowed to look at (WORLD).
 ///
-/// **The destructure below is exhaustive on purpose.** Add a field to `CheckOptions` and
-/// this function stops compiling until the author writes it into one of the two lists.
-/// That compile error is the only structural defence there is against the next
-/// `check_files`: a knob that reads external state but gets filed with the pure ones is
-/// a knob a certificate will happily vouch for, and that is a false clean waiting to
-/// happen. Rust has no effect system; this is the closest thing to one we get.
+/// **Every field is named below on purpose.** A knob that reads external state but gets
+/// filed with the pure ones is a knob a certificate will happily vouch for, and that is
+/// a false clean waiting to happen. `CheckOptions` is `#[non_exhaustive]`, so this
+/// pattern has to end in `..` and cannot itself refuse a new field. The validator holds
+/// the exhaustive copy instead (`every_knob_is_classified_in_trust`), which stops
+/// compiling until the author of a new field lists it there and classifies it here.
+/// Rust has no effect system; this is the closest thing to one we get.
 pub fn split_options(
     opts: &CheckOptions,
     world: WorldScope,
@@ -140,6 +147,12 @@ pub fn split_options(
         // --- WORLD: reads state the bytes do not contain. No certificate may speak
         //     for these; they run live, every call.
         check_files, // Rule 20's on-disk FILE/ tree
+        // --- NEITHER: decides how many findings a report keeps, never which ones the
+        //     engine finds or how many it counts (#1089). The question a certificate
+        //     answers is the counts, so a capped and an uncapped request ask the same
+        //     one, and a vouched cert has no findings to cap.
+        max_findings_per_rule: _,
+        ..
     } = opts;
 
     // The request and the ability to honour it must agree. Asking for the on-disk check
@@ -207,7 +220,7 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
 
     if let Some(Decision::Vouched) = decision {
         let cert = req.cert.expect("Vouched implies a cert");
-        let mut found = findings::Findings::new();
+        let mut found = Collector::new(req.opts.max_findings_per_rule);
 
         // A vouched cert means: every tier the caller asked about was measured, and
         // every one came back empty. So the content findings ARE empty — nothing to
@@ -222,7 +235,7 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
             world::run(&parsed, &world, &mut found);
         }
 
-        return vouched(cert, found);
+        return vouched(cert, found.finish());
     }
 
     // No usable cert: the engine runs. Content and world both, through the validator's
@@ -230,7 +243,8 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
     let parsed = parse_bytes(req.bytes, req.opts.encoding).map_err(ValidatorError::from)?;
     let (found, dv, res) = check_parsed_with_dict(&parsed, req.opts, &world)?;
     Ok(Outcome {
-        findings: found,
+        findings: found.findings,
+        truncated: found.truncated,
         dict_version: dv,
         resolution: res,
         certified: false,
@@ -243,10 +257,11 @@ pub fn check(req: Request<'_>) -> Result<Outcome, ValidatorError> {
 
 /// The outcome of a vouched certificate: no content findings, and the edition the cert
 /// was judged under. `found` holds whatever the world check found, if one ran.
-fn vouched(cert: &Sidecar, found: Findings) -> Result<Outcome, ValidatorError> {
+fn vouched(cert: &Sidecar, found: Collected) -> Result<Outcome, ValidatorError> {
     let (dv, res) = edition_of(cert)?;
     Ok(Outcome {
-        findings: found,
+        findings: found.findings,
+        truncated: found.truncated,
         dict_version: dv,
         resolution: res,
         certified: true,
@@ -359,7 +374,7 @@ pub fn check_reader<F: std::io::Read + std::io::Seek>(
         }
         if sized && only_the_hash_is_left(c, opts, &world, compat.as_deref()) {
             if c.is_fresh_for_reader(&mut file)? {
-                return Ok(vouched(c, Findings::new())?);
+                return Ok(vouched(c, Collected::default())?);
             }
             if named {
                 return Err(ReaderError::StaleCert);
@@ -442,7 +457,8 @@ pub fn check_parsed_measured(
         tally: Tally::of(&found, dv, res),
     });
     let outcome = Outcome {
-        findings: found,
+        findings: found.findings,
+        truncated: found.truncated,
         dict_version: dv,
         resolution: res,
         certified: false,
@@ -486,7 +502,9 @@ struct Tally {
 }
 
 impl Tally {
-    fn of(found: &Findings, dict_version: DictVersion, resolution: DictResolution) -> Self {
+    /// Counted from what the run found, kept or not: a capped run mints the
+    /// certificate an uncapped one does (#1089).
+    fn of(found: &Collected, dict_version: DictVersion, resolution: DictResolution) -> Self {
         Tally {
             dict_version,
             resolution,
@@ -605,14 +623,13 @@ fn mint_options(opts: &CheckOptions) -> CheckOptions {
     // Both tiers, always. A cert that measured only errors can still be used — it just
     // can't answer a `--show-warnings` request (`TierNotMeasured`) — but there is no
     // reason to mint a weaker cert than we can, and a caller cannot ask us to.
-    CheckOptions {
-        include_warnings: true,
-        include_fyi: true,
-        // The mint is CONTENT-only by construction. Even if the caller was doing an
-        // on-disk check, its result has no business in a certificate.
-        check_files: false,
-        ..opts.clone()
-    }
+    let mut full = opts.clone();
+    full.include_warnings = true;
+    full.include_fyi = true;
+    // The mint is CONTENT-only by construction. Even if the caller was doing an
+    // on-disk check, its result has no business in a certificate.
+    full.check_files = false;
+    full
 }
 
 fn run_engine(parsed: &ParsedFile, full: &CheckOptions) -> Result<Tally, MintError> {
@@ -712,16 +729,19 @@ fn seal(
         .map_err(|e: CliError| MintError::NotIndexable(e.to_string()))
 }
 
-/// Findings of one severity.
+/// Findings of one severity, kept or not.
 // Bounded by the number of validator findings in a file, which can't exceed
 // the file's cell count — far below u32::MAX for any real AGS4 file.
 #[allow(clippy::cast_possible_truncation)]
-fn count_of(found: &Findings, sev: findings::Severity) -> u32 {
-    found
+fn count_of(found: &Collected, sev: findings::Severity) -> u32 {
+    let kept = found
+        .findings
         .values()
         .flatten()
         .filter(|f| f.severity == sev)
-        .count() as u32
+        .count();
+    let cut: usize = found.truncated.values().map(|t| t.dropped(sev)).sum();
+    (kept + cut) as u32
 }
 
 /// The edition a vouched certificate was judged against, as the surfaces report it.

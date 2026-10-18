@@ -124,12 +124,14 @@ const report = validate(bytes, {
   dictVersion: "4.1.1",   // "auto" (or omitted) reads the file's TRAN_AGS
   fyi: true,
   maxPerRule: 50,         // clip what CROSSES the boundary; totals stay true
+  maxFindingsPerRule: 1000, // the ENGINE keeps 1000 per rule; totals stay true
 });
 
 report.ok;                 // the verdict: no error and no findings
 report.dict_version;       // the edition judged against, e.g. "4.1.1"
 report.finding_count;      // the TRUE total, never clipped
 report.findings;           // grouped by rule: [{ rule, total, items: [{ line, group, desc, … }] }]
+report.truncated;          // { "<rule>": { shown, total } } for each rule maxFindingsPerRule cut
 report.error;              // { kind, message } when the input wasn't validatable at all
 ```
 

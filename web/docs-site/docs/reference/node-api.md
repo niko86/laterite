@@ -22,7 +22,8 @@ a `read()` returns. This is the full surface; for the guided tour, see the
 
 `source` is a path (`string`) or `Uint8Array`; `read`/`validate` also take
 `{ text }` in `opts` to read from an in-memory string. `validate`/`fix` accept
-`{ warnings, fyi, checkFiles, encoding, dictVersion }`.
+`{ warnings, fyi, checkFiles, encoding, dictVersion }`, and `validate` also takes
+`{ maxFindingsPerRule }` (see [Validate a delivery](../cookbook/validate-a-delivery.md#cap-a-large-report)).
 
 ```js
 import { read, validate, buildAgs4 } from "laterite";

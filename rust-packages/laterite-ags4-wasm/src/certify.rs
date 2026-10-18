@@ -123,12 +123,10 @@ fn certify_core(data: &[u8], o: &CertifyOptions) -> Result<String, String> {
         encoding,
     )?;
 
-    let opts = CheckOptions {
-        dict_version: dict_over,
-        encoding,
-        custom_dict,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = dict_over;
+    opts.encoding = encoding;
+    opts.custom_dict = custom_dict;
     let sidecar =
         laterite_ags4_trust::mint(data, &opts, checked_at, None).map_err(|e| e.to_string())?;
     let json = sidecar.to_json().map_err(|e| e.to_string())?;

@@ -168,11 +168,9 @@ fn bench_rule_families(c: &mut Criterion) {
 ///     per-finding cost on a synthetic single-group file of `n` empty-REQUIRED
 ///     rows — unique keys → no 10a, a root group → no 10c: only 10b fires.
 fn bench_error_path(c: &mut Criterion) {
-    let gated = CheckOptions {
-        include_warnings: true,
-        include_fyi: true,
-        ..CheckOptions::default()
-    };
+    let mut gated = CheckOptions::default();
+    gated.include_warnings = true;
+    gated.include_fyi = true;
     let dict = Dictionary::bundled(DictVersion::V4_1_1);
 
     // (1) Whole-engine, size-scaled: clean `large` vs the rule-16 dirty twin.

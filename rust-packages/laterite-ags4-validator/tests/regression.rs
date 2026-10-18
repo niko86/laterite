@@ -100,12 +100,10 @@ fn is_clean_is_not_the_verdict() {
 
     // The crate default is errors-only; the warning tier has to be asked for
     // here, exactly as the binding layer asks for it.
-    let opts = CheckOptions {
-        include_warnings: true,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.include_warnings = true;
     let found = check_file(f.path(), &opts).unwrap();
-    let v = verdict::Verdict::of(&found, false);
+    let v = verdict::Verdict::of(&found, &findings::Truncated::new(), false);
     assert_eq!(
         (v.errors, v.warnings),
         (0, 1),
@@ -367,13 +365,11 @@ fn rule10c_standalone_child_is_warned_about_not_silently_skipped() {
     // indistinguishable — the row simply produced nothing. A legitimate
     // standalone record and a key blanked by accident look identical here, and
     // only the author knows which they meant.
-    let f = check_file(
-        &fixture("rule10c_standalone_child.ags"),
-        &CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
-        },
-    )
+    let f = check_file(&fixture("rule10c_standalone_child.ags"), &{
+        let mut o = CheckOptions::default();
+        o.include_warnings = true;
+        o
+    })
     .expect("the fixture checks");
     let warn = f
         .get("Warning (Related to Rule 10c)")
@@ -400,13 +396,11 @@ fn rule10c_reports_the_link_it_cannot_ask_about() {
     // row that does not exist and the file would still pass. AGS4 gives a group
     // one parent, so this is the format's limit, not a defect in the file: the
     // advisory names what went unchecked and changes no verdict.
-    let f = check_file(
-        &fixture("rule10c_foreign_key_link.ags"),
-        &CheckOptions {
-            include_fyi: true,
-            ..CheckOptions::default()
-        },
-    )
+    let f = check_file(&fixture("rule10c_foreign_key_link.ags"), &{
+        let mut o = CheckOptions::default();
+        o.include_fyi = true;
+        o
+    })
     .expect("the fixture checks");
     let fyi = f
         .get("FYI (Related to Rule 10c)")
@@ -567,13 +561,11 @@ fn valid_utf8_extended_char_is_fyi_only_not_rule1() {
         "valid extended-ASCII must not be a Rule 1 error, got {default:?}"
     );
 
-    let with_fyi = check_file(
-        tf.path(),
-        &CheckOptions {
-            include_fyi: true,
-            ..CheckOptions::default()
-        },
-    )
+    let with_fyi = check_file(tf.path(), &{
+        let mut o = CheckOptions::default();
+        o.include_fyi = true;
+        o
+    })
     .unwrap();
     assert!(
         with_fyi.contains_key("FYI (Related to Rule 1)"),
@@ -599,13 +591,11 @@ fn rule_16_nonstandard_self_declared_abbr_is_fyi_only() {
         "the FYI must be suppressed by default (opt-in): {default:?}"
     );
 
-    let with_fyi = check_file(
-        &path,
-        &CheckOptions {
-            include_fyi: true,
-            ..CheckOptions::default()
-        },
-    )
+    let with_fyi = check_file(&path, &{
+        let mut o = CheckOptions::default();
+        o.include_fyi = true;
+        o
+    })
     .unwrap();
     let fyi = with_fyi
         .get("FYI (Related to Rule 16)")
@@ -631,13 +621,11 @@ fn rule_18_malformed_dict_is_warning_only() {
         "the DICT warning must be opt-in: {default:?}"
     );
 
-    let with_warn = check_file(
-        &path,
-        &CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
-        },
-    )
+    let with_warn = check_file(&path, &{
+        let mut o = CheckOptions::default();
+        o.include_warnings = true;
+        o
+    })
     .unwrap();
     let w = with_warn
         .get("Warning (Related to Rule 18)")
@@ -687,11 +675,9 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures");
-    let opts = CheckOptions {
-        include_fyi: true,
-        include_warnings: true,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.include_fyi = true;
+    opts.include_warnings = true;
     let mut seen_numbered: BTreeSet<String> = BTreeSet::new();
     for entry in std::fs::read_dir(&dir).expect("read fixtures dir") {
         let path = entry.expect("dir entry").path();

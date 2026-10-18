@@ -55,7 +55,8 @@ path, so a bytes/text caller physically cannot request a world check (it gets
 ## Inputs / outputs
 
 In: a `Request` (bytes/text/path source, an optional certificate, the requested
-`WorldScope`, options split by `split_options`). Out: an `Outcome` from `check`,
+`WorldScope`, options split by `split_options`). Out: an `Outcome` from `check`
+(its `truncated` map names the rules a `max_findings_per_rule` cap cut, #1089),
 or a minted `Sidecar` from `mint` (`MintError` on failure). `check_parsed` is
 `check` for a caller that already holds the parse (a read handle validating what
 it read) — and takes no certificate, because a cert is checked against bytes the

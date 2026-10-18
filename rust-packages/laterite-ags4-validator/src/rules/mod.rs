@@ -25,7 +25,7 @@ pub mod typed_values;
 
 use crate::CheckOptions;
 use crate::dict::Dictionary;
-use crate::findings::Findings;
+use crate::findings::Collector;
 use crate::parse::ParsedFile;
 
 /// Run every enabled rule against `parsed`, appending to `found`.
@@ -43,11 +43,16 @@ use crate::parse::ParsedFile;
 /// [`crate::check_parsed`], which is the only place that can refuse an
 /// incoherent request. Before, four surfaces called this directly with
 /// `check_files: true` in their options and got a silent false clean.
+///
+/// It takes the concrete [`Collector`], not any [`crate::findings::Sink`], on
+/// purpose: every rule is generic over its sink, and a second sink type here would
+/// compile every rule twice into the same binary (the browser's wasm ceiling is what
+/// noticed). A caller that wants every finding passes `Collector::new(None)`.
 pub(crate) fn run_all(
     parsed: &ParsedFile,
     dict: &Dictionary,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut Collector,
 ) {
     line_format::check(parsed, opts, found); // Rules 1, 3, 5, 6
     structure::check(parsed, found); //          Rules 2, 2a, 2b, 4

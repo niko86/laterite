@@ -35,7 +35,7 @@ import {
   xlsxBytesToAgs4,
 } from "./native";
 import * as registry from "./registry";
-import { Report } from "./report";
+import { Report, findingsCap } from "./report";
 import { AgsGroup } from "./typed-graph";
 
 /** File-reading knobs shared by every verb that opens a source (`read`,
@@ -172,6 +172,12 @@ export interface ValidateOptions extends FileOptions {
   /** Treat `dictionary` as a FULL REPLACEMENT — drop the bundled base entirely rather
    *  than overlaying it (default `false`). Cannot be combined with `dictVersion`. */
   dictReplace?: boolean;
+  /** Keep at most this many findings per rule (default: every finding). Past it a
+   *  rule is only counted, so a file whose one defect repeats on every line costs
+   *  the cap's worth of memory, not the file's worth. The verdict and every count
+   *  still cover all findings, and `report.truncated` names the rules that were
+   *  cut. `0` keeps no findings, only the counts. */
+  maxFindingsPerRule?: number;
 }
 
 /** Split a `dictionary` custom-dict override (laterite-dev#568) into the `[dictPath, dictBytes]`
@@ -248,6 +254,7 @@ export function validate(
     // asserted THERE, and quietly re-validating is right if the file has since
     // moved under it.
     cert !== undefined,
+    findingsCap(opts.maxFindingsPerRule),
   );
   return new Report(raiseFor(r));
 }

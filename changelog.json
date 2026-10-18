@@ -14,6 +14,9 @@
       },
       {
         "text": "**`laterite-ags4-trust`: `check_reader` (#1097), and `laterite-ags4-core`: `Sidecar::is_fresh_for_reader` and `Sidecar::answers`.** `check_reader` is `check` for a file it reads itself: a certificate of another size is settled before any byte is read, and one that would vouch is checked against a hash taken as the file streams, so the file is never held. Same verdict and `revalidate_reason` as `check`. `ReaderRequest::named` makes a stale certificate the error `ReaderError::StaleCert`. `is_fresh_for_reader` is `is_fresh_for` over a stream; `answers` is `decide` without the format, size and content gates."
+      },
+      {
+        "text": "**A per-rule findings cap on every validate door (#1089).** `validate(..., max_findings_per_rule=N)` and `Ags4File.validate(max_findings_per_rule=N)` in Python, `lat validate --max-findings-per-rule N`, `{ maxFindingsPerRule: N }` in Node and the browser package, and `Validate::max_findings_per_rule` on the Rust facade. A rule keeps its first N findings and only counts the rest, so a file whose one defect repeats on every line no longer holds every finding in memory. The verdict, the exit code, `count` and the per-tier counts still cover every finding. `Report.truncated` (Python and Node), `report.truncated` (browser) and `Report::truncated` (facade) name the rules that were cut as `{rule: {shown, total}}`. The JSON report gains a `truncated` key and the NDJSON report ends with one `{\"truncated\": ...}` record, both only when a rule was cut. `0` keeps no findings, only the counts. The default is no cap, and an uncapped report is unchanged. A capped run mints the same certificate as an uncapped one."
       }
     ],
     "changed": [
@@ -40,6 +43,10 @@
       },
       {
         "text": "**`validate(path, index=…)` no longer holds the whole file to check the certificate (#1097).** A certificate of another size is reported stale before the file is read. When the certificate vouches, the SHA-256 is computed as the file streams, so the check's memory no longer grows with the file. The file is read whole only when the rules have to run. Verdicts and `revalidate_reason` are unchanged."
+      },
+      {
+        "text": "**Breaking: `laterite-ags4-validator` 0.21 caps findings in the engine (#1089).** `CheckOptions` gains `max_findings_per_rule` and is now `#[non_exhaustive]`: build it from `CheckOptions::default()` and set fields, since a struct literal no longer compiles outside the crate. `check_parsed`, `check_parsed_with_dict` and `check_file_with_dict` return `findings::Collected` (the kept `findings` plus the `truncated` map) where they returned `Findings`. `Verdict::of` takes the `Truncated` map as a second argument, and `findings_json`, `findings_json_value` and `findings_ndjson` take it too. Rule functions take any `findings::Sink`, which a plain `Findings` map still is. `check_file` keeps its signature and always keeps every finding. `laterite-ags4-trust` 0.19 adds `Outcome::truncated`. `laterite-ags4-emit` 0.20.5 and `laterite-ags4-hostopts` 0.3.4 ride along, because their published pins froze `^0.20`.",
+        "breaking": true
       }
     ],
     "deprecated": [],

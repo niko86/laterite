@@ -394,6 +394,15 @@ pub struct Finding {
     pub severity: Option<String>,
 }
 
+/// A rule `maxFindingsPerRule` cut (#1089): it kept `shown` of its `total` findings.
+/// A list in rule order here; the TS `Report.truncated` keys it by `rule`.
+#[napi(object)]
+pub struct TruncatedRule {
+    pub rule: String,
+    pub shown: u32,
+    pub total: u32,
+}
+
 /// The validation report — the Node mirror of laterite-py's `run_check` dict.
 /// `ok` is **false only for un-validatable input** (the TS `raiseFor` raises
 /// then); rule *violations* come back in `findings` with `ok:true`. `Report`'s
@@ -412,7 +421,8 @@ pub struct ValidationReport {
     pub file: String,
     pub dict_version: String,
     pub resolution: String,
-    /// Every finding in the report, whatever its tier — what it SHOWS.
+    /// Every finding the run made, whatever its tier — what it SHOWS. A total:
+    /// under `maxFindingsPerRule` it also counts the findings `findings` did not keep.
     pub count: u32,
     /// The verdict — what it CONCLUDES (#321). Not `count == 0`: a warning is
     /// shown by default and does not fail, so a file can be `valid` with a
@@ -431,6 +441,8 @@ pub struct ValidationReport {
     /// offered, or it was vouched.
     pub revalidate_reason: Option<String>,
     pub findings: Vec<Finding>,
+    /// The rules `maxFindingsPerRule` cut, in rule order; empty when nothing was.
+    pub truncated: Vec<TruncatedRule>,
     pub json: String,
     pub ndjson: String,
 }
@@ -459,6 +471,7 @@ impl ValidationReport {
             certified: false,
             revalidate_reason: None,
             findings: Vec::new(),
+            truncated: Vec::new(),
             json: String::new(),
             ndjson: String::new(),
         }
@@ -471,7 +484,7 @@ impl ValidationReport {
 // "ported verbatim from laterite-py's findings_ndjson" — the third of three
 // hand-copies of one format (laterite-dev#530). `lat validate --json`, laterite-py's report
 // JSON and this binding now all come out of the same function.
-use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
+use laterite_ags4_validator::findings::{Truncated, findings_json, findings_ndjson};
 
 /// Parse the `--dict` custom-dictionary override for a node call, mirroring the CLI's
 /// `apply_dict_args` and laterite-py's helper (laterite-dev#568). The dict arrives as a filesystem
@@ -528,7 +541,15 @@ fn validate_inner(
     // the check can use bytes already in hand instead of reading the file twice.
     strict_cert: bool,
 ) -> std::result::Result<
-    (String, String, String, Findings, bool, Option<String>),
+    (
+        String,
+        String,
+        String,
+        Findings,
+        Truncated,
+        bool,
+        Option<String>,
+    ),
     (i32, &'static str, String),
 > {
     let map = |e: ValidatorError| {
@@ -601,6 +622,7 @@ fn validate_inner(
         out.dict_version.as_str().to_string(),
         out.resolution.as_str().to_string(),
         out.findings,
+        out.truncated,
         out.certified,
         out.revalidate_reason.map(|r| r.as_str().to_string()),
     ))
@@ -643,6 +665,9 @@ pub fn run_check(
     // Private to the napi ABI — neither `validate()` nor `Ags4File.validate()`
     // exposes it. It records WHICH door the cert came through; see `validate_inner`.
     strict_cert: Option<bool>,
+    // Keep at most this many findings per rule (#1089); the counts and the verdict
+    // still cover every finding. The TS layer has refused a negative or fractional one.
+    max_findings_per_rule: Option<u32>,
 ) -> Result<ValidationReport> {
     let forced = match resolve_edition(dict_version.as_deref()) {
         Ok(v) => v,
@@ -665,15 +690,15 @@ pub fn run_check(
         Ok(cd) => cd,
         Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),
     };
-    let opts = CheckOptions {
-        dict_version: forced,
-        include_warnings: include_warnings.unwrap_or(true),
-        include_fyi: include_fyi.unwrap_or(false),
-        check_files: check_files.unwrap_or(false),
-        encoding: enc,
-        custom_dict,
-    };
-    let (file, dv, res, found, certified, revalidate_reason) = match validate_inner(
+    let mut opts = CheckOptions::default();
+    opts.dict_version = forced;
+    opts.include_warnings = include_warnings.unwrap_or(true);
+    opts.include_fyi = include_fyi.unwrap_or(false);
+    opts.check_files = check_files.unwrap_or(false);
+    opts.encoding = enc;
+    opts.custom_dict = custom_dict;
+    opts.max_findings_per_rule = max_findings_per_rule.map(|n| n as usize);
+    let (file, dv, res, found, cut, certified, revalidate_reason) = match validate_inner(
         path.as_deref(),
         text.as_deref(),
         data.as_deref(),
@@ -699,14 +724,24 @@ pub fn run_check(
             })
         })
         .collect();
+    // `count` is what the report SHOWS; the verdict is what it CONCLUDES
+    // (#321). Both travel to TS so `isValid` never has to re-derive one from
+    // the other — which is exactly how the surfaces would drift. Both count every
+    // finding, including any `maxFindingsPerRule` did not keep.
+    let verdict = Verdict::of(&found, &cut, warnings_as_errors.unwrap_or(false));
     // Bounded by the number of validator findings in a file, which can't
     // exceed the file's cell count — far below u32::MAX for any real file.
     #[allow(clippy::cast_possible_truncation)]
-    let count = findings.len() as u32;
-    // `count` is what the report SHOWS; the verdict is what it CONCLUDES
-    // (#321). Both travel to TS so `isValid` never has to re-derive one from
-    // the other — which is exactly how the surfaces would drift.
-    let verdict = Verdict::of(&found, warnings_as_errors.unwrap_or(false));
+    let count = verdict.total() as u32;
+    #[allow(clippy::cast_possible_truncation)]
+    let truncated = cut
+        .iter()
+        .map(|(rule, t)| TruncatedRule {
+            rule: rule.clone(),
+            shown: t.shown as u32,
+            total: t.total as u32,
+        })
+        .collect();
     #[allow(clippy::cast_possible_truncation)]
     Ok(ValidationReport {
         ok: true,
@@ -719,13 +754,14 @@ pub fn run_check(
         warnings: verdict.warnings as u32,
         fyi: verdict.fyi as u32,
         exit_code: verdict.exit_code(),
-        json: findings_json(&file, &found),
-        ndjson: findings_ndjson(&found),
+        json: findings_json(&file, &found, &cut),
+        ndjson: findings_ndjson(&found, &cut),
         file,
         dict_version: dv,
         resolution: res,
         count,
         findings,
+        truncated,
     })
 }
 
@@ -1152,12 +1188,10 @@ impl Sidecar {
             enc,
         )
         .map_err(|(_, _, msg)| Error::from_reason(msg))?;
-        let opts = CheckOptions {
-            dict_version: forced,
-            encoding: enc,
-            custom_dict,
-            ..CheckOptions::default()
-        };
+        let mut opts = CheckOptions::default();
+        opts.dict_version = forced;
+        opts.encoding = enc;
+        opts.custom_dict = custom_dict;
         let inner = laterite_ags4_trust::mint(data.as_ref(), &opts, checked_at, compat)
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(Sidecar { inner })
@@ -1457,17 +1491,15 @@ pub fn fix_file(
         Ok(cd) => cd,
         Err((code, kind, msg)) => return Ok(FixReport::failure(kind, code, msg)),
     };
-    let opts = CheckOptions {
-        dict_version: forced,
-        encoding: enc,
-        custom_dict,
-        // The residual re-validation tier matches this surface's `validate()`
-        // default (errors + warnings) — not `CheckOptions::default()`'s
-        // errors-only, which under-reported what the fix left behind (#294 C).
-        include_warnings: true,
-        include_fyi: false,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = forced;
+    opts.encoding = enc;
+    opts.custom_dict = custom_dict;
+    // The residual re-validation tier matches this surface's `validate()`
+    // default (errors + warnings) — not `CheckOptions::default()`'s
+    // errors-only, which under-reported what the fix left behind (#294 C).
+    opts.include_warnings = true;
+    opts.include_fyi = false;
     let exclude = exclude.unwrap_or_default();
     let outcome = match fix_document_recoding(
         &raw,

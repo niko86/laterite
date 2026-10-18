@@ -38,10 +38,9 @@ use proptest::prelude::*;
 /// `include_fyi` so Rule 1 (non-ASCII findings are FYI-severity) actually
 /// yields the typography fix — the same profile the in-crate `check()` uses.
 fn check_opts() -> CheckOptions {
-    CheckOptions {
-        include_fyi: true,
-        ..CheckOptions::default()
-    }
+    let mut o = CheckOptions::default();
+    o.include_fyi = true;
+    o
 }
 
 /// The 1-based line numbers any applied `SpanEdit` touched.

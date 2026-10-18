@@ -152,6 +152,8 @@ struct Checked {
     dict_version: String,
     resolution: String,
     findings: Findings,
+    /// The rules `max_findings_per_rule` cut (#1089); empty when nothing was.
+    truncated: Truncated,
     /// A cert answered the CONTENT half. The world half (Rule 20 on-disk) ran regardless.
     certified: bool,
     /// If a certificate was offered and NOT used, the stable token for why (the core
@@ -195,6 +197,7 @@ fn validate(
     // (#1090). Used only when no cert is offered: a cert is checked against BYTES,
     // and the parse alone cannot show it any.
     retained: Option<&laterite_ags4_parse::ParsedFile>,
+    max_findings_per_rule: Option<usize>,
 ) -> Result<Checked, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -205,14 +208,14 @@ fn validate(
         )
     })?;
     let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)?;
-    let opts = CheckOptions {
-        dict_version: over,
-        custom_dict,
-        include_warnings: warnings,
-        include_fyi: fyi,
-        check_files,
-        encoding: enc,
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = over;
+    opts.custom_dict = custom_dict;
+    opts.include_warnings = warnings;
+    opts.include_fyi = fyi;
+    opts.check_files = check_files;
+    opts.encoding = enc;
+    opts.max_findings_per_rule = max_findings_per_rule;
 
     if let (Some(parsed), None) = (retained, cert) {
         let (label, world) = match (path, text) {
@@ -231,6 +234,7 @@ fn validate(
             dict_version: out.dict_version.as_str().to_string(),
             resolution: out.resolution.as_str().to_string(),
             findings: out.findings,
+            truncated: out.truncated,
             certified: out.certified,
             revalidate_reason: None,
             measured,
@@ -285,6 +289,7 @@ fn validate(
             dict_version: out.dict_version.as_str().to_string(),
             resolution: out.resolution.as_str().to_string(),
             findings: out.findings,
+            truncated: out.truncated,
             certified: out.certified,
             revalidate_reason: out.revalidate_reason.map(|r| r.as_str().to_string()),
             measured: None,
@@ -346,6 +351,7 @@ fn validate(
         dict_version: out.dict_version.as_str().to_string(),
         resolution: out.resolution.as_str().to_string(),
         findings: out.findings,
+        truncated: out.truncated,
         certified: out.certified,
         revalidate_reason: out.revalidate_reason.map(|r| r.as_str().to_string()),
         // These bytes were read for this call, so no parse a mint holds is the one this
@@ -377,7 +383,7 @@ fn severity_str(s: Severity) -> &'static str {
 // copy, marked "byte-identical to the binary's `ndjson_string`" — a comment is
 // not a guarantee, and there were three such copies (laterite-dev#530). Now `lat validate
 // --json`, `laterite`'s report JSON and Node's all come out of one function.
-use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
+use laterite_ags4_validator::findings::{Truncated, findings_json, findings_ndjson};
 use laterite_ags4_validator::verdict::Verdict;
 
 fn err_dict<'py>(
@@ -400,7 +406,7 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None, strict_cert=false, retained=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None, strict_cert=false, retained=None, max_findings_per_rule=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -435,6 +441,9 @@ fn run_check<'py>(
     // parsing the source again (#1090). The caller vouches it was parsed from this
     // source under this `encoding`.
     retained: Option<PyRef<'py, Reading>>,
+    // Keep at most this many findings per rule; the counts and the verdict still
+    // cover every finding (#1089). `None` keeps them all.
+    max_findings_per_rule: Option<usize>,
 ) -> PyResult<Bound<'py, PyDict>> {
     // Release the GIL for the whole parse+validate compute (pure Rust, touches no
     // Python) so concurrent validators actually parallelise across cores instead
@@ -460,6 +469,7 @@ fn run_check<'py>(
             cert_inner.as_ref(),
             strict_cert,
             retained,
+            max_findings_per_rule,
         )
     });
     match outcome {
@@ -470,6 +480,7 @@ fn run_check<'py>(
                 dict_version: dv,
                 resolution: res,
                 findings: found,
+                truncated,
                 certified,
                 revalidate_reason,
                 measured,
@@ -486,18 +497,27 @@ fn run_check<'py>(
             // passed no cert always sees `None`; a certified read also sees `None`.
             d.set_item("revalidate_reason", revalidate_reason)?;
 
-            let count: usize = found.values().map(Vec::len).sum();
             // `count` is what the report SHOWS; the verdict is what it
             // CONCLUDES (#321). Both are emitted so the Python layer never has
             // to re-derive either — `Report.is_valid` reads `valid`, not
             // `count == 0`, which is how the two stopped being the same claim.
-            let verdict = Verdict::of(&found, warnings_as_errors);
-            d.set_item("count", count)?;
+            // Both count every finding, kept or not (#1089).
+            let verdict = Verdict::of(&found, &truncated, warnings_as_errors);
+            d.set_item("count", verdict.total())?;
             d.set_item("errors", verdict.errors)?;
             d.set_item("warnings", verdict.warnings)?;
             d.set_item("fyi", verdict.fyi)?;
             d.set_item("valid", verdict.is_valid())?;
             d.set_item("exit_code", verdict.exit_code())?;
+            // `{rule: {shown, total}}` for each rule the cap cut; empty without one.
+            let cut = PyDict::new(py);
+            for (rule, t) in &truncated {
+                let o = PyDict::new(py);
+                o.set_item("shown", t.shown)?;
+                o.set_item("total", t.total)?;
+                cut.set_item(rule, o)?;
+            }
+            d.set_item("truncated", cut)?;
             // The finding list and both serialisations are built on ask, not here
             // (#1089): a file with one finding per line would otherwise hold all
             // three at once — a Python dict per finding plus two whole-report
@@ -507,6 +527,7 @@ fn run_check<'py>(
                 CheckedFindings {
                     file,
                     found,
+                    truncated,
                     measured,
                 },
             )?;
@@ -527,6 +548,7 @@ fn run_check<'py>(
 struct CheckedFindings {
     file: String,
     found: Findings,
+    truncated: Truncated,
     measured: Option<laterite_ags4_trust::Measurement>,
 }
 
@@ -573,12 +595,12 @@ impl CheckedFindings {
 
     /// Byte-identical to `lat validate --json`.
     fn json(&self) -> String {
-        findings_json(&self.file, &self.found)
+        findings_json(&self.file, &self.found, &self.truncated)
     }
 
     /// Byte-identical to `lat validate --ndjson`.
     fn ndjson(&self) -> String {
-        findings_ndjson(&self.found)
+        findings_ndjson(&self.found, &self.truncated)
     }
 }
 
@@ -685,14 +707,13 @@ fn fix_core(
     // warnings) so a fix reports what it left behind at the same tier the user
     // sees on validate — was errors + FYI, which both under- and over-reported
     // vs the other surfaces (#294 Batch C).
-    let opts = CheckOptions {
-        dict_version: over,
-        custom_dict,
-        include_warnings: true,
-        include_fyi: false,
-        check_files: false,
-        encoding: enc,
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = over;
+    opts.custom_dict = custom_dict;
+    opts.include_warnings = true;
+    opts.include_fyi = false;
+    opts.check_files = false;
+    opts.encoding = enc;
     let out = fix_document_recoding(&raw, &opts, include_risky, only, exclude, &rewrite).map_err(
         |e| match e {
             FixError::Validator(e) => map_err(&e),
@@ -1530,12 +1551,10 @@ impl PySidecar {
         // different dict revalidates rather than inheriting a stale verdict.
         let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)
             .map_err(|(_, _, m)| pyo3::exceptions::PyValueError::new_err(m))?;
-        let opts = CheckOptions {
-            dict_version: over,
-            custom_dict,
-            encoding: enc,
-            ..CheckOptions::default()
-        };
+        let mut opts = CheckOptions::default();
+        opts.dict_version = over;
+        opts.custom_dict = custom_dict;
+        opts.encoding = enc;
         let prior = retained
             .as_deref()
             .zip(measured.as_deref().and_then(|m| m.measured.as_ref()));

@@ -97,10 +97,9 @@ const RULE_1: &str = "AGS Format Rule 1";
 
 /// `CheckOptions` reading the bytes through a named decoder.
 fn read_as(label: &str) -> CheckOptions {
-    CheckOptions {
-        encoding: laterite_ags4_parse::resolve_encoding(Some(label)).expect("a known label"),
-        ..CheckOptions::default()
-    }
+    let mut o = CheckOptions::default();
+    o.encoding = laterite_ags4_parse::resolve_encoding(Some(label)).expect("a known label");
+    o
 }
 
 fn errors_only() -> CheckOptions {
@@ -108,11 +107,10 @@ fn errors_only() -> CheckOptions {
 }
 
 fn with_tiers(warnings: bool, fyi: bool) -> CheckOptions {
-    CheckOptions {
-        include_warnings: warnings,
-        include_fyi: fyi,
-        ..CheckOptions::default()
-    }
+    let mut o = CheckOptions::default();
+    o.include_warnings = warnings;
+    o.include_fyi = fyi;
+    o
 }
 
 /// A file, its cert, and a temp dir to put a `FILE/` tree in.
@@ -403,10 +401,8 @@ fn a_forced_edition_and_an_auto_one_do_not_answer_for_each_other() {
     // a file whose declared edition disagreed with its content the two runs would
     // apply different dictionaries. The old `profile_covers` compared the edition
     // string and the forced flag separately and got this wrong.
-    let forced = CheckOptions {
-        dict_version: Some(DictVersion::V4_2),
-        ..CheckOptions::default()
-    };
+    let mut forced = CheckOptions::default();
+    forced.dict_version = Some(DictVersion::V4_2);
     let out = check(Request {
         bytes,
         opts: &forced,
@@ -474,10 +470,8 @@ fn a_vouched_cert_does_not_stop_the_world_check_from_running() {
     std::fs::write(leaf.join("photo.jpg"), b"x").expect("write");
 
     let cert = mint(bytes, &errors_only(), AT.to_string(), None).expect("mints");
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
 
     let out = check(Request {
         bytes,
@@ -523,10 +517,8 @@ fn a_world_check_with_no_world_is_refused_not_answered() {
     // is a question with nothing to ask it of.
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
     let cert = mint(bytes, &errors_only(), AT.to_string(), None).expect("mints");
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
     let err = check(Request {
         bytes,
         opts: &cf,
@@ -544,10 +536,8 @@ fn the_mint_never_records_a_world_claim_even_when_one_was_asked_for() {
     // it — but assert the OUTPUT: a stamp built from an options struct that had
     // check_files set carries no trace of it, because the struct has nowhere to put it.
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
     let cert = mint(bytes, &cf, AT.to_string(), None).expect("mints");
 
     let json = String::from_utf8(cert.to_json().expect("serialises")).expect("utf8");
@@ -567,10 +557,8 @@ fn with_no_cert_the_engine_runs_and_the_world_is_still_checked() {
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
     std::fs::write(&ags, bytes).expect("write"); // no FILE/ tree beside it
 
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
     let out = check(Request {
         bytes,
         opts: &cf,
@@ -630,10 +618,8 @@ fn an_external_dict_is_honoured_not_refused() {
         "mine.json",
     )
     .expect("custom dict parses");
-    let opts = CheckOptions {
-        custom_dict: Some(custom),
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.custom_dict = Some(custom);
     check(Request {
         bytes,
         opts: &opts,
@@ -758,10 +744,8 @@ fn a_held_parse_still_runs_the_world_check_and_still_refuses_one_with_no_world()
     let ags = dir.path().join("delivery.ags");
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
     std::fs::write(&ags, bytes).expect("write"); // no FILE/ tree beside it
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
     let parsed = parse_bytes(bytes, cf.encoding).expect("parses");
 
     let out = check_parsed(&parsed, &cf, WorldScope::OnDisk(ags)).expect("checks");
@@ -808,10 +792,8 @@ fn a_narrower_run_or_one_that_looked_at_the_world_is_not_a_measurement() {
         assert!(m.is_none(), "{opts:?} did not measure every tier");
     }
     let dir = tempfile::tempdir().expect("tempdir");
-    let world = CheckOptions {
-        check_files: true,
-        ..with_tiers(true, true)
-    };
+    let mut world = with_tiers(true, true);
+    world.check_files = true;
     let scope = WorldScope::OnDisk(dir.path().join("x.ags"));
     let (_, m) = check_parsed_measured(&parsed, &world, scope).expect("checks");
     assert!(m.is_none(), "a world check's findings are not content");
@@ -820,15 +802,11 @@ fn a_narrower_run_or_one_that_looked_at_the_world_is_not_a_measurement() {
 #[test]
 fn a_measurement_under_another_question_is_not_reused() {
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
-    let forced = CheckOptions {
-        dict_version: Some(DictVersion::V4_2),
-        ..with_tiers(true, true)
-    };
-    let cp1252 = CheckOptions {
-        include_warnings: true,
-        include_fyi: true,
-        ..read_as("windows-1252")
-    };
+    let mut forced = with_tiers(true, true);
+    forced.dict_version = Some(DictVersion::V4_2);
+    let mut cp1252 = read_as("windows-1252");
+    cp1252.include_warnings = true;
+    cp1252.include_fyi = true;
     // Measured under one edition, decoder or engine; minted under another.
     let cases = [
         (forced, None),
@@ -1044,10 +1022,8 @@ fn the_reader_door_still_runs_the_world_check_under_a_vouched_cert() {
     let ags = dir.path().join("delivery.ags");
     let (bytes, cert) = minted(CLEAN_WITH_ATTACHMENT);
     std::fs::write(&ags, &bytes).expect("write"); // no FILE/ tree beside it
-    let cf = CheckOptions {
-        check_files: true,
-        ..CheckOptions::default()
-    };
+    let mut cf = CheckOptions::default();
+    cf.check_files = true;
 
     let out = check_reader(ReaderRequest {
         file: std::fs::File::open(&ags).expect("open"),
@@ -1060,4 +1036,87 @@ fn the_reader_door_still_runs_the_world_check_under_a_vouched_cert() {
     .expect("checks");
     assert!(out.certified, "the content is still vouched for");
     assert!(out.findings.contains_key(RULE_20), "{:?}", out.findings);
+}
+
+// --- the per-rule findings cap (#1089) ---------------------------------------
+
+fn capped(cap: usize) -> CheckOptions {
+    let mut o = with_tiers(true, true);
+    o.max_findings_per_rule = Some(cap);
+    o
+}
+
+#[test]
+fn a_capped_mint_is_the_mint_an_uncapped_one_makes() {
+    // A certificate records counts, never findings, so a cap has nothing to change
+    // in it. CLEAN_WITH_A_WARNING is the case that could: its one warning is exactly
+    // what a cap of 0 does not keep.
+    for text in [CLEAN_WITH_ATTACHMENT, CLEAN_WITH_A_WARNING] {
+        let bytes = text.as_bytes();
+        let uncapped = mint(bytes, &errors_only(), AT.to_string(), None).expect("mints");
+        for cap in [0, 1] {
+            let fresh = mint(bytes, &capped(cap), AT.to_string(), None).expect("mints");
+            assert_eq!(fresh, uncapped, "cap {cap}");
+
+            // And the validate-then-certify route, which reuses the capped run's
+            // measurement instead of running the engine again (#1096).
+            let (parsed, m) = measured(text, &capped(cap));
+            let reused = mint_measured(bytes, &errors_only(), AT.to_string(), None, &parsed, &m);
+            assert!(
+                !reused.engine_ran,
+                "cap {cap}: a capped run is a measurement"
+            );
+            assert_eq!(reused.result.expect("mints"), uncapped, "cap {cap}");
+        }
+    }
+}
+
+#[test]
+fn a_capped_check_counts_what_it_did_not_keep() {
+    let bytes = CLEAN_WITH_A_WARNING.as_bytes();
+    let run = |opts: &CheckOptions| {
+        check(Request {
+            bytes,
+            opts,
+            cert: None,
+            world: WorldScope::None,
+            compat: None,
+        })
+        .expect("checks")
+    };
+    let full = run(&with_tiers(true, true));
+    let counts_only = run(&capped(0));
+    assert!(full.truncated.is_empty());
+    assert!(
+        count(&full.findings) > 0,
+        "the fixture must carry a finding"
+    );
+    assert!(
+        counts_only.findings.is_empty(),
+        "{:?}",
+        counts_only.findings
+    );
+    let tiers = |o: &Outcome| {
+        let v = laterite_ags4_validator::verdict::Verdict::of(&o.findings, &o.truncated, false);
+        (v.errors, v.warnings, v.fyi, v.is_valid())
+    };
+    assert_eq!(tiers(&counts_only), tiers(&full));
+    let cut: usize = counts_only.truncated.values().map(|t| t.total).sum();
+    assert_eq!(cut, count(&full.findings));
+}
+
+#[test]
+fn a_cap_does_not_change_the_question_a_certificate_answers() {
+    // So a cert minted under one cap vouches for a request under another.
+    let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
+    let cert = mint(bytes, &capped(0), AT.to_string(), None).expect("mints");
+    let out = check(Request {
+        bytes,
+        opts: &capped(3),
+        cert: Some(&cert),
+        world: WorldScope::None,
+        compat: None,
+    })
+    .expect("checks");
+    assert!(out.certified, "{:?}", out.revalidate_reason);
 }

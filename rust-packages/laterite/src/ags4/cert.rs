@@ -61,16 +61,17 @@ impl Certify<'_> {
     }
 
     fn mint(&self) -> Result<Sidecar, Error> {
-        let opts = CheckOptions {
-            dict_version: self.edition.as_deref().map(resolve_edition).transpose()?,
-            custom_dict: None,
+        let opts = {
+            let mut o = CheckOptions::default();
+            o.dict_version = self.edition.as_deref().map(resolve_edition).transpose()?;
+            o.custom_dict = None;
             // Whatever these are set to, `mint` forces both tiers on. Minting a
             // certificate weaker than the one we can measure would only ever
             // narrow the set of questions it can later answer.
-            include_warnings: true,
-            include_fyi: true,
-            check_files: false,
-            encoding: laterite_ags4_parse::resolve_encoding(self.doc.encoding.as_deref())
+            o.include_warnings = true;
+            o.include_fyi = true;
+            o.check_files = false;
+            o.encoding = laterite_ags4_parse::resolve_encoding(self.doc.encoding.as_deref())
                 .ok_or_else(|| {
                     Error::new(
                         ErrorKind::InvalidArgument,
@@ -79,7 +80,8 @@ impl Certify<'_> {
                             self.doc.encoding.as_deref().unwrap_or_default()
                         ),
                     )
-                })?,
+                })?;
+            o
         };
 
         laterite_ags4_trust::mint(

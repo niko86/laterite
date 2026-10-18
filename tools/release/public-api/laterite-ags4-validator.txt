@@ -95,6 +95,46 @@ impl core::marker::Unpin for laterite_ags4_validator::findings::Target
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::findings::Target
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::findings::Target
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::findings::Target
+pub struct laterite_ags4_validator::findings::Collected
+pub laterite_ags4_validator::findings::Collected::findings: laterite_ags4_validator::findings::Findings
+pub laterite_ags4_validator::findings::Collected::truncated: laterite_ags4_validator::findings::Truncated
+impl laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collected::count(&self) -> usize
+impl core::clone::Clone for laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collected::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::findings::Collected
+impl core::cmp::PartialEq for laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collected::eq(&self, &Self) -> bool
+impl core::default::Default for laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collected::default() -> Self
+impl core::fmt::Debug for laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collected::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::findings::Collected
+impl core::marker::Freeze for laterite_ags4_validator::findings::Collected
+impl core::marker::Send for laterite_ags4_validator::findings::Collected
+impl core::marker::Sync for laterite_ags4_validator::findings::Collected
+impl core::marker::Unpin for laterite_ags4_validator::findings::Collected
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::findings::Collected
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::findings::Collected
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::findings::Collected
+pub struct laterite_ags4_validator::findings::Collector
+impl laterite_ags4_validator::findings::Collector
+pub fn laterite_ags4_validator::findings::Collector::finish(self) -> laterite_ags4_validator::findings::Collected
+pub fn laterite_ags4_validator::findings::Collector::new(core::option::Option<usize>) -> Self
+impl core::default::Default for laterite_ags4_validator::findings::Collector
+pub fn laterite_ags4_validator::findings::Collector::default() -> Self
+impl core::fmt::Debug for laterite_ags4_validator::findings::Collector
+pub fn laterite_ags4_validator::findings::Collector::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl laterite_ags4_validator::findings::Sink for laterite_ags4_validator::findings::Collector
+pub fn laterite_ags4_validator::findings::Collector::fired(&self, &str) -> bool
+pub fn laterite_ags4_validator::findings::Collector::push(&mut self, &str, laterite_ags4_validator::findings::Finding)
+impl core::marker::Freeze for laterite_ags4_validator::findings::Collector
+impl core::marker::Send for laterite_ags4_validator::findings::Collector
+impl core::marker::Sync for laterite_ags4_validator::findings::Collector
+impl core::marker::Unpin for laterite_ags4_validator::findings::Collector
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::findings::Collector
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::findings::Collector
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::findings::Collector
 pub struct laterite_ags4_validator::findings::Finding
 pub laterite_ags4_validator::findings::Finding::desc: alloc::string::String
 pub laterite_ags4_validator::findings::Finding::group: alloc::string::String
@@ -143,14 +183,47 @@ impl core::marker::Unpin for laterite_ags4_validator::findings::Location
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::findings::Location
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::findings::Location
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::findings::Location
-pub fn laterite_ags4_validator::findings::add(&mut laterite_ags4_validator::findings::Findings, &str, core::option::Option<u32>, &str, impl core::convert::Into<alloc::string::String>)
-pub fn laterite_ags4_validator::findings::add_at(&mut laterite_ags4_validator::findings::Findings, &str, core::option::Option<u32>, &str, impl core::convert::Into<alloc::string::String>, laterite_ags4_validator::findings::Location, laterite_ags4_validator::findings::Severity)
+pub struct laterite_ags4_validator::findings::Truncation
+pub laterite_ags4_validator::findings::Truncation::shown: usize
+pub laterite_ags4_validator::findings::Truncation::total: usize
+impl laterite_ags4_validator::findings::Truncation
+pub fn laterite_ags4_validator::findings::Truncation::dropped(&self, laterite_ags4_validator::findings::Severity) -> usize
+impl core::clone::Clone for laterite_ags4_validator::findings::Truncation
+pub fn laterite_ags4_validator::findings::Truncation::clone(&self) -> Self
+impl core::cmp::Eq for laterite_ags4_validator::findings::Truncation
+impl core::cmp::PartialEq for laterite_ags4_validator::findings::Truncation
+pub fn laterite_ags4_validator::findings::Truncation::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_validator::findings::Truncation
+pub fn laterite_ags4_validator::findings::Truncation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_validator::findings::Truncation
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::findings::Truncation
+impl serde_core::ser::Serialize for laterite_ags4_validator::findings::Truncation
+pub fn laterite_ags4_validator::findings::Truncation::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_validator::findings::Truncation
+impl core::marker::Send for laterite_ags4_validator::findings::Truncation
+impl core::marker::Sync for laterite_ags4_validator::findings::Truncation
+impl core::marker::Unpin for laterite_ags4_validator::findings::Truncation
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::findings::Truncation
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::findings::Truncation
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::findings::Truncation
+pub trait laterite_ags4_validator::findings::Sink
+pub fn laterite_ags4_validator::findings::Sink::fired(&self, &str) -> bool
+pub fn laterite_ags4_validator::findings::Sink::push(&mut self, &str, laterite_ags4_validator::findings::Finding)
+impl laterite_ags4_validator::findings::Sink for laterite_ags4_validator::findings::Collector
+pub fn laterite_ags4_validator::findings::Collector::fired(&self, &str) -> bool
+pub fn laterite_ags4_validator::findings::Collector::push(&mut self, &str, laterite_ags4_validator::findings::Finding)
+impl laterite_ags4_validator::findings::Sink for laterite_ags4_validator::findings::Findings
+pub fn laterite_ags4_validator::findings::Findings::fired(&self, &str) -> bool
+pub fn laterite_ags4_validator::findings::Findings::push(&mut self, &str, laterite_ags4_validator::findings::Finding)
+pub fn laterite_ags4_validator::findings::add(&mut impl laterite_ags4_validator::findings::Sink, &str, core::option::Option<u32>, &str, impl core::convert::Into<alloc::string::String>)
+pub fn laterite_ags4_validator::findings::add_at(&mut impl laterite_ags4_validator::findings::Sink, &str, core::option::Option<u32>, &str, impl core::convert::Into<alloc::string::String>, laterite_ags4_validator::findings::Location, laterite_ags4_validator::findings::Severity)
 pub fn laterite_ags4_validator::findings::count(&laterite_ags4_validator::findings::Findings) -> usize
 pub fn laterite_ags4_validator::findings::count_by_rule(&laterite_ags4_validator::findings::Findings) -> alloc::vec::Vec<(&str, usize)>
-pub fn laterite_ags4_validator::findings::findings_json(&str, &laterite_ags4_validator::findings::Findings) -> alloc::string::String
-pub fn laterite_ags4_validator::findings::findings_json_value(&str, &laterite_ags4_validator::findings::Findings) -> serde_json::value::Value
-pub fn laterite_ags4_validator::findings::findings_ndjson(&laterite_ags4_validator::findings::Findings) -> alloc::string::String
+pub fn laterite_ags4_validator::findings::findings_json(&str, &laterite_ags4_validator::findings::Findings, &laterite_ags4_validator::findings::Truncated) -> alloc::string::String
+pub fn laterite_ags4_validator::findings::findings_json_value(&str, &laterite_ags4_validator::findings::Findings, &laterite_ags4_validator::findings::Truncated) -> serde_json::value::Value
+pub fn laterite_ags4_validator::findings::findings_ndjson(&laterite_ags4_validator::findings::Findings, &laterite_ags4_validator::findings::Truncated) -> alloc::string::String
 pub type laterite_ags4_validator::findings::Findings = alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_validator::findings::Finding>>
+pub type laterite_ags4_validator::findings::Truncated = alloc::collections::btree::map::BTreeMap<alloc::string::String, laterite_ags4_validator::findings::Truncation>
 pub mod laterite_ags4_validator::fixes
 pub use laterite_ags4_validator::fixes::CodeCaseMode
 pub use laterite_ags4_validator::fixes::Recode
@@ -388,22 +461,22 @@ pub fn laterite_ags4_validator::parse::parse_file_with_encoding(&std::path::Path
 pub fn laterite_ags4_validator::parse::parse_str(&str) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_validator::error::ValidatorError>
 pub mod laterite_ags4_validator::rules
 pub mod laterite_ags4_validator::rules::dictionary
-pub fn laterite_ags4_validator::rules::dictionary::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::dictionary::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::groups
-pub fn laterite_ags4_validator::rules::groups::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::groups::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::line_format
-pub fn laterite_ags4_validator::rules::line_format::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::line_format::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::naming
-pub fn laterite_ags4_validator::rules::naming::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::naming::check(&laterite_ags4_parse::ParsedFile, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::references
-pub fn laterite_ags4_validator::rules::references::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::references::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::relational
-pub fn laterite_ags4_validator::rules::relational::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut laterite_ags4_validator::findings::Findings)
-pub fn laterite_ags4_validator::rules::relational::check_with(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::relational::check(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &mut impl laterite_ags4_validator::findings::Sink)
+pub fn laterite_ags4_validator::rules::relational::check_with(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::structure
-pub fn laterite_ags4_validator::rules::structure::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::structure::check(&laterite_ags4_parse::ParsedFile, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::rules::typed_values
-pub fn laterite_ags4_validator::rules::typed_values::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::rules::typed_values::check(&laterite_ags4_parse::ParsedFile, &mut impl laterite_ags4_validator::findings::Sink)
 pub mod laterite_ags4_validator::verdict
 pub struct laterite_ags4_validator::verdict::Verdict
 pub laterite_ags4_validator::verdict::Verdict::errors: usize
@@ -412,7 +485,7 @@ pub laterite_ags4_validator::verdict::Verdict::warnings: usize
 impl laterite_ags4_validator::verdict::Verdict
 pub fn laterite_ags4_validator::verdict::Verdict::exit_code(&self) -> i32
 pub fn laterite_ags4_validator::verdict::Verdict::is_valid(&self) -> bool
-pub fn laterite_ags4_validator::verdict::Verdict::of(&laterite_ags4_validator::findings::Findings, bool) -> Self
+pub fn laterite_ags4_validator::verdict::Verdict::of(&laterite_ags4_validator::findings::Findings, &laterite_ags4_validator::findings::Truncated, bool) -> Self
 pub fn laterite_ags4_validator::verdict::Verdict::total(&self) -> usize
 impl core::clone::Clone for laterite_ags4_validator::verdict::Verdict
 pub fn laterite_ags4_validator::verdict::Verdict::clone(&self) -> Self
@@ -449,7 +522,7 @@ impl core::marker::Unpin for laterite_ags4_validator::world::WorldScope
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::world::WorldScope
-pub fn laterite_ags4_validator::world::run(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::world::WorldScope, &mut laterite_ags4_validator::findings::Findings)
+pub fn laterite_ags4_validator::world::run(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::world::WorldScope, &mut impl laterite_ags4_validator::findings::Sink)
 pub enum laterite_ags4_validator::FixError
 pub laterite_ags4_validator::FixError::Recode(laterite_ags4_reference::recode::RecodeError)
 pub laterite_ags4_validator::FixError::Validator(laterite_ags4_validator::error::ValidatorError)
@@ -553,13 +626,14 @@ impl core::marker::Unpin for laterite_ags4_validator::world::WorldScope
 impl core::marker::UnsafeUnpin for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::world::WorldScope
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::world::WorldScope
-pub struct laterite_ags4_validator::CheckOptions
+#[non_exhaustive] pub struct laterite_ags4_validator::CheckOptions
 pub laterite_ags4_validator::CheckOptions::check_files: bool
 pub laterite_ags4_validator::CheckOptions::custom_dict: core::option::Option<laterite_ags4_reference::overlay::CustomDict>
 pub laterite_ags4_validator::CheckOptions::dict_version: core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>
 pub laterite_ags4_validator::CheckOptions::encoding: &'static encoding_rs::Encoding
 pub laterite_ags4_validator::CheckOptions::include_fyi: bool
 pub laterite_ags4_validator::CheckOptions::include_warnings: bool
+pub laterite_ags4_validator::CheckOptions::max_findings_per_rule: core::option::Option<usize>
 impl core::clone::Clone for laterite_ags4_validator::CheckOptions
 pub fn laterite_ags4_validator::CheckOptions::clone(&self) -> Self
 impl core::default::Default for laterite_ags4_validator::CheckOptions
@@ -709,9 +783,9 @@ pub const laterite_ags4_validator::ENGINE_FINGERPRINT: &str
 pub const laterite_ags4_validator::VERSION: &str
 pub fn laterite_ags4_validator::apply_fixes(&str, bool, &[laterite_ags4_validator::fixes::Fix]) -> alloc::string::String
 pub fn laterite_ags4_validator::check_file(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<laterite_ags4_validator::findings::Findings, laterite_ags4_validator::error::ValidatorError>
-pub fn laterite_ags4_validator::check_file_with_dict(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<(laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
-pub fn laterite_ags4_validator::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_validator::findings::Findings, laterite_ags4_validator::error::ValidatorError>
-pub fn laterite_ags4_validator::check_parsed_with_dict(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::check_file_with_dict(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<(laterite_ags4_validator::findings::Collected, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::check_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<laterite_ags4_validator::findings::Collected, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::check_parsed_with_dict(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::CheckOptions, &laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_validator::findings::Collected, laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::compute_fixes(&laterite_ags4_parse::ParsedFile, &laterite_ags4_validator::findings::Findings, laterite_ags4_reference::dict::Dictionary<'_>) -> laterite_ags4_validator::fixes::Fixes
 pub fn laterite_ags4_validator::editions_joined(&str) -> alloc::string::String
 pub fn laterite_ags4_validator::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>

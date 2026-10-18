@@ -161,7 +161,10 @@ Since Phase 1.5, `validate` accepts a `maxPerRule` cap — today a named
 field of its options-object argument (`validate(data, opts)`), originally
 a positional 5th arg — a UI safety cap on findings *serialized* per rule
 (totals stay true) — and is called
-**inside a Web Worker**, never the main thread. See [[tech-stack-wasm]]
+**inside a Web Worker**, never the main thread. `maxFindingsPerRule` (#1089) is the
+other cap: it reaches the ENGINE, so a rule stops storing findings past it, and the
+report's `truncated` map names the rules it cut. `maxPerRule` still clips only what
+crosses to JS. See [[tech-stack-wasm]]
 and [[validator-site]] Phase 1.5.
 
 ## Inputs / outputs

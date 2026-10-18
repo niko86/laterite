@@ -133,7 +133,13 @@ pub(crate) fn judge(abs: &Path, manifest_sha: &str, opts: &CheckOptions) -> Judg
     // `baseline` capture; `validate` reads only the summary `outcome`.
     let mut captured: Option<Findings> = None;
     let outcome = match res {
-        Ok(Ok((found, dv, kind))) => {
+        Ok(Ok((
+            laterite_ags4_validator::findings::Collected {
+                findings: found, ..
+            },
+            dv,
+            kind,
+        ))) => {
             dict_used = dv.as_str().to_string();
             dict_resolution = kind.as_str().to_string();
             let n = findings::count(&found);
@@ -233,21 +239,20 @@ pub fn run(args: &ValidateArgs, ctx: Ctx, corpus_dir: &Path) -> Result<i32> {
         return Ok(0);
     }
 
-    let opts = CheckOptions {
-        dict_version,
-        custom_dict: None,
-        include_warnings: args.show_warnings,
-        include_fyi: args.show_fyi,
-        // ON by default: match python-ags4's always-on Rule 20 on-disk
-        // stat so the dogfood AGREEs on Rule 20 (no O-27 shim). The
-        // harvested corpus copies have no sidecar tree, so both
-        // validators emit Rule 20 identically → parity, not divergence.
-        check_files: !args.no_check_files,
-        // Corpus is UTF-8 by harvesting convention; no per-file
-        // override yet. If a future corpus item needs a different
-        // encoding, it'll be a manifest field.
-        encoding: encoding_rs::UTF_8,
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = dict_version;
+    opts.custom_dict = None;
+    opts.include_warnings = args.show_warnings;
+    opts.include_fyi = args.show_fyi;
+    // ON by default: match python-ags4's always-on Rule 20 on-disk
+    // stat so the dogfood AGREEs on Rule 20 (no O-27 shim). The
+    // harvested corpus copies have no sidecar tree, so both
+    // validators emit Rule 20 identically → parity, not divergence.
+    opts.check_files = !args.no_check_files;
+    // Corpus is UTF-8 by harvesting convention; no per-file
+    // override yet. If a future corpus item needs a different
+    // encoding, it'll be a manifest field.
+    opts.encoding = encoding_rs::UTF_8;
 
     let pb = progress_bar(manifest.files.len() as u64, ctx.quiet);
     pb.set_message("validating");

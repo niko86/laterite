@@ -211,6 +211,69 @@ fn validate_json_out_tees_the_same_json_as_stdout() {
     assert_eq!(artifact, printed, "tee'd JSON differs from --json stdout");
 }
 
+/// A file with LF line endings: one Rule 2a finding per line, so a per-rule cap
+/// has something to cut.
+fn lf_file() -> PathBuf {
+    let src = std::fs::read_to_string(fixture("clean_minimal.ags")).unwrap();
+    let p = scratch().join("lf.ags");
+    std::fs::write(&p, src.replace("\r\n", "\n")).unwrap();
+    p
+}
+
+#[test]
+fn validate_max_findings_per_rule_caps_what_is_shown_and_not_what_is_counted() {
+    let f = lf_file();
+    let f = f.to_str().unwrap();
+    let full = lat(["validate", "--json", f]);
+    let full_v: Value = serde_json::from_str(&stdout(&full)).unwrap();
+    let total = full_v["findings"]["AGS Format Rule 2a"]
+        .as_array()
+        .expect("the LF file must fire Rule 2a")
+        .len();
+    assert!(total > 2, "{total}");
+    assert!(
+        full_v.get("truncated").is_none(),
+        "nothing cut without a cap"
+    );
+
+    let capped = lat(["validate", "--json", "--max-findings-per-rule", "2", f]);
+    assert_eq!(
+        capped.status.code(),
+        full.status.code(),
+        "the verdict moved"
+    );
+    let v: Value = serde_json::from_str(&stdout(&capped)).unwrap();
+    assert_eq!(
+        v["findings"]["AGS Format Rule 2a"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        v["truncated"]["AGS Format Rule 2a"],
+        serde_json::json!({"shown": 2, "total": total})
+    );
+
+    let nd = lat(["validate", "--ndjson", "--max-findings-per-rule", "2", f]);
+    let last: Value = serde_json::from_str(stdout(&nd).lines().last().unwrap()).unwrap();
+    assert_eq!(last["truncated"], v["truncated"]);
+
+    // `0`: the counts alone. The plain head line still states the total.
+    let zero = lat(["validate", "--max-findings-per-rule", "0", f]);
+    assert_eq!(zero.status.code(), full.status.code());
+    let plain = lat(["validate", f]);
+    let head = |o: &Output| stdout(o).lines().next().unwrap_or_default().to_string();
+    assert_eq!(head(&zero), head(&plain));
+    assert!(
+        stdout(&zero).contains(&format!(
+            "truncated: AGS Format Rule 2a — 0 of {total} shown"
+        )),
+        "{}",
+        stdout(&zero)
+    );
+}
+
 // --- fix --------------------------------------------------------------------
 
 #[test]

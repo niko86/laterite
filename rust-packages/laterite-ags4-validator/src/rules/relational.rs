@@ -50,7 +50,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::CheckOptions;
 use crate::dict::Dictionary;
 use crate::effective_dict::EffectiveDict;
-use crate::findings::{Findings, Location, Severity, Target, add, add_at};
+use crate::findings::{Location, Severity, Sink, Target, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
 
 const RULE_10A: &str = "AGS Format Rule 10a";
@@ -88,7 +88,7 @@ const PARENTLESS: &[&str] = &[
 /// ones it got before the declined-parentage warning existed. [`check_with`]
 /// is the tier-aware form, and the two should converge on the next breaking
 /// bump (`groups::check` and `line_format::check` already take options).
-pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut impl Sink) {
     check_with(parsed, dict, &CheckOptions::default(), found);
 }
 
@@ -97,7 +97,7 @@ pub fn check_with(
     parsed: &ParsedFile,
     dict: &Dictionary<'_>,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     let eff = EffectiveDict::build(parsed, *dict);
 
@@ -156,7 +156,7 @@ fn tuple_at<'a>(
 // `ri` is a DATA row's index within one AGS4 group — bounded by that
 // group's actual row count, far below u32::MAX for any real AGS4 file.
 #[allow(clippy::cast_possible_truncation)]
-fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Findings) {
+fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut impl Sink) {
     let keys = eff.key_fields(code);
     if keys.is_empty() {
         return;
@@ -215,7 +215,7 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
 /// Rule 10b — REQUIRED fields present and non-empty in every DATA row.
 // `ri` is bounded the same way as in `rule_10a` above.
 #[allow(clippy::cast_possible_truncation)]
-fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Findings) {
+fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut impl Sink) {
     let req = eff.required_fields(code);
     if req.is_empty() {
         return;
@@ -301,7 +301,7 @@ fn rule_10c<'p>(
     code: &str,
     eff: &EffectiveDict<'_>,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut impl Sink,
     parent_tuples: &mut HashMap<String, HashSet<Vec<&'p str>>>,
 ) {
     if PARENTLESS.contains(&code) {
@@ -489,7 +489,7 @@ fn rule_10c_unchecked_link(
     code: &str,
     eff: &EffectiveDict<'_>,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     if !opts.include_fyi || PARENTLESS.contains(&code) {
         return;
@@ -565,7 +565,7 @@ fn rule_10c_unchecked_link(
 }
 
 /// Rule 11 — read `TRAN_DLIM` / `TRAN_RCON`, dispatch 11a/11b/11c.
-fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_11(parsed: &ParsedFile, found: &mut impl Sink) {
     let Some(tran) = parsed.groups.get("TRAN") else {
         return; // TRAN missing → Rule 14 reports it
     };
@@ -613,7 +613,7 @@ fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
 // `ci`/`ri` are a column/row index within one AGS4 group — both bounded
 // far below u32::MAX for any real AGS4 file (see `rule_10a` above).
 #[allow(clippy::cast_possible_truncation)]
-fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut Findings) {
+fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut impl Sink) {
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         for (ci, ty) in g.types.iter().enumerate() {
@@ -704,6 +704,7 @@ fn fetch_count(parsed: &ParsedFile, parts: &[&str]) -> usize {
 mod tests {
     use super::*;
     use crate::dict::DictVersion;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

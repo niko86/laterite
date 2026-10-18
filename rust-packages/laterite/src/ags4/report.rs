@@ -68,14 +68,73 @@ impl Finding {
     }
 }
 
+/// A rule that [`Validate::max_findings_per_rule`](super::Validate::max_findings_per_rule)
+/// cut: it kept its first [`shown`](Truncation::shown) findings of
+/// [`total`](Truncation::total).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Truncation {
+    pub(crate) rule: String,
+    pub(crate) shown: usize,
+    pub(crate) total: usize,
+}
+
+impl Truncation {
+    /// The rule label, e.g. `"AGS Format Rule 2a"`.
+    #[must_use]
+    pub fn rule(&self) -> &str {
+        &self.rule
+    }
+
+    /// How many of its findings the report holds.
+    #[must_use]
+    pub fn shown(&self) -> usize {
+        self.shown
+    }
+
+    /// How many findings the rule made.
+    #[must_use]
+    pub fn total(&self) -> usize {
+        self.total
+    }
+}
+
 /// The result of validating a file.
 pub struct Report {
     pub(crate) findings: Vec<Finding>,
+    pub(crate) truncated: Vec<Truncation>,
+    /// Every finding by tier, kept or not: errors, warnings, fyi.
+    pub(crate) counts: [usize; 3],
     pub(crate) certified: bool,
     pub(crate) revalidate_reason: Option<String>,
 }
 
 impl Report {
+    /// Counted by the engine's one verdict, so a finding a cap did not keep still
+    /// counts here.
+    pub(crate) fn new(
+        found: laterite_ags4_validator::findings::Collected,
+        certified: bool,
+        revalidate_reason: Option<String>,
+    ) -> Report {
+        let v =
+            laterite_ags4_validator::verdict::Verdict::of(&found.findings, &found.truncated, false);
+        Report {
+            truncated: found
+                .truncated
+                .iter()
+                .map(|(rule, t)| Truncation {
+                    rule: rule.clone(),
+                    shown: t.shown,
+                    total: t.total,
+                })
+                .collect(),
+            counts: [v.errors, v.warnings, v.fyi],
+            findings: super::convert(found.findings),
+            certified,
+            revalidate_reason,
+        }
+    }
+
     /// Does the file break no error-severity rule?
     ///
     /// Warnings and FYIs do not make a file invalid, so this stays true when
@@ -83,14 +142,24 @@ impl Report {
     /// "did the run produce findings".
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        !self.findings.iter().any(|f| f.severity == Severity::Error)
+        self.count(Severity::Error) == 0
     }
 
-    /// Every finding, ordered by rule then by the order the engine emitted them,
-    /// so two runs over the same file are diffable.
+    /// Every finding the report holds, ordered by rule then by the order the
+    /// engine emitted them, so two runs over the same file are diffable. Under
+    /// [`Validate::max_findings_per_rule`](super::Validate::max_findings_per_rule)
+    /// that is each rule's first findings; [`Report::truncated`] says which rules
+    /// had more.
     #[must_use]
     pub fn findings(&self) -> &[Finding] {
         &self.findings
+    }
+
+    /// The rules a per-rule cap cut, in rule order. Empty when nothing was cut,
+    /// which is always the case without a cap.
+    #[must_use]
+    pub fn truncated(&self) -> &[Truncation] {
+        &self.truncated
     }
 
     /// Did an offered certificate stand in for the rule engine?
@@ -115,19 +184,21 @@ impl Report {
         self.revalidate_reason.as_deref()
     }
 
-    /// How many findings at this severity.
+    /// How many findings at this severity — every one the run made, including
+    /// any a per-rule cap did not keep.
     #[must_use]
     pub fn count(&self, severity: Severity) -> usize {
-        self.findings
-            .iter()
-            .filter(|f| f.severity == severity)
-            .count()
+        match severity {
+            Severity::Error => self.counts[0],
+            Severity::Warning => self.counts[1],
+            Severity::Fyi => self.counts[2],
+        }
     }
 
     /// Were there no findings at all, at any severity?
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.findings.is_empty()
+        self.counts.iter().all(|n| *n == 0)
     }
 }
 

@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::findings::{Findings, add};
+use crate::findings::{Sink, add};
 use crate::parse::ParsedFile;
 use crate::rules::references::RULE_20;
 
@@ -41,7 +41,7 @@ pub enum WorldScope {
 /// Run every WORLD check in `scope`. Called from the one door in
 /// [`crate::check_parsed`], *outside* any certificate-skip branch — the whole
 /// point is that this runs even when the content half is vouched for.
-pub fn run(parsed: &ParsedFile, scope: &WorldScope, found: &mut Findings) {
+pub fn run(parsed: &ParsedFile, scope: &WorldScope, found: &mut impl Sink) {
     match scope {
         WorldScope::None => {}
         WorldScope::OnDisk(source) => rule_20_on_disk(parsed, source, found),
@@ -51,7 +51,7 @@ pub fn run(parsed: &ParsedFile, scope: &WorldScope, found: &mut Findings) {
 /// Rule 20 (on-disk half). The sidecar `FILE/<FILE_FSET>/<FILE_NAME>` tree must
 /// exist beside the `.ags`. `std::fs` only — no new dependency. Messages are
 /// clean-room; the dogfood compares rule-key presence, not wording.
-fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
+fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut impl Sink) {
     // No FILE group → the data-level pass already spoke (or there are
     // no attachments at all). Nothing on-disk to assert.
     let Some(file_g) = parsed.groups.get("FILE") else {
@@ -115,6 +115,7 @@ fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     #[test]

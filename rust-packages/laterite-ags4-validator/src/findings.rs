@@ -116,6 +116,161 @@ pub struct Finding {
 /// keeps reports deterministic / diffable across runs.
 pub type Findings = BTreeMap<String, Vec<Finding>>;
 
+/// What a per-rule cap ([`crate::CheckOptions::max_findings_per_rule`]) cut from
+/// one rule: the rule kept its first `shown` findings and found `total`.
+///
+/// The tier split of the findings it did not keep rides along, private, because
+/// the verdict counts every finding a rule made, kept or not. A cap bounds what a
+/// report holds, never what it concludes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Truncation {
+    /// Findings kept for this rule, which is the cap.
+    pub shown: usize,
+    /// Findings this rule made, kept or not.
+    pub total: usize,
+    #[serde(skip)]
+    dropped: [usize; 3],
+}
+
+impl Truncation {
+    /// How many of the findings this rule did not keep were at `severity`.
+    #[must_use]
+    pub fn dropped(&self, severity: Severity) -> usize {
+        self.dropped[tier_index(severity)]
+    }
+}
+
+/// The rules a cap cut, keyed like [`Findings`]. Empty when nothing was cut,
+/// which is always the case for an uncapped run.
+pub type Truncated = BTreeMap<String, Truncation>;
+
+fn tier_index(severity: Severity) -> usize {
+    match severity {
+        Severity::Error => 0,
+        Severity::Warning => 1,
+        Severity::Fyi => 2,
+    }
+}
+
+/// Where a rule puts what it finds.
+///
+/// Every rule pushes through [`add`] / [`add_at`], and those push through this.
+/// That makes it the one seam a cap can sit on: a [`Collector`] stops storing a
+/// rule's findings at the cap and only counts the rest, so a file with one finding
+/// per line holds the cap's worth, not the file's worth. Rules never see the cap.
+///
+/// A plain [`Findings`] map is a `Sink` too, keeping everything, so a caller that
+/// drives a rule module directly passes one exactly as before.
+pub trait Sink {
+    /// Record `finding` under `rule`.
+    fn push(&mut self, rule: &str, finding: Finding);
+    /// Has `rule` found anything so far, kept or not? A rule that reads another
+    /// rule's result (Rule 18 reads Rule 9) asks this, not the stored map: under a
+    /// cap of `0` nothing is stored, and the answer must not change with the cap.
+    fn fired(&self, rule: &str) -> bool;
+}
+
+impl Sink for Findings {
+    fn push(&mut self, rule: &str, finding: Finding) {
+        self.entry(rule.to_string()).or_default().push(finding);
+    }
+
+    fn fired(&self, rule: &str) -> bool {
+        self.contains_key(rule)
+    }
+}
+
+/// The engine's own [`Sink`]: a [`Findings`] map that keeps at most `cap`
+/// findings per rule and counts the rest in a [`Truncated`].
+#[derive(Debug, Default)]
+pub struct Collector {
+    findings: Findings,
+    cap: Option<usize>,
+    truncated: Truncated,
+}
+
+impl Collector {
+    /// A collector keeping at most `cap` findings per rule; `None` keeps all.
+    #[must_use]
+    pub fn new(cap: Option<usize>) -> Self {
+        Self {
+            findings: Findings::new(),
+            cap,
+            truncated: Truncated::new(),
+        }
+    }
+
+    /// What was kept, and what the cap cut.
+    #[must_use]
+    pub fn finish(self) -> Collected {
+        Collected {
+            findings: self.findings,
+            truncated: self.truncated,
+        }
+    }
+
+    /// Count a finding the cap did not keep. Out of line and cold because only a
+    /// capped run past its cap reaches it, and `push` is inlined into every rule: kept
+    /// inline, this map work was copied into each one and the browser engine's size
+    /// gate (`tools/release/check-wasm-slim.mjs`) noticed.
+    #[cold]
+    #[inline(never)]
+    fn cut(&mut self, rule: &str, kept: usize, severity: Severity) {
+        let cut = self
+            .truncated
+            .entry(rule.to_string())
+            .or_insert(Truncation {
+                shown: kept,
+                total: kept,
+                dropped: [0; 3],
+            });
+        cut.total += 1;
+        cut.dropped[tier_index(severity)] += 1;
+    }
+}
+
+impl Sink for Collector {
+    fn push(&mut self, rule: &str, finding: Finding) {
+        if let Some(cap) = self.cap {
+            let kept = self.findings.get(rule).map_or(0, Vec::len);
+            if kept >= cap {
+                return self.cut(rule, kept, finding.severity);
+            }
+        }
+        self.findings.push(rule, finding);
+    }
+
+    fn fired(&self, rule: &str) -> bool {
+        self.findings.contains_key(rule) || self.truncated.contains_key(rule)
+    }
+}
+
+/// What a rule run produced: the findings kept, and what a per-rule cap cut.
+///
+/// `truncated` is empty for an uncapped run, so `findings` is then every finding.
+/// Count with [`Collected::count`], never by summing `findings` — under a cap the
+/// two differ, and only the first is the total.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Collected {
+    /// The findings kept, at most the cap per rule.
+    pub findings: Findings,
+    /// The rules the cap cut, with what they kept and what they found.
+    pub truncated: Truncated,
+}
+
+impl Collected {
+    /// Every finding the run made, kept or not.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        count(&self.findings)
+            + self
+                .truncated
+                .values()
+                .map(|t| t.total - t.shown)
+                .sum::<usize>()
+    }
+}
+
 // --- the findings renderers -------------------------------------------
 //
 // ONE renderer per format, living next to the type it renders. The `lat`
@@ -131,8 +286,16 @@ pub type Findings = BTreeMap<String, Vec<Finding>>;
 /// The nested report value `{file, findings:{rule:[{line,group,desc}]}}`.
 /// Returned as a `Value` (not a string) because the CLI's `--json` stdout path
 /// renders it rich/coloured; `findings_json` is the plain-string form.
+///
+/// A capped run that cut a rule adds `truncated: {rule: {shown, total}}` after
+/// `findings` (#1089). The key is absent when nothing was cut, so an uncapped
+/// report is byte-identical to one rendered before the cap existed.
 #[must_use]
-pub fn findings_json_value(file: &str, found: &Findings) -> serde_json::Value {
+pub fn findings_json_value(
+    file: &str,
+    found: &Findings,
+    truncated: &Truncated,
+) -> serde_json::Value {
     use serde_json::{Map, Value};
     let mut fmap = Map::new();
     for (rule, items) in found {
@@ -148,19 +311,32 @@ pub fn findings_json_value(file: &str, found: &Findings) -> serde_json::Value {
     let mut root = Map::new();
     root.insert("file".into(), Value::from(file.to_string()));
     root.insert("findings".into(), Value::Object(fmap));
+    if !truncated.is_empty() {
+        root.insert("truncated".into(), truncated_value(truncated));
+    }
     Value::Object(root)
+}
+
+/// `{rule: {shown, total}}` — the one spelling of a cut, shared by both renderers.
+fn truncated_value(truncated: &Truncated) -> serde_json::Value {
+    serde_json::to_value(truncated).unwrap_or(serde_json::Value::Null)
 }
 
 /// Pretty JSON of [`findings_json_value`] — the `--json` file/report form.
 #[must_use]
-pub fn findings_json(file: &str, found: &Findings) -> String {
-    serde_json::to_string_pretty(&findings_json_value(file, found)).unwrap_or_default()
+pub fn findings_json(file: &str, found: &Findings, truncated: &Truncated) -> String {
+    serde_json::to_string_pretty(&findings_json_value(file, found, truncated)).unwrap_or_default()
 }
 
 /// One flat JSON object per finding per line (NDJSON). Stream/grep friendly,
 /// never coloured; empty (no lines) when there are zero findings.
+///
+/// A capped run that cut a rule ends with one summary record,
+/// `{"truncated":{rule:{shown,total}}}`, after the last finding (#1089). It has no
+/// `rule` key, so a reader keyed on `rule` can tell it from a finding. There is no
+/// such record when nothing was cut.
 #[must_use]
-pub fn findings_ndjson(found: &Findings) -> String {
+pub fn findings_ndjson(found: &Findings, truncated: &Truncated) -> String {
     use serde_json::{Map, Value};
     let mut s = String::new();
     for (rule, items) in found {
@@ -177,6 +353,12 @@ pub fn findings_ndjson(found: &Findings) -> String {
             s.push('\n');
         }
     }
+    if !truncated.is_empty() {
+        let mut o = Map::new();
+        o.insert("truncated".into(), truncated_value(truncated));
+        s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
+        s.push('\n');
+    }
     s
 }
 
@@ -184,19 +366,22 @@ pub fn findings_ndjson(found: &Findings) -> String {
 /// Rule modules call this rather than poking the map directly so the
 /// key convention stays in one place.
 pub fn add(
-    findings: &mut Findings,
+    findings: &mut impl Sink,
     rule: &str,
     line: Option<u32>,
     group: &str,
     desc: impl Into<String>,
 ) {
-    findings.entry(rule.to_string()).or_default().push(Finding {
-        line,
-        group: group.to_string(),
-        desc: desc.into(),
-        location: Location::default(),
-        severity: Severity::Error,
-    });
+    findings.push(
+        rule,
+        Finding {
+            line,
+            group: group.to_string(),
+            desc: desc.into(),
+            location: Location::default(),
+            severity: Severity::Error,
+        },
+    );
 }
 
 /// Append a finding with an explicit [`Location`] and [`Severity`] —
@@ -204,7 +389,7 @@ pub fn add(
 /// flag warning/fyi severity. The line-only `add` stays the fast path.
 #[allow(clippy::too_many_arguments)]
 pub fn add_at(
-    findings: &mut Findings,
+    findings: &mut impl Sink,
     rule: &str,
     line: Option<u32>,
     group: &str,
@@ -212,13 +397,16 @@ pub fn add_at(
     location: Location,
     severity: Severity,
 ) {
-    findings.entry(rule.to_string()).or_default().push(Finding {
-        line,
-        group: group.to_string(),
-        desc: desc.into(),
-        location,
-        severity,
-    });
+    findings.push(
+        rule,
+        Finding {
+            line,
+            group: group.to_string(),
+            desc: desc.into(),
+            location,
+            severity,
+        },
+    );
 }
 
 /// Total finding count across every rule — what `is_valid` and the CLI
@@ -314,6 +502,52 @@ mod tests {
         );
     }
 
+    /// A cut rule is named in both renderers, after the findings, and nothing
+    /// is added when nothing was cut: that absence is what keeps an uncapped
+    /// report byte-identical to one rendered before the cap existed (#1089).
+    #[test]
+    fn renderers_name_a_cut_rule_and_add_nothing_when_none_was_cut() {
+        let mut c = Collector::new(Some(1));
+        add(&mut c, "AGS Format Rule 8", Some(5), "LOCA", "a");
+        add(&mut c, "AGS Format Rule 8", Some(6), "LOCA", "b");
+        add(&mut c, "AGS Format Rule 9", Some(2), "SAMP", "c");
+        let Collected {
+            findings,
+            truncated,
+        } = c.finish();
+
+        let json = findings_json("d.ags", &findings, &truncated);
+        let tail = json.split("\"truncated\"").nth(1).expect("a truncated key");
+        assert!(
+            tail.contains("\"AGS Format Rule 8\"") && !tail.contains("Rule 9"),
+            "{json}"
+        );
+        assert!(
+            json.find("\"findings\"") < json.find("\"truncated\""),
+            "{json}"
+        );
+        let v = findings_json_value("d.ags", &findings, &truncated);
+        assert_eq!(
+            v["truncated"],
+            serde_json::json!({"AGS Format Rule 8": {"shown": 1, "total": 2}})
+        );
+
+        let nd = findings_ndjson(&findings, &truncated);
+        assert_eq!(
+            nd.lines().last(),
+            Some(r#"{"truncated":{"AGS Format Rule 8":{"shown":1,"total":2}}}"#)
+        );
+        assert_eq!(
+            nd.lines().count(),
+            3,
+            "two kept findings, one summary: {nd}"
+        );
+
+        let none = Truncated::new();
+        assert!(!findings_json("d.ags", &findings, &none).contains("truncated"));
+        assert!(!findings_ndjson(&findings, &none).contains("truncated"));
+    }
+
     /// The three renderers must actually emit the finding content — a canned
     /// empty/default return passes no assertion here.
     #[test]
@@ -321,21 +555,21 @@ mod tests {
         let mut f = Findings::new();
         add(&mut f, "AGS Format Rule 8", Some(5), "LOCA", "boom");
 
-        let v = findings_json_value("d.ags", &f);
+        let v = findings_json_value("d.ags", &f, &Truncated::new());
         assert_eq!(v["file"], serde_json::json!("d.ags"));
         assert_eq!(
             v["findings"]["AGS Format Rule 8"][0]["desc"],
             serde_json::json!("boom")
         );
 
-        let json = findings_json("d.ags", &f);
+        let json = findings_json("d.ags", &f, &Truncated::new());
         assert!(json.contains("\"file\": \"d.ags\""), "{json}");
         assert!(
             json.contains("boom") && json.contains("AGS Format Rule 8"),
             "{json}"
         );
 
-        let nd = findings_ndjson(&f);
+        let nd = findings_ndjson(&f, &Truncated::new());
         assert_eq!(
             nd.trim(),
             r#"{"rule":"AGS Format Rule 8","line":5,"group":"LOCA","desc":"boom"}"#

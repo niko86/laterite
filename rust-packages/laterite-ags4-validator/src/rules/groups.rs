@@ -56,7 +56,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::CheckOptions;
 use crate::dict::Dictionary;
-use crate::findings::{Findings, Location, Severity, add, add_at};
+use crate::findings::{Location, Severity, Sink, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::closeness::{MAX_SUGGESTIONS, nearest};
 
@@ -98,7 +98,7 @@ const RULE_18_FYI: &str = "FYI (Related to Rule 18)";
 
 const KNOWN_TRAN_AGS: &[&str] = &["4.0", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 
-pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found: &mut impl Sink) {
     single_row_group(parsed, "PROJ", RULE_13, found);
     single_row_group(parsed, "TRAN", RULE_14, found);
     rule_15(parsed, found);
@@ -156,7 +156,7 @@ fn abbr_list_is_case_insensitive(edition: crate::dict::DictVersion) -> bool {
 /// `'HDNG: Description of abbreviation "CODE" is "X" but it should
 /// be "Y" according to the standard abbreviations list.'`
 /// Mirrors python-ags4 `check.fyi_16_1`.
-fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut impl Sink) {
     let Some(abbr) = parsed.groups.get("ABBR") else {
         return;
     };
@@ -217,7 +217,7 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
 /// Warnings section is unimplemented). See OBSERVATIONS O-43. Complementary to
 /// [`rule_16_fyi`]: that fires when a standard code's description differs; this
 /// fires when the code itself isn't standard (the case `rule_16_fyi` skips).
-fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &mut impl Sink) {
     let Some(abbr) = parsed.groups.get("ABBR") else {
         return;
     };
@@ -298,7 +298,7 @@ fn or_list(codes: &[&str]) -> Option<String> {
 /// OBSERVATIONS O-58.
 fn rule_16_case_collision(
     parsed: &ParsedFile,
-    found: &mut Findings,
+    found: &mut impl Sink,
     label: &'static str,
     severity: Severity,
 ) {
@@ -362,7 +362,7 @@ fn rule_16_case_collision(
 /// (warnings-on) view, or python-ags4's FYI tier for `compat` — see `check`.
 fn tran_ags_unrecognised(
     parsed: &ParsedFile,
-    found: &mut Findings,
+    found: &mut impl Sink,
     label: &'static str,
     severity: Severity,
 ) {
@@ -408,7 +408,7 @@ fn column_values(g: &ParsedGroup, ci: usize) -> BTreeSet<&str> {
 }
 
 /// Rules 13/14 — PROJ/TRAN must exist with exactly one DATA row.
-fn single_row_group(parsed: &ParsedFile, code: &str, rule: &str, found: &mut Findings) {
+fn single_row_group(parsed: &ParsedFile, code: &str, rule: &str, found: &mut impl Sink) {
     let Some(g) = parsed.groups.get(code) else {
         add(found, rule, None, code, format!("{code} group not found."));
         return;
@@ -439,7 +439,7 @@ fn single_row_group(parsed: &ParsedFile, code: &str, rule: &str, found: &mut Fin
 
 /// Rule 15 — every unit used (UNIT rows + `PU`-typed DATA) must be
 /// defined in the UNIT group's `UNIT_UNIT` column.
-fn rule_15(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_15(parsed: &ParsedFile, found: &mut impl Sink) {
     let Some(unit_g) = parsed.groups.get("UNIT") else {
         add(found, RULE_15, None, "UNIT", "UNIT group not found.");
         return;
@@ -603,7 +603,7 @@ impl<'a> AbbrLookup<'a> {
 /// here would pass a file its importers refuse; but 4.2 says the ABBR list is
 /// not case-sensitive, so the error itself says why it still fires. It is a
 /// trailing sentence after the plain message, which compat's rewrite drops.
-fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mut Findings) {
+fn rule_16(parsed: &ParsedFile, dict: &Dictionary, include_fyi: bool, found: &mut impl Sink) {
     // Does the file use any PA column at all?
     let has_pa = parsed
         .group_order
@@ -723,7 +723,7 @@ fn suggestions(lookup: &AbbrLookup, dict: &Dictionary, hd: &str, p: &str) -> Opt
 
 /// Rule 17 — every TYPE code used in any group's TYPE row must be
 /// defined in the TYPE group's `TYPE_TYPE` column.
-fn rule_17(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_17(parsed: &ParsedFile, found: &mut impl Sink) {
     let Some(type_g) = parsed.groups.get("TYPE") else {
         add(found, RULE_17, None, "TYPE", "TYPE group not found.");
         return;
@@ -765,8 +765,8 @@ fn rule_17(parsed: &ParsedFile, found: &mut Findings) {
 /// `run_all`, so the presence of a Rule 9 finding *is* "the file uses
 /// a non-standard heading" (python-ags4 wires this the same way, by
 /// inspecting `rule_9`'s output).
-fn rule_18(parsed: &ParsedFile, found: &mut Findings) {
-    let non_standard = found.contains_key("AGS Format Rule 9");
+fn rule_18(parsed: &ParsedFile, found: &mut impl Sink) {
+    let non_standard = found.fired("AGS Format Rule 9");
     if non_standard && !parsed.groups.contains_key("DICT") {
         add(
             found,
@@ -794,7 +794,7 @@ fn rule_18(parsed: &ParsedFile, found: &mut Findings) {
 /// leaves the default verdict and the compat path untouched. The label is
 /// [`RULE_18_WARN`] (not `"AGS Format Rule 18"`) so the compat severity
 /// classifier never miscounts it as an error. Clean-room — laterite-originated.
-fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_18_structure(parsed: &ParsedFile, found: &mut impl Sink) {
     let Some(dictg) = parsed.groups.get("DICT") else {
         return; // a missing DICT is the error-tier `rule_18`'s job, not this.
     };
@@ -888,7 +888,7 @@ fn rule_18_redeclaration(
     parsed: &ParsedFile,
     dict: &Dictionary,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     if !opts.include_warnings && !opts.include_fyi {
         return; // nothing this emits is error-tier
@@ -1031,6 +1031,7 @@ fn same_status(a: &str, b: &str) -> bool {
 mod tests {
     use super::*;
     use crate::dict::DictVersion;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

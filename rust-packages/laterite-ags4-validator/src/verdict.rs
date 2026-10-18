@@ -18,13 +18,15 @@
 //! computed beside it, so the two cannot contradict each other. The invariant
 //! `is_valid == (exit_code == 0)` holds by construction, not by test.
 
-use crate::findings::{Findings, Severity};
+use crate::findings::{Findings, Severity, Truncated};
 
 /// What a validation run concluded, and the tier counts it concluded it from.
 ///
-/// Build with [`Verdict::of`]. The counts are of findings **present in the
-/// report** — a tier the caller did not ask for was never collected, so it
-/// counts zero here for the same reason it shows nothing there.
+/// Build with [`Verdict::of`]. The counts are of findings **the run made** — a
+/// tier the caller did not ask for was never collected, so it counts zero here
+/// for the same reason it shows nothing there. A finding a per-rule cap did not
+/// keep still counts (#1089): the cap bounds what a report holds, not what it
+/// concludes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Verdict {
     /// Findings at [`Severity::Error`]. These always fail.
@@ -40,15 +42,19 @@ pub struct Verdict {
 }
 
 impl Verdict {
-    /// Count `found` by tier and record whether warnings were asked to be
-    /// fatal.
+    /// Count `found`, plus what `truncated` says a cap did not keep, by tier, and
+    /// record whether warnings were asked to be fatal.
+    ///
+    /// `truncated` is a required argument, not a default, so a surface that
+    /// offers a cap cannot forget to count what it cut: under a cap of `0`,
+    /// `found` alone is empty and would read as a pass.
     ///
     /// `warnings_as_errors` is the caller's *request*, not a property of the
     /// findings, which is why it is stored rather than folded into the counts:
     /// a report and its verdict are different questions, and the tier counts
     /// stay meaningful under either answer.
     #[must_use]
-    pub fn of(found: &Findings, warnings_as_errors: bool) -> Self {
+    pub fn of(found: &Findings, truncated: &Truncated, warnings_as_errors: bool) -> Self {
         let mut v = Self {
             errors: 0,
             warnings: 0,
@@ -61,6 +67,11 @@ impl Verdict {
                 Severity::Warning => v.warnings += 1,
                 Severity::Fyi => v.fyi += 1,
             }
+        }
+        for cut in truncated.values() {
+            v.errors += cut.dropped(Severity::Error);
+            v.warnings += cut.dropped(Severity::Warning);
+            v.fyi += cut.dropped(Severity::Fyi);
         }
         v
     }
@@ -116,7 +127,7 @@ mod tests {
 
     #[test]
     fn a_clean_file_passes() {
-        let v = Verdict::of(&Findings::new(), false);
+        let v = Verdict::of(&Findings::new(), &Truncated::new(), false);
         assert!(v.is_valid());
         assert_eq!(v.exit_code(), 0);
         assert_eq!(v.total(), 0);
@@ -125,7 +136,7 @@ mod tests {
     #[test]
     fn an_error_always_fails() {
         for fatal in [false, true] {
-            let v = Verdict::of(&one(Severity::Error), fatal);
+            let v = Verdict::of(&one(Severity::Error), &Truncated::new(), fatal);
             assert!(!v.is_valid(), "an error must fail (fatal={fatal})");
             assert_eq!(v.exit_code(), 1);
         }
@@ -135,7 +146,7 @@ mod tests {
     fn a_warning_is_shown_but_does_not_fail() {
         // The whole point of #321: the finding is in the report (total counts
         // it) and the file still passes.
-        let v = Verdict::of(&one(Severity::Warning), false);
+        let v = Verdict::of(&one(Severity::Warning), &Truncated::new(), false);
         assert_eq!(v.warnings, 1);
         assert_eq!(v.total(), 1);
         assert!(v.is_valid());
@@ -144,7 +155,7 @@ mod tests {
 
     #[test]
     fn warnings_as_errors_makes_the_same_warning_fatal() {
-        let v = Verdict::of(&one(Severity::Warning), true);
+        let v = Verdict::of(&one(Severity::Warning), &Truncated::new(), true);
         assert_eq!(v.warnings, 1);
         assert!(!v.is_valid());
         assert_eq!(v.exit_code(), 1);
@@ -155,7 +166,7 @@ mod tests {
         // `--warnings-as-errors` says warnings, and means it. Escalating fyi
         // too would make the flag's name a lie and the tier unusable.
         for fatal in [false, true] {
-            let v = Verdict::of(&one(Severity::Fyi), fatal);
+            let v = Verdict::of(&one(Severity::Fyi), &Truncated::new(), fatal);
             assert_eq!(v.fyi, 1);
             assert!(v.is_valid(), "fyi must never fail (fatal={fatal})");
             assert_eq!(v.exit_code(), 0);
@@ -181,7 +192,7 @@ mod tests {
         }
         for found in [Findings::new(), one(Severity::Warning), mixed] {
             for fatal in [false, true] {
-                let v = Verdict::of(&found, fatal);
+                let v = Verdict::of(&found, &Truncated::new(), fatal);
                 assert_eq!(v.is_valid(), v.exit_code() == 0);
             }
         }
@@ -206,7 +217,7 @@ mod tests {
                 sev,
             );
         }
-        let v = Verdict::of(&f, false);
+        let v = Verdict::of(&f, &Truncated::new(), false);
         assert_eq!((v.errors, v.warnings, v.fyi), (1, 2, 1));
         assert_eq!(v.total(), 4);
     }

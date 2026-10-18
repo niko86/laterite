@@ -42,14 +42,14 @@
 //! dict ∪ the file's own DICT. This module is deliberately
 //! dictionary-free, which is why Rule 19b has two emission sites.
 
-use crate::findings::{Findings, Location, Severity, Target, add, add_at};
+use crate::findings::{Location, Severity, Sink, Target, add, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_19: &str = "AGS Format Rule 19";
 const RULE_19A: &str = "AGS Format Rule 19a";
 const RULE_19B: &str = "AGS Format Rule 19b";
 
-pub fn check(parsed: &ParsedFile, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, found: &mut impl Sink) {
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
 
@@ -78,7 +78,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
 /// Rule 19 — GROUP name: enforce the de-facto convention — **exactly
 /// 4 uppercase letters `[A-Z]`**. (Spec prose says "≤4 / letters and
 /// numbers" but 0 of 319 standard groups deviate; see O-6.)
-fn rule_19(code: &str, line: u32, found: &mut Findings) {
+fn rule_19(code: &str, line: u32, found: &mut impl Sink) {
     let ok = code.chars().count() == 4 && code.chars().all(|c| c.is_ascii_uppercase());
     if !ok {
         add_at(
@@ -103,7 +103,7 @@ fn rule_19(code: &str, line: u32, found: &mut Findings) {
 // group's heading count (dictionary-bounded, a few dozen at most), nowhere
 // near u32::MAX.
 #[allow(clippy::cast_possible_truncation)]
-fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
+fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut impl Sink) {
     let loc = || Location {
         target: Target::Heading,
         field_index: Some(ci as u32),
@@ -151,7 +151,7 @@ fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
 /// `19b_2/3` — resolved against standard dict ∪ the file's own DICT.
 // `ci` is bounded the same way as in `rule_19a` above.
 #[allow(clippy::cast_possible_truncation)]
-fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
+fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut impl Sink) {
     let loc = || Location {
         target: Target::Heading,
         field_index: Some(ci as u32),
@@ -197,6 +197,7 @@ fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

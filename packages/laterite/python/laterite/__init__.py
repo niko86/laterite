@@ -315,13 +315,14 @@ class Report:
         dict_version: The AGS dictionary edition the rules were resolved against.
         resolution: How that edition was resolved — ``"exact"`` / ``"guessed"`` / ``"fallback"`` / ``"forced"``.
         certified: ``True`` when an ``index=`` certificate answered the content half and the rule engine was skipped.
-        count: Number of findings shown (across whichever tiers were asked for).
+        count: Number of findings (across whichever tiers were asked for), including any ``max_findings_per_rule`` did not keep.
         errors: Findings at the error tier — the only tier that decides the verdict.
         warnings: Findings at the warning tier — fatal only under ``warnings_as_errors``.
         fyi: Findings at the fyi tier — never fatal.
         is_valid: The verdict, read from the engine — **not** ``count == 0``.
         exit_code: Process exit code mirroring the ``lat`` binary.
         findings: Flat polars frame, one row per finding (rule, line, group, desc, severity, target, heading, field_index, data_row).
+        truncated: ``{rule: {"shown": n, "total": m}}`` for each rule ``max_findings_per_rule`` cut; empty when nothing was.
     """
 
     __slots__ = ("_r",)
@@ -346,7 +347,24 @@ class Report:
 
     @property
     def count(self) -> int:
+        """How many findings the run made, across whichever tiers were asked for.
+
+        A total, not a length: under ``max_findings_per_rule`` it still counts the
+        findings the report did not keep, so it can exceed the rows of
+        [`findings`][laterite.Report.findings]. [`truncated`][laterite.Report.truncated]
+        says by how much, rule by rule."""
         return self._r["count"]
+
+    @property
+    def truncated(self) -> dict[str, dict[str, int]]:
+        """The rules ``max_findings_per_rule`` cut: ``{rule: {"shown": n, "total": m}}``.
+
+        ``shown`` is how many of the rule's findings the report holds (the cap) and
+        ``total`` how many it made. Empty when nothing was cut, which is always the
+        case without a cap. The verdict and every count cover all ``total``
+        findings, so a cut never changes [`is_valid`][laterite.Report.is_valid] or
+        [`count`][laterite.Report.count]."""
+        return {rule: dict(t) for rule, t in self._r.get("truncated", {}).items()}
 
     @property
     def certified(self) -> bool:
@@ -480,13 +498,16 @@ class Report:
     def to_json(self) -> str:
         """``{file, findings:{"AGS Format Rule N":[{line,group,desc}]}}`` —
         byte-identical to ``lat validate --json``. Rendered on each call, not held
-        by the report — keep the string if you need it twice."""
+        by the report — keep the string if you need it twice. A capped run that cut
+        a rule adds ``truncated: {rule: {shown, total}}`` after ``findings``."""
         return self._r["_found"].json()
 
     def to_ndjson(self) -> str:
         """One flat ``{rule,line,group,desc}`` per line — byte-identical to
         ``lat validate --ndjson``. Rendered on each call, like
-        [`to_json`][laterite.Report.to_json]."""
+        [`to_json`][laterite.Report.to_json]. A capped run that cut a rule ends with
+        one ``{"truncated": {rule: {shown, total}}}`` record, which has no ``rule``
+        key."""
         return self._r["_found"].ndjson()
 
     def __repr__(self) -> str:
@@ -950,6 +971,7 @@ class Ags4File:
         encoding: str | None = None,
         dictionary: str | Path | builtins.bytes | None = None,
         dict_replace: bool = False,
+        max_findings_per_rule: int | None = None,
     ) -> Self:
         """Validate this file against the AGS4 rules and return ``self`` (chainable —
         ``read(p).validate().query(...)``); the outcome lands on [`report`][laterite.Ags4File.report]. Same
@@ -994,7 +1016,12 @@ class Ags4File:
         as first-class rather than being flagged unknown. The base edition is detected from
         the dictionary itself; ``dict_version=`` forces it, or ``dict_replace=True`` drops
         it for a full replacement (the two cannot be combined). Re-parenting or overriding a
-        standard heading is honoured **and** reported as a warning."""
+        standard heading is honoured **and** reported as a warning.
+
+        ``max_findings_per_rule=N`` keeps at most ``N`` findings per rule, as
+        [`validate`][laterite.validate] does; the verdict and counts still cover every
+        finding, and [`Report.truncated`][laterite.Report.truncated] names the rules
+        that were cut."""
         self._last_dict_version = dict_version
         self._last_dictionary = dictionary
         self._last_dict_replace = dict_replace
@@ -1028,6 +1055,7 @@ class Ags4File:
             # this handle inherited from `read(index=)` was asserted THERE.
             strict_cert=False,
             retained=self._p["_handle"] if same_parse else None,
+            max_findings_per_rule=max_findings_per_rule,
         )
         self._report = Report(raise_for(r))
         return self
@@ -1743,6 +1771,7 @@ def _run_check(
     cert: Any,
     strict_cert: bool,
     retained: Any = None,
+    max_findings_per_rule: int | None = None,
 ) -> dict:
     """The one piece of plumbing under BOTH validate doors (#927).
 
@@ -1755,6 +1784,15 @@ def _run_check(
     reappear twice, which is the test it was extracted against.
     """
     dict_path, dict_bytes = _split_dict(dictionary)
+    if max_findings_per_rule is not None and (
+        isinstance(max_findings_per_rule, bool)
+        or not isinstance(max_findings_per_rule, int)
+        or max_findings_per_rule < 0
+    ):
+        raise ValueError(
+            "max_findings_per_rule must be a non-negative int or None, "
+            f"not {max_findings_per_rule!r}"
+        )
     return _native.run_check(
         path=path,
         text=txt,
@@ -1771,6 +1809,7 @@ def _run_check(
         cert=cert,
         strict_cert=strict_cert,
         retained=retained,
+        max_findings_per_rule=max_findings_per_rule,
     )
 
 
@@ -1787,6 +1826,7 @@ def validate(
     encoding: str | None = None,
     dictionary: str | Path | builtins.bytes | None = None,
     dict_replace: bool = False,
+    max_findings_per_rule: int | None = None,
 ) -> Report:
     """Run the AGS4.1 numbered-rules engine over a file and return its verdict as a
     [`Report`][laterite.Report]. This is the validate door: it answers *is this a conformant
@@ -1867,6 +1907,12 @@ def validate(
         dict_replace: Treat ``dictionary`` as a full replacement — drop the bundled
             base entirely rather than overlaying it (default ``False``). Cannot be
             combined with ``dict_version``.
+        max_findings_per_rule: Keep at most this many findings per rule (default
+            ``None``, every finding). Past it a rule is only counted, so a file whose
+            one defect repeats on every line costs the cap's worth of memory, not the
+            file's worth. The verdict and every count still cover all findings, and
+            [`Report.truncated`][laterite.Report.truncated] names the rules that were
+            cut. ``0`` keeps no findings, only the counts.
 
     Returns:
         A [`Report`][laterite.Report] — ``is_valid`` for the verdict at a glance,
@@ -1882,6 +1928,7 @@ def validate(
             edition (e.g. AGS3).
         BadDictError: ``dict_version`` is not a known edition, or ``dictionary`` is
             malformed / contradicts ``dict_replace``.
+        ValueError: ``max_findings_per_rule`` is negative or not an ``int``.
         StaleCertError: ``index=`` names a certificate whose size / SHA-256 do not
             match this file. Raised **before** the rule engine runs, because the
             point of naming a cert is to skip that work — finding the mismatch
@@ -1915,6 +1962,7 @@ def validate(
         # there, not here, and quietly re-validating is the right answer if the
         # file has since moved under it.
         strict_cert=cert is not None,
+        max_findings_per_rule=max_findings_per_rule,
     )
     return Report(raise_for(r))
 

@@ -220,8 +220,22 @@ def _box_table(headings: list[str], rows: list[list[str]], *, colour: bool) -> s
     return "\n".join(out) + "\n"
 
 
+def _non_negative_int(v: str) -> int:
+    """`--max-findings-per-rule N`: a count, so `-1` is refused rather than read as
+    "keep nothing" or "keep everything"."""
+    n = int(v)
+    if n < 0:
+        raise argparse.ArgumentTypeError(f"expected a non-negative integer, not {v}")
+    return n
+
+
 def _plain(
-    file: str, findings: list[dict], n: int, dict_version: str, resolution: str
+    file: str,
+    findings: list[dict],
+    n: int,
+    dict_version: str,
+    resolution: str,
+    truncated: dict | None = None,
 ) -> str:
     # `— dictionary <ed> (<res>)` rides the head line on the binary and here in
     # the same bytes (the two share a hand-kept layout the byte-parity test
@@ -239,10 +253,25 @@ def _plain(
         ]
         for f in findings
     ]
-    table = _box_table(
-        ["Rule", "Line", "Group", "Description"], rows, colour=_colour_enabled()
+    # Under `--max-findings-per-rule 0` nothing is kept, and the head line's count
+    # (always the total) stands alone, as on the binary.
+    table = (
+        _box_table(
+            ["Rule", "Line", "Group", "Description"], rows, colour=_colour_enabled()
+        )
+        if rows
+        else ""
     )
-    return f"{file}: {n} finding(s){dict_note}\n{table}"
+    return f"{file}: {n} finding(s){dict_note}\n{table}{_truncated_lines(truncated)}"
+
+
+def _truncated_lines(truncated: dict | None) -> str:
+    """One line per rule `--max-findings-per-rule` cut, in the binary's bytes. Empty
+    when nothing was cut, so an uncapped report is unchanged."""
+    return "".join(
+        f"truncated: {rule} — {t['shown']} of {t['total']} shown\n"
+        for rule, t in sorted((truncated or {}).items())
+    )
 
 
 def _engine(args: argparse.Namespace) -> dict:
@@ -257,6 +286,7 @@ def _engine(args: argparse.Namespace) -> dict:
         encoding=args.encoding,
         dict_path=args.dict,
         dict_replace=args.dict_replace,
+        max_findings_per_rule=args.max_findings_per_rule,
     )
 
 
@@ -314,6 +344,7 @@ def _with_cert(args: argparse.Namespace) -> dict:
             check_files=args.check_files,
             dictionary=args.dict,
             dict_replace=args.dict_replace,
+            max_findings_per_rule=args.max_findings_per_rule,
         ).report
     except Ags4Error as e:
         return {"ok": False, "error": str(e), "exit_code": e.exit_code}
@@ -343,13 +374,27 @@ def _run_validate(args: argparse.Namespace) -> int:
     elif args.ndjson:
         active = found.ndjson()
     else:
-        active = _plain(r["file"], found.items(), n, r["dict_version"], r["resolution"])
+        active = _plain(
+            r["file"],
+            found.items(),
+            n,
+            r["dict_version"],
+            r["resolution"],
+            r.get("truncated"),
+        )
 
     if args.json_out:
         with Path(args.json_out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(found.json() + "\n")
         sys.stdout.write(
-            _plain(r["file"], found.items(), n, r["dict_version"], r["resolution"])
+            _plain(
+                r["file"],
+                found.items(),
+                n,
+                r["dict_version"],
+                r["resolution"],
+                r.get("truncated"),
+            )
         )  # tee: plain still to stdout
         return code
 
@@ -1079,6 +1124,8 @@ def _build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--index")
     pv.add_argument("--out")
     pv.add_argument("--json-out")
+    # Keep at most N findings per rule; the verdict and counts still cover them all.
+    pv.add_argument("--max-findings-per-rule", type=_non_negative_int, metavar="N")
 
     prd = sub.add_parser("read", add_help=False, parents=[gp])
     prd.add_argument("file")

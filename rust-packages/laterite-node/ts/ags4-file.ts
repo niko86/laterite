@@ -29,7 +29,7 @@ import {
 import type { FixResult } from "./fix-result";
 import type { ExcelStats, GroupMeta } from "./native";
 import { Reading, Sidecar, parseArrow, runCheck } from "./native";
-import { Report } from "./report";
+import { Report, findingsCap } from "./report";
 import {
   AgsSubset,
   type AtOptions,
@@ -373,6 +373,8 @@ export class Ags4File {
           dictBytes,
           opts.dictReplace,
           this.#cert,
+          undefined,
+          findingsCap(opts.maxFindingsPerRule),
         ),
       ),
     );

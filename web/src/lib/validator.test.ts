@@ -51,6 +51,7 @@ const report = (findings: FindingDto[]): ValidationReport => ({
     ? [{ rule: "Rule 1", total: findings.length, items: findings }]
     : [],
   error: null,
+  truncated: {},
   revalidate_reason: null,
 });
 

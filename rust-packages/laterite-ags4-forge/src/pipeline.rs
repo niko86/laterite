@@ -68,18 +68,23 @@ pub fn rust_check(path: &Path) -> (RustResult, String) {
 /// is this with the counts dropped — one code path, so a Rust-only run and
 /// a dual-validated one can never disagree about what the validator said.
 pub fn rust_check_counted(path: &Path) -> (RustResult, BTreeMap<String, u64>, String) {
-    let opts = laterite_ags4_validator::CheckOptions {
-        include_fyi: true,
-        include_warnings: true,
-        check_files: true,
-        ..Default::default()
-    };
+    let mut opts = laterite_ags4_validator::CheckOptions::default();
+    opts.include_fyi = true;
+    opts.include_warnings = true;
+    opts.check_files = true;
+
     let p = path.to_path_buf();
     let res = catch_unwind(AssertUnwindSafe(|| {
         laterite_ags4_validator::check_file_with_dict(&p, &opts)
     }));
     match res {
-        Ok(Ok((found, dict, _res))) => (
+        Ok(Ok((
+            laterite_ags4_validator::findings::Collected {
+                findings: found, ..
+            },
+            dict,
+            _res,
+        ))) => (
             RustResult::from_findings(&found),
             rust_rule_counts(&found),
             format!("{dict:?}"),

@@ -32,6 +32,7 @@ const report = (findings: RuleGroup[]): ValidationReport => {
     shown_count: items.length,
     findings,
     error: null,
+    truncated: {},
     revalidate_reason: null,
   };
 };

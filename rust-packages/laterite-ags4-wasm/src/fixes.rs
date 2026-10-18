@@ -137,15 +137,20 @@ fn compute_fixes_core(
     let Ok(parsed) = parse_bytes(data, encoding) else {
         return Ok(Vec::new());
     };
-    let opts = CheckOptions {
-        dict_version: dict_over,
-        include_fyi: true,
-        encoding,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = dict_over;
+    opts.include_fyi = true;
+    opts.encoding = encoding;
     // Through the door, so the fixes offered in the browser are computed against the
     // same dictionary `lat fix` would use on the same bytes (the O-42 guard included).
-    let Ok((found, dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
+    let Ok((
+        laterite_ags4_validator::findings::Collected {
+            findings: found, ..
+        },
+        dv,
+        _kind,
+    )) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None)
+    else {
         return Ok(Vec::new());
     };
     let dict = laterite_ags4_validator::dict::Dictionary::bundled(dv);

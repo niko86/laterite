@@ -8877,6 +8877,7 @@ def run_check(
     cert: Any = ...,
     strict_cert: Any = ...,
     retained: Any = ...,
+    max_findings_per_rule: Any = ...,
 ) -> Any: ...
 def staged_write(path: Any, data: Any) -> Any: ...
 def transport_lock(

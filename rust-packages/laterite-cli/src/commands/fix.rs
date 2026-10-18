@@ -32,9 +32,10 @@ fn applied_fix_json(f: &laterite_ags4_validator::fixes::Fix) -> serde_json::Valu
 /// fixable (3/4/5 on read/parse/dict errors).
 pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
     let opts = apply_dict_args(
-        CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
+        {
+            let mut o = CheckOptions::default();
+            o.include_warnings = true;
+            o
         },
         &args.dict,
     );
