@@ -804,14 +804,13 @@ pub fn emit_ags4_unchecked(
 /// [`reclaim_bytes`], zero-copy out of the verdict's buffer.
 fn judge(parsed: ParsedFile, emitted_len: usize, opts: &EmitOpts) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
-    let copts = CheckOptions {
-        dict_version: Some(opts.edition),
-        ..CheckOptions::default()
-    };
+    let mut copts = CheckOptions::default();
+    copts.dict_version = Some(opts.edition);
     // Content-only by construction: bytes produced in memory have no
     // directory to sit beside, so there is no world to look at.
     let found = check_parsed(&parsed, &dict, &copts, &WorldScope::None)
-        .map_err(|e| EmitError::Reparse(e.to_string()))?;
+        .map_err(|e| EmitError::Reparse(e.to_string()))?
+        .findings;
     match opts.mode {
         EmitMode::Report => Ok(EmitResult {
             bytes: reclaim_bytes(parsed, emitted_len),
@@ -998,12 +997,11 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings)
     let parsed =
         parse_bytes(bytes, encoding_rs::UTF_8).map_err(|e| EmitError::Reparse(e.to_string()))?;
     let dict = Dictionary::bundled(edition);
-    let opts = CheckOptions {
-        dict_version: Some(edition),
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = Some(edition);
     let found = check_parsed(&parsed, &dict, &opts, &WorldScope::None)
-        .map_err(|e| EmitError::Reparse(e.to_string()))?;
+        .map_err(|e| EmitError::Reparse(e.to_string()))?
+        .findings;
     Ok((parsed, found))
 }
 
@@ -1366,10 +1364,8 @@ mod tests {
         }
 
         // Definition 1: the findings.
-        let copts = CheckOptions {
-            dict_version: Some(opts.edition),
-            ..CheckOptions::default()
-        };
+        let mut copts = CheckOptions::default();
+        copts.dict_version = Some(opts.edition);
         let f_built = check_parsed(&built, &dict, &copts, &WorldScope::None).expect("check built");
         let f_reparsed =
             check_parsed(&reparsed, &dict, &copts, &WorldScope::None).expect("check reparse");

@@ -157,16 +157,15 @@ fn capture(args: &BaselineArgs, ctx: Ctx, corpus_dir: &Path) -> Result<Baseline>
     let manifest = CrawlManifest::load(&manifest_path)
         .with_context(|| "load manifest (run `crawl` first?)")?;
 
-    let opts = CheckOptions {
-        dict_version,
-        custom_dict: None,
-        include_warnings: args.show_warnings,
-        include_fyi: args.show_fyi,
-        // Match `validate`'s default: Rule 20 on-disk stat ON (parity
-        // with python-ags4) unless explicitly opted out.
-        check_files: !args.no_check_files,
-        encoding: encoding_rs::UTF_8,
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = dict_version;
+    opts.custom_dict = None;
+    opts.include_warnings = args.show_warnings;
+    opts.include_fyi = args.show_fyi;
+    // Match `validate`'s default: Rule 20 on-disk stat ON (parity
+    // with python-ags4) unless explicitly opted out.
+    opts.check_files = !args.no_check_files;
+    opts.encoding = encoding_rs::UTF_8;
 
     let pb = progress_bar(manifest.files.len() as u64, ctx.quiet);
     pb.set_message("baselining");

@@ -7,7 +7,7 @@ import {
   type Component,
 } from "solid-js";
 import {
-  DEFAULT_MAX_PER_RULE,
+  DEFAULT_MAX_FINDINGS_PER_RULE,
   severityOf,
   type ValidationReport,
 } from "../../lib/validator";
@@ -116,7 +116,14 @@ export const ValidatePane: Component = () => {
       if (!b || b.length === 0) return null;
       return { b, dict: dictVersion(), enc: encoding() };
     },
-    (src) => runValidate(src.b, src.dict, true, src.enc, DEFAULT_MAX_PER_RULE),
+    (src) =>
+      runValidate(
+        src.b,
+        src.dict,
+        true,
+        src.enc,
+        DEFAULT_MAX_FINDINGS_PER_RULE,
+      ),
   );
 
   // EVERY read of the report goes through here. A Solid resource THROWS when

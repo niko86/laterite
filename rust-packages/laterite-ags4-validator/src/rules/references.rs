@@ -44,7 +44,7 @@ use std::collections::HashSet;
 
 use crate::dict::Dictionary;
 use crate::effective_dict::EffectiveDict;
-use crate::findings::{Findings, Location, Severity, Target, add, add_at};
+use crate::findings::{Location, Severity, Sink, Target, add, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_19B: &str = "AGS Format Rule 19b";
@@ -57,7 +57,7 @@ pub(crate) const RULE_20: &str = "AGS Format Rule 20";
 /// without a matching GROUP). python-ags4 hardcodes the same pair.
 const PREFIX_EXCEPTIONS: &[&str] = &["SPEC", "TEST"];
 
-pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut impl Sink) {
     // The Rule 18 union, read by the shared `effective_dict` module (#777).
     let eff = EffectiveDict::build(parsed, *dict);
 
@@ -182,7 +182,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
 
 /// Rule 20 (data level) — every `FILE_FSET` used must be defined in the
 /// FILE group; the FILE group must exist when `FILE_FSET` is used.
-fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_20(parsed: &ParsedFile, found: &mut impl Sink) {
     // (group, fset value, line, field_index, data_row) for every
     // alphanumeric FILE_FSET used. `ci` is the tag-stripped column index
     // of FILE_FSET; the data row's 1-based ordinal lets the UI tint the
@@ -259,6 +259,7 @@ fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
 mod tests {
     use super::*;
     use crate::dict::DictVersion;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

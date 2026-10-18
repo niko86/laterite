@@ -192,7 +192,12 @@ Enforced three ways, in descending strength:
    ```
    The next knob added to `CheckOptions` is caught because **adding it breaks the
    build** (the exhaustive `split_options` destructure) and the author must classify
-   it CONTENT / WORLD before it compiles. `custom_dict` — the deferred [[O-28]]
+   it CONTENT / WORLD before it compiles. (Since validator 0.21, #1089, `CheckOptions`
+   is `#[non_exhaustive]`, so `split_options` must end its pattern in `..`. The
+   exhaustive copy now lives in the validator crate, where a field is added, and points
+   the author back to `split_options`. `max_findings_per_rule` is filed as neither: it
+   decides what a report keeps, never what the engine counts, so a certificate answers a
+   capped and an uncapped request alike.) `custom_dict` — the deferred [[O-28]]
    external dictionary this section once named as the obvious untested case — landed
    in **laterite-dev#568** and exercised exactly this defence: it classified CONTENT (its identity
    is a pure function of the parsed dictionary, not the delivery file), so the

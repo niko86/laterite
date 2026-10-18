@@ -33,7 +33,7 @@
 //!   illegal).
 
 use crate::CheckOptions;
-use crate::findings::{Findings, Location, Severity, add, add_at};
+use crate::findings::{Location, Severity, Sink, add, add_at};
 use crate::parse::ParsedFile;
 use laterite_ags4_parse::scan::first_field;
 
@@ -45,7 +45,7 @@ const RULE_6: &str = "AGS Format Rule 6";
 
 const DESCRIPTORS: [&str; 5] = ["GROUP", "HEADING", "UNIT", "TYPE", "DATA"];
 
-pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut impl Sink) {
     // BOM finding fires once at line 1 if the file started with EF BB BF
     // (`parse_file_with_encoding` sets the flag — see parse.rs). python-ags4
     // emits a Rule 1 error AND a FYI (Related to Rule 1) for the BOM case;
@@ -93,7 +93,7 @@ pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
 }
 
 /// Rule 1 — character set.
-fn rule_1(line: &str, n: u32, opts: &CheckOptions, found: &mut Findings) {
+fn rule_1(line: &str, n: u32, opts: &CheckOptions, found: &mut impl Sink) {
     // The overwhelmingly common case is a pure-ASCII line, which is compliant.
     // `str::is_ascii` is a word-at-a-time byte scan, where the old per-char
     // `max_cp` loop decoded every scalar — so this replaces the hot path's only
@@ -157,7 +157,7 @@ fn first_codepoint_over(line: &str, threshold: u32) -> Option<u32> {
 }
 
 /// Rule 3 — leading data descriptor.
-fn rule_3(line: &str, n: u32, found: &mut Findings) {
+fn rule_3(line: &str, n: u32, found: &mut impl Sink) {
     // Only field 0 is needed. This used to call `split_ags_line`, which
     // allocates a Vec<String> of EVERY field (~21 allocations on a 20-column
     // DATA row) and then read one of them — on every line of every file, making
@@ -186,7 +186,7 @@ fn rule_3(line: &str, n: u32, found: &mut Findings) {
 /// the exact wording. We classify the deviation type and emit
 /// matching distinct descs so `compat.check_file` can parity-match
 /// without a translator branch.
-fn rule_5(line: &str, n: u32, found: &mut Findings) {
+fn rule_5(line: &str, n: u32, found: &mut impl Sink) {
     let desc = match check_quoting(line) {
         QuotingDeviation::Ok => return,
         QuotingDeviation::EmbeddedQuote => {
@@ -215,7 +215,7 @@ enum QuotingDeviation {
 /// Rule 6 — embedded carriage return inside row content. (Comma
 /// separation and inter-field newlines surface via Rule 5 / structural
 /// rules; this is the one independent Rule 6 check worth making.)
-fn rule_6(line: &str, n: u32, found: &mut Findings) {
+fn rule_6(line: &str, n: u32, found: &mut impl Sink) {
     // A CR or LF surviving in the line body is EMBEDDED: the quote-aware
     // splitter keeps an in-quote newline in the field (a row is NOT torn on
     // it — #422), and every legitimate terminator is consumed, so any CR/LF
@@ -298,6 +298,7 @@ fn check_quoting(line: &str) -> QuotingDeviation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str, fyi: bool) -> Findings {

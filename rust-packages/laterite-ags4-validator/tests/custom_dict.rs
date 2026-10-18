@@ -63,17 +63,13 @@ fn ags_and_json_dict_fixtures_converge() {
 
 #[test]
 fn overlay_makes_a_bespoke_group_valid() {
-    let with = CheckOptions {
-        custom_dict: Some(parse_fixture_dict("xtra.dict.json")),
-        include_warnings: true,
-        include_fyi: true,
-        ..Default::default()
-    };
-    let without = CheckOptions {
-        include_warnings: true,
-        include_fyi: true,
-        ..Default::default()
-    };
+    let mut with = CheckOptions::default();
+    with.custom_dict = Some(parse_fixture_dict("xtra.dict.json"));
+    with.include_warnings = true;
+    with.include_fyi = true;
+    let mut without = CheckOptions::default();
+    without.include_warnings = true;
+    without.include_fyi = true;
 
     let without_n = xtra_findings(&without);
     let with_n = xtra_findings(&with);

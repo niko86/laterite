@@ -81,6 +81,7 @@ pub laterite_ags4_trust::Outcome::dict_version: laterite_ags4_reference::dict::d
 pub laterite_ags4_trust::Outcome::findings: laterite_ags4_validator::findings::Findings
 pub laterite_ags4_trust::Outcome::resolution: laterite_ags4_reference::dict::DictResolution
 pub laterite_ags4_trust::Outcome::revalidate_reason: core::option::Option<laterite_ags4_core::index::RevalidateReason>
+pub laterite_ags4_trust::Outcome::truncated: laterite_ags4_validator::findings::Truncated
 impl core::fmt::Debug for laterite_ags4_trust::Outcome
 pub fn laterite_ags4_trust::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite_ags4_trust::Outcome

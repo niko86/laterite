@@ -6,7 +6,7 @@
 use std::process::exit;
 
 use laterite_ags4_trust::{Request, check};
-use laterite_ags4_validator::{CheckOptions, WorldScope, findings, verdict::Verdict};
+use laterite_ags4_validator::{CheckOptions, WorldScope, verdict::Verdict};
 use laterite_cliutil::{Spinner, write_atomic};
 
 use crate::cli::ValidateArgs;
@@ -19,9 +19,10 @@ use crate::render;
 /// the low-signal tier).
 fn options(args: &ValidateArgs) -> CheckOptions {
     let mut opts = apply_dict_args(
-        CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
+        {
+            let mut o = CheckOptions::default();
+            o.include_warnings = true;
+            o
         },
         &args.dict,
     );
@@ -34,6 +35,7 @@ fn options(args: &ValidateArgs) -> CheckOptions {
     if args.check_files {
         opts.check_files = true;
     }
+    opts.max_findings_per_rule = args.max_findings_per_rule;
     opts
 }
 
@@ -90,16 +92,17 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 cert::why(reason)
             );
         }
-        (o.findings, o.dict_version, o.resolution)
+        (o.findings, o.truncated, o.dict_version, o.resolution)
     });
 
     match result {
-        Ok((found, dv, resolution)) => {
+        Ok((found, cut, dv, resolution)) => {
             // `n` is what the report SHOWS (every tier the caller asked for);
             // `verdict` is what it CONCLUDES. They stopped being the same
-            // question in #321 — a warning prints and does not fail.
-            let n = findings::count(&found);
-            let verdict = Verdict::of(&found, args.warnings_as_errors);
+            // question in #321 — a warning prints and does not fail. Both count
+            // every finding, including any `--max-findings-per-rule` did not keep.
+            let verdict = Verdict::of(&found, &cut, args.warnings_as_errors);
+            let n = verdict.total();
 
             #[cfg(feature = "tui")]
             if args.tui {
@@ -126,7 +129,8 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
 
             // `--json-out`: always tee a JSON artifact, independent of stdout.
             if let Some(p) = args.json_out.as_deref() {
-                if let Err(e) = write_atomic(p, render::json_string(path, &found).as_bytes()) {
+                if let Err(e) = write_atomic(p, render::json_string(path, &found, &cut).as_bytes())
+                {
                     eprintln!("error: --json-out {}: {e}", p.display());
                     exit(3);
                 }
@@ -136,11 +140,11 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
             // `--out`: redirect the active format to a file; one confirmation line.
             if let Some(p) = args.out.as_deref() {
                 let body = if json {
-                    render::json_string(path, &found)
+                    render::json_string(path, &found, &cut)
                 } else if ndjson {
-                    render::ndjson_string(&found)
+                    render::ndjson_string(&found, &cut)
                 } else {
-                    render::plain_string(path, &found, n, dv.as_str(), resolution.as_str())
+                    render::plain_string(path, &found, &cut, n, dv.as_str(), resolution.as_str())
                 };
                 if let Err(e) = write_atomic(p, body.as_bytes()) {
                     eprintln!("error: --out {}: {e}", p.display());
@@ -151,9 +155,9 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
             }
 
             if json {
-                render::emit_json(path, &found);
+                render::emit_json(path, &found, &cut);
             } else if ndjson {
-                print!("{}", render::ndjson_string(&found));
+                print!("{}", render::ndjson_string(&found, &cut));
             } else if n == 0 {
                 // The dictionary that judged the file, and how it was chosen,
                 // is a FACT of the verdict — the launcher contract binds facts
@@ -161,10 +165,10 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 // shape, owned by render::plain_string, not a second copy here.
                 print!(
                     "{}",
-                    render::plain_string(path, &found, 0, dv.as_str(), resolution.as_str())
+                    render::plain_string(path, &found, &cut, 0, dv.as_str(), resolution.as_str())
                 );
             } else {
-                render::report_table(path, &found, n, dv.as_str(), resolution.as_str());
+                render::report_table(path, &found, &cut, n, dv.as_str(), resolution.as_str());
             }
             exit(code);
         }

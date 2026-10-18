@@ -36,7 +36,7 @@
 //! agrees; the Rule 5 strict-quote check (V1) is additive, not a
 //! reattribution.
 
-use crate::findings::{Findings, add};
+use crate::findings::{Sink, add};
 use crate::parse::{ParsedFile, split_ags_line};
 
 const RULE_2: &str = "AGS Format Rule 2";
@@ -44,7 +44,7 @@ const RULE_2A: &str = "AGS Format Rule 2a";
 const RULE_2B: &str = "AGS Format Rule 2b";
 const RULE_4: &str = "AGS Format Rule 4";
 
-pub fn check(parsed: &ParsedFile, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, found: &mut impl Sink) {
     rule_2_orphan_rows(parsed, found);
     rule_2a(parsed, found);
     for code in &parsed.group_order {
@@ -62,7 +62,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
 /// the file; we REPORT each orphan as a finding instead, so the validation
 /// report stays complete (see O-41). Walks `raw_lines` only up to the first
 /// GROUP, so a well-formed file (GROUP on line 1) pays one comparison.
-fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut impl Sink) {
     for rl in &parsed.raw_lines {
         let text = parsed.line_text(rl);
         if text.trim().is_empty() {
@@ -86,7 +86,7 @@ fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut Findings) {
 }
 
 /// Rule 2a — CR+LF line termination, every line.
-fn rule_2a(parsed: &ParsedFile, found: &mut Findings) {
+fn rule_2a(parsed: &ParsedFile, found: &mut impl Sink) {
     for rl in &parsed.raw_lines {
         if !rl.had_crlf {
             add(
@@ -101,7 +101,7 @@ fn rule_2a(parsed: &ParsedFile, found: &mut Findings) {
 }
 
 /// Rule 2 — each group must have ≥ 1 DATA row.
-fn rule_2(g: &crate::parse::ParsedGroup, found: &mut Findings) {
+fn rule_2(g: &crate::parse::ParsedGroup, found: &mut impl Sink) {
     if g.rows.is_empty() {
         add(
             found,
@@ -116,7 +116,7 @@ fn rule_2(g: &crate::parse::ParsedGroup, found: &mut Findings) {
 /// Rule 2b — UNIT/TYPE present and contiguous, in order, right after
 /// HEADING. (Missing HEADING is a Rule 4 finding, not 2b — keeps
 /// per-rule attribution aligned with python-ags4.)
-fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut Findings) {
+fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut impl Sink) {
     let at = g.group_line;
 
     match g.unit_line {
@@ -170,7 +170,7 @@ fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut Findings) {
 }
 
 /// Rule 4 — GROUP-row arity + UNIT/TYPE/DATA field-count == HEADING.
-fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut Findings) {
+fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut impl Sink) {
     // 4.1: the GROUP row carries only the descriptor + the group name.
     // Re-split the raw GROUP line, found BY NUMBER: line numbers are physical
     // and skip past a quoted field spanning a newline, so the index is not
@@ -247,6 +247,7 @@ fn rule_4(parsed: &ParsedFile, g: &crate::parse::ParsedGroup, found: &mut Findin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

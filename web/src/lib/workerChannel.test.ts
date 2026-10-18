@@ -110,7 +110,7 @@ const VALIDATE = {
   dict: null,
   includeFyi: true,
   encoding: "utf-8",
-  maxPerRule: null,
+  maxFindingsPerRule: null,
 } as const;
 
 describe("createChannel", () => {

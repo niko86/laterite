@@ -26,7 +26,7 @@
 //! O-11/O-12/O-13.
 
 use crate::dict::Dictionary;
-use crate::findings::{Findings, Location, Severity, Target, add_at};
+use crate::findings::{Location, Severity, Sink, Target, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_8: &str = "AGS Format Rule 8";
@@ -100,7 +100,7 @@ fn classify(code: &str) -> Check {
 // below u32::MAX for any real AGS4 file (dictionary-bounded heading count;
 // row count bounded by what's actually held in memory).
 #[allow(clippy::cast_possible_truncation)]
-pub fn check(parsed: &ParsedFile, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, found: &mut impl Sink) {
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         // No TYPE row → nothing to validate (python aborts the group
@@ -225,7 +225,7 @@ pub(crate) fn declared_type(
     dict: &Dictionary,
     include_warnings: bool,
     include_fyi: bool,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     if !include_warnings && !include_fyi {
         return;
@@ -306,7 +306,7 @@ fn flag_duplicate_ids(
     ci: usize,
     code: &str,
     ty: &str,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     use std::collections::HashMap;
     let mut counts: HashMap<&str, usize> = HashMap::new();
@@ -706,6 +706,7 @@ pub(crate) use laterite_ags4_types::{format_ndp, format_nsci, format_nsf};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

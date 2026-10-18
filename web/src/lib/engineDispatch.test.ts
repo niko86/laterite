@@ -103,7 +103,7 @@ const validateReq = (over = {}) =>
     dict: null,
     includeFyi: false,
     encoding: "utf-8",
-    maxPerRule: null,
+    maxFindingsPerRule: null,
     ...over,
   }) as Parameters<ReturnType<typeof createEngineDispatch>>[0];
 
@@ -424,7 +424,7 @@ describe("the request → engine argument contract", () => {
       warnings: true,
       fyi: false,
       encoding: "utf-8",
-      maxPerRule: undefined,
+      maxFindingsPerRule: undefined,
       dictionary: undefined,
       dictReplace: false,
     });
@@ -442,7 +442,7 @@ describe("the request → engine argument contract", () => {
       validateReq({
         dict: "4.1.1",
         includeFyi: true,
-        maxPerRule: 5,
+        maxFindingsPerRule: 5,
         dictBytes,
         dictReplace: true,
       }),
@@ -453,7 +453,7 @@ describe("the request → engine argument contract", () => {
       warnings: true,
       fyi: true,
       encoding: "utf-8",
-      maxPerRule: 5,
+      maxFindingsPerRule: 5,
       dictionary: dictBytes,
       dictReplace: true,
     });

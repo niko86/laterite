@@ -62,6 +62,12 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
     --index <path>       CONSUME an .ags.idx: a fresh (bytes unchanged), same-
                          engine, profile-covering cert lets the check SKIP the
                          rule engine; a stale / foreign cert is re-validated
+    --max-findings-per-rule <N>
+                         keep at most N findings per rule; past N a rule is only
+                         counted. The exit code and every count still cover all
+                         findings, and the report names each rule it cut
+                         (`truncated` in --json, a closing record in --ndjson).
+                         0 reports the counts alone
     --tui                interactive findings browser (needs the `tui` build feature)
 
 ## read <file> [group]

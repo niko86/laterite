@@ -7,6 +7,7 @@
 use std::io;
 use std::path::Path;
 
+use laterite_ags4_validator::findings::Truncated;
 use laterite_ags4_validator::{Findings, findings};
 use laterite_cliutil::{colour_enabled, styled_table, write_json_pretty};
 use serde_json::Value;
@@ -34,14 +35,35 @@ pub fn findings_table(found: &Findings, use_color: bool) -> String {
     styled_table(&["Rule", "Line", "Group", "Description"], rows, use_color).to_string()
 }
 
-pub fn report_table(path: &Path, found: &Findings, n: usize, dict: &str, resolution: &str) {
+pub fn report_table(
+    path: &Path,
+    found: &Findings,
+    cut: &Truncated,
+    n: usize,
+    dict: &str,
+    resolution: &str,
+) {
     // `dict`/`resolution` ride the head line: which dictionary judged the file
     // is a launcher-contract FACT, not decoration (#542).
     println!(
         "{}: {n} finding(s) — dictionary {dict} ({resolution})",
         path.display()
     );
-    println!("{}", findings_table(found, colour_enabled(false)));
+    if !found.is_empty() {
+        println!("{}", findings_table(found, colour_enabled(false)));
+    }
+    print!("{}", truncated_lines(cut));
+}
+
+/// One line per rule `--max-findings-per-rule` cut, after the table: the head
+/// line's count is the total, so the table alone would read as the whole report.
+/// Empty when nothing was cut, which keeps an uncapped report byte-identical.
+pub fn truncated_lines(cut: &Truncated) -> String {
+    use std::fmt::Write as _;
+    cut.iter().fold(String::new(), |mut s, (rule, t)| {
+        let _ = writeln!(s, "truncated: {rule} — {} of {} shown", t.shown, t.total);
+        s
+    })
 }
 
 /// The nested report value `{file, findings:{rule:[{line,group,desc}]}}`. Shared
@@ -52,20 +74,20 @@ pub fn report_table(path: &Path, found: &Findings, n: usize, dict: &str, resolut
 /// lives beside `Finding` in `laterite_ags4_validator::findings` so this
 /// binary, laterite-py and laterite-node cannot spell `--json` differently
 /// (laterite-dev#530).
-pub fn json_value(path: &Path, found: &Findings) -> Value {
-    findings::findings_json_value(&path.display().to_string(), found)
+pub fn json_value(path: &Path, found: &Findings, cut: &Truncated) -> Value {
+    findings::findings_json_value(&path.display().to_string(), found, cut)
 }
 
 /// Plain pretty JSON (never coloured) — for files (`--out`/`--json-out`).
-pub fn json_string(path: &Path, found: &Findings) -> String {
-    findings::findings_json(&path.display().to_string(), found)
+pub fn json_string(path: &Path, found: &Findings, cut: &Truncated) -> String {
+    findings::findings_json(&path.display().to_string(), found, cut)
 }
 
 /// One flat JSON object per finding per line (NDJSON). Stream/grep friendly;
 /// identical whether it goes to stdout or a file (no colour). Empty (no lines)
 /// when there are zero findings.
-pub fn ndjson_string(found: &Findings) -> String {
-    findings::findings_ndjson(found)
+pub fn ndjson_string(found: &Findings, cut: &Truncated) -> String {
+    findings::findings_ndjson(found, cut)
 }
 
 /// The plain report rendered to a `String` (no colour) — for `--out` when
@@ -73,6 +95,7 @@ pub fn ndjson_string(found: &Findings) -> String {
 pub fn plain_string(
     path: &Path,
     found: &Findings,
+    cut: &Truncated,
     n: usize,
     dict: &str,
     resolution: &str,
@@ -83,17 +106,22 @@ pub fn plain_string(
             path.display()
         );
     }
+    let table = if found.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", findings_table(found, false))
+    };
     format!(
-        "{}: {n} finding(s) — dictionary {dict} ({resolution})\n{}\n",
+        "{}: {n} finding(s) — dictionary {dict} ({resolution})\n{table}{}",
         path.display(),
-        findings_table(found, false)
+        truncated_lines(cut)
     )
 }
 
 /// `--json` to stdout: the report value rendered rich-style (coloured on a TTY)
 /// or plain pretty otherwise, via the shared writer.
-pub fn emit_json(path: &Path, found: &Findings) {
-    let v = json_value(path, found);
+pub fn emit_json(path: &Path, found: &Findings, cut: &Truncated) {
+    let v = json_value(path, found, cut);
     let mut out = io::stdout().lock();
     let _ = write_json_pretty(&mut out, &v, colour_enabled(false));
 }
@@ -118,7 +146,7 @@ mod tests {
 
     #[test]
     fn ndjson_is_one_object_per_finding() {
-        let s = ndjson_string(&sample());
+        let s = ndjson_string(&sample(), &Truncated::new());
         let lines: Vec<&str> = s.lines().collect();
         assert_eq!(lines.len(), 2);
         let a: Value = serde_json::from_str(lines[0]).unwrap();
@@ -128,26 +156,64 @@ mod tests {
         assert_eq!(a["desc"], "bad \"value\""); // quotes escaped correctly
         let b: Value = serde_json::from_str(lines[1]).unwrap();
         assert!(b["line"].is_null()); // None → null
-        assert_eq!(ndjson_string(&Findings::new()), ""); // zero findings → empty
+        assert_eq!(ndjson_string(&Findings::new(), &Truncated::new()), ""); // zero findings → empty
     }
 
     #[test]
     fn json_string_round_trips() {
-        let v: Value = serde_json::from_str(&json_string(Path::new("x.ags"), &sample())).unwrap();
+        let v: Value = serde_json::from_str(&json_string(
+            Path::new("x.ags"),
+            &sample(),
+            &Truncated::new(),
+        ))
+        .unwrap();
         assert_eq!(v["file"], "x.ags");
         assert!(v["findings"]["AGS Format Rule 8"].is_array());
     }
 
     #[test]
     fn plain_string_reports_clean_and_findings() {
-        let clean = plain_string(Path::new("x.ags"), &Findings::new(), 0, "4.1.1", "exact");
+        let clean = plain_string(
+            Path::new("x.ags"),
+            &Findings::new(),
+            &Truncated::new(),
+            0,
+            "4.1.1",
+            "exact",
+        );
         assert!(clean.contains("clean (0 findings)"));
         assert!(
             clean.contains("— dictionary 4.1.1 (exact)"),
             "the judging dictionary is a launcher-contract fact (#542)"
         );
-        let p = plain_string(Path::new("x.ags"), &sample(), 2, "4.0.4", "fallback");
+        let p = plain_string(
+            Path::new("x.ags"),
+            &sample(),
+            &Truncated::new(),
+            2,
+            "4.0.4",
+            "fallback",
+        );
         assert!(p.contains("2 finding(s)") && p.contains("LOCA"));
         assert!(p.contains("— dictionary 4.0.4 (fallback)"));
+        assert!(!p.contains("truncated"), "nothing was cut: {p}");
+    }
+
+    #[test]
+    fn plain_string_names_each_cut_rule_after_the_table() {
+        use laterite_ags4_validator::findings::{Collected, Collector};
+        let mut c = Collector::new(Some(0));
+        add(&mut c, "AGS Format Rule 2a", Some(1), "", "a");
+        add(&mut c, "AGS Format Rule 2a", Some(2), "", "b");
+        let Collected {
+            findings,
+            truncated,
+        } = c.finish();
+        let p = plain_string(Path::new("x.ags"), &findings, &truncated, 2, "4.1", "exact");
+        assert_eq!(
+            p,
+            "x.ags: 2 finding(s) — dictionary 4.1 (exact)\n\
+             truncated: AGS Format Rule 2a — 0 of 2 shown\n"
+        );
     }
 }

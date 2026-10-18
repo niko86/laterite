@@ -23,7 +23,9 @@ use laterite_ags4_core::ags4_codec::{ReadOptions, read_ags4_bytes_with};
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, TranStamp, emit_ags4};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
-use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed_with_dict};
+use laterite_ags4_validator::{
+    CheckOptions, WorldScope, check_file_with_dict, check_parsed_with_dict,
+};
 
 pub use build::{
     Build, BuildSaved, BuildUnchecked, Cell, GroupData, build, build_document, build_unchecked,
@@ -42,7 +44,7 @@ pub use fix::{Fix, Fixed, Repair, fix, fix_bytes, fix_str, fixable_rules};
 pub use merge::{
     Merge, Merged, MissingTran, Note, Revision, TypeClash, merge, merge_bytes, merge_documents,
 };
-pub use report::{Finding, Report, Severity};
+pub use report::{Finding, Report, Severity, Truncation};
 
 use crate::{Error, ErrorKind};
 
@@ -423,6 +425,7 @@ pub struct Validate {
     edition: Option<String>,
     encoding: Option<String>,
     check_files: bool,
+    max_findings_per_rule: Option<usize>,
 }
 
 /// Validate an AGS4 file on disk against the numbered rules.
@@ -439,6 +442,7 @@ pub fn validate(path: impl AsRef<Path>) -> Validate {
         edition: None,
         encoding: None,
         check_files: false,
+        max_findings_per_rule: None,
     }
 }
 
@@ -465,6 +469,7 @@ pub fn validate_bytes(bytes: impl Into<Vec<u8>>) -> Validate {
         edition: None,
         encoding: None,
         check_files: false,
+        max_findings_per_rule: None,
     }
 }
 
@@ -485,6 +490,7 @@ pub fn validate_str(text: impl Into<String>) -> Validate {
         edition: None,
         encoding: None,
         check_files: false,
+        max_findings_per_rule: None,
     }
 }
 
@@ -557,18 +563,30 @@ impl Validate {
         self
     }
 
+    /// Keep at most `n` findings per rule; past it a rule only counts.
+    ///
+    /// For a file whose one defect repeats on every line, where the full list costs
+    /// memory in proportion to the file and says nothing the first few findings do
+    /// not. The verdict and [`Report::count`] still cover every finding, and
+    /// [`Report::truncated`] names the rules that were cut. `0` keeps no findings,
+    /// only the counts. Unset, every finding is kept.
+    #[must_use]
+    pub fn max_findings_per_rule(mut self, n: usize) -> Validate {
+        self.max_findings_per_rule = Some(n);
+        self
+    }
+
     /// Do it.
     pub fn run(self) -> Result<Report, Error> {
-        let opts = CheckOptions {
-            dict_version: self.edition.as_deref().map(resolve_edition).transpose()?,
-            custom_dict: None,
-            include_warnings: self.warnings,
-            include_fyi: self.fyi,
-            check_files: self.check_files,
-            // `resolve_encoding(None)` is UTF-8, so one call covers both arms.
-            encoding: laterite_ags4_parse::resolve_encoding(self.encoding.as_deref())
-                .ok_or_else(|| bad_encoding(self.encoding.as_deref().unwrap_or_default()))?,
-        };
+        let mut opts = CheckOptions::default();
+        opts.dict_version = self.edition.as_deref().map(resolve_edition).transpose()?;
+        opts.include_warnings = self.warnings;
+        opts.include_fyi = self.fyi;
+        opts.check_files = self.check_files;
+        // `resolve_encoding(None)` is UTF-8, so one call covers both arms.
+        opts.encoding = laterite_ags4_parse::resolve_encoding(self.encoding.as_deref())
+            .ok_or_else(|| bad_encoding(self.encoding.as_deref().unwrap_or_default()))?;
+        opts.max_findings_per_rule = self.max_findings_per_rule;
         // Text is decoded already, so its bytes must be read back as UTF-8
         // whatever `encoding` says. `resolve_encoding(None)` is UTF-8 — the same
         // fact the comment above relies on.
@@ -611,21 +629,24 @@ impl Validate {
             })
             .map_err(|e| Error::with_source(validator_kind(e.kind()), "cannot validate", e))?;
 
-            return Ok(Report {
-                findings: convert(outcome.findings),
-                certified: outcome.certified,
-                revalidate_reason: outcome.revalidate_reason.map(|r| r.as_str().to_string()),
-            });
+            return Ok(Report::new(
+                laterite_ags4_validator::findings::Collected {
+                    findings: outcome.findings,
+                    truncated: outcome.truncated,
+                },
+                outcome.certified,
+                outcome.revalidate_reason.map(|r| r.as_str().to_string()),
+            ));
         }
 
-        // Both arms end at `check_parsed_with_dict` — `check_file` reaches it too.
+        // Every arm ends at `check_parsed_with_dict` — `check_file_with_dict` reaches it too.
         // That is not incidental: resolving `TRAN_AGS` and applying the 4.0.3→4.0.4
         // content guard is four steps, and the engine records that every surface
         // which hand-assembled them got the guard wrong, judging one file against
         // two dictionaries depending on whether it arrived as a path or as bytes.
         // Whatever this does, it must not become a fifth place that gets it wrong.
         let result = match &self.source {
-            Source::Path(p) => check_file(p, &opts),
+            Source::Path(p) => check_file_with_dict(p, &opts).map(|(f, _, _)| f),
             Source::Bytes(b) => parse_bytes(b, opts.encoding).and_then(|parsed| {
                 // `WorldScope::None` is the honest scope for bytes, and it is what
                 // turns `check_files` into an error inside the engine rather than a
@@ -670,11 +691,7 @@ impl Validate {
                 Error::with_source(kind, subject, e)
             }
         })?;
-        Ok(Report {
-            findings: convert(findings),
-            certified: false,
-            revalidate_reason: None,
-        })
+        Ok(Report::new(findings, false, None))
     }
 }
 
@@ -1033,6 +1050,7 @@ impl std::fmt::Debug for Validate {
                 },
             )
             .field("check_files", &self.check_files)
+            .field("max_findings_per_rule", &self.max_findings_per_rule)
             .finish()
     }
 }

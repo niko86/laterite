@@ -74,7 +74,7 @@ interface WasmGlue {
       warnings?: boolean;
       fyi?: boolean;
       encoding?: string;
-      maxPerRule?: number;
+      maxFindingsPerRule?: number;
       dictionary?: Uint8Array;
       dictReplace?: boolean;
     },

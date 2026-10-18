@@ -145,19 +145,21 @@ impl Fix {
             Source::Text(_) => None,
             _ => self.encoding.as_deref(),
         };
-        let opts = CheckOptions {
-            dict_version: self.edition.as_deref().map(resolve_edition).transpose()?,
-            custom_dict: None,
+        let opts = {
+            let mut o = CheckOptions::default();
+            o.dict_version = self.edition.as_deref().map(resolve_edition).transpose()?;
+            o.custom_dict = None;
             // Errors AND warnings in the residual, unconditionally — not this
             // crate's errors-only `validate` default. A fix run's residual is an
             // account of what it could not put right, and an errors-only account
             // under-reports that. The other surfaces settled here for the same
             // reason, so one file's residual reads the same wherever it is fixed.
-            include_warnings: true,
-            include_fyi: false,
-            check_files: false,
-            encoding: laterite_ags4_parse::resolve_encoding(label)
-                .ok_or_else(|| bad_encoding(label.unwrap_or_default()))?,
+            o.include_warnings = true;
+            o.include_fyi = false;
+            o.check_files = false;
+            o.encoding = laterite_ags4_parse::resolve_encoding(label)
+                .ok_or_else(|| bad_encoding(label.unwrap_or_default()))?;
+            o
         };
 
         let outcome =

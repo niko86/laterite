@@ -536,7 +536,7 @@ export declare function rowOrderModes(): Array<string>
  * errors alone — `warningsAsErrors` (default `false`) is the separate dial that
  * makes warnings fatal too, the compiler's `-Werror`. FYIs never fail.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null, strictCert?: boolean | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null, strictCert?: boolean | undefined | null, maxFindingsPerRule?: number | undefined | null): ValidationReport
 
 /**
  * One requested ABBR code rewrite `fix` left undone — the Node mirror of the
@@ -612,6 +612,16 @@ export declare function transportUnpack(src: string, dest: string): UnpackStats
 export declare function transportUnpackBytes(data: Uint8Array): Buffer
 
 /**
+ * A rule `maxFindingsPerRule` cut (#1089): it kept `shown` of its `total` findings.
+ * A list in rule order here; the TS `Report.truncated` keys it by `rule`.
+ */
+export interface TruncatedRule {
+  rule: string
+  shown: number
+  total: number
+}
+
+/**
  * The `--on-type-clash` modes merge accepts, in declaration order —
  * `["error", "widen", "promote"]`.
  *
@@ -652,7 +662,10 @@ export interface ValidationReport {
   file: string
   dictVersion: string
   resolution: string
-  /** Every finding in the report, whatever its tier — what it SHOWS. */
+  /**
+   * Every finding the run made, whatever its tier — what it SHOWS. A total:
+   * under `maxFindingsPerRule` it also counts the findings `findings` did not keep.
+   */
   count: number
   /**
    * The verdict — what it CONCLUDES (#321). Not `count == 0`: a warning is
@@ -679,6 +692,8 @@ export interface ValidationReport {
    */
   revalidateReason?: string
   findings: Array<Finding>
+  /** The rules `maxFindingsPerRule` cut, in rule order; empty when nothing was. */
+  truncated: Array<TruncatedRule>
   json: string
   ndjson: string
 }

@@ -105,8 +105,12 @@ pub fn editions_joined(sep: &str) -> String {
 }
 
 /// Validation options. `Default` = **auto-detect** the dictionary from
-/// the file's `TRAN_AGS`, errors only.
+/// the file's `TRAN_AGS`, errors only, every finding kept.
+///
+/// `#[non_exhaustive]`: build one from `CheckOptions::default()` and set the
+/// fields you need, so a knob added later is not a breaking change.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct CheckOptions {
     /// `None` ⇒ auto-select the bundled edition from the file's
     /// `TRAN_AGS` (the default — see [`resolve_dict_version`]).
@@ -144,6 +148,13 @@ pub struct CheckOptions {
     /// `encoding_rs`'s lossy mode (undefined bytes → U+FFFD,
     /// matching python-ags4's `errors='replace'`).
     pub encoding: &'static encoding_rs::Encoding,
+    /// Keep at most this many findings per rule (#1089). Past it a rule only
+    /// counts, so a file with one finding per line holds the cap's worth of
+    /// findings, not the file's worth. The verdict and every count stay totals;
+    /// [`findings::Collected::truncated`] names the rules that were cut. `Some(0)`
+    /// keeps no findings at all, only the counts. `None` (the default) keeps
+    /// every finding.
+    pub max_findings_per_rule: Option<usize>,
 }
 
 impl Default for CheckOptions {
@@ -155,8 +166,27 @@ impl Default for CheckOptions {
             include_fyi: false,
             check_files: false, // path-independent by default (O-27)
             encoding: encoding_rs::UTF_8,
+            max_findings_per_rule: None, // keep every finding
         }
     }
+}
+
+// The exhaustive destructure `laterite-ags4-trust`'s `split_options` used to hold.
+// `#[non_exhaustive]` forbids it outside this crate, so it lives here, where a new
+// field is added: this stops compiling until the author lists the field below and
+// classifies it in `split_options` too. That function decides whether a certificate
+// may speak for a knob, and a knob nobody classified is a future false clean.
+#[allow(dead_code)]
+fn every_knob_is_classified_in_trust(opts: &CheckOptions) {
+    let CheckOptions {
+        dict_version: _,
+        custom_dict: _,
+        include_warnings: _,
+        include_fyi: _,
+        check_files: _,
+        encoding: _,
+        max_findings_per_rule: _,
+    } = opts;
 }
 
 /// The file's declared `TRAN_AGS` value (TRAN group, first DATA row,
@@ -238,8 +268,15 @@ pub fn resolve_dict_version(
 /// one), then runs every enabled rule. Rule *violations* come back as
 /// [`Findings`]; only un-validatable inputs (missing, non-UTF-8, not
 /// AGS4, unsupported edition) return `Err`.
+///
+/// **Every finding, whatever `opts.max_findings_per_rule` says.** A bare
+/// [`Findings`] has nowhere to record what a cap cut, and a capped map read as the
+/// whole answer is a false clean under a cap of `0`. A caller that wants the cap
+/// goes through [`check_file_with_dict`], which says what it cut.
 pub fn check_file(path: &Path, opts: &CheckOptions) -> Result<Findings, ValidatorError> {
-    check_file_with_dict(path, opts).map(|(f, _, _)| f)
+    let mut uncapped = opts.clone();
+    uncapped.max_findings_per_rule = None;
+    check_file_with_dict(path, &uncapped).map(|(c, _, _)| c.findings)
 }
 
 /// Run the rules over an already-parsed file — **the one door into the engine**.
@@ -257,19 +294,36 @@ pub fn check_file(path: &Path, opts: &CheckOptions) -> Result<Findings, Validato
 /// read, and wasm always — the honest answer is
 /// [`ValidatorError::WorldCheckRequiresSource`], not a clean Rule 20. The engine
 /// used to give the clean one.
+///
+/// `opts.max_findings_per_rule` caps what each rule keeps, as the rules run, so a
+/// capped run never holds more than the cap per rule. What the cap cut comes back
+/// in [`findings::Collected::truncated`].
 pub fn check_parsed(
     parsed: &parse::ParsedFile,
     dict: &Dictionary,
     opts: &CheckOptions,
     world: &WorldScope,
-) -> Result<Findings, ValidatorError> {
+) -> Result<findings::Collected, ValidatorError> {
+    let mut found = findings::Collector::new(opts.max_findings_per_rule);
+    check_parsed_into(parsed, dict, opts, world, &mut found)?;
+    Ok(found.finish())
+}
+
+/// [`check_parsed`] into a caller's collector, so the findings
+/// [`check_parsed_with_dict`] adds after the rules fall under the same cap.
+fn check_parsed_into(
+    parsed: &parse::ParsedFile,
+    dict: &Dictionary,
+    opts: &CheckOptions,
+    world: &WorldScope,
+    found: &mut findings::Collector,
+) -> Result<(), ValidatorError> {
     if opts.check_files && matches!(world, WorldScope::None) {
         return Err(ValidatorError::WorldCheckRequiresSource);
     }
-    let mut found: Findings = Findings::new();
-    rules::run_all(parsed, dict, opts, &mut found);
-    world::run(parsed, world, &mut found);
-    Ok(found)
+    rules::run_all(parsed, dict, opts, found);
+    world::run(parsed, world, found);
+    Ok(())
 }
 
 /// The world a caller with `source` and `opts` is entitled to look at: the
@@ -344,7 +398,7 @@ fn guard_4_0_4(
 pub fn check_file_with_dict(
     path: &Path,
     opts: &CheckOptions,
-) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
+) -> Result<(findings::Collected, DictVersion, DictResolution), ValidatorError> {
     let parsed = parse::parse_file_with_encoding(path, opts.encoding)?;
     // We have a path, so `--check-files` is answerable: Rule 20's on-disk half
     // can locate the sibling `FILE/` tree.
@@ -370,7 +424,8 @@ pub fn check_parsed_with_dict(
     parsed: &parse::ParsedFile,
     opts: &CheckOptions,
     world: &WorldScope,
-) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
+) -> Result<(findings::Collected, DictVersion, DictResolution), ValidatorError> {
+    let mut found = findings::Collector::new(opts.max_findings_per_rule);
     // The custom-dictionary path (laterite-dev#568): the base + delta are already fixed on
     // the `CustomDict` (parsed once at the surface boundary), so there is no
     // `TRAN_AGS` resolution and no 4.0.3→4.0.4 content guard — the caller chose
@@ -382,20 +437,20 @@ pub fn check_parsed_with_dict(
             reason: e.to_string(),
         })?;
         let dict = Dictionary::layered(&delta);
-        let mut found = check_parsed(parsed, &dict, opts, world)?;
+        check_parsed_into(parsed, &dict, opts, world, &mut found)?;
         // Honour + warn (laterite-dev#568 §3): the overlay takes effect, but every override
         // of a STANDARD group/heading is surfaced, so a bespoke dictionary can
         // never silently reshape the standard schema. Which TIER each override
         // lands in is the #321 surprise test — see the function.
         emit_override_findings(custom, &delta, opts, &mut found);
-        return Ok((found, custom.base_version, custom.resolution));
+        return Ok((found.finish(), custom.base_version, custom.resolution));
     }
 
     let (dv, kind) = resolve_dict_version(opts.dict_version, tran_ags_of(parsed).as_deref())?;
     let (dv, kind, upgraded_from_4_0_3) = guard_4_0_4(dv, kind, parsed);
     let dict = Dictionary::bundled(dv);
 
-    let mut found = check_parsed(parsed, &dict, opts, world)?;
+    check_parsed_into(parsed, &dict, opts, world, &mut found)?;
     // Transparency FYI (#222 / O-42): if we resolved UP from the file's
     // declared 4.0.3 to 4.0.4 because it uses 4.0.4-only vocabulary, say so —
     // TRAN_AGS and the file's content disagree, and the user may want to bump
@@ -415,7 +470,7 @@ pub fn check_parsed_with_dict(
             findings::Severity::Fyi,
         );
     }
-    Ok((found, dv, kind))
+    Ok((found.finish(), dv, kind))
 }
 
 /// Surface each override a custom overlay makes to a STANDARD group/heading
@@ -439,7 +494,7 @@ fn emit_override_findings(
     custom: &overlay::CustomDict,
     delta: &overlay::OwnedDelta,
     opts: &CheckOptions,
-    found: &mut Findings,
+    found: &mut findings::Collector,
 ) {
     if !custom.fall_through {
         return; // a full replacement redefines the schema wholesale, by design
@@ -650,6 +705,7 @@ mod tests {
         .expect("parses");
         let (found, _dv, _res) =
             check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+        let found = found.findings;
         let dict = found.get("DICT").expect("DICT override warnings");
         assert!(
             dict.iter()
@@ -719,6 +775,7 @@ mod tests {
             };
             let (found, _dv, _res) =
                 check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+            let found = found.findings;
             (
                 found.contains_key("DICT"),
                 found.contains_key("FYI (Related to DICT)"),
@@ -765,6 +822,7 @@ mod tests {
         .expect("parses");
         let (found, _dv, _res) =
             check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+        let found = found.findings;
         // Every branch here is an "overrides" line, so all three land in the FYI
         // bucket now — and the WARNING bucket must be absent entirely, which is
         // the assertion that would catch a demotion applied to the wrong branch.
@@ -993,7 +1051,8 @@ mod tests {
         let ags = tmp.path().join("site.ags"); // no FILE/ tree beside it
 
         let found = check_parsed(&pf, &dict, &opts, &WorldScope::OnDisk(ags))
-            .expect("a path makes the question answerable");
+            .expect("a path makes the question answerable")
+            .findings;
         assert!(
             found.contains_key("AGS Format Rule 20"),
             "missing FILE/ tree must flag Rule 20: {found:?}"
@@ -1007,7 +1066,8 @@ mod tests {
         let pf = parse::parse_str(WITH_ATTACHMENT).expect("parses");
         let dict = Dictionary::bundled(V4_2);
         let found = check_parsed(&pf, &dict, &CheckOptions::default(), &WorldScope::None)
-            .expect("content-only always answerable");
+            .expect("content-only always answerable")
+            .findings;
         assert!(
             !found.contains_key("AGS Format Rule 20"),
             "content-only must stay path-independent: {found:?}"

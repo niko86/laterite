@@ -1603,8 +1603,10 @@ pub fn fix_document_recoding(
     let tran = crate::tran_ags_of(&pf);
     let (dv, res) = crate::resolve_dict_version(opts.dict_version, tran.as_deref())?;
     let dict = crate::Dictionary::bundled(dv);
-    let mut found = Findings::new();
+    // Uncapped whatever `opts` asks: `compute_fixes` reads every finding.
+    let mut found = crate::findings::Collector::new(None);
     crate::rules::run_all(&pf, &dict, opts, &mut found);
+    let found = found.finish().findings;
 
     let mut selected = compute_fixes(&pf, &found, dict);
     let mut skipped = Vec::new();
@@ -1675,8 +1677,9 @@ pub fn fix_document_recoding(
     let tran2 = crate::tran_ags_of(&pf2);
     let (dv2, res2) = crate::resolve_dict_version(opts.dict_version, tran2.as_deref())?;
     let dict2 = crate::Dictionary::bundled(dv2);
-    let mut residual = Findings::new();
+    let mut residual = crate::findings::Collector::new(None);
     crate::rules::run_all(&pf2, &dict2, opts, &mut residual);
+    let residual = residual.finish().findings;
 
     Ok(FixOutcome {
         fixed,
@@ -1706,9 +1709,9 @@ mod tests {
             include_fyi: true,
             ..Default::default()
         };
-        let mut found = Findings::new();
+        let mut found = crate::findings::Collector::new(None);
         rules::run_all(&parsed, &dict, &opts, &mut found);
-        (parsed, found)
+        (parsed, found.finish().findings)
     }
 
     /// `as_str` and the serde spelling must be ONE spelling: the wasm surface

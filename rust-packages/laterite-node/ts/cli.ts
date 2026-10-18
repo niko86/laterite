@@ -122,13 +122,22 @@ const SPECS: Record<string, Spec> = {
       "index",
       "json",
       "json-out",
+      "max-findings-per-rule",
       "ndjson",
       "no-warnings",
       "out",
       "show-fyi",
       "warnings-as-errors",
     ],
-    valued: ["dict", "dict-version", "encoding", "index", "json-out", "out"],
+    valued: [
+      "dict",
+      "dict-version",
+      "encoding",
+      "index",
+      "json-out",
+      "max-findings-per-rule",
+      "out",
+    ],
     positionals: ["<file>"],
   },
   read: {
@@ -598,6 +607,15 @@ function validateWithCert(
   }
 }
 
+/** `--max-findings-per-rule N`: a count, refused (exit 5, as clap's parse error
+ *  maps) unless it is a non-negative integer. */
+function cap(v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  if (!/^\d+$/.test(v))
+    fail(`--max-findings-per-rule expects a non-negative integer, not ${v}`, 5);
+  return Number(v);
+}
+
 function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
   const file = p.positionals[0];
   if (!file) fail("validate needs a file", 5);
@@ -616,6 +634,7 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
     checkFiles: !!p.flags["check-files"],
     dictionary: str(p.flags["dict"]),
     dictReplace: !!p.flags["dict-replace"],
+    maxFindingsPerRule: cap(str(p.flags["max-findings-per-rule"])),
   };
   const index = str(p.flags["index"]);
   let report;
@@ -657,19 +676,24 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
         ? "  clean — no findings"
         : `  ${report.count} finding(s)`,
     ];
-    if (report.count !== 0) {
+    if (report.findings.length !== 0) {
       for (const line of report.toNdjson().trimEnd().split("\n")) {
         // NDJSON is our own `lat-check --ndjson` output (one flat finding per
         // line), so the shape is known — assert it rather than reading `any`.
         const f = JSON.parse(line) as {
-          rule: string;
+          rule?: string;
           line: number;
           group: string;
           desc: string;
         };
+        // The one record without a `rule` is a capped run's `truncated` summary,
+        // stated below in words.
+        if (f.rule === undefined) continue;
         lines.push(`    ${f.rule} (line ${f.line}, ${f.group}): ${f.desc}`);
       }
     }
+    for (const [rule, t] of Object.entries(report.truncated))
+      lines.push(`  truncated: ${rule} — ${t.shown} of ${t.total} shown`);
     emit(`${lines.join("\n")}\n`, out);
   }
   return report.exitCode;

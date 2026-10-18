@@ -530,6 +530,7 @@ pub fn laterite::ags4::Report::findings(&self) -> &[laterite::ags4::Finding]
 pub fn laterite::ags4::Report::is_empty(&self) -> bool
 pub fn laterite::ags4::Report::is_valid(&self) -> bool
 pub fn laterite::ags4::Report::revalidate_reason(&self) -> core::option::Option<&str>
+pub fn laterite::ags4::Report::truncated(&self) -> &[laterite::ags4::Truncation]
 impl core::fmt::Debug for laterite::ags4::Report
 pub fn laterite::ags4::Report::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Report
@@ -622,6 +623,26 @@ impl core::marker::Unpin for laterite::ags4::ToExcel
 impl core::marker::UnsafeUnpin for laterite::ags4::ToExcel
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::ToExcel
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::ToExcel
+pub struct laterite::ags4::Truncation
+impl laterite::ags4::Truncation
+pub fn laterite::ags4::Truncation::rule(&self) -> &str
+pub fn laterite::ags4::Truncation::shown(&self) -> usize
+pub fn laterite::ags4::Truncation::total(&self) -> usize
+impl core::clone::Clone for laterite::ags4::Truncation
+pub fn laterite::ags4::Truncation::clone(&self) -> Self
+impl core::cmp::Eq for laterite::ags4::Truncation
+impl core::cmp::PartialEq for laterite::ags4::Truncation
+pub fn laterite::ags4::Truncation::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite::ags4::Truncation
+pub fn laterite::ags4::Truncation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite::ags4::Truncation
+impl core::marker::Freeze for laterite::ags4::Truncation
+impl core::marker::Send for laterite::ags4::Truncation
+impl core::marker::Sync for laterite::ags4::Truncation
+impl core::marker::Unpin for laterite::ags4::Truncation
+impl core::marker::UnsafeUnpin for laterite::ags4::Truncation
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Truncation
+impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Truncation
 pub struct laterite::ags4::Validate
 impl laterite::ags4::Validate
 pub fn laterite::ags4::Validate::check_files(self, bool) -> laterite::ags4::Validate
@@ -630,6 +651,7 @@ pub fn laterite::ags4::Validate::encoding(self, impl core::convert::Into<alloc::
 pub fn laterite::ags4::Validate::fyi(self, bool) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::index(self, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::index_bytes(self, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::max_findings_per_rule(self, usize) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::run(self) -> core::result::Result<laterite::ags4::Report, laterite::Error>
 pub fn laterite::ags4::Validate::warnings(self, bool) -> laterite::ags4::Validate
 impl core::fmt::Debug for laterite::ags4::Validate

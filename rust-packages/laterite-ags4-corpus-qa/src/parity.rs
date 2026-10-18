@@ -396,13 +396,12 @@ mod tests {
         // (python reports every tier — Rule 1 is FYI in Rust). The
         // Findings→presence + error→variant mapping now lives in the
         // shared crate (RustResult::from_findings/from_validator_error).
-        let opts = laterite_ags4_validator::CheckOptions {
-            include_fyi: true,
-            include_warnings: true,
-            ..Default::default()
-        };
+        let mut opts = laterite_ags4_validator::CheckOptions::default();
+        opts.include_fyi = true;
+        opts.include_warnings = true;
+
         match laterite_ags4_validator::check_file_with_dict(p, &opts) {
-            Ok((found, _, _)) => RustResult::from_findings(&found),
+            Ok((found, _, _)) => RustResult::from_findings(&found.findings),
             Err(e) => RustResult::from_validator_error(&e),
         }
     }

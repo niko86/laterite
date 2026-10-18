@@ -40,13 +40,13 @@ use std::collections::BTreeSet;
 
 use crate::dict::Dictionary;
 use crate::effective_dict::EffectiveDict;
-use crate::findings::{Findings, Location, Severity, Target, add, add_at};
+use crate::findings::{Location, Severity, Sink, Target, add, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_7: &str = "AGS Format Rule 7";
 const RULE_9: &str = "AGS Format Rule 9";
 
-pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut impl Sink) {
     // The Rule 18 union (standard ∪ the file's own DICT group), read by the
     // shared `effective_dict` module (#777). Consumed here, validated in V6.
     let eff = EffectiveDict::build(parsed, *dict);
@@ -101,7 +101,7 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
 /// Rule 7 (duplicate-heading facet) — a HEADING row must not repeat a
 /// field name. Independent of the dictionary; attributed to Rule 7
 /// with an empty group, matching python-ags4's per-line attribution.
-fn rule_7_1(headings: &[String], line: u32, found: &mut Findings) {
+fn rule_7_1(headings: &[String], line: u32, found: &mut impl Sink) {
     let mut seen = BTreeSet::new();
     // The first heading that repeats names the offending field for the
     // UI; the set-level finding (`field_index: None`) still spans the
@@ -134,7 +134,7 @@ fn rule_7_2(
     known: &BTreeSet<&str>,
     line: u32,
     group: &str,
-    found: &mut Findings,
+    found: &mut impl Sink,
 ) {
     if !headings.iter().all(|h| known.contains(h.as_str())) {
         add(
@@ -182,6 +182,7 @@ fn rule_7_2(
 mod tests {
     use super::*;
     use crate::dict::DictVersion;
+    use crate::findings::Findings;
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {

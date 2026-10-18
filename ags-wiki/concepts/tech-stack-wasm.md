@@ -70,15 +70,16 @@ The crate exposes these `#[wasm_bindgen]` entry points — **ten** in every
 build, plus seven more behind the features described below
 (one module per verb under `repo:rust-packages/laterite-ags4-wasm/src`):
 
-- `validate(bytes, dict_version, include_fyi, encoding, max_per_rule)` → a
-  `ValidationReport` JS object — the whole clean-room rule engine run
-  in-browser with `source = None` (no filesystem). `max_per_rule` caps how
-  many findings per rule are **serialized** (every rule still runs over
-  every line); `finding_count`/`RuleGroup.total` keep the true totals and
-  `shown_count` reports what crossed the boundary. This is a UI safety
-  ceiling — a pathologically dirty file can yield millions of findings
-  (hundreds of MB of JSON) — and is **wasm-only**: the CLI's `--json` is
-  built independently in `repo:rust-packages/laterite-cli/src/main.rs`.
+- `validate(bytes, opts)` → a `ValidationReport` JS object — the whole
+  clean-room rule engine run in-browser with `source = None` (no filesystem).
+  `maxFindingsPerRule` caps how many findings per rule the **engine keeps**
+  (every rule still runs over every line and counts what it drops);
+  `finding_count`/`RuleGroup.total` keep the true totals, `truncated` names the
+  rules cut, and `shown_count` reports what crossed the boundary. A
+  pathologically dirty file can yield millions of findings (hundreds of MB of
+  JSON), and the cap is the UI's safety ceiling. It is the same option every
+  surface has (#1089); until then the browser had a wasm-only `maxPerRule` that
+  clipped only what was serialized, after the engine had kept everything.
 - `read(bytes, encoding)` → a `ParsedDataset` exposing `group_codes()`,
   `meta(code)` (`{headings, units, types, sql_types}`), and
   `arrow_ipc(code)` — one **typed Apache Arrow IPC stream per group**,

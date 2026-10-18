@@ -222,9 +222,15 @@ pub struct ValidateArgs {
     /// covering, skip the rule engine and report the certified verdict.
     #[arg(long, value_name = "PATH")]
     pub index: Option<PathBuf>,
+    /// Keep at most N findings per rule; past N a rule is only counted. The
+    /// verdict, exit code and counts still cover every finding, and the report
+    /// names the rules that were cut. 0 reports the counts alone.
+    #[arg(long, value_name = "N")]
+    pub max_findings_per_rule: Option<usize>,
     /// Interactive findings browser (needs the `tui` build feature + a terminal).
+    /// It browses every finding, so it takes no cap.
     #[cfg(feature = "tui")]
-    #[arg(long)]
+    #[arg(long, conflicts_with = "max_findings_per_rule")]
     pub tui: bool,
 }
 

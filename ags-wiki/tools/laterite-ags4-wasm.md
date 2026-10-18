@@ -157,11 +157,13 @@ none. [[tech-stack-wasm]] carries the split and the measurements:
   (`web/src/components/tools/Anonymiser.tsx`) is deleted. See
   [[dec-ags4-censor-leaf]].
 
-Since Phase 1.5, `validate` accepts a `maxPerRule` cap — today a named
-field of its options-object argument (`validate(data, opts)`), originally
-a positional 5th arg — a UI safety cap on findings *serialized* per rule
-(totals stay true) — and is called
-**inside a Web Worker**, never the main thread. See [[tech-stack-wasm]]
+`validate` takes a `maxFindingsPerRule` cap — a named field of its
+options-object argument (`validate(data, opts)`) — and is called
+**inside a Web Worker**, never the main thread. The cap reaches the ENGINE
+(#1089): a rule stops storing findings past it and only counts the rest, so the
+totals stay true and the report's `truncated` map names the rules it cut. It
+replaced Phase 1.5's `maxPerRule`, which clipped only what was *serialized*, after
+the engine had kept every finding. See [[tech-stack-wasm]]
 and [[validator-site]] Phase 1.5.
 
 ## Inputs / outputs

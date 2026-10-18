@@ -51,9 +51,10 @@ pub(crate) struct FindingDto {
 #[derive(Serialize)]
 pub(crate) struct RuleGroup {
     pub(crate) rule: String,
-    /// True number of findings for this rule, **before** any serialization
-    /// cap. `items.len()` may be smaller when `max_per_rule` clips the tail;
-    /// the UI shows "N of `total`" so a cap never hides the real count.
+    /// True number of findings for this rule, **before** any cap. `items.len()`
+    /// may be smaller when `max_findings_per_rule` stopped the engine keeping them
+    /// (or the boundary budget in [`run`] clipped the tail); the UI shows
+    /// "N of `total`" so a cap never hides the real count.
     pub(crate) total: usize,
     pub(crate) items: Vec<FindingDto>,
 }
@@ -94,10 +95,14 @@ pub(crate) struct ValidationReport {
     pub(crate) fyi: usize,
     /// How many `FindingDto` were actually serialized into `findings`
     /// (the sum of each group's `items.len()`). Equals `finding_count`
-    /// when uncapped; smaller when `max_per_rule` clipped some groups, so
+    /// when uncapped; smaller when `max_findings_per_rule` cut some rules, so
     /// the UI can say "showing `shown_count` of `finding_count`".
     pub(crate) shown_count: usize,
     pub(crate) findings: Vec<RuleGroup>,
+    /// `{rule: {shown, total}}` for each rule `maxFindingsPerRule` cut in the
+    /// engine (#1089) — the same map Python's `Report.truncated` and Node's
+    /// `report.truncated` carry. Empty without that option.
+    pub(crate) truncated: laterite_ags4_validator::findings::Truncated,
     pub(crate) error: Option<ValErr>,
     /// Why a proffered `.ags.idx` certificate did NOT stand in for the rule engine,
     /// as the stable snake_case token (`"dictionary_changed"`, `"content_changed"`,
@@ -126,6 +131,7 @@ impl ValidationReport {
             fyi: 0,
             shown_count: 0,
             findings: Vec::new(),
+            truncated: laterite_ags4_validator::findings::Truncated::new(),
             error: Some(ValErr {
                 kind: kind.to_string(),
                 message,
@@ -176,8 +182,8 @@ export interface FindingDto {
 /** Findings for a single rule. */
 export interface RuleGroup {
   rule: string;
-  /** True per-rule count, **before** any `maxPerRule` cap; `items.length` may
-   *  be smaller, which is why both exist. */
+  /** True per-rule count, **before** any `maxFindingsPerRule` cap;
+   *  `items.length` may be smaller, which is why both exist. */
   total: number;
   items: FindingDto[];
 }
@@ -214,6 +220,10 @@ export interface ValidationReport {
   /** How many findings were actually serialised (≤ `finding_count` when capped). */
   shown_count: number;
   findings: RuleGroup[];
+  /** `{rule: {shown, total}}` for each rule `maxFindingsPerRule` cut in the
+   *  engine; `{}` without that option. Matches Python's `Report.truncated` and
+   *  Node's `report.truncated`. */
+  truncated: Record<string, { shown: number; total: number }>;
   error: ValErr | null;
   /** Why a proffered `.ags.idx` cert did not stand in for the engine. **Always
    *  `null` on this surface** — `validate` has no cert-consume door, so none is
@@ -254,7 +264,11 @@ pub(crate) struct ValidateOptions {
     /// Node default the same way, so the browser is not the odd surface out.
     warnings_as_errors: Option<bool>,
     encoding: Option<String>,
-    max_per_rule: Option<u32>,
+    /// The ENGINE cap (#1089): a rule keeps at most this many findings and only
+    /// counts the rest, so a file with one finding per line never holds them all.
+    /// It replaced `maxPerRule`, which clipped only what crossed to JS after the
+    /// engine had kept everything.
+    max_findings_per_rule: Option<u32>,
     #[serde(with = "serde_bytes")]
     dictionary: Option<Vec<u8>>,
     dict_replace: Option<bool>,
@@ -267,7 +281,7 @@ impl WasmOptions for ValidateOptions {
         "fyi",
         "warningsAsErrors",
         "encoding",
-        "maxPerRule",
+        "maxFindingsPerRule",
         "dictionary",
         "dictReplace",
     ];
@@ -292,10 +306,12 @@ export interface ValidateOptions {
   fyi?: boolean;
   /** `"utf-8"` (default) or `"windows-1252"` for legacy files. */
   encoding?: "utf-8" | "windows-1252";
-  /** Cap findings *serialised* per rule. Every rule still runs over every
-   *  line and the reported totals stay uncapped — this only bounds how much
-   *  crosses the wasm→JS boundary for an interactive view. */
-  maxPerRule?: number;
+  /** Keep at most this many findings per rule in the ENGINE: past it a rule is
+   *  only counted, so a file whose one defect repeats on every line holds the
+   *  cap's worth of findings, not the file's worth. The verdict and every count
+   *  stay totals, and `report.truncated` names the rules that were cut. `0`
+   *  keeps no findings, only the counts. Default: every finding. */
+  maxFindingsPerRule?: number;
   /** A custom AGS4 dictionary (`.ags` or JSON) as raw bytes. */
   dictionary?: Uint8Array;
   /** With `dictionary`, replace the bundled base entirely rather than
@@ -392,7 +408,7 @@ fn derive_char_span(
 fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
     let include_warnings = o.warnings.unwrap_or(true);
     let include_fyi = o.fyi.unwrap_or(false);
-    let max_per_rule = o.max_per_rule.map(|c| c as usize);
+    let max_findings_per_rule = o.max_findings_per_rule.map(|c| c as usize);
     let dict_bytes = o.dictionary.as_deref();
 
     let dict_over = match resolve_dict_override(o.dict_version.as_deref()) {
@@ -428,14 +444,13 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
         }
     };
 
-    let opts = CheckOptions {
-        dict_version: dict_over,
-        include_warnings,
-        include_fyi,
-        encoding,
-        custom_dict,
-        ..CheckOptions::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.dict_version = dict_over;
+    opts.include_warnings = include_warnings;
+    opts.include_fyi = include_fyi;
+    opts.encoding = encoding;
+    opts.custom_dict = custom_dict;
+    opts.max_findings_per_rule = max_findings_per_rule;
 
     // The one door: it resolves the edition, applies the O-42 4.0.3→4.0.4 content
     // guard, runs the rules, and emits the transparency FYI. The browser used to
@@ -444,16 +459,23 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
     // same bytes. `WorldScope::None` is the only scope the browser can name —
     // `OnDisk` needs a path, and the wasm sandbox has no filesystem — so this run is
     // filesystem-free by construction, not by a coincidentally-false flag.
-    let (found, dv, kind) = match check_parsed_with_dict(&parsed, &opts, &WorldScope::None) {
+    let (
+        findings::Collected {
+            findings: found,
+            truncated,
+        },
+        dv,
+        kind,
+    ) = match check_parsed_with_dict(&parsed, &opts, &WorldScope::None) {
         Ok(r) => r,
         Err(e) => return ValidationReport::failure(e.kind(), e.to_string()),
     };
 
-    let finding_count = findings::count(&found);
     // Computed before `found` is consumed by the serialization walk below, and
-    // from the FULL finding set — the `max_per_rule` cap clips what crosses the
-    // boundary, never what the verdict was reached from.
-    let verdict = Verdict::of(&found, o.warnings_as_errors.unwrap_or(false));
+    // from every finding the engine made — neither cap moves what the verdict was
+    // reached from.
+    let verdict = Verdict::of(&found, &truncated, o.warnings_as_errors.unwrap_or(false));
+    let finding_count = verdict.total();
     // Raw line text by 1-based line number — `raw_lines` is sequential
     // from 1, but index by `number` defensively rather than assuming the
     // offset. Used to compute a precise char span for cell/heading
@@ -466,30 +488,33 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
         .map(|rl| (rl.number, parsed.line_text(rl)))
         .collect();
     let raw_line = |line: Option<u32>| -> Option<&str> { line_index.get(&line?).copied() };
-    // Cap per rule on *serialization* only — every rule already ran over
-    // every line above; we just clip the tail each group contributes to
-    // the JS payload. `total` preserves the true per-rule count and
-    // `shown_count` sums what actually crossed the boundary.
-    //
-    // On top of the per-rule cap, a GLOBAL budget bounds the TOTAL rows that
-    // cross the boundary in the interactive (capped) mode — so a file with
-    // hundreds of dirty rules can't structured-clone 100k–300k objects (a
+    // The engine cap above bounds each rule; a GLOBAL budget bounds the TOTAL
+    // rows that cross the boundary in the interactive (capped) mode — so a file
+    // with many dirty rules can't structured-clone 100k–300k objects (a
     // multi-second freeze / OOM on a weak machine), no matter how many rules
-    // fire. It only applies when `max_per_rule` is set; the download path
-    // (`max_per_rule = None`) is intentionally uncapped so the full report is
-    // available. `finding_count` stays the true total, so the UI's "showing N
-    // of M" reflects the cap.
+    // fire. It only applies when `max_findings_per_rule` is set; the download
+    // path (no cap) is intentionally uncapped so the full report is available.
+    // `total` keeps each rule's true count, `finding_count` the file's, and
+    // `shown_count` sums what actually crossed, so the UI's "showing N of M"
+    // reflects both. (It rode on `maxPerRule` until #1089 removed that option.)
     const MAX_SHOWN_TOTAL: usize = 30_000;
-    let global_budget = max_per_rule.map(|_| MAX_SHOWN_TOTAL);
+    let global_budget = max_findings_per_rule.map(|_| MAX_SHOWN_TOTAL);
     let mut shown_count = 0usize;
+    // A rule the engine cap cut to nothing (`maxFindingsPerRule: 0`) still gets its
+    // group, empty, so the UI can say "0 of N" for it. Without that cap there are no
+    // such rules, and this is the engine's own map.
+    let mut found = found;
+    for rule in truncated.keys() {
+        found.entry(rule.clone()).or_default();
+    }
     let findings_out = found
         .into_iter()
         .map(|(rule, items)| {
-            let total = items.len();
-            let per_rule = max_per_rule.map_or(total, |c| total.min(c));
+            let kept = items.len();
+            let total = truncated.get(&rule).map_or(kept, |t| t.total);
             let take = match global_budget {
-                Some(budget) => per_rule.min(budget.saturating_sub(shown_count)),
-                None => per_rule,
+                Some(budget) => kept.min(budget.saturating_sub(shown_count)),
+                None => kept,
             };
             shown_count += take;
             RuleGroup {
@@ -551,6 +576,7 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
         fyi: verdict.fyi,
         shown_count,
         findings: findings_out,
+        truncated,
         error: None,
         // No cert-consume path on this surface (see the field's doc): the engine
         // always ran, so there is no proffered certificate to have rejected.
@@ -822,46 +848,51 @@ mod tests {
     }
 
     #[test]
-    fn max_per_rule_caps_what_crosses_the_boundary_not_what_was_found() {
-        // `finding_count` is the true total and `shown_count` is what was
-        // serialised, so the UI can say "showing N of M". A cap that also
-        // reduced the total would under-report the state of the file.
-        let uncapped = run(
-            DELIVERY,
-            &ValidateOptions {
-                warnings: Some(true),
-                fyi: Some(true),
-                ..Default::default()
-            },
-        );
-        let capped = run(
-            DELIVERY,
-            &ValidateOptions {
-                warnings: Some(true),
-                fyi: Some(true),
-                max_per_rule: Some(1),
-                ..Default::default()
-            },
-        );
-        assert_eq!(
-            capped.finding_count, uncapped.finding_count,
-            "the true total must survive the cap"
-        );
-        assert!(
-            capped.shown_count <= uncapped.shown_count,
-            "the cap must reduce what is serialised"
-        );
-        assert_eq!(
-            capped.shown_count,
-            capped.findings.iter().map(|g| g.items.len()).sum::<usize>(),
-            "shown_count must equal what is actually in the payload"
-        );
-        for g in &capped.findings {
-            assert!(g.items.len() <= 1, "rule {:?} exceeded the cap", g.rule);
-            assert!(
-                g.total >= g.items.len(),
-                "the per-rule total must be the true count"
+    fn max_findings_per_rule_caps_the_engine_and_keeps_every_count() {
+        // The ENGINE cap (#1089): the per-rule totals, the tier counts and the
+        // verdict are those of the uncapped run, and `truncated` names exactly the
+        // rules with more findings than the cap.
+        let opts = |cap: Option<u32>| ValidateOptions {
+            warnings: Some(true),
+            fyi: Some(true),
+            max_findings_per_rule: cap,
+            ..Default::default()
+        };
+        let full = run(DELIVERY, &opts(None));
+        assert!(full.truncated.is_empty(), "nothing cut without the cap");
+        let totals = |r: &ValidationReport| {
+            r.findings
+                .iter()
+                .map(|g| (g.rule.clone(), g.total))
+                .collect::<Vec<_>>()
+        };
+        let counts = |r: &ValidationReport| (r.finding_count, r.errors, r.warnings, r.fyi, r.valid);
+        for cap in [0u32, 1] {
+            let capped = run(DELIVERY, &opts(Some(cap)));
+            assert_eq!(counts(&capped), counts(&full), "cap {cap}");
+            assert_eq!(totals(&capped), totals(&full), "cap {cap}");
+            let cut: Vec<_> = capped
+                .truncated
+                .iter()
+                .map(|(k, t)| (k.clone(), t.shown, t.total))
+                .collect();
+            let expected: Vec<_> = full
+                .findings
+                .iter()
+                .filter(|g| g.total > cap as usize)
+                .map(|g| (g.rule.clone(), cap as usize, g.total))
+                .collect();
+            assert!(!expected.is_empty(), "the fixture must have a rule to cut");
+            assert_eq!(cut, expected, "cap {cap}");
+            assert_eq!(
+                capped.shown_count,
+                capped.findings.iter().map(|g| g.items.len()).sum::<usize>(),
+                "shown_count must equal what is actually in the payload"
             );
+            assert!(capped.shown_count < full.shown_count, "cap {cap}");
+            for g in &capped.findings {
+                assert!(g.items.len() <= cap as usize, "{}", g.rule);
+            }
         }
     }
 

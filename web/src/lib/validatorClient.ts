@@ -111,13 +111,13 @@ export function isTier2Started(): boolean {
   return tier2.started();
 }
 
-/** Validate, returning the (capped, per `maxPerRule`) report. */
+/** Validate, returning the report capped per `maxFindingsPerRule`. */
 export function validate(
   bytes: Uint8Array,
   dictVersion: DictVersionOpt,
   includeFyi: boolean,
   encoding: EncodingOpt,
-  maxPerRule: number | null,
+  maxFindingsPerRule: number | null,
   dict?: CustomDict,
 ): Promise<ValidationReport> {
   return new Promise((resolve, reject) => {
@@ -128,7 +128,7 @@ export function validate(
         dict: dictVersion === "auto" ? null : dictVersion,
         includeFyi,
         encoding,
-        maxPerRule,
+        maxFindingsPerRule,
         dictBytes: dict?.bytes,
         dictReplace: dict?.replace ?? false,
       },
@@ -156,7 +156,7 @@ export function validateGzip(
         dict: dictVersion === "auto" ? null : dictVersion,
         includeFyi,
         encoding,
-        maxPerRule: null,
+        maxFindingsPerRule: null,
         gzip: true,
         dictBytes: dict?.bytes,
         dictReplace: dict?.replace ?? false,

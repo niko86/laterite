@@ -102,4 +102,26 @@ the parsed file in the same process.
 How strict that gate is, is your call: see [severity
 tiers](../concepts/severity-tiers.md) for the two dials.
 
+## Cap a large report
+
+A file can break one rule on every line. Written with LF line endings instead
+of CRLF, every line is a Rule 2a finding, and a report that keeps them all
+grows with the file. Cap it per rule:
+
+| Surface | Option |
+| --- | --- |
+| Python | `validate(path, max_findings_per_rule=100)`, or the same keyword on `Ags4File.validate()` |
+| Node | `validate(path, { maxFindingsPerRule: 100 })` |
+| Browser | `validate(bytes, { maxFindingsPerRule: 100 })` |
+| CLI | `lat validate delivery.ags --max-findings-per-rule 100` |
+
+Each rule keeps its first 100 findings and only counts the rest, so the engine
+never holds more than that. The verdict, the exit code, `count` and the
+per-tier counts still cover every finding. `report.truncated` names each rule
+that was cut as `{rule: {shown, total}}`, `--json` carries the same map under a
+`truncated` key, and `--ndjson` ends with one `{"truncated": ...}` record. `0`
+keeps no findings at all, only the counts. The default is no cap. A certificate
+records counts, never findings, so a capped run mints the same `.ags.idx` an
+uncapped one does.
+
 See also: [lat CLI](../reference/cli.md) · [Certify a file](./certify.md)

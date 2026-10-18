@@ -1,5 +1,16 @@
 import type { Finding, ValidationReport } from "./native";
 
+/** `maxFindingsPerRule`, checked: a count, so a negative or fractional one throws
+ *  rather than reaching the native `u32` and wrapping. */
+export function findingsCap(n: number | undefined): number | undefined {
+  if (n === undefined) return undefined;
+  if (!Number.isInteger(n) || n < 0 || n > 0xffffffff)
+    throw new RangeError(
+      `maxFindingsPerRule must be a non-negative integer, not ${String(n)}`,
+    );
+  return n;
+}
+
 /** One finding without its `rule` key — the value shape `byRule()` groups. */
 export type RuleFinding = Omit<Finding, "rule">;
 
@@ -74,8 +85,21 @@ export class Report {
   get resolution(): string {
     return this.#r.resolution;
   }
+  /** Every finding the run made, across the tiers asked for. A total: under
+   * `maxFindingsPerRule` it also counts the findings `findings` does not hold, and
+   * `truncated` says how many, rule by rule. */
   get count(): number {
     return this.#r.count;
+  }
+  /** The rules `maxFindingsPerRule` cut: `{ rule: { shown, total } }`, in rule
+   * order. `shown` is how many of the rule's findings `findings` holds and `total`
+   * how many it made. Empty when nothing was cut, which is always the case without
+   * a cap. Mirrors `laterite.Report.truncated`. */
+  get truncated(): Record<string, { shown: number; total: number }> {
+    const out: Record<string, { shown: number; total: number }> = {};
+    for (const t of this.#r.truncated)
+      out[t.rule] = { shown: t.shown, total: t.total };
+    return out;
   }
   /** The VERDICT (distinct from the native `ok`, which only means
    * "validatable"). Not `count === 0`: since #321 a warning is reported without
@@ -116,11 +140,14 @@ export class Report {
     return out;
   }
 
-  /** `{file, findings:{…}}` pretty-JSON — byte-identical to `lat-check --json`. */
+  /** `{file, findings:{…}}` pretty-JSON — byte-identical to `lat-check --json`.
+   * A capped run that cut a rule adds `truncated: {rule: {shown, total}}`. */
   toJson(): string {
     return this.#r.json;
   }
-  /** One flat `{rule, …}` per line — byte-identical to `lat-check --ndjson`. */
+  /** One flat `{rule, …}` per line — byte-identical to `lat-check --ndjson`. A
+   * capped run that cut a rule ends with one `{"truncated": …}` record, which has
+   * no `rule` key. */
   toNdjson(): string {
     return this.#r.ndjson;
   }

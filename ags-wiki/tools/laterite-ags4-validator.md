@@ -149,6 +149,20 @@ rule-keyed map of `Finding` records. By default the dictionary edition is
 catalogue lives at
 `repo:OBSERVATIONS.md`.
 
+**The per-rule cap (#1089).** `CheckOptions::max_findings_per_rule` bounds what a
+run keeps. Rules push through the `findings::Sink` trait (`add` / `add_at`), and the
+engine's `Collector` sink stops storing a rule's findings at the cap and only counts
+the rest, so memory is bounded where findings are made, not trimmed afterwards. The
+capped doors (`check_parsed`, `check_parsed_with_dict`, `check_file_with_dict`) return
+`findings::Collected`: the kept `findings` plus a `truncated` map of
+`{rule: {shown, total}}` that also carries the tier split of what was dropped.
+`Verdict::of` takes that map, so the verdict and tier counts stay totals. A rule that
+reads another rule's result asks `Sink::fired`, not the map (Rule 18 reads Rule 9, and
+under a cap of `0` nothing is stored). `check_file` returns a bare `Findings`, so it
+always runs uncapped. `CheckOptions` became `#[non_exhaustive]` in the same 0.21 bump;
+the exhaustive destructure that holds every knob to a CONTENT / WORLD classification
+moved here from `laterite-ags4-trust` (see [[laterite-ags4-trust]]).
+
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-validator` — near the root of the

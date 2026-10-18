@@ -93,12 +93,10 @@ fn main() {
         .map_or_else(|| PathBuf::from("output/compliance-results"), PathBuf::from);
 
     // The harness invariants — FYI/warnings ON, on-disk Rule 20 OFF.
-    let opts = CheckOptions {
-        include_warnings: true,
-        include_fyi: true,
-        check_files: false,
-        ..Default::default()
-    };
+    let mut opts = CheckOptions::default();
+    opts.include_warnings = true;
+    opts.include_fyi = true;
+    opts.check_files = false;
 
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&fixtures_dir)
         .unwrap_or_else(|e| {

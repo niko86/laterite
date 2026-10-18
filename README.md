@@ -94,6 +94,7 @@ lat delivery.ags                       # shorthand for `lat validate`
 lat validate delivery.ags --json       # machine-readable findings
 lat validate delivery.ags --no-warnings   # errors only
 lat validate delivery.ags --warnings-as-errors  # fail on warnings too (-Werror)
+lat validate delivery.ags --max-findings-per-rule 100  # keep 100 per rule; counts stay whole
 lat fix delivery.ags                   # repair → sibling .fixed.ags (safe fixes)
 lat diff old.ags new.ags               # KEY-aware revision delta
 lat certify delivery.ags               # mint delivery.ags.idx if clean

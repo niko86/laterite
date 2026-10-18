@@ -99,13 +99,12 @@ fn main() {
         };
         // The independent side: a REAL parse of the emitted bytes, same rules.
         let reparsed = parse_bytes(&res.bytes, encoding_rs::UTF_8).expect("emitted bytes parse");
-        let copts = CheckOptions {
-            dict_version: Some(opts.edition),
-            ..CheckOptions::default()
-        };
+        let mut copts = CheckOptions::default();
+        copts.dict_version = Some(opts.edition);
         let dict = laterite_ags4_validator::dict::Dictionary::bundled(opts.edition);
-        let independent =
-            check_parsed(&reparsed, &dict, &copts, &WorldScope::None).expect("check re-parse");
+        let independent = check_parsed(&reparsed, &dict, &copts, &WorldScope::None)
+            .expect("check re-parse")
+            .findings;
         if res.findings == independent {
             println!(
                 "OK    {} ({} finding group(s))",
