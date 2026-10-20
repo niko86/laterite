@@ -13,6 +13,10 @@ ignore = [
     # proc-macro-error2 — which is ALSO unmaintained (RUSTSEC-2026-0173). Still
     # transitive (age → i18n-embed-fl), no safe upgrade, low risk.
     "RUSTSEC-2026-0173", # proc-macro-error2 (via age's i18n-embed-fl)
+    # Same path (age → i18n-embed-fl → i18n-config): basic-toml only parses
+    # age's i18n.toml inside a proc-macro at build time, so it never runs in
+    # anything we ship. i18n-config and age are at their latest releases.
+    "RUSTSEC-2026-0374", # basic-toml (via age's i18n-embed-fl)
     # --- zip 8 extraction flaws, fixed in zip 9. All three live in
     # ZipArchive::extract / ZipStreamReader::extract (unpacking to disk), which
     # calamine never calls: it reads entries in memory. calamine 0.36 still pins
