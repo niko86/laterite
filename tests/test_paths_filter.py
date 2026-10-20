@@ -332,7 +332,7 @@ def test_code_is_true_for_gate_inputs(filters: dict[str, list[str]], path: str) 
         "rust-packages/laterite-ags4-types/src/lib.rs",
         "rust-packages/laterite-ags4-corpus-qa/src/baseline.rs",
         "rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json",
-        "rust-packages/laterite-ags4-forge/vendor/pyags4-tests/4.1-rule8-1.ags",
+        "rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/4.1-rule8-1.ags",
         "rust-packages/Cargo.lock",
         "tools/check_corpus_drift.py",
     ],

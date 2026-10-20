@@ -207,7 +207,8 @@ pub struct MineArgs {
     pub scaffold: String,
     /// Directory of .ags files whose Rust signatures define the "covered"
     /// rule-break shapes (default: the vendored python-ags4 corpus at
-    /// vendor/pyags4-tests — run `forge seed vendor` first). Absent/empty
+    /// laterite-ags4-corpus-qa/vendor/pyags4-tests — run `forge seed vendor`
+    /// first). Absent/empty
     /// → empty covered-set (every synthesized combination reads as a gap).
     #[arg(long)]
     pub corpus: Option<PathBuf>,
@@ -422,7 +423,7 @@ pub struct VendorArgs {
     #[arg(long)]
     pub r#ref: String,
     /// Where to drop the vendored corpus — REQUIRED, no default (e.g.
-    /// `rust-packages/laterite-ags4-forge/vendor/pyags4-tests`).
+    /// `rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests`).
     #[arg(long)]
     pub dest: PathBuf,
 }

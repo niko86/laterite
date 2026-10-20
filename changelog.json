@@ -47,6 +47,9 @@
       {
         "text": "**Breaking: `laterite-ags4-validator` 0.21 caps findings in the engine (#1089).** `CheckOptions` gains `max_findings_per_rule` and is now `#[non_exhaustive]`: build it from `CheckOptions::default()` and set fields, since a struct literal no longer compiles outside the crate. `check_parsed`, `check_parsed_with_dict` and `check_file_with_dict` return `findings::Collected` (the kept `findings` plus the `truncated` map) where they returned `Findings`. `Verdict::of` takes the `Truncated` map as a second argument, and `findings_json`, `findings_json_value` and `findings_ndjson` take it too. Rule functions take any `findings::Sink`, which a plain `Findings` map still is. `check_file` keeps its signature and always keeps every finding. `laterite-ags4-trust` 0.19 adds `Outcome::truncated`. `laterite-ags4-emit` 0.20.5 and `laterite-ags4-hostopts` 0.3.4 ride along, because their published pins froze `^0.20`.",
         "breaking": true
+      },
+      {
+        "text": "**The vendored python-ags4 test corpus moved to `rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/` (#1110).** It sat under `laterite-ags4-forge/`, but this repo's own gates read it. It now sits beside the drift baseline frozen over it, with the files unchanged. The validator's fixture-corpus invariant test read a path that never existed and skipped, so it never checked a file. It now reads the corpus and fails if it is missing."
       }
     ],
     "deprecated": [],
