@@ -34,6 +34,16 @@ sources: []
 > seedable `Rng`/`reservoir`. The extract-over-duplicate stance is the
 > same one that created [[laterite-cliutil]].
 
+Since #1109 it also holds the whole two-engine comparison over real files,
+in `repo:rust-packages/laterite-ags4-parity/src/check.rs`: the in-process
+Rust run (every tier on, Rule 20's on-disk check on), the python call, the
+directory walk with its skipped-entry count, and the single-file and sweep
+report documents with per-rule counts. It moved here out of forge's `check`
+subcommand so that [[laterite-ags4-corpus-qa]] `check` and forge `check` are
+each one call into it rather than two copies. That is also why this crate now
+depends on [[laterite-cliutil]]: the documents render through the shared
+report contract.
+
 ## Inputs / outputs
 > [!quote] In: a Rust crate dependency (path). Out: the parity verdict
 > primitives + python oracle bridge. Depends *on*
@@ -54,6 +64,7 @@ graceful-degradation/oracle-drift policy stay at the
 flowchart LR
   val[laterite-ags4-validator lib] --> parity[laterite-ags4-parity]
   parity --> py[py-ags4-check-json]
+  parity --> cliutil[laterite-cliutil]
   cq[laterite-ags4-corpus-qa] --> parity
   forge[laterite-ags4-forge] --> parity
 ```

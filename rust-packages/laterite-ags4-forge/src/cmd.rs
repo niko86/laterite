@@ -5,7 +5,6 @@
 //! and `seed vendor`.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use laterite_cliutil::report::{Ctx, Plan, emit, note};
@@ -21,8 +20,8 @@ use crate::minimize::{insight_stub, minimize as ddmin};
 use crate::ops::{Injection, synth_combined_lab, synth_injected_lab};
 use crate::pipeline::{build_oracle, dual_validate};
 use crate::report::{
-    Candidate, CatalogEntry, CatalogReport, CheckReport, CheckSweepReport, DescribeReport,
-    DescribeRow, ForgeReport, UninjectableRule,
+    Candidate, CatalogEntry, CatalogReport, DescribeReport, DescribeRow, ForgeReport,
+    UninjectableRule,
 };
 use crate::strategy::{ConfidenceCfg, Strategy};
 use crate::synth::Scaffold;
@@ -76,84 +75,18 @@ fn combo_meta(injs: &[Injection]) -> (String, Option<String>) {
     (label, target)
 }
 
-/// `forge check <file>` — exit 1 iff a real (unexplained) divergence.
-pub fn check(args: &CheckArgs, ctx: Ctx) -> Result<i32> {
-    let mut files: Vec<PathBuf> = Vec::new();
-    let mut skipped = 0usize;
-    for p in &args.paths {
-        if !p.exists() {
-            eprintln!("error: file not found: {}", p.display());
-            return Ok(3);
-        }
-        collect_ags(p, true, &mut files, &mut skipped);
-    }
-    files.sort();
-    files.dedup();
-    if files.is_empty() {
-        eprintln!("error: no .ags file among the given path(s)");
-        return Ok(3);
-    }
-    let oracle = if args.no_oracle {
-        None
-    } else {
-        build_oracle(args.timeout).map(|(o, _)| o)
-    };
-    if oracle.is_none() && !args.no_oracle {
-        note("check: python-ags4 unavailable — Rust-only verdict (optional QA)");
-    }
-    let reports: Vec<CheckReport> = files
-        .iter()
-        .map(|f| {
-            let outcome = dual_validate(f, oracle.as_ref());
-            CheckReport::new(f.display().to_string(), &outcome, oracle.is_some())
-        })
-        .collect();
-    // One file named directly keeps the single-file document it has always
-    // emitted — a caller reading `.verdict` off it predates the sweep and
-    // must not have to learn a new shape to keep working.
-    if reports.len() == 1 && args.paths.len() == 1 && args.paths[0].is_file() {
-        let action = reports[0].is_action();
-        emit(&reports[0], &ctx)?;
-        return Ok(i32::from(action));
-    }
-    let sweep = CheckSweepReport::new(reports, oracle.is_some(), skipped);
-    let action = sweep.is_action();
-    emit(&sweep, &ctx)?;
-    Ok(i32::from(action))
-}
-
-/// Expand one path into the files to validate, counting what was walked
-/// past. A directory recurses and keeps only its `.ags` files — the caller
-/// may well have pointed at a mixed corpus on purpose, so the rest are a
-/// counted skip rather than an error.
+/// `forge check <path>...` — exit 1 iff a real (unexplained) divergence.
 ///
-/// `named` is whether the CALLER wrote this path on the command line. A
-/// named file is taken whatever it is called: `check` has always validated
-/// the path it was handed, and an extension filter that reached a named
-/// file would turn "validate this" into "find nothing" for every delivery
-/// that does not end in `.ags` — which is a real shape, and a silent one.
-/// The filter is for deciding what a DIRECTORY meant, and nothing else.
-fn collect_ags(path: &Path, named: bool, out: &mut Vec<PathBuf>, skipped: &mut usize) {
-    if path.is_dir() {
-        let Ok(rd) = std::fs::read_dir(path) else {
-            return;
-        };
-        let mut entries: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).collect();
-        entries.sort();
-        for e in entries {
-            collect_ags(&e, false, out, skipped);
-        }
-        return;
-    }
-    let is_ags = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case("ags"));
-    if named || is_ags {
-        out.push(path.to_path_buf());
-    } else {
-        *skipped += 1;
-    }
+/// One call into `laterite_ags4_parity::check`, which `laterite-ags4-corpus-qa
+/// check` makes too (#1109): the comparison has one home, so the two commands
+/// cannot answer differently while both exist.
+pub fn check(args: &CheckArgs, ctx: Ctx) -> Result<i32> {
+    Ok(laterite_ags4_parity::check::run(
+        &args.paths,
+        args.timeout,
+        args.no_oracle,
+        &ctx,
+    )?)
 }
 
 /// `forge gen` — synthesize the base, apply each `--inject`, write the
@@ -1429,54 +1362,5 @@ mod tests {
                 "the no-operations message must advertise --{spelling}"
             );
         }
-    }
-
-    #[test]
-    fn a_directory_yields_its_ags_files_and_counts_what_it_walked_past() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let root = tmp.path();
-        std::fs::create_dir(root.join("nested")).unwrap();
-        for f in [
-            "b.ags",
-            "a.AGS",
-            "notes.txt",
-            "nested/c.ags",
-            "nested/readme.md",
-        ] {
-            std::fs::write(root.join(f), b"x").unwrap();
-        }
-        let mut out = Vec::new();
-        let mut skipped = 0;
-        collect_ags(root, true, &mut out, &mut skipped);
-        out.sort();
-        let names: Vec<String> = out
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        // Recursive, and the extension match is case-insensitive: a
-        // corpus written on Windows is full of `.AGS`.
-        assert_eq!(names, vec!["a.AGS", "b.ags", "c.ags"]);
-        // The two non-.ags files are REPORTED, not silently dropped — a
-        // sweep that says nothing about what it ignored reads as having
-        // checked everything.
-        assert_eq!(skipped, 2);
-    }
-
-    #[test]
-    fn a_file_named_directly_is_taken_whatever_its_extension() {
-        // `check <path>` has always validated the path it was handed. The
-        // extension filter arrived to decide what a DIRECTORY meant, and if
-        // it reached a named file it would turn "validate this" into "no
-        // .ags file among the given path(s)" for every delivery that does
-        // not end in `.ags`. The name is deliberately NOT `.ags`, because a
-        // `.ags` fixture here would pass whether or not that held.
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let p = tmp.path().join("delivery.dat");
-        std::fs::write(&p, b"x").unwrap();
-        let mut out = Vec::new();
-        let mut skipped = 0;
-        collect_ags(&p, true, &mut out, &mut skipped);
-        assert_eq!(out, vec![p]);
-        assert_eq!(skipped, 0);
     }
 }

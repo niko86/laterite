@@ -12,6 +12,10 @@
 # library's documented lean dep-graph guarantee is unaffected. Every
 # dependency is already in rust-packages/Cargo.lock — zero new external
 # surface; no walkdir/rayon/clap/ratatui.
+#
+# `laterite-cliutil` (no features, so no clap) since #1109: the `check`
+# module carries the two-engine report documents, and they render through
+# the shared report contract like every other document in both consumers.
 
 [package]
 name = "laterite-ags4-parity"
@@ -26,6 +30,10 @@ publish = false
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+laterite-cliutil = { path = "../laterite-cliutil" }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

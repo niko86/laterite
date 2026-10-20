@@ -80,7 +80,7 @@ jobs:
               - 'web/scripts/sweep-demo-states.mjs'
               - 'tools/gen_demo_state_map.py'
               # The python half of the dual-validation. The generator shells
-              # out to the forge, which shells out to this bridge — so what
+              # out to corpus-qa `check`, which shells out to this bridge — so what
               # this script chooses to return IS one of the two answers being
               # compared, and changing it moves every state at once. Left out,
               # the gate would switch itself off for the one edit guaranteed
@@ -93,7 +93,10 @@ jobs:
               # touching a rule module, so leaving this out is a filter that
               # switches the gate off exactly when it is needed.
               - 'rust-packages/laterite-ags4-reference/**'
-              - 'rust-packages/laterite-ags4-forge/**'
+              # The two-engine check itself (#1109): the command the generator
+              # runs, and the crate that holds every line of the comparison.
+              - 'rust-packages/laterite-ags4-corpus-qa/**'
+              - 'rust-packages/laterite-ags4-parity/**'
               - '.github/workflows/parity.yml'
             compat:
               - 'rust-packages/laterite-ags4-validator/**'
@@ -227,9 +230,10 @@ jobs:
         working-directory: web
         run: npm ci
 
-      # forge is what runs BOTH engines and reports per-rule counts.
-      - name: Build forge (the dual-validator)
-        run: cargo build --release -p laterite-ags4-forge
+      # corpus-qa's `check` is what runs BOTH engines and reports per-rule
+      # counts (#1109; it was forge's `check`, the same parity call).
+      - name: Build corpus-qa (the dual-validator)
+        run: cargo build --release -p laterite-ags4-corpus-qa
         working-directory: rust-packages
 
       - name: Every demo state answers the way the map says

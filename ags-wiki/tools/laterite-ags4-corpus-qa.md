@@ -22,8 +22,8 @@ sources: []
 ## What it is
 > [!quote] Dogfooding/QA harness: crawl real corpora → validate → parity-cross-check vs python-ags4 (parity.rs). Run-versioned artifacts (runs/<id>/, runs/latest last-write-under-runs wins). The engine that produced the O-32/O-33/O-34 findings.
 
-Six subcommands: `crawl`, `validate`, `parity`, `run` (the original
-gather→check→cross-check), plus two added 2026-06-21:
+Seven subcommands: `crawl`, `validate`, `parity`, `run` (the original
+gather→check→cross-check), two added 2026-06-21, and `check` (#1109):
 - **`baseline`** — freeze (`--out`) or drift-check (`--check`) a
   deterministic, privacy-scrubbed snapshot of the validator's findings
   over a manifest. Keyed by content sha256; structural `(rule, line,
@@ -64,6 +64,17 @@ gather→check→cross-check), plus two added 2026-06-21:
   ([[laterite-ags4-wasm]]) — the two tools are independent callers of one
   engine, not two implementations. See [[crate-map]] ·
   [[dec-ags4-censor-leaf]].
+- **`check`** (#1109) — the corpus-free comparison: both engines over the
+  files or directories named, each side's rules, per-rule finding counts and
+  the parity verdict, with no corpus dir and no run artifacts. It is the
+  command `repo:tools/gen_demo_state_map.py` runs for the
+  [[demo-state-sweep]], and the one CLAUDE.md names for comparing the engines
+  on real files. It holds no comparison logic: `repo:rust-packages/laterite-ags4-corpus-qa/src/main.rs`
+  makes one call into [[laterite-ags4-parity]]'s `check` module, the same
+  call `laterite-ags4-forge check` makes, which is where the command lived
+  before forge began leaving this repo.
+  `repo:rust-packages/laterite-ags4-corpus-qa/tests/check.rs` runs both
+  binaries over vendored files and holds their documents equal.
 
 `validate.rs::parse_dict_version` asks the shared
 `laterite_ags4_hostopts::edition` resolver (which itself asks the generated

@@ -96,7 +96,7 @@ uv run ty check                                  # Astral `ty` type-faithfulness
 
 uv run lat validate delivery.ags --json          # the shipped AGS4 validator CLI (laterite-cli)
 
-cargo run -p laterite-ags4-forge -- check <file-or-dir>   # dual-validate against python-ags4:
+cargo run -p laterite-ags4-corpus-qa -- check <file-or-dir>   # dual-validate against python-ags4:
                                                  # each side's rules + per-rule counts + the parity
                                                  # verdict. A directory sweeps recursively. This is
                                                  # how you compare the two engines on real files.

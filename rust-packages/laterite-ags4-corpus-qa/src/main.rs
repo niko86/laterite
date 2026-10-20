@@ -15,6 +15,7 @@
 //! Crawl a (network) share for `.ags`, copy a subset locally,
 //! batch-run the clean-room Rust validator over them, bucket the
 //! odd/failed ones, then parity-check those against python-ags4.
+//! `check` is the corpus-free form: both engines over the files named.
 //!
 //! NOT a shipped product. Depends on `laterite-ags4-validator` by its public
 //! library API only — the validator's dep graph is unaffected. Shared
@@ -91,6 +92,13 @@ fn main() {
         Commands::Run(a) => run::run(a, ctx),
         Commands::Baseline(a) => baseline::run(a, ctx, &paths::corpus_dir(a.corpus_dir.as_deref())),
         Commands::Censor(a) => censor::run(a, ctx, &paths::corpus_dir(a.corpus_dir.as_deref())),
+        // No corpus dir and no run artifacts: `check` reads the paths it is
+        // given and writes only the report, so it is the shared parity call
+        // and nothing else.
+        Commands::Check(a) => {
+            laterite_ags4_parity::check::run(&a.paths, a.timeout, a.no_oracle, &ctx)
+                .map_err(Into::into)
+        }
     };
 
     match result {
