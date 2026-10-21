@@ -59,6 +59,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Removed
 
 - **Breaking: the browser package's `maxPerRule` option is gone (#1089).** `validate(bytes, { maxFindingsPerRule: N })` replaces it. `maxPerRule` clipped only what crossed into JavaScript, after the engine had kept every finding, so a dirty file still filled the engine's memory. `maxFindingsPerRule` stops a rule keeping findings past the cap and only counts the rest, so memory stays bounded and the totals stay true. Passing `maxPerRule` is now refused as an unknown option, with the accepted options listed.
+- **`laterite-ags4-forge` leaves this repo for [niko86/laterite-forge](https://github.com/niko86/laterite-forge) (#1111).** Forge was never published from here; its code, history and design pages now live in that repo, which releases its binaries. The perf workflows and bench tools here run its pinned release binary through `tools/fetch_forge.py`, which checks the download against the release's `SHA256SUMS`, and never build it. The fixtures that binary mints match the hashes pinned in `tools/readme-bench-fixtures.json` unchanged.
 
 ### Fixed
 

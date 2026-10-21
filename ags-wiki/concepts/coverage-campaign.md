@@ -107,7 +107,7 @@ drifted to 85 while its gate sat green above 95. Both lanes now have one.
 
 Rust's denominator is the shipped engine: the `cargo llvm-cov` run excludes the
 binding cdylibs (wasm, tokenizer-wasm, py, node — tested by the Python/Node/browser
-suites, ~0% under `cargo test`) and the dev-only QA tooling (xcheck, parity, forge,
+suites, ~0% under `cargo test`) and the dev-only QA tooling (xcheck, parity,
 corpus-qa, perf, compliance — never shipped). Those crates are still *tested* on
 every PR; they are out of the *measurement*, not the test authority.
 

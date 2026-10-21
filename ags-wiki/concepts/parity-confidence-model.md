@@ -7,13 +7,13 @@ ags_editions: []
 repo_refs:
   parity: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"
   obs36: "repo:OBSERVATIONS.md#o-36"
-related: [parity-model, O-36, parity-triage-sampling-bias, evolutionary-dogfooding, laterite-ags4-forge, oracle-drift-pin]
+related: [parity-model, O-36, parity-triage-sampling-bias, evolutionary-dogfooding, oracle-drift-pin]
 sources: []
 ---
 # parity confidence model
 
 ## Definition
-> [!quote] The adaptive oracle-gating model in [[laterite-ags4-forge]]
+> [!quote] The adaptive oracle-gating model in [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)
 > (`confidence.rs`) that turns "Rust validates ~10³–10⁴× faster than
 > python" into "spend the oracle only where it informs, and **measure**
 > how sure we are." Class key = the Rust-side outcome (free for 100%
@@ -58,9 +58,9 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-ags4-forge]] gates [[laterite-ags4-parity]]'s `PyOracle` with it; the
+[laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) gates [[laterite-ags4-parity]]'s `PyOracle` with it; the
 run report + `forge confidence show` expose the bounds; it tightens
 the [[parity-model]] limitation that [[O-36]] documents.
 
 ## Related
-[[parity-model]] · [[O-36]] · [[parity-triage-sampling-bias]] · [[evolutionary-dogfooding]] · [[laterite-ags4-forge]] · [[oracle-drift-pin]]
+[[parity-model]] · [[O-36]] · [[parity-triage-sampling-bias]] · [[evolutionary-dogfooding]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[oracle-drift-pin]]

@@ -9,7 +9,7 @@ repo_refs:
   cli: "rust-packages/laterite-ags4-corpus-qa/src/cli.rs"
   main: "rust-packages/laterite-ags4-corpus-qa/src/main.rs"
   output: "rust-packages/laterite-ags4-corpus-qa/src/output.rs"
-related: [laterite-cliutil, laterite-ags4-corpus-qa, laterite-cli, laterite-ags4-forge, laterite-ags4-parity, surface-census]
+related: [laterite-cliutil, laterite-ags4-corpus-qa, laterite-cli, laterite-ags4-parity, surface-census]
 sources: []
 ---
 # agent-first CLI contract
@@ -36,7 +36,7 @@ output to another tool). It is also why `laterite-cliutil` exists at all:
 duplication across CLIs is resolved by **extracting a shared crate**,
 never a documented copy. The validator *library*'s lean dep-graph
 (no walkdir/rayon/ratatui) is a hard guarantee — shared UI stays
-bin-side. New CLIs ([[laterite-ags4-forge]]) inherit this verbatim; the
+bin-side. New CLIs ([laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)) inherit this verbatim; the
 `Ctx/Report/emit/Plan` layer is being lifted into [[laterite-cliutil]] so
 forge and [[laterite-ags4-corpus-qa]] share one report scaffold.
 
@@ -70,9 +70,9 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-cli]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [[laterite-ags4-forge]]
+[[laterite-cli]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)
 next. The shared primitives live in [[laterite-cliutil]]; the report-doc
 half of the contract is the [[laterite-ags4-corpus-qa]] `output.rs` pattern.
 
 ## Related
-[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-cli]] · laterite-ags5-db · [[laterite-ags4-forge]] · [[laterite-ags4-parity]] · [[surface-census]]
+[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-cli]] · laterite-ags5-db · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[laterite-ags4-parity]] · [[surface-census]]

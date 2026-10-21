@@ -75,7 +75,6 @@ LAYER = {
     # both — and below the five surfaces that call it.
     "laterite-ags4-hostopts": 3,
     "laterite-ags4-parity": 3,
-    "laterite-ags4-forge": 3,
     "laterite-ags4-corpus-qa": 3,
     "laterite-ags4-perf": 3,
     "laterite-ags4-compliance": 3,

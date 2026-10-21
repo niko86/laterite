@@ -1,6 +1,6 @@
 //! Command-line surface (clap derive) for `lat` — the reworked AGS4 tool.
 //!
-//! Follows the workspace CLI lineage (`ags4-forge` / `ags4-corpus-qa`): `--quiet`
+//! Follows the CLI lineage (`ags4-forge` / `ags4-corpus-qa`): `--quiet`
 //! is the one **global** flag, results to **stdout**, progress to **stderr**, typed
 //! exit codes in `after_help`. Each verb owns its flags, so a flag can't reach a
 //! verb it doesn't belong to — which is the whole point of laterite-dev#545: `--json`/`--ndjson`

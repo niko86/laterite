@@ -93,7 +93,7 @@ on top:
 
 ## Performance
 
-Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+Synthetic, spec-valid AGS4 from [`ags4-forge`](https://github.com/niko86/laterite-forge) — the `wide` scaffold: **123
 groups**, realistic type mix, zero findings. macOS arm64, hot files, mean of 5
 warm runs, `python-ags4` 1.2.0 vs `laterite` 0.12.0. Both agree on the findings.
 

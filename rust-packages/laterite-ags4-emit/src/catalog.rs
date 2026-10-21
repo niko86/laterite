@@ -19,8 +19,9 @@
 //! types version on crates.io — a new types module is unreachable from a
 //! packaged emit until the next engine cut publishes it (the same
 //! constraint that deferred the facade's hostopts adoption, #930). Forge,
-//! the other consumer, is never packaged, so it can call new emit API
-//! through its path dependency immediately.
+//! the other consumer, was then an unpackaged workspace member, so it could
+//! call new emit API through its path dependency immediately; it has since
+//! left for niko86/laterite-forge and reads emit from crates.io (#1111).
 use std::collections::BTreeSet;
 
 /// The slice of a group the collection rule reads: the UNIT/TYPE header

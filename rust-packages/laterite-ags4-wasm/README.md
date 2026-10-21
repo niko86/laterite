@@ -306,7 +306,7 @@ hasn't.
 
 ## Performance
 
-Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+Synthetic, spec-valid AGS4 from [`ags4-forge`](https://github.com/niko86/laterite-forge) — the `wide` scaffold: **123
 groups**, realistic type mix, zero findings. Median of 10 warm in-process
 runs on macOS arm64, executed under Node's V8 — a browser engine will differ,
 so treat these as indicative rather than promised. The JS→wasm boundary copy

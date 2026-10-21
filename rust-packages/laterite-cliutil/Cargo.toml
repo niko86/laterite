@@ -18,8 +18,9 @@
 # argv) does not pull clap.
 #
 # Published since #1108, alongside laterite-ags4-parity (which renders its
-# reports through `report`): forge is leaving this repo and depends on both,
-# and a crate outside the workspace can only depend on what crates.io holds.
+# reports through `report`): forge left this repo for niko86/laterite-forge
+# (#1111) and depends on both, and a crate outside the workspace can only
+# depend on what crates.io holds.
 
 [package]
 name = "laterite-cliutil"

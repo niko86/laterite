@@ -201,10 +201,12 @@ load-bearing chain:
 
 Surfaces: `laterite-py` (PyO3 → the `laterite` wheel), `laterite-node` (napi-rs),
 `laterite-ags4-wasm` (browser). CLI: **`lat`** (`laterite-cli`). Supporting
-crates include the `laterite-ags4-{parity,forge,corpus-qa,perf}` QA tools,
+crates include the `laterite-ags4-{parity,corpus-qa,perf}` QA tools,
 `laterite-ags4-xcheck` (cross-surface output-value gate), and `laterite-ags4-excel`
 (AGS4↔XLSX, extracted so its `calamine`/`rust_xlsxwriter` deps don't ride into
-every consumer).
+every consumer). The synthetic-AGS4 generator, forge, is its own repo
+(`niko86/laterite-forge`); the perf workflows and bench tools run its pinned
+release binary through `tools/fetch_forge.py` and never build it.
 
 Shipped Python import surface (`packages/laterite/python/laterite/`):
 - `from laterite.groups import PROJ, LOCA, SAMP, …` — the 174 typed-graph classes.

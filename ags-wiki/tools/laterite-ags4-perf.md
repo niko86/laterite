@@ -12,7 +12,7 @@ repo_refs:
   ladder_gen: "repo:tools/perf-ladder.py"
   manifest_in: "output/perf-ladder/manifest.json"
   aggregator: "repo:tools/perf-matrix.py"
-related: [laterite-ags4-forge, laterite-ags4-validator, perf-campaign, crate-map]
+related: [laterite-ags4-validator, perf-campaign, crate-map]
 sources: []
 ---
 # laterite-ags4-perf
@@ -27,7 +27,7 @@ sources: []
 > leg of the cross-surface performance matrix — a **dev/QA bin, never
 > shipped** (`publish = false`). It measures the three operations every
 > shipped surface performs — `validate`, `parse-to-typed` and `write` — over
-> the [[laterite-ags4-forge]]-generated size ladder, in both of the
+> the [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)-generated size ladder, in both of the
 > [[perf-campaign]]'s instruments (wall time, and peak RSS of a fresh
 > subprocess), so the rust path can be compared like-for-like against the
 > python/node/wasm hosts.
@@ -79,7 +79,7 @@ bindings take**.
 ## Relationship to other components
 ```mermaid
 flowchart LR
-  forge[laterite-ags4-forge] -->|size ladder| ladder[tools/perf-ladder.py]
+  forge["laterite-ags4-forge<br/>own repo: niko86/laterite-forge"] -->|size ladder| ladder[tools/perf-ladder.py]
   ladder -->|manifest.json| perf[laterite-ags4-perf]
   ladder -->|manifest.json| nodelane[laterite-node bench/perf-matrix.mjs]
   ladder -->|manifest.json| wasmlane[web bench/perf-matrix.mjs]
@@ -122,4 +122,4 @@ machinery outright, which is also what finally put tests on the python
 copy.
 
 ## Related
-[[laterite-ags4-forge]] · [[laterite-ags4-validator]] · [[perf-campaign]] · [[crate-map]]
+[laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[laterite-ags4-validator]] · [[perf-campaign]] · [[crate-map]]

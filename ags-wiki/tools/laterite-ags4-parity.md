@@ -10,24 +10,24 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-parity"
   extracted_from: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"
-related: [parity-model, laterite-ags4-corpus-qa, laterite-ags4-forge, agent-first-cli-contract]
+related: [parity-model, laterite-ags4-corpus-qa, agent-first-cli-contract]
 sources: []
 ---
 # laterite-ags4-parity
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
 > [!note] **Cleared for crates.io** — `laterite-ags4-parity` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
-> **Used by** — [[laterite-ags4-compliance]], [[laterite-ags4-corpus-qa]], [[laterite-ags4-forge]].
+> **Used by** — [[laterite-ags4-compliance]], [[laterite-ags4-corpus-qa]].
 <!-- END GENERATED: crate-card -->
 
 ## What it is
 > [!quote] **Implemented** (`repo:rust-packages/laterite-ags4-parity`,
 > extracted in P1 — laterite-ags4-corpus-qa behaviour-neutral, full suite +
 > the real-python parity-matrix dogfood green; see
-> [[dec-ags4-forge-evolutionary-dogfood]]). The shared parity
+> [dec-ags4-forge-evolutionary-dogfood](https://github.com/niko86/laterite-forge/blob/main/docs/dec-ags4-forge-evolutionary-dogfood.md)). The shared parity
 > library extracted out of
 > `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` so it is consumed
-> by **both** [[laterite-ags4-corpus-qa]] and [[laterite-ags4-forge]] instead of
+> by **both** [[laterite-ags4-corpus-qa]] and [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) instead of
 > duplicated: `RustResult`, `Parity`, `classify`, `reconcile`
 > (the documented O-2/O-3/O-26/O-30/O-34 arms), `PyOracle` (the
 > `run_py` python bridge + `--selfcheck` version pin), and the
@@ -57,8 +57,9 @@ Published to crates.io since #1108, on its own version, so forge can depend on
 it from outside this repo. That is why the oracle no longer finds its own
 wrapper: `PyOracle::new` and `check::build_oracle` take the wrapper script and
 the uv project that runs it from the caller, and `check::run` takes both
-through to them. corpus-qa and forge pass this repo's
-`tools/py_ags4_check_json.py` and root, the values the crate used to resolve
+through to them. corpus-qa passes this repo's
+`tools/py_ags4_check_json.py` and root (forge passes its own copy, in
+niko86/laterite-forge), the values the crate used to resolve
 for itself from its manifest dir — which on a registry copy is a cache with no
 wrapper beside it.
 
@@ -75,10 +76,10 @@ flowchart LR
   parity --> py[py-ags4-check-json]
   parity --> cliutil[laterite-cliutil]
   cq[laterite-ags4-corpus-qa] --> parity
-  forge[laterite-ags4-forge] --> parity
+  forge["laterite-ags4-forge<br/>own repo: niko86/laterite-forge"] --> parity
 ```
 
 See [[parity-model]] for the verdict semantics this crate carries.
 
 ## Related
-[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-forge]] · laterite-ags4-compliance · [[agent-first-cli-contract]] · [[dec-ags4-forge-evolutionary-dogfood]] · [[crate-map]]
+[[parity-model]] · [[laterite-ags4-corpus-qa]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · laterite-ags4-compliance · [[agent-first-cli-contract]] · [dec-ags4-forge-evolutionary-dogfood](https://github.com/niko86/laterite-forge/blob/main/docs/dec-ags4-forge-evolutionary-dogfood.md) · [[crate-map]]

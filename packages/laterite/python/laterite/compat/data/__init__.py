@@ -5,7 +5,8 @@ surface a port has to carry, not an internal.
 
 **The file here is ours.** Upstream's ``test_data.ags`` is LGPL-3.0 and must not
 enter this tree, so ``test_data.ags`` beside this module is clean-room: generated
-by ``laterite-ags4-forge`` (``gen --scaffold loca-samp``) from laterite's own
+by ``laterite-ags4-forge`` (``gen --scaffold loca-samp``; forge now lives at
+https://github.com/niko86/laterite-forge) from laterite's own
 bundled v4.2 dictionary, then verified to validate clean under BOTH the Rust
 engine and real python-ags4 1.2.0. It keeps upstream's *filename* so that code
 reaching for ``DATA_DIR / "test_data.ags"`` ports unchanged — but the contents

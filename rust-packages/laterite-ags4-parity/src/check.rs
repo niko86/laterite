@@ -2,8 +2,9 @@
 //!
 //! The comparison a person reaches for on a delivery: each side's rule set,
 //! how many times each rule fired, and the parity verdict. It lived in
-//! `laterite-ags4-forge`'s `check` subcommand; forge is leaving this repo while
-//! the comparison is this repo's parity job (#1109), so the whole of it moved
+//! `laterite-ags4-forge`'s `check` subcommand; forge left this repo
+//! (niko86/laterite-forge, #1111) while the comparison is this repo's parity
+//! job (#1109), so the whole of it moved
 //! here — the in-process Rust run, the python call, the walk, and the report
 //! documents. `laterite-ags4-corpus-qa check` and `laterite-ags4-forge check`
 //! are each one call into [`run`], so the two cannot answer differently.

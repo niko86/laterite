@@ -185,7 +185,7 @@ matches that and adds a cross-surface toolchain on top:
 
 ## Performance
 
-Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+Synthetic, spec-valid AGS4 from [`ags4-forge`](https://github.com/niko86/laterite-forge) — the `wide` scaffold: **123
 groups**, realistic type mix, zero findings. macOS arm64, hot files, mean of 5
 warm runs, against `python-ags4` 1.2.0. Each cell is laterite's time and its
 speedup.

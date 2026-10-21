@@ -100,7 +100,7 @@ One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs:
 (a new step before `write_ags4`, gated to AutoFix), so **all four surfaces** (PyO3,
 Node, both wasm paths) inherit it with zero per-binding work; `"report"`/`"strict"`
 are unchanged (they show/reject the gaps). Mirrors the existing forge synthesizer
-(`repo:rust-packages/laterite-ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
+([`src/synth/model.rs`](https://github.com/niko86/laterite-forge/blob/main/src/synth/model.rs) in niko86/laterite-forge, `collect_unit`/`collect_type`/`tran`)
 — a parallel flagged for convergence in [[reliquary]]. **Converged (#924):** the
 drift trigger fired (forge kept padded units emit trimmed, and never learned the
 PU harvest), so the Rule 15/17 *collection rule* now lives once in

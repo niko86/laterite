@@ -7,13 +7,13 @@ ags_editions: []
 repo_refs:
   matrix: "ags-wiki/strategies/strat-parity-matrix.md"
   parity: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"
-related: [parity-model, parity-confidence-model, laterite-ags4-forge, parity-triage-sampling-bias, parity-cascade-unreconcilable, strat-parity-matrix]
+related: [parity-model, parity-confidence-model, parity-triage-sampling-bias, parity-cascade-unreconcilable, strat-parity-matrix]
 sources: []
 ---
 # evolutionary dogfooding
 
 ## Definition
-> [!quote] The method [[laterite-ags4-forge]] implements: instead of *waiting*
+> [!quote] The method [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) implements: instead of *waiting*
 > for a crawl to surface a Rust↔python divergence, **manufacture and
 > prove** it. A candidate's *signature* is
 > `(parity_tag, rust_rules, python_rules, injection, scaffold)`; **fitness =
@@ -56,11 +56,11 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-ags4-forge]] (`evolve.rs`); pairs with [[parity-confidence-model]]
+[laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) (`evolve.rs`); pairs with [[parity-confidence-model]]
 for *who* reaches the oracle; confirmed findings flow into the
 [[strategies/_README|strategies]] register and the §12.5
 insight→`OBSERVATIONS.md` O-N path; serves
 req-reproducible-conformance-corpus.
 
 ## Related
-[[parity-model]] · [[parity-confidence-model]] · [[laterite-ags4-forge]] · [[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · [[strat-parity-matrix]] · req-reproducible-conformance-corpus
+[[parity-model]] · [[parity-confidence-model]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · [[strat-parity-matrix]] · req-reproducible-conformance-corpus

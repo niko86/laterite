@@ -9,7 +9,7 @@ artifact: laterite-ags4-corpus-qa
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-corpus-qa"
-related: [parity-model, laterite-cli, laterite-ags4-parity, laterite-ags4-forge, data-single-source-audit, edition-resolution, crate-map, dec-ags4-censor-leaf, laterite-ags4-wasm]
+related: [parity-model, laterite-cli, laterite-ags4-parity, data-single-source-audit, edition-resolution, crate-map, dec-ags4-censor-leaf, laterite-ags4-wasm]
 sources: []
 ---
 # laterite-ags4-corpus-qa
@@ -96,7 +96,7 @@ flowchart LR
   crawl[laterite-ags4-corpus-qa] --> parity[laterite-ags4-parity]
   parity --> py[py-ags4-check-json]
   crawl --> ags4check[lat]
-  forge[laterite-ags4-forge] --> parity
+  forge["laterite-ags4-forge<br/>own repo: niko86/laterite-forge"] --> parity
   ags4check --> cliutil[laterite-cliutil]
   ags5db[ags5db] --> cliutil
 ```
@@ -105,9 +105,9 @@ See [[crate-map]] for the workspace dependency graph.
 
 See [[parity-model]] for the lat ↔ py-ags4-check-json
 cross-check. `parity.rs` was extracted into [[laterite-ags4-parity]] (P1)
-so [[laterite-ags4-forge]] shares the identical `classify`/`reconcile` without
+so [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) shares the identical `classify`/`reconcile` without
 duplication (behaviour-neutral refactor, complete); this crate now consumes
 the parity crate.
 
 ## Related
-[[parity-model]] · [[laterite-cli]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[crate-map]] · [[data-single-source-audit]] · [[edition-resolution]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-wasm]]
+[[parity-model]] · [[laterite-cli]] · [[laterite-ags4-parity]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[crate-map]] · [[data-single-source-audit]] · [[edition-resolution]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-wasm]]

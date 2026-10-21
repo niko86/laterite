@@ -21,7 +21,7 @@ hard-error-free). `proposed` → `probed` → `confirmed` (with recorded
 `evidence`).
 
 A `strat-forge-*` page is the human-readable twin of an executable
-[[laterite-ags4-forge]] `strategy.toml`: the agent authors both from this wiki,
+[laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) `strategy.toml`: the agent authors both from this wiki,
 the CLI evolves/minimizes, and a confirmed divergence flips the page
 `proposed`→`probed`→`confirmed` with the minimized probe as
 `evidence` ([[evolutionary-dogfooding]]).
@@ -40,4 +40,4 @@ TABLE targets, evidence FROM "strategies" WHERE status = "confirmed"
 ```
 
 ## Related
-[[start-here]] · [[parity-model]] · [[evolutionary-dogfooding]] · [[laterite-ags4-forge]] · [[insights/_README|insights register]]
+[[start-here]] · [[parity-model]] · [[evolutionary-dogfooding]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[insights/_README|insights register]]

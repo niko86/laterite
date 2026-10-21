@@ -18,15 +18,18 @@
 # Output goes to `output/bench-fixtures/` (gitignored). Re-running is cheap and
 # idempotent; the files are regenerated rather than cached.
 #
+# Forge is the pinned release binary from `tools/fetch_forge.py` (downloaded
+# and checksum-verified on first use), never a source build — forge lives in
+# https://github.com/niko86/laterite-forge.
+#
 # Usage:
-#     ./tools/gen-bench-fixtures.sh          # build forge if needed, generate
+#     ./tools/gen-bench-fixtures.sh          # fetch forge if needed, generate
 #     ./tools/gen-bench-fixtures.sh --force  # regenerate even if present
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/output/bench-fixtures"
-FORGE="$REPO_ROOT/rust-packages/target/release/laterite-ags4-forge"
 
 # Seed 0 everywhere: the point is a fixed file, not a varied one. A bench that
 # measures a different file each run measures noise.
@@ -44,10 +47,7 @@ RUNGS=(
 force=0
 [ "${1:-}" = "--force" ] && force=1
 
-if [ ! -x "$FORGE" ]; then
-    echo "building laterite-ags4-forge (release) — first run only..."
-    (cd "$REPO_ROOT/rust-packages" && cargo build --release -p laterite-ags4-forge)
-fi
+FORGE="$(uv run --no-project python "$REPO_ROOT/tools/fetch_forge.py")"
 
 mkdir -p "$OUT_DIR"
 

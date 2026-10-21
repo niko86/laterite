@@ -73,13 +73,6 @@ REPO = Path(__file__).resolve().parents[1]
 # be reproduced anywhere.)
 OUT_DIR = REPO / "output" / "readme-bench"
 MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
-FORGE = (
-    REPO
-    / "rust-packages"
-    / "target"
-    / "release"
-    / ("laterite-ags4-forge.exe" if sys.platform == "win32" else "laterite-ags4-forge")
-)
 DEFAULT_RUNGS = ["25MB", "265MB"]
 SEED = 0
 SCAFFOLD = "wide"
@@ -117,17 +110,16 @@ def fixture(size: str) -> Path:
 
         unpack(packed)
     if not path.exists():
-        if not FORGE.exists():
-            print("building laterite-ags4-forge (release) ...", flush=True)
-            subprocess.run(
-                ["cargo", "build", "--release", "-p", "laterite-ags4-forge"],
-                cwd=REPO / "rust-packages",
-                check=True,
-            )
+        # The pinned forge release, fetched and checksum-verified on first
+        # use — never built from source here.
+        sys.path.insert(0, str(REPO / "tools"))
+        import fetch_forge
+
+        forge = fetch_forge.forge_path()
         print(f"generating {path.name} ...", flush=True)
         subprocess.run(
             [
-                str(FORGE),
+                str(forge),
                 "scale",
                 "--size",
                 size,
