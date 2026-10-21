@@ -44,7 +44,7 @@ def test_numeric_casts_xn_columns_to_float_with_null_qualifiers():
 def test_numeric_view_is_consistent_across_sql_and_at():
     ags = lat.read(text=AGS, xn="numeric")
     # the engine table is numeric, so SQL aggregates work without per-call casts.
-    avg = ags.sql('SELECT AVG("FRAC_FI") AS a FROM "FRAC"').fetchone()[0]
+    avg = ags.sql('SELECT AVG("FRAC_FI") AS a FROM "FRAC"').fetchall()[0][0]
     assert avg == pytest.approx(12.5)  # only BH01 is numeric
     # at() rides the same engine table → same numeric typing.
     sub = ags.at("LOCA", ["BH02"])["FRAC"]
