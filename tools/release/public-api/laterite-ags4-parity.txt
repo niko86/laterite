@@ -1,0 +1,319 @@
+pub mod laterite_ags4_parity
+pub mod laterite_ags4_parity::check
+pub struct laterite_ags4_parity::check::CheckReport
+pub laterite_ags4_parity::check::CheckReport::detail: alloc::string::String
+pub laterite_ags4_parity::check::CheckReport::dict_used: alloc::string::String
+pub laterite_ags4_parity::check::CheckReport::file: alloc::string::String
+pub laterite_ags4_parity::check::CheckReport::oracle: bool
+pub laterite_ags4_parity::check::CheckReport::python_rule_counts: alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub laterite_ags4_parity::check::CheckReport::python_rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::check::CheckReport::rust_rule_counts: alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub laterite_ags4_parity::check::CheckReport::rust_rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::check::CheckReport::schema: u32
+pub laterite_ags4_parity::check::CheckReport::verdict: alloc::string::String
+impl laterite_ags4_parity::check::CheckReport
+pub fn laterite_ags4_parity::check::CheckReport::count_rows(&self) -> alloc::vec::Vec<(alloc::string::String, core::option::Option<u64>, core::option::Option<u64>)>
+pub fn laterite_ags4_parity::check::CheckReport::is_action(&self) -> bool
+pub fn laterite_ags4_parity::check::CheckReport::new(alloc::string::String, &laterite_ags4_parity::check::Outcome, bool) -> Self
+impl core::fmt::Debug for laterite_ags4_parity::check::CheckReport
+pub fn laterite_ags4_parity::check::CheckReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl laterite_cliutil::report::Report for laterite_ags4_parity::check::CheckReport
+pub fn laterite_ags4_parity::check::CheckReport::render_table(&self, &mut dyn core::io::write::Write, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+impl serde_core::ser::Serialize for laterite_ags4_parity::check::CheckReport
+pub fn laterite_ags4_parity::check::CheckReport::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_parity::check::CheckReport
+impl core::marker::Send for laterite_ags4_parity::check::CheckReport
+impl core::marker::Sync for laterite_ags4_parity::check::CheckReport
+impl core::marker::Unpin for laterite_ags4_parity::check::CheckReport
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::check::CheckReport
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::check::CheckReport
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::check::CheckReport
+pub struct laterite_ags4_parity::check::CheckSweepReport
+pub laterite_ags4_parity::check::CheckSweepReport::counts: alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub laterite_ags4_parity::check::CheckSweepReport::files: alloc::vec::Vec<laterite_ags4_parity::check::CheckReport>
+pub laterite_ags4_parity::check::CheckSweepReport::files_checked: usize
+pub laterite_ags4_parity::check::CheckSweepReport::oracle: bool
+pub laterite_ags4_parity::check::CheckSweepReport::schema: u32
+pub laterite_ags4_parity::check::CheckSweepReport::skipped_not_ags: usize
+impl laterite_ags4_parity::check::CheckSweepReport
+pub fn laterite_ags4_parity::check::CheckSweepReport::is_action(&self) -> bool
+pub fn laterite_ags4_parity::check::CheckSweepReport::new(alloc::vec::Vec<laterite_ags4_parity::check::CheckReport>, bool, usize) -> Self
+impl core::fmt::Debug for laterite_ags4_parity::check::CheckSweepReport
+pub fn laterite_ags4_parity::check::CheckSweepReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl laterite_cliutil::report::Report for laterite_ags4_parity::check::CheckSweepReport
+pub fn laterite_ags4_parity::check::CheckSweepReport::compact_value(&self) -> serde_json::value::Value
+pub fn laterite_ags4_parity::check::CheckSweepReport::render_table(&self, &mut dyn core::io::write::Write, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+impl serde_core::ser::Serialize for laterite_ags4_parity::check::CheckSweepReport
+pub fn laterite_ags4_parity::check::CheckSweepReport::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_parity::check::CheckSweepReport
+impl core::marker::Send for laterite_ags4_parity::check::CheckSweepReport
+impl core::marker::Sync for laterite_ags4_parity::check::CheckSweepReport
+impl core::marker::Unpin for laterite_ags4_parity::check::CheckSweepReport
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::check::CheckSweepReport
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::check::CheckSweepReport
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::check::CheckSweepReport
+pub struct laterite_ags4_parity::check::Outcome
+pub laterite_ags4_parity::check::Outcome::dict_used: alloc::string::String
+pub laterite_ags4_parity::check::Outcome::python: core::option::Option<core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>>
+pub laterite_ags4_parity::check::Outcome::python_counts: alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub laterite_ags4_parity::check::Outcome::rust: laterite_ags4_parity::verdict::RustResult
+pub laterite_ags4_parity::check::Outcome::rust_counts: alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub laterite_ags4_parity::check::Outcome::verdict: core::option::Option<laterite_ags4_parity::verdict::Parity>
+impl laterite_ags4_parity::check::Outcome
+pub fn laterite_ags4_parity::check::Outcome::python_rules(&self) -> alloc::vec::Vec<alloc::string::String>
+pub fn laterite_ags4_parity::check::Outcome::rust_rules(&self) -> alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_parity::check::Outcome
+pub fn laterite_ags4_parity::check::Outcome::clone(&self) -> Self
+impl core::fmt::Debug for laterite_ags4_parity::check::Outcome
+pub fn laterite_ags4_parity::check::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parity::check::Outcome
+impl core::marker::Send for laterite_ags4_parity::check::Outcome
+impl core::marker::Sync for laterite_ags4_parity::check::Outcome
+impl core::marker::Unpin for laterite_ags4_parity::check::Outcome
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::check::Outcome
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::check::Outcome
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::check::Outcome
+pub fn laterite_ags4_parity::check::build_oracle(std::path::PathBuf, std::path::PathBuf, u64) -> core::option::Option<(laterite_ags4_parity::oracle::PyOracle, alloc::string::String)>
+pub fn laterite_ags4_parity::check::collect_ags(&std::path::Path, bool, &mut alloc::vec::Vec<std::path::PathBuf>, &mut usize)
+pub fn laterite_ags4_parity::check::dual_validate(&std::path::Path, core::option::Option<&laterite_ags4_parity::oracle::PyOracle>) -> laterite_ags4_parity::check::Outcome
+pub fn laterite_ags4_parity::check::run(&[std::path::PathBuf], &std::path::Path, &std::path::Path, u64, bool, &laterite_cliutil::report::Ctx) -> core::io::error::Result<i32>
+pub fn laterite_ags4_parity::check::rust_check(&std::path::Path) -> (laterite_ags4_parity::verdict::RustResult, alloc::string::String)
+pub fn laterite_ags4_parity::check::rust_check_counted(&std::path::Path) -> (laterite_ags4_parity::verdict::RustResult, alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String)
+pub fn laterite_ags4_parity::check::verdict_parts(core::option::Option<&laterite_ags4_parity::verdict::Parity>) -> (alloc::string::String, alloc::string::String)
+pub mod laterite_ags4_parity::oracle
+pub enum laterite_ags4_parity::oracle::OracleError
+pub laterite_ags4_parity::oracle::OracleError::NotImportable
+pub laterite_ags4_parity::oracle::OracleError::Unavailable(alloc::string::String)
+impl core::fmt::Debug for laterite_ags4_parity::oracle::OracleError
+pub fn laterite_ags4_parity::oracle::OracleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Send for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Sync for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Unpin for laterite_ags4_parity::oracle::OracleError
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::OracleError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::OracleError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::OracleError
+pub struct laterite_ags4_parity::oracle::PyOracle
+impl laterite_ags4_parity::oracle::PyOracle
+pub fn laterite_ags4_parity::oracle::PyOracle::check(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>
+pub fn laterite_ags4_parity::oracle::PyOracle::check_counts(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String>
+pub fn laterite_ags4_parity::oracle::PyOracle::new(&str, std::path::PathBuf, std::path::PathBuf, core::time::Duration) -> Self
+pub fn laterite_ags4_parity::oracle::PyOracle::selfcheck(&self) -> core::result::Result<laterite_ags4_parity::oracle::SelfCheck, laterite_ags4_parity::oracle::OracleError>
+impl core::marker::Freeze for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Send for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Sync for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Unpin for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::PyOracle
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::PyOracle
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::PyOracle
+pub struct laterite_ags4_parity::oracle::SelfCheck
+pub laterite_ags4_parity::oracle::SelfCheck::python_ags4: core::option::Option<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_parity::oracle::SelfCheck
+pub fn laterite_ags4_parity::oracle::SelfCheck::clone(&self) -> Self
+impl core::fmt::Debug for laterite_ags4_parity::oracle::SelfCheck
+pub fn laterite_ags4_parity::oracle::SelfCheck::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Send for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Sync for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Unpin for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::SelfCheck
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+pub const laterite_ags4_parity::oracle::EXPECTED_PYAGS4: &str
+pub mod laterite_ags4_parity::rng
+pub struct laterite_ags4_parity::rng::Rng(_)
+impl laterite_ags4_parity::rng::Rng
+pub fn laterite_ags4_parity::rng::Rng::below(&mut self, u64) -> u64
+pub fn laterite_ags4_parity::rng::Rng::choose<'a, T>(&mut self, &'a [T]) -> &'a T
+pub fn laterite_ags4_parity::rng::Rng::from_time() -> Self
+pub fn laterite_ags4_parity::rng::Rng::range(&mut self, i64, i64) -> i64
+pub fn laterite_ags4_parity::rng::Rng::seeded(u64) -> Self
+impl core::marker::Freeze for laterite_ags4_parity::rng::Rng
+impl core::marker::Send for laterite_ags4_parity::rng::Rng
+impl core::marker::Sync for laterite_ags4_parity::rng::Rng
+impl core::marker::Unpin for laterite_ags4_parity::rng::Rng
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::rng::Rng
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::rng::Rng
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::rng::Rng
+pub fn laterite_ags4_parity::rng::reservoir<T, I: core::iter::traits::iterator::Iterator<Item = T>>(I, usize, &mut laterite_ags4_parity::rng::Rng) -> alloc::vec::Vec<T>
+pub mod laterite_ags4_parity::verdict
+pub enum laterite_ags4_parity::verdict::Parity
+pub laterite_ags4_parity::verdict::Parity::Agree
+pub laterite_ags4_parity::verdict::Parity::KnownDivergence
+pub laterite_ags4_parity::verdict::Parity::KnownDivergence::detail: alloc::string::String
+pub laterite_ags4_parity::verdict::Parity::KnownDivergence::observation: alloc::string::String
+pub laterite_ags4_parity::verdict::Parity::PythonError
+pub laterite_ags4_parity::verdict::Parity::PythonError::reason: alloc::string::String
+pub laterite_ags4_parity::verdict::Parity::PythonOnlyRules
+pub laterite_ags4_parity::verdict::Parity::PythonOnlyRules::rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::verdict::Parity::RulesDiffer
+pub laterite_ags4_parity::verdict::Parity::RulesDiffer::python_only: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::verdict::Parity::RulesDiffer::rust_only: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::verdict::Parity::RustOnlyRules
+pub laterite_ags4_parity::verdict::Parity::RustOnlyRules::rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::verdict::Parity::ValidityDisagree
+pub laterite_ags4_parity::verdict::Parity::ValidityDisagree::python: alloc::string::String
+pub laterite_ags4_parity::verdict::Parity::ValidityDisagree::rust: alloc::string::String
+impl laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::is_action(&self) -> bool
+pub fn laterite_ags4_parity::verdict::Parity::is_action_tag(&str) -> bool
+pub fn laterite_ags4_parity::verdict::Parity::tag(&self) -> &'static str
+impl core::clone::Clone for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::clone(&self) -> Self
+impl core::cmp::PartialEq for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parity::verdict::Parity
+impl serde_core::ser::Serialize for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_parity::verdict::Parity
+impl core::marker::Send for laterite_ags4_parity::verdict::Parity
+impl core::marker::Sync for laterite_ags4_parity::verdict::Parity
+impl core::marker::Unpin for laterite_ags4_parity::verdict::Parity
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::verdict::Parity
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::verdict::Parity
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::verdict::Parity
+pub enum laterite_ags4_parity::verdict::RustResult
+pub laterite_ags4_parity::verdict::RustResult::Clean
+pub laterite_ags4_parity::verdict::RustResult::HardError(alloc::string::String)
+pub laterite_ags4_parity::verdict::RustResult::Panic
+pub laterite_ags4_parity::verdict::RustResult::Rules(alloc::collections::btree::set::BTreeSet<alloc::string::String>)
+impl laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::from_findings(&laterite_ags4_validator::findings::Findings) -> Self
+pub fn laterite_ags4_parity::verdict::RustResult::from_validator_error(&laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::clone::Clone for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::clone(&self) -> Self
+impl core::cmp::PartialEq for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Freeze for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Send for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Sync for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Unpin for laterite_ags4_parity::verdict::RustResult
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::verdict::RustResult
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::verdict::RustResult
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::classify(&laterite_ags4_parity::verdict::RustResult, &core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>) -> laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::rust_rule_counts(&laterite_ags4_validator::findings::Findings) -> alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>
+pub enum laterite_ags4_parity::OracleError
+pub laterite_ags4_parity::OracleError::NotImportable
+pub laterite_ags4_parity::OracleError::Unavailable(alloc::string::String)
+impl core::fmt::Debug for laterite_ags4_parity::oracle::OracleError
+pub fn laterite_ags4_parity::oracle::OracleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Send for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Sync for laterite_ags4_parity::oracle::OracleError
+impl core::marker::Unpin for laterite_ags4_parity::oracle::OracleError
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::OracleError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::OracleError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::OracleError
+pub enum laterite_ags4_parity::Parity
+pub laterite_ags4_parity::Parity::Agree
+pub laterite_ags4_parity::Parity::KnownDivergence
+pub laterite_ags4_parity::Parity::KnownDivergence::detail: alloc::string::String
+pub laterite_ags4_parity::Parity::KnownDivergence::observation: alloc::string::String
+pub laterite_ags4_parity::Parity::PythonError
+pub laterite_ags4_parity::Parity::PythonError::reason: alloc::string::String
+pub laterite_ags4_parity::Parity::PythonOnlyRules
+pub laterite_ags4_parity::Parity::PythonOnlyRules::rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::Parity::RulesDiffer
+pub laterite_ags4_parity::Parity::RulesDiffer::python_only: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::Parity::RulesDiffer::rust_only: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::Parity::RustOnlyRules
+pub laterite_ags4_parity::Parity::RustOnlyRules::rules: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parity::Parity::ValidityDisagree
+pub laterite_ags4_parity::Parity::ValidityDisagree::python: alloc::string::String
+pub laterite_ags4_parity::Parity::ValidityDisagree::rust: alloc::string::String
+impl laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::is_action(&self) -> bool
+pub fn laterite_ags4_parity::verdict::Parity::is_action_tag(&str) -> bool
+pub fn laterite_ags4_parity::verdict::Parity::tag(&self) -> &'static str
+impl core::clone::Clone for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::clone(&self) -> Self
+impl core::cmp::PartialEq for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parity::verdict::Parity
+impl serde_core::ser::Serialize for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::verdict::Parity::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_parity::verdict::Parity
+impl core::marker::Send for laterite_ags4_parity::verdict::Parity
+impl core::marker::Sync for laterite_ags4_parity::verdict::Parity
+impl core::marker::Unpin for laterite_ags4_parity::verdict::Parity
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::verdict::Parity
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::verdict::Parity
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::verdict::Parity
+pub enum laterite_ags4_parity::RustResult
+pub laterite_ags4_parity::RustResult::Clean
+pub laterite_ags4_parity::RustResult::HardError(alloc::string::String)
+pub laterite_ags4_parity::RustResult::Panic
+pub laterite_ags4_parity::RustResult::Rules(alloc::collections::btree::set::BTreeSet<alloc::string::String>)
+impl laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::from_findings(&laterite_ags4_validator::findings::Findings) -> Self
+pub fn laterite_ags4_parity::verdict::RustResult::from_validator_error(&laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::clone::Clone for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::clone(&self) -> Self
+impl core::cmp::PartialEq for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_ags4_parity::verdict::RustResult
+pub fn laterite_ags4_parity::verdict::RustResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Freeze for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Send for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Sync for laterite_ags4_parity::verdict::RustResult
+impl core::marker::Unpin for laterite_ags4_parity::verdict::RustResult
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::verdict::RustResult
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::verdict::RustResult
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::verdict::RustResult
+pub struct laterite_ags4_parity::PyOracle
+impl laterite_ags4_parity::oracle::PyOracle
+pub fn laterite_ags4_parity::oracle::PyOracle::check(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>
+pub fn laterite_ags4_parity::oracle::PyOracle::check_counts(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String>
+pub fn laterite_ags4_parity::oracle::PyOracle::new(&str, std::path::PathBuf, std::path::PathBuf, core::time::Duration) -> Self
+pub fn laterite_ags4_parity::oracle::PyOracle::selfcheck(&self) -> core::result::Result<laterite_ags4_parity::oracle::SelfCheck, laterite_ags4_parity::oracle::OracleError>
+impl core::marker::Freeze for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Send for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Sync for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::Unpin for laterite_ags4_parity::oracle::PyOracle
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::PyOracle
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::PyOracle
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::PyOracle
+pub struct laterite_ags4_parity::Rng(_)
+impl laterite_ags4_parity::rng::Rng
+pub fn laterite_ags4_parity::rng::Rng::below(&mut self, u64) -> u64
+pub fn laterite_ags4_parity::rng::Rng::choose<'a, T>(&mut self, &'a [T]) -> &'a T
+pub fn laterite_ags4_parity::rng::Rng::from_time() -> Self
+pub fn laterite_ags4_parity::rng::Rng::range(&mut self, i64, i64) -> i64
+pub fn laterite_ags4_parity::rng::Rng::seeded(u64) -> Self
+impl core::marker::Freeze for laterite_ags4_parity::rng::Rng
+impl core::marker::Send for laterite_ags4_parity::rng::Rng
+impl core::marker::Sync for laterite_ags4_parity::rng::Rng
+impl core::marker::Unpin for laterite_ags4_parity::rng::Rng
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::rng::Rng
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::rng::Rng
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::rng::Rng
+pub struct laterite_ags4_parity::SelfCheck
+pub laterite_ags4_parity::SelfCheck::python_ags4: core::option::Option<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_parity::oracle::SelfCheck
+pub fn laterite_ags4_parity::oracle::SelfCheck::clone(&self) -> Self
+impl core::fmt::Debug for laterite_ags4_parity::oracle::SelfCheck
+pub fn laterite_ags4_parity::oracle::SelfCheck::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Send for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Sync for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::Unpin for laterite_ags4_parity::oracle::SelfCheck
+impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::SelfCheck
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+pub const laterite_ags4_parity::EXPECTED_PYAGS4: &str
+pub fn laterite_ags4_parity::classify(&laterite_ags4_parity::verdict::RustResult, &core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>) -> laterite_ags4_parity::verdict::Parity
+pub fn laterite_ags4_parity::reservoir<T, I: core::iter::traits::iterator::Iterator<Item = T>>(I, usize, &mut laterite_ags4_parity::rng::Rng) -> alloc::vec::Vec<T>
+pub fn laterite_ags4_parity::rust_rule_counts(&laterite_ags4_validator::findings::Findings) -> alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>

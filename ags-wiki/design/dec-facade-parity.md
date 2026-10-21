@@ -260,6 +260,12 @@ meanings. And it would put `clap`/`ratatui`/`crossterm`/`calamine` on a publishe
 dependency surface, which is the weight the crate split exists to keep off
 library consumers.
 
+> [!note] `laterite-cliutil` publishes anyway, since #1108
+> Not for the CLI: forge is leaving this repo and depends on cliutil and
+> `laterite-ags4-parity`, so both joined the publish set with their own
+> snapshots and versions. The reasoning above about publishing `laterite-cli`
+> stands unchanged.
+
 `lat` continues to reach people as it does today: per-target binaries from the
 release workflow, and the `lat` console script that rides in the wheel.
 

@@ -24,3 +24,11 @@ pub mod verdict;
 pub use oracle::{EXPECTED_PYAGS4, OracleError, PyOracle, SelfCheck};
 pub use rng::{Rng, reservoir};
 pub use verdict::{Parity, RustResult, classify, rust_rule_counts};
+
+// The README's example is a doctest, not a second copy of one. `cfg(doctest)`
+// means this module exists only while rustdoc collects doctests: it is absent
+// from a normal build and from the rendered docs.rs page. The README is the
+// single source, and `cargo test --workspace` already compiles it.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}

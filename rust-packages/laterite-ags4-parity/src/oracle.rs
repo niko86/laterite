@@ -1,7 +1,7 @@
 //! `PyOracle` — the python-ags4 subprocess bridge.
 //!
-//! Spawns `uv run python <wrapper> …` with cwd = the repo root (so
-//! `uv run` resolves the project's deps). The body of [`PyOracle::check`]
+//! Spawns `uv run python <wrapper> …` with cwd = the caller's uv project
+//! (so `uv run` resolves that project's deps). The body of [`PyOracle::check`]
 //! is the verbatim former `parity.rs::run_py`; [`PyOracle::selfcheck`]
 //! is the verbatim former inline `--selfcheck` probe — both extracted
 //! so `laterite-ags4-corpus-qa` and `laterite-ags4-forge` share one bridge. The
@@ -45,24 +45,28 @@ pub struct SelfCheck {
     pub python_ags4: Option<String>,
 }
 
-/// The python bridge. `uv`/`wrapper`/`repo`/`timeout` are exactly the
+/// The python bridge. `uv`/`wrapper`/`project`/`timeout` are exactly the
 /// former `run_py` parameters; held so one instance serves both the
 /// startup self-check and every per-file check (shared across a rayon
 /// pool by `&self` — `check` spawns its own `Command`).
 pub struct PyOracle {
     uv: String,
     wrapper: PathBuf,
-    repo: PathBuf,
+    project: PathBuf,
     timeout: Duration,
 }
 
 impl PyOracle {
+    /// `wrapper` is the python script to run and `project` the uv project
+    /// whose environment runs it (the child's cwd). Nothing here defaults
+    /// either one: a published crate has no repo of its own to find them in
+    /// (#1108), so they are whatever the caller passes.
     #[must_use]
-    pub fn new(uv: &str, wrapper: PathBuf, repo: PathBuf, timeout: Duration) -> Self {
+    pub fn new(uv: &str, wrapper: PathBuf, project: PathBuf, timeout: Duration) -> Self {
         Self {
             uv: uv.to_string(),
             wrapper,
-            repo,
+            project,
             timeout,
         }
     }
@@ -76,7 +80,7 @@ impl PyOracle {
             .args(["run", "python"])
             .arg(&self.wrapper)
             .arg("--selfcheck")
-            .current_dir(&self.repo)
+            .current_dir(&self.project)
             .stderr(Stdio::null())
             .output();
         match probe {
@@ -113,16 +117,16 @@ impl PyOracle {
     /// O-22/O-26), so a count comparison manufactures divergences the
     /// presence model exists to avoid. Observable, never judged.
     pub fn check_counts(&self, target: &Path) -> Result<BTreeMap<String, u64>, String> {
-        // The child runs with cwd = repo root (so `uv run` resolves the
-        // project's deps), so the target must be absolute — it's
-        // relative to the *harness* cwd, not the repo.
+        // The child runs with cwd = the uv project (so `uv run` resolves
+        // its deps), so the target must be absolute — it's relative to
+        // the *harness* cwd, not the project.
         let target_abs = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
         let mut child = Command::new(&self.uv)
             .args(["run", "python"])
             .arg(&self.wrapper)
             .arg("--encoding-fallback")
             .arg(&target_abs)
-            .current_dir(&self.repo)
+            .current_dir(&self.project)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()

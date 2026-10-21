@@ -96,8 +96,16 @@ fn main() {
         // given and writes only the report, so it is the shared parity call
         // and nothing else.
         Commands::Check(a) => {
-            laterite_ags4_parity::check::run(&a.paths, a.timeout, a.no_oracle, &ctx)
-                .map_err(Into::into)
+            let (wrapper, project) = parity::oracle_site();
+            laterite_ags4_parity::check::run(
+                &a.paths,
+                &wrapper,
+                &project,
+                a.timeout,
+                a.no_oracle,
+                &ctx,
+            )
+            .map_err(Into::into)
         }
     };
 

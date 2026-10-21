@@ -126,6 +126,13 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
+/// Where `check`'s oracle runs: this repo's wrapper script and the uv
+/// project at this repo's root — the values the parity crate resolved for
+/// itself before it published and stopped knowing where it was (#1108).
+pub fn oracle_site() -> (PathBuf, PathBuf) {
+    (repo_root().join("tools/py_ags4_check_json.py"), repo_root())
+}
+
 pub fn run(args: &ParityArgs, ctx: Ctx, corpus_dir: &Path) -> Result<i32> {
     let wrapper = args
         .wrapper
