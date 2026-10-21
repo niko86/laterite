@@ -253,10 +253,10 @@ impl MultiLine {
     /// Set worker line `idx`'s message (no-op when static/quiet, or
     /// `idx` out of range — display must never panic the caller).
     pub fn set_line(&self, idx: usize, msg: &str) {
-        if let MultiKind::Live { lines, .. } = &self.inner {
-            if let Some(pb) = lines.get(idx) {
-                pb.set_message(msg.to_string());
-            }
+        if let MultiKind::Live { lines, .. } = &self.inner
+            && let Some(pb) = lines.get(idx)
+        {
+            pb.set_message(msg.to_string());
         }
     }
 
@@ -327,10 +327,10 @@ fn readme_arg_present(args: impl Iterator<Item = String>) -> bool {
 /// Atomic file write: create parent dirs, write a sibling temp file,
 /// then rename over the target so a reader never sees a partial file.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)?;
     }
     // Sibling temp file (same dir → rename is atomic), then swap.
     let mut tmp = path.as_os_str().to_owned();
@@ -422,6 +422,14 @@ pub fn write_ndjson<W: Write>(out: &mut W, v: &Value) -> io::Result<()> {
     serde_json::to_writer(&mut *out, v)?;
     out.write_all(b"\n")
 }
+
+// The README's example is a doctest, not a second copy of one. `cfg(doctest)`
+// means this module exists only while rustdoc collects doctests: it is absent
+// from a normal build and from the rendered docs.rs page. The README is the
+// single source, and `cargo test --workspace` already compiles it.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}
 
 #[cfg(test)]
 mod tests {

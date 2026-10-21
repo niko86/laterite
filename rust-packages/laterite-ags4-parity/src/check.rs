@@ -108,19 +108,23 @@ pub fn rust_check_counted(path: &Path) -> (RustResult, BTreeMap<String, u64>, St
     }
 }
 
-/// The python-ags4 bridge over this repo's own wrapper,
-/// `tools/py_ags4_check_json.py`, built once and reused (it spawns its own
+/// The python-ags4 bridge, built once and reused (it spawns its own
 /// subprocess per file). `Some((oracle, version))` on success — forge keys
 /// its confidence ledger on the version, so an oracle bump cold-starts
 /// trust; `None` ⇒ unavailable → callers degrade to Rust-only.
 ///
-/// Anchored on this crate's manifest dir, which sits at the same depth as
-/// every caller's, so the repo root it resolves is the one they share.
+/// `wrapper` is the python script `uv run` executes and `project` the uv
+/// project whose environment runs it. Both are the caller's: this crate
+/// publishes to crates.io, where its own manifest dir is a registry cache
+/// with no wrapper beside it, so it cannot find them by walking up from
+/// itself (#1108).
 #[must_use]
-pub fn build_oracle(timeout_secs: u64) -> Option<(PyOracle, String)> {
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let wrapper = repo.join("tools/py_ags4_check_json.py");
-    let oracle = PyOracle::new("uv", wrapper, repo, Duration::from_secs(timeout_secs));
+pub fn build_oracle(
+    wrapper: PathBuf,
+    project: PathBuf,
+    timeout_secs: u64,
+) -> Option<(PyOracle, String)> {
+    let oracle = PyOracle::new("uv", wrapper, project, Duration::from_secs(timeout_secs));
     // One self-check: if uv/python-ags4 isn't importable, treat the
     // oracle as absent (optional QA — same policy as corpus-qa `parity`).
     match oracle.selfcheck() {
@@ -234,9 +238,19 @@ pub fn collect_ags(path: &Path, named: bool, out: &mut Vec<PathBuf>, skipped: &m
 /// contract: 0 no parity action, 1 a real (unexplained) divergence, 3 a
 /// named path that does not exist or no file to check.
 ///
+/// `wrapper` and `project` are where the oracle runs, as for
+/// [`build_oracle`]; neither is touched when `no_oracle` is set.
+///
 /// # Errors
 /// Only a failure to write the report to stdout.
-pub fn run(paths: &[PathBuf], timeout_secs: u64, no_oracle: bool, ctx: &Ctx) -> io::Result<i32> {
+pub fn run(
+    paths: &[PathBuf],
+    wrapper: &Path,
+    project: &Path,
+    timeout_secs: u64,
+    no_oracle: bool,
+    ctx: &Ctx,
+) -> io::Result<i32> {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut skipped = 0usize;
     for p in paths {
@@ -255,7 +269,7 @@ pub fn run(paths: &[PathBuf], timeout_secs: u64, no_oracle: bool, ctx: &Ctx) -> 
     let oracle = if no_oracle {
         None
     } else {
-        build_oracle(timeout_secs).map(|(o, _)| o)
+        build_oracle(wrapper.to_path_buf(), project.to_path_buf(), timeout_secs).map(|(o, _)| o)
     };
     if oracle.is_none() && !no_oracle {
         note("check: python-ags4 unavailable — Rust-only verdict (optional QA)");

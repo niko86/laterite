@@ -81,8 +81,11 @@ fn combo_meta(injs: &[Injection]) -> (String, Option<String>) {
 /// check` makes too (#1109): the comparison has one home, so the two commands
 /// cannot answer differently while both exist.
 pub fn check(args: &CheckArgs, ctx: Ctx) -> Result<i32> {
+    let (wrapper, project) = crate::pipeline::oracle_site();
     Ok(laterite_ags4_parity::check::run(
         &args.paths,
+        &wrapper,
+        &project,
         args.timeout,
         args.no_oracle,
         &ctx,

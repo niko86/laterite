@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.11.0"
+version = "0.1.0"
 dependencies = [
  "laterite-ags4-validator",
  "laterite-cliutil",
@@ -2433,7 +2433,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cliutil"
-version = "0.11.0"
+version = "0.1.0"
 dependencies = [
  "clap",
  "comfy-table 8.0.1",

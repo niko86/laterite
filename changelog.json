@@ -20,6 +20,9 @@
       },
       {
         "text": "**`laterite-ags4-corpus-qa check` compares laterite with python-ags4 on real files (#1109).** Name a file, several files or a directory and it reports each engine's rules, per-rule finding counts and the parity verdict, with the same flags and output as `laterite-ags4-forge check`. Both commands now run the same code in `laterite-ags4-parity`. The demo-state sweep uses it, so the `parity` workflow no longer builds forge."
+      },
+      {
+        "text": "**`laterite-ags4-parity` and `laterite-cliutil` join the crates.io publish set (#1108).** `laterite-ags4-parity` (the laterite/python-ags4 verdict model and the oracle that runs python-ags4) and `laterite-cliutil` (the shared CLI table, spinner, colour gate and report contract) carry their own versions, starting at 0.1.0, and are released like the other engine crates. Both declare `rust-version` 1.88, which `comfy-table` 8 requires. The oracle no longer looks for its wrapper script beside the crate: `check::build_oracle` and `check::run` take the wrapper and the uv project that runs it from the caller."
       }
     ],
     "changed": [

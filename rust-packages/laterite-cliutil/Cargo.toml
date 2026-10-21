@@ -16,15 +16,32 @@
 # documented lean dep-graph guarantee is unaffected. The `clap`
 # ValueEnum derive is feature-gated so `lat` (which hand-parses
 # argv) does not pull clap.
+#
+# Published since #1108, alongside laterite-ags4-parity (which renders its
+# reports through `report`): forge is leaving this repo and depends on both,
+# and a crate outside the workspace can only depend on what crates.io holds.
 
 [package]
 name = "laterite-cliutil"
-version.workspace = true
+version = "0.1.0"  # per-crate since #1108 — bump via tools/release/bump_crate.py
 edition = "2024"
-rust-version = "1.85"
+# 1.88, above the tier's 1.85: comfy-table 8 requires it, which check_msrv.py
+# found the day this crate joined the publish set (#1108).
+rust-version = "1.88"
 description = "Shared CLI presentation (spinner, table, colour, JSON) for the AGS4 CLI binaries"
 license = "MIT"
-publish = false
+repository.workspace = true
+keywords = ["ags", "ags4", "cli", "table", "spinner"]
+categories = ["command-line-interface"]
+publish = true
+
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+    "/README.md",
+]
 
 [features]
 default = []
@@ -48,3 +65,8 @@ console = "0.16"
 
 [lints]
 workspace = true
+
+# Which release train cuts this crate (#806): the nightly engine cut derives
+# bumps for `engine` crates only; `product` crates ride the product trains.
+[package.metadata.laterite]
+release_tier = "engine"

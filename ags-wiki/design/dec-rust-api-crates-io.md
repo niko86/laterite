@@ -222,10 +222,11 @@ deciding that question now.
 > `test_surface_engine_pins_record_what_ships` holds the pins equal to each
 > crate's own version; cargo itself refuses to resolve a path crate a pin no
 > longer admits, so a drifted pin is a loud build error rather than a quiet
-> lie. Unpublished laterite deps (`censor`, `cliutil`) deliberately
+> lie. Unpublished laterite deps (`censor`) deliberately
 > carry **no** version: nothing published exists for one to record. (Excel left
 > this set at [[dec-facade-parity]] phases 5–6 — published, and pinned
-> everywhere like the rest.)
+> everywhere like the rest. `cliutil` left it at #1108, with
+> `laterite-ags4-parity`, so forge can depend on both from outside this repo.)
 
 **Revised 2026-08-14 — what the rules above are a promise *about*.** Everything in
 this section is the mechanism by which the facade absorbs **engine** reshaping. It

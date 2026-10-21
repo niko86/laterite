@@ -16,24 +16,48 @@
 # `laterite-cliutil` (no features, so no clap) since #1109: the `check`
 # module carries the two-engine report documents, and they render through
 # the shared report contract like every other document in both consumers.
+#
+# Published since #1108: forge is leaving this repo, and a crate outside the
+# workspace can only depend on what crates.io holds. So this carries its own
+# version and rides the per-crate cascade like the engine crates — and the
+# python oracle takes its wrapper script and uv project from the caller, since
+# a registry copy has no repo root to find them in.
 
 [package]
 name = "laterite-ags4-parity"
-version.workspace = true
+version = "0.1.0"  # per-crate since #1108 — bump via tools/release/bump_crate.py
 edition = "2024"
-rust-version = "1.85"
+# 1.88, above the tier's 1.85: laterite-cliutil's comfy-table 8 requires it
+# (check_msrv.py, #1108).
+rust-version = "1.88"
 description = "Shared Rust↔python-ags4 parity verdict model + python oracle bridge"
 license = "MIT"
-publish = false
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "parity", "validator"]
+categories = ["science::geo", "development-tools::testing"]
+publish = true
+
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+    "/README.md",
+]
 
 [dependencies]
-laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-validator = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-laterite-cliutil = { path = "../laterite-cliutil" }
+laterite-cliutil = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
 
 [lints]
 workspace = true
+
+# Which release train cuts this crate (#806): the nightly engine cut derives
+# bumps for `engine` crates only; `product` crates ride the product trains.
+[package.metadata.laterite]
+release_tier = "engine"

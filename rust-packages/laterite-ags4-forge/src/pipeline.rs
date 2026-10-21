@@ -15,7 +15,24 @@
 //! re-exports it so forge's call sites are unchanged, and keeps the tests
 //! that hold forge's own generator to it.
 
-pub use laterite_ags4_parity::check::{Outcome, build_oracle, dual_validate, rust_check};
+use std::path::PathBuf;
+
+use laterite_ags4_parity::PyOracle;
+pub use laterite_ags4_parity::check::{Outcome, dual_validate, rust_check};
+
+/// Where the oracle runs: this repo's wrapper script and the uv project at
+/// this repo's root. The parity crate no longer finds them for itself
+/// (#1108), so forge names them — the same values it always resolved to.
+pub fn oracle_site() -> (PathBuf, PathBuf) {
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    (repo.join("tools/py_ags4_check_json.py"), repo)
+}
+
+/// [`laterite_ags4_parity::check::build_oracle`] at [`oracle_site`].
+pub fn build_oracle(timeout_secs: u64) -> Option<(PyOracle, String)> {
+    let (wrapper, project) = oracle_site();
+    laterite_ags4_parity::check::build_oracle(wrapper, project, timeout_secs)
+}
 
 #[cfg(test)]
 mod tests {

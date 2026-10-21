@@ -15,7 +15,7 @@ sources: []
 # laterite-cliutil
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Not published** — `laterite-cliutil` is a workspace crate, internal to this repo, versioned with the workspace.
+> [!note] **Cleared for crates.io** — `laterite-cliutil` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
 > **Used by** — [[laterite-ags4-corpus-qa]], [[laterite-ags4-forge]], [[laterite-ags4-parity]], [[laterite-cli]].
 <!-- END GENERATED: crate-card -->
 

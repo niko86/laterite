@@ -70,7 +70,7 @@ def _toml(rel: str) -> dict:
 PRODUCT = _toml("packages/laterite/pyproject.toml")["project"]["version"]
 
 #: `[workspace.package].version` — since #781 inherited only by the UNPUBLISHED
-#: members (QA tools, cliutil, censor…); the published crates version per-crate.
+#: members (QA tools, censor…); the published crates version per-crate.
 WORKSPACE = _toml("rust-packages/Cargo.toml")["workspace"]["package"]["version"]
 
 
@@ -470,7 +470,7 @@ def test_surface_engine_pins_record_what_ships() -> None:
     * a pin unequal to the crate's own version is drift — `bump_crate.py`
       rewrites every member pin when it moves a crate, so an unequal pin means
       something was moved by hand;
-    * an UNPUBLISHED laterite dep (censor, cliutil) must NOT carry a
+    * an UNPUBLISHED laterite dep (censor) must NOT carry a
       version — there is no published version to record, so a number there
       would be an invention that starts lying at its first divergence.
     """

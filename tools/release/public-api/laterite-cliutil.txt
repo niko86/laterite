@@ -1,0 +1,118 @@
+pub mod laterite_cliutil
+pub mod laterite_cliutil::report
+pub struct laterite_cliutil::report::Ctx
+pub laterite_cliutil::report::Ctx::compact: bool
+pub laterite_cliutil::report::Ctx::dry_run: bool
+pub laterite_cliutil::report::Ctx::mode: laterite_cliutil::OutputMode
+pub laterite_cliutil::report::Ctx::no_color: bool
+pub laterite_cliutil::report::Ctx::no_input: bool
+pub laterite_cliutil::report::Ctx::quiet: bool
+impl laterite_cliutil::report::Ctx
+pub fn laterite_cliutil::report::Ctx::colour(&self) -> bool
+impl core::clone::Clone for laterite_cliutil::report::Ctx
+pub fn laterite_cliutil::report::Ctx::clone(&self) -> Self
+impl core::fmt::Debug for laterite_cliutil::report::Ctx
+pub fn laterite_cliutil::report::Ctx::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_cliutil::report::Ctx
+impl core::marker::Freeze for laterite_cliutil::report::Ctx
+impl core::marker::Send for laterite_cliutil::report::Ctx
+impl core::marker::Sync for laterite_cliutil::report::Ctx
+impl core::marker::Unpin for laterite_cliutil::report::Ctx
+impl core::marker::UnsafeUnpin for laterite_cliutil::report::Ctx
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_cliutil::report::Ctx
+impl core::panic::unwind_safe::UnwindSafe for laterite_cliutil::report::Ctx
+pub struct laterite_cliutil::report::Plan
+pub laterite_cliutil::report::Plan::action: alloc::string::String
+pub laterite_cliutil::report::Plan::detail: serde_json::map::Map<alloc::string::String, serde_json::value::Value>
+pub laterite_cliutil::report::Plan::dry_run: bool
+pub laterite_cliutil::report::Plan::summary: alloc::string::String
+impl laterite_cliutil::report::Plan
+pub fn laterite_cliutil::report::Plan::new(&str, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn laterite_cliutil::report::Plan::with(self, &str, impl core::convert::Into<serde_json::value::Value>) -> Self
+impl core::fmt::Debug for laterite_cliutil::report::Plan
+pub fn laterite_cliutil::report::Plan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl laterite_cliutil::report::Report for laterite_cliutil::report::Plan
+pub fn laterite_cliutil::report::Plan::compact_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Plan::full_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Plan::render_table(&self, &mut dyn core::io::write::Write, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+impl serde_core::ser::Serialize for laterite_cliutil::report::Plan
+pub fn laterite_cliutil::report::Plan::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_cliutil::report::Plan
+impl core::marker::Send for laterite_cliutil::report::Plan
+impl core::marker::Sync for laterite_cliutil::report::Plan
+impl core::marker::Unpin for laterite_cliutil::report::Plan
+impl core::marker::UnsafeUnpin for laterite_cliutil::report::Plan
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_cliutil::report::Plan
+impl core::panic::unwind_safe::UnwindSafe for laterite_cliutil::report::Plan
+pub trait laterite_cliutil::report::Report: serde_core::ser::Serialize
+pub fn laterite_cliutil::report::Report::compact_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Report::full_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Report::render_table(&self, &mut dyn core::io::write::Write, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+impl laterite_cliutil::report::Report for laterite_cliutil::report::Plan
+pub fn laterite_cliutil::report::Plan::compact_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Plan::full_value(&self) -> serde_json::value::Value
+pub fn laterite_cliutil::report::Plan::render_table(&self, &mut dyn core::io::write::Write, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+pub fn laterite_cliutil::report::emit<R: laterite_cliutil::report::Report>(&R, &laterite_cliutil::report::Ctx) -> core::io::error::Result<()>
+pub fn laterite_cliutil::report::note(impl core::convert::AsRef<str>)
+pub fn laterite_cliutil::report::without_keys(serde_json::value::Value, &[&str]) -> serde_json::value::Value
+pub enum laterite_cliutil::OutputMode
+pub laterite_cliutil::OutputMode::Json
+pub laterite_cliutil::OutputMode::Ndjson
+pub laterite_cliutil::OutputMode::Table
+impl laterite_cliutil::OutputMode
+pub fn laterite_cliutil::OutputMode::auto() -> Self
+impl clap_builder::derive::ValueEnum for laterite_cliutil::OutputMode
+pub fn laterite_cliutil::OutputMode::to_possible_value<'a>(&self) -> core::option::Option<clap_builder::builder::possible_value::PossibleValue>
+pub fn laterite_cliutil::OutputMode::value_variants<'a>() -> &'a [Self]
+impl core::clone::Clone for laterite_cliutil::OutputMode
+pub fn laterite_cliutil::OutputMode::clone(&self) -> Self
+impl core::cmp::Eq for laterite_cliutil::OutputMode
+impl core::cmp::PartialEq for laterite_cliutil::OutputMode
+pub fn laterite_cliutil::OutputMode::eq(&self, &Self) -> bool
+impl core::fmt::Debug for laterite_cliutil::OutputMode
+pub fn laterite_cliutil::OutputMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_cliutil::OutputMode
+impl core::marker::StructuralPartialEq for laterite_cliutil::OutputMode
+impl core::marker::Freeze for laterite_cliutil::OutputMode
+impl core::marker::Send for laterite_cliutil::OutputMode
+impl core::marker::Sync for laterite_cliutil::OutputMode
+impl core::marker::Unpin for laterite_cliutil::OutputMode
+impl core::marker::UnsafeUnpin for laterite_cliutil::OutputMode
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_cliutil::OutputMode
+impl core::panic::unwind_safe::UnwindSafe for laterite_cliutil::OutputMode
+pub struct laterite_cliutil::MultiLine
+impl laterite_cliutil::MultiLine
+pub fn laterite_cliutil::MultiLine::set_header(&self, &str)
+pub fn laterite_cliutil::MultiLine::set_line(&self, usize, &str)
+pub fn laterite_cliutil::MultiLine::start(&str, usize, bool) -> Self
+pub fn laterite_cliutil::MultiLine::suspend<R>(&self, impl core::ops::function::FnOnce() -> R) -> R
+impl core::ops::drop::Drop for laterite_cliutil::MultiLine
+pub fn laterite_cliutil::MultiLine::drop(&mut self)
+impl core::marker::Freeze for laterite_cliutil::MultiLine
+impl core::marker::Send for laterite_cliutil::MultiLine
+impl core::marker::Sync for laterite_cliutil::MultiLine
+impl core::marker::Unpin for laterite_cliutil::MultiLine
+impl core::marker::UnsafeUnpin for laterite_cliutil::MultiLine
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_cliutil::MultiLine
+impl core::panic::unwind_safe::UnwindSafe for laterite_cliutil::MultiLine
+pub struct laterite_cliutil::Spinner
+impl laterite_cliutil::Spinner
+pub fn laterite_cliutil::Spinner::set(&self, &str)
+pub fn laterite_cliutil::Spinner::start(&str, bool) -> Self
+impl core::ops::drop::Drop for laterite_cliutil::Spinner
+pub fn laterite_cliutil::Spinner::drop(&mut self)
+impl core::marker::Freeze for laterite_cliutil::Spinner
+impl core::marker::Send for laterite_cliutil::Spinner
+impl core::marker::Sync for laterite_cliutil::Spinner
+impl core::marker::Unpin for laterite_cliutil::Spinner
+impl core::marker::UnsafeUnpin for laterite_cliutil::Spinner
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_cliutil::Spinner
+impl core::panic::unwind_safe::UnwindSafe for laterite_cliutil::Spinner
+pub fn laterite_cliutil::colour_enabled(bool) -> bool
+pub fn laterite_cliutil::print_readme_if_requested(&str)
+pub fn laterite_cliutil::progress_bar(u64, bool) -> indicatif::progress_bar::ProgressBar
+pub fn laterite_cliutil::styled_table(&[&str], alloc::vec::Vec<alloc::vec::Vec<alloc::string::String>>, bool) -> comfy_table::table::Table
+pub fn laterite_cliutil::term_cols() -> core::option::Option<usize>
+pub fn laterite_cliutil::write_atomic(&std::path::Path, &[u8]) -> core::io::error::Result<()>
+pub fn laterite_cliutil::write_json_pretty<W: core::io::write::Write>(&mut W, &serde_json::value::Value, bool) -> core::io::error::Result<()>
+pub fn laterite_cliutil::write_ndjson<W: core::io::write::Write>(&mut W, &serde_json::value::Value) -> core::io::error::Result<()>

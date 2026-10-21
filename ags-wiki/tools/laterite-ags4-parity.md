@@ -16,7 +16,7 @@ sources: []
 # laterite-ags4-parity
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Not published** — `laterite-ags4-parity` is a workspace crate, internal to this repo, versioned with the workspace.
+> [!note] **Cleared for crates.io** — `laterite-ags4-parity` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
 > **Used by** — [[laterite-ags4-compliance]], [[laterite-ags4-corpus-qa]], [[laterite-ags4-forge]].
 <!-- END GENERATED: crate-card -->
 
@@ -45,13 +45,22 @@ depends on [[laterite-cliutil]]: the documents render through the shared
 report contract.
 
 ## Inputs / outputs
-> [!quote] In: a Rust crate dependency (path). Out: the parity verdict
+> [!quote] In: a Rust crate dependency. Out: the parity verdict
 > primitives + python oracle bridge. Depends *on*
 > `repo:rust-packages/laterite-ags4-validator` and never the reverse, so
 > the validator's lean dep-graph guarantee is untouched (no
 > walkdir/rayon/clap). The corpus-qa refactor is behaviour-neutral —
 > the existing `classify`/`reconcile` unit tests move with the code
 > and must stay green.
+
+Published to crates.io since #1108, on its own version, so forge can depend on
+it from outside this repo. That is why the oracle no longer finds its own
+wrapper: `PyOracle::new` and `check::build_oracle` take the wrapper script and
+the uv project that runs it from the caller, and `check::run` takes both
+through to them. corpus-qa and forge pass this repo's
+`tools/py_ags4_check_json.py` and root, the values the crate used to resolve
+for itself from its manifest dir — which on a registry copy is a cache with no
+wrapper beside it.
 
 ## Where it lives
 `repo:rust-packages/laterite-ags4-parity` — extracted at P1; the crate is the
