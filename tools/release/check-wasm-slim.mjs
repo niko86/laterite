@@ -57,11 +57,12 @@ const EXPECTED_CLASSES = {
   ParsedDataset: ["group_codes", "meta", "rows_json"],
 };
 
-// Measured 2026-08-16 (post-#342), by the shared gate's own `gzipSync(level: 9)`
-// so the numbers below are the ones it compares — node's zlib runs ~8 KB above
-// the `gzip -9` binary on this artifact, which is exactly the sort of gap that
-// makes a hand-copied figure wrong. Each row is that feature alone on top of
-// slim:
+// A dated record, not the current artifact: measured 2026-08-16 (post-#342),
+// before either raise below, by the shared gate's own `gzipSync(level: 9)` so
+// the numbers were the ones it compared — node's zlib ran ~8 KB above the
+// `gzip -9` binary on this artifact, which is exactly the sort of gap that makes
+// a hand-copied figure wrong. Today's sizes are the ones the gate prints on
+// every run. Each row is that feature alone on top of slim, as of that date:
 //
 //                 gzip KiB            raw KiB
 //     slim         757.3              1868.9
@@ -84,7 +85,8 @@ const EXPECTED_CLASSES = {
 //
 // What the ceilings are for is the failure the surface check CANNOT see: a heavy
 // dependency landing on an UNGATED path, where the export list is unchanged and
-// only the weight moved. Both leave ~12% headroom over slim for honest growth.
+// only the weight moved. When first set, both left ~12% headroom over slim for
+// honest growth.
 //
 // Raised once, on purpose, in #1024 (an owner decision, not a leak): the fix
 // engine's ABBR code rewrite reuses `merge`'s recode plan, which until then
@@ -99,8 +101,8 @@ const EXPECTED_CLASSES = {
 // diff of named builds against main confirmed that is where the growth sits, not a
 // duplicated dependency. The raise is that growth plus a modest margin; gzip
 // still clears its own ceiling and was left alone.
-const MAX_GZIP_BYTES = 870 * 1024; // slim 757.3 (2026-08-16)
-const MAX_RAW_BYTES = 2180 * 1024; // slim 1868.9 (2026-08-16)
+const MAX_GZIP_BYTES = 870 * 1024;
+const MAX_RAW_BYTES = 2180 * 1024;
 
 checkWasmArtifact({
   label: "wasm-slim",

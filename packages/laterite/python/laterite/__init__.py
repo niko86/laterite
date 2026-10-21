@@ -511,10 +511,13 @@ class Report:
         return self._r["_found"].ndjson()
 
     def __repr__(self) -> str:
-        # What the repr states is what the report HOLDS, so it counts findings
-        # rather than reading the verdict — since the severity split a passing
-        # file can carry warnings, and "valid" over a listed finding reads as a
-        # contradiction. The verdict is `is_valid`, and it is asked for by name.
+        # The repr states what the run FOUND, so it counts findings rather than
+        # reading the verdict — since the severity split a passing file can carry
+        # warnings, and "valid" over a listed finding reads as a contradiction.
+        # The verdict is `is_valid`, and it is asked for by name. The figure is
+        # `count`, a total: under `max_findings_per_rule` it includes findings
+        # the report did not keep, as the CLI's "N finding(s)" headline and the
+        # Node `toString` do. `truncated` says how many were kept.
         v = "valid" if self.count == 0 else f"{self.count} finding(s)"
         return f"<Report {self.file!r} {v} dict={self.dict_version}>"
 

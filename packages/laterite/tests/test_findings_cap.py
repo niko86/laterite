@@ -77,6 +77,9 @@ def test_zero_keeps_no_findings_and_the_serialisations_say_so(lf):
     assert doc["truncated"] == zero.truncated
     lines = zero.to_ndjson().splitlines()
     assert [json.loads(x) for x in lines] == [{"truncated": zero.truncated}]
+    # The repr states what the run found, like the CLI headline: the total, not
+    # the rows kept (#1130).
+    assert repr(zero) == repr(full)
 
 
 def test_an_uncapped_report_carries_no_truncation(lf):
