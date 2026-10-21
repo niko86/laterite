@@ -32,8 +32,11 @@ gather→check→cross-check), plus two added 2026-06-21:
   `validate`'s `judge` verbatim, so the snapshot reflects the real tool.
   The finding-drift gate for the [[reliquary|parser convergence]], and
   **wired into this repo's CI** (#1034): a committed baseline over the vendored
-  corpus (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`,
-  regen note beside it) is `--check`ed by the `corpus-drift` job in
+  python-ags4 corpus
+  (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`,
+  regen note beside it; the corpus itself sits in this crate at
+  `repo:rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/`, moved out
+  of forge by #1110) is `--check`ed by the `corpus-drift` job in
   `repo:.github/workflows/ci.yml`, path-filtered on the validator and its
   deps, this crate, the fixtures and the lockfile, with
   `repo:tools/check_corpus_drift.py` turning the two JSON outputs into the

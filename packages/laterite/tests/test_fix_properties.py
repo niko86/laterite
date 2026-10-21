@@ -24,7 +24,9 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 _ROOT = Path(__file__).resolve().parents[3]  # repo root
-_CORPUS = _ROOT / "rust-packages" / "laterite-ags4-forge" / "vendor" / "pyags4-tests"
+_CORPUS = (
+    _ROOT / "rust-packages" / "laterite-ags4-corpus-qa" / "vendor" / "pyags4-tests"
+)
 
 # Fail LOUD if the corpus path is wrong. Without this, a mistyped directory makes
 # every fixture read as "not parseable" and the whole suite degrades to an

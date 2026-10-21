@@ -364,12 +364,16 @@ proptest! {
 
 #[test]
 fn fixture_corpus_upholds_the_invariants() {
-    let dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ags4-forge/vendor/pyags4-tests");
-    if !dir.is_dir() {
-        eprintln!("skipping fixture sweep: {} absent", dir.display());
-        return;
-    }
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../laterite-ags4-corpus-qa/vendor/pyags4-tests");
+    // Fail, never skip: this read a path that never existed and skipped on it,
+    // so it passed on every run without checking a file (#1110). The corpus
+    // is committed, so its absence is a broken path, not an optional input.
+    assert!(
+        dir.is_dir(),
+        "fixture corpus not found at {} — the sweep would check nothing",
+        dir.display()
+    );
     let (mut checked, mut skipped) = (0, 0);
     for entry in std::fs::read_dir(&dir).expect("read vendor dir") {
         let path = entry.expect("dir entry").path();

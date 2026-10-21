@@ -14,7 +14,7 @@ safe to commit even though the corpus itself is private.
 ## `pyags4-vendor.json`
 
 The validator's findings over the vendored python-ags4 fixture corpus
-(`../../laterite-ags4-forge/vendor/pyags4-tests`, 83 files by content). Invariants:
+(`../vendor/pyags4-tests`, 83 files by content). Invariants:
 **warnings ON, FYI ON, `check_files` OFF, dict auto**.
 
 ### Check it
@@ -22,7 +22,7 @@ The validator's findings over the vendored python-ags4 fixture corpus
 CI runs this check as the **`corpus-drift`** job in
 `.github/workflows/ci.yml`, on every pull request whose paths can move it: the
 validator and its parse / reference / types deps, `laterite-ags4-hostopts`,
-this crate (baseline included), the vendored fixtures,
+this crate (baseline and vendored fixtures included),
 `rust-packages/Cargo.lock`, the job's script and the workflow itself (the
 `corpus` filter in the `changes` job). A PR that touches none of those skips
 the job, which reports success; a scheduled or manually dispatched run of the
@@ -35,7 +35,7 @@ fixture by name with its `added`/`removed` findings and the re-freeze command.
 To run the same check locally, from the repo root:
 
 ```bash
-FIX=rust-packages/laterite-ags4-forge/vendor/pyags4-tests
+FIX=rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests
 QA=output/qa-drift              # gitignored working space
 cargo run --manifest-path rust-packages/Cargo.toml -p laterite-ags4-corpus-qa -- \
   crawl --root "$FIX" --all --corpus-dir "$QA" --no-input -q

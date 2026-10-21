@@ -499,8 +499,10 @@ pub fn mine(args: &MineArgs, ctx: Ctx) -> Result<i32> {
     }
     // Default corpus: the vendored python-ags4 fixtures (run `forge seed
     // vendor` first). Absent → an empty covered-set, surfaced in the report.
+    // It lives beside corpus-qa, whose drift baseline is frozen over it (#1110).
     let corpus = args.corpus.clone().unwrap_or_else(|| {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/pyags4-tests")
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../laterite-ags4-corpus-qa/vendor/pyags4-tests")
     });
 
     let out = forge_dir(args.out_dir.as_deref());

@@ -22,7 +22,7 @@ from typing import Any
 import pytest
 from _tools import load_tool
 
-ROOT = "rust-packages/laterite-ags4-forge/vendor/pyags4-tests"
+ROOT = "rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests"
 BASE = "rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json"
 
 CRAWL: dict[str, Any] = {

@@ -318,8 +318,10 @@ jobs:
               - 'rust-packages/laterite-ags4-hostopts/**'
               # The harness, and the committed baseline that lives inside it.
               - 'rust-packages/laterite-ags4-corpus-qa/**'
-              # The fixture corpus the baseline was frozen over.
-              - 'rust-packages/laterite-ags4-forge/vendor/pyags4-tests/**'
+              # The fixture corpus the baseline was frozen over. The line above
+              # already covers it since #1110 moved it out of forge; it stays
+              # named so a later move has to edit the input it is moving.
+              - 'rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/**'
               # A dependency bump can move a finding without touching a crate.
               - 'rust-packages/Cargo.lock'
               - 'tools/check_corpus_drift.py'
@@ -1351,7 +1353,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          FIX=rust-packages/laterite-ags4-forge/vendor/pyags4-tests
+          FIX=rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests
           BASE=rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json
           QA="$RUNNER_TEMP/qa-drift"
           qa() { cargo run -q --manifest-path rust-packages/Cargo.toml -p laterite-ags4-corpus-qa -- "$@"; }
