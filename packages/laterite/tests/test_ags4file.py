@@ -339,7 +339,7 @@ def test_a_one_group_statement_registers_only_that_group(run):
 def test_sql_matches_a_group_named_in_any_case():
     # DuckDB resolves identifiers case-insensitively, so `loca` reads LOCA.
     f = laterite.read(text=_RELATED_SRC)
-    assert f.sql("select count(*) from loca").fetchone()[0] == 3
+    assert f.sql("select count(*) from loca").fetchall()[0][0] == 3
     assert f._registered == {"LOCA"}
 
 
@@ -378,7 +378,7 @@ def test_a_statement_whose_groups_cannot_be_told_registers_every_group(sql):
 def test_connection_exposes_raw_duckdb_seeded_with_groups():
     f = laterite.read(text=_NUMERIC_SRC)
     con = f.connection
-    assert con.sql("SELECT COUNT(*) FROM LOCA").fetchone()[0] == 3
+    assert con.sql("SELECT COUNT(*) FROM LOCA").fetchall()[0][0] == 3
 
 
 def test_context_manager_closes_engine():

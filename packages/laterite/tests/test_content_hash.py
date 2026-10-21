@@ -82,13 +82,13 @@ def test_value_dedup_collapses_identical_rows_and_keeps_revisions():
              UNION ALL
              SELECT LOCA_ID, LOCA_GL, _id, _content_hash FROM B"""
     )
-    assert con.sql("SELECT count(*) FROM U").fetchone()[0] == 5
+    assert con.sql("SELECT count(*) FROM U").fetchall()[0][0] == 5
     # Three BOREHOLES across the two deliveries — identity.
-    assert con.sql("SELECT count(DISTINCT _id) FROM U").fetchone()[0] == 3
+    assert con.sql("SELECT count(DISTINCT _id) FROM U").fetchall()[0][0] == 3
     # Four distinct row VALUES: BH01 (once — the reformat + new blank column did
     # NOT make it a different row), BH02 twice (12.00 and the 12.75 revision),
     # BH03 once.
-    assert con.sql("SELECT count(DISTINCT _content_hash) FROM U").fetchone()[0] == 4
+    assert con.sql("SELECT count(DISTINCT _content_hash) FROM U").fetchall()[0][0] == 4
 
 
 def test_a_revised_row_shares_its_id_but_not_its_hash():

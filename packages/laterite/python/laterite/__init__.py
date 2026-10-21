@@ -736,7 +736,12 @@ class Ags4File:
         con.register(tmp, table)  # the arro3 table's Arrow capsule (pyarrow-free)
         try:
             select = "*" if self._xn == "string" else self._xn_select(con, tmp, code)
-            con.execute(f'CREATE TABLE "{code}" AS SELECT {select} FROM "{tmp}"')
+            # Drained, not left pending: duckdb 2.0 refuses any further work on a
+            # connection while an execute() result is unread (#1139). fetchall()
+            # is the spelling both 1.x and 2.0 accept; 2.0's complete() isn't in 1.x.
+            con.execute(
+                f'CREATE TABLE "{code}" AS SELECT {select} FROM "{tmp}"'
+            ).fetchall()
         finally:
             con.unregister(tmp)
 
@@ -1320,10 +1325,10 @@ class Ags4File:
         try:
             for code in codes:
                 self._create_table(con, code)
-                # count(*) always yields one row; the guard is for the type checker,
-                # since DuckDBPyConnection.fetchone() is typed Optional.
-                count_row = con.execute(f'SELECT count(*) FROM "{code}"').fetchone()
-                rows += count_row[0] if count_row is not None else 0
+                # fetchall(), not fetchone(): duckdb 2.0 keeps a result open until a
+                # fetch comes back empty, and the next group's register() is refused
+                # while one is open (#1139). count(*) always yields exactly one row.
+                rows += con.execute(f'SELECT count(*) FROM "{code}"').fetchall()[0][0]
         finally:
             con.close()
         return {"path": path, "tables_written": len(codes), "rows_written": rows}

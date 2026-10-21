@@ -113,7 +113,7 @@ def test_register_user_frame() -> None:
     # register()'s body runs on the call itself (no AGS-group registration needed);
     # a capsule-exposing frame routes through the pyarrow-free ArrowStream path.
     f.register("mine", pl.DataFrame({"k": ["a", "b"], "v": [1, 2]}))
-    got = f.sql("SELECT COUNT(*) AS n FROM mine").fetchone()
+    got = f.sql("SELECT COUNT(*) AS n FROM mine").fetchall()[0]
     assert got[0] == 2
 
 
