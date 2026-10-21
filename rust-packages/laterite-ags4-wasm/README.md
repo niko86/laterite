@@ -130,7 +130,7 @@ report.ok;                 // the verdict: no error and no findings
 report.dict_version;       // the edition judged against, e.g. "4.1.1"
 report.finding_count;      // the TRUE total, never clipped
 report.findings;           // grouped by rule: [{ rule, total, items: [{ line, group, desc, … }] }]
-report.truncated;          // { "<rule>": { shown, total } } for each rule maxFindingsPerRule cut
+report.truncated;          // { "<rule>": { shown, total } } for each rule that is short of its total
 report.error;              // { kind, message } when the input wasn't validatable at all
 ```
 

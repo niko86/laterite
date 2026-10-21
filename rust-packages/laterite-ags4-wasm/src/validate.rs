@@ -59,6 +59,21 @@ pub(crate) struct RuleGroup {
     pub(crate) items: Vec<FindingDto>,
 }
 
+/// One rule's entry in [`ValidationReport::truncated`]: the engine's
+/// `Truncation` as it serialises, rebuilt here because the row budget cuts after
+/// the engine has finished, and a rule only the budget cut has no `Truncation`.
+#[derive(Serialize)]
+pub(crate) struct Cut {
+    /// Findings that crossed the boundary for this rule.
+    pub(crate) shown: usize,
+    /// Findings this rule made, kept or not.
+    pub(crate) total: usize,
+}
+
+fn as_map<S: serde::Serializer>(cuts: &[(String, Cut)], s: S) -> Result<S::Ok, S::Error> {
+    s.collect_map(cuts.iter().map(|(rule, cut)| (rule, cut)))
+}
+
 /// An un-validatable input (not a rule violation). `kind` is a stable
 /// machine token the UI switches on; `message` is the human string.
 #[derive(Serialize)]
@@ -101,8 +116,15 @@ pub(crate) struct ValidationReport {
     pub(crate) findings: Vec<RuleGroup>,
     /// `{rule: {shown, total}}` for each rule `maxFindingsPerRule` cut in the
     /// engine (#1089) — the same map Python's `Report.truncated` and Node's
-    /// `report.truncated` carry. Empty without that option.
-    pub(crate) truncated: laterite_ags4_validator::findings::Truncated,
+    /// `report.truncated` carry — plus each rule the row budget in [`run`] cut
+    /// (#1129), with `shown` what crossed. Empty without that option.
+    ///
+    /// A `Vec` in rule order serialised as a map, not a `BTreeMap`: it is built
+    /// in the engine's rule order already, and a second map type's insert and
+    /// serialise code pushed the tier-1 engine over its size gate
+    /// (`tools/release/check-wasm-tier1.mjs`).
+    #[serde(serialize_with = "as_map")]
+    pub(crate) truncated: Vec<(String, Cut)>,
     pub(crate) error: Option<ValErr>,
     /// Why a proffered `.ags.idx` certificate did NOT stand in for the rule engine,
     /// as the stable snake_case token (`"dictionary_changed"`, `"content_changed"`,
@@ -131,7 +153,7 @@ impl ValidationReport {
             fyi: 0,
             shown_count: 0,
             findings: Vec::new(),
-            truncated: laterite_ags4_validator::findings::Truncated::new(),
+            truncated: Vec::new(),
             error: Some(ValErr {
                 kind: kind.to_string(),
                 message,
@@ -221,8 +243,9 @@ export interface ValidationReport {
   shown_count: number;
   findings: RuleGroup[];
   /** `{rule: {shown, total}}` for each rule `maxFindingsPerRule` cut in the
-   *  engine; `{}` without that option. Matches Python's `Report.truncated` and
-   *  Node's `report.truncated`. */
+   *  engine, or the browser's row budget cut on its way out; `{}` without that
+   *  option. `shown` is what is in `findings`. Matches Python's
+   *  `Report.truncated` and Node's `report.truncated`. */
   truncated: Record<string, { shown: number; total: number }>;
   error: ValErr | null;
   /** Why a proffered `.ags.idx` cert did not stand in for the engine. **Always
@@ -406,6 +429,15 @@ fn derive_char_span(
 /// and silently changed what the report contained. Field names remove that; the
 /// defaults still resolve here, so every door gets the same ones.
 fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
+    run_with_budget(data, o, MAX_SHOWN_TOTAL)
+}
+
+/// The row budget `run` applies when `maxFindingsPerRule` is set. A parameter of
+/// `run_with_budget` rather than a literal inside it so a test can trip it
+/// without building a file with this many findings.
+const MAX_SHOWN_TOTAL: usize = 30_000;
+
+fn run_with_budget(data: &[u8], o: &ValidateOptions, max_shown_total: usize) -> ValidationReport {
     let include_warnings = o.warnings.unwrap_or(true);
     let include_fyi = o.fyi.unwrap_or(false);
     let max_findings_per_rule = o.max_findings_per_rule.map(|c| c as usize);
@@ -497,9 +529,12 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
     // `total` keeps each rule's true count, `finding_count` the file's, and
     // `shown_count` sums what actually crossed, so the UI's "showing N of M"
     // reflects both. (It rode on `maxPerRule` until #1089 removed that option.)
-    const MAX_SHOWN_TOTAL: usize = 30_000;
-    let global_budget = max_findings_per_rule.map(|_| MAX_SHOWN_TOTAL);
+    // A rule either limit cut lands in `truncated_out` with what crossed, so a
+    // consumer reading `truncated` alone sees every rule the payload is short of
+    // (#1129) — not only the ones the engine cut.
+    let global_budget = max_findings_per_rule.map(|_| max_shown_total);
     let mut shown_count = 0usize;
+    let mut truncated_out = Vec::new();
     // A rule the engine cap cut to nothing (`maxFindingsPerRule: 0`) still gets its
     // group, empty, so the UI can say "0 of N" for it. Without that cap there are no
     // such rules, and this is the engine's own map.
@@ -517,6 +552,9 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
                 None => kept,
             };
             shown_count += take;
+            if take < total {
+                truncated_out.push((rule.clone(), Cut { shown: take, total }));
+            }
             RuleGroup {
                 rule,
                 total,
@@ -576,7 +614,7 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
         fyi: verdict.fyi,
         shown_count,
         findings: findings_out,
-        truncated,
+        truncated: truncated_out,
         error: None,
         // No cert-consume path on this surface (see the field's doc): the engine
         // always ran, so there is no proffered certificate to have rejected.
@@ -894,6 +932,48 @@ mod tests {
                 assert!(g.items.len() <= cap as usize, "{}", g.rule);
             }
         }
+    }
+
+    #[test]
+    fn a_rule_the_row_budget_trims_is_named_in_truncated() {
+        // #1129: the row budget cut rows the engine cap never touched, and the rule
+        // went missing from `truncated` while its `total` and `shown_count` still
+        // showed the gap. A cut by either limit is a cut.
+        let opts = |cap: u32| ValidateOptions {
+            warnings: Some(true),
+            fyi: Some(true),
+            max_findings_per_rule: Some(cap),
+            ..Default::default()
+        };
+        let cut = |r: &ValidationReport| {
+            r.truncated
+                .iter()
+                .map(|(k, t)| (k.clone(), t.shown, t.total))
+                .collect::<Vec<_>>()
+        };
+
+        // A cap no rule reaches, and a budget one row short: only the budget
+        // trims, and only the last rule's last row.
+        let roomy = run_with_budget(DELIVERY, &opts(u32::MAX), usize::MAX);
+        assert!(roomy.truncated.is_empty(), "nothing cut by either limit");
+        let last = roomy.findings.last().expect("the fixture has findings");
+        let budget = roomy.shown_count - 1;
+        let trimmed = run_with_budget(DELIVERY, &opts(u32::MAX), budget);
+        assert_eq!(trimmed.shown_count, budget);
+        assert_eq!(
+            cut(&trimmed),
+            vec![(last.rule.clone(), last.total - 1, last.total)]
+        );
+
+        // Both limits on one rule: `shown` is what crossed, `total` what was found.
+        let both = run_with_budget(DELIVERY, &opts(1), 0);
+        let expected: Vec<_> = roomy
+            .findings
+            .iter()
+            .filter(|g| g.total > 0)
+            .map(|g| (g.rule.clone(), 0, g.total))
+            .collect();
+        assert_eq!(cut(&both), expected);
     }
 
     #[test]
