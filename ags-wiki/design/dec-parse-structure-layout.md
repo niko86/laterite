@@ -61,8 +61,8 @@ Two facts bound the design space:
   `byte_offsets_source_true`. Those fields have exactly three consumers:
   the `.ags.idx` certificate index
   (`repo:rust-packages/laterite-ags4-core/src/index.rs`), forge's editor
-  (`repo:rust-packages/laterite-ags4-forge/src/edit.rs`), and one xcheck
-  helper. For them the source-byte coordinate system is load-bearing
+  ([`src/edit.rs`](https://github.com/niko86/laterite-forge/blob/main/src/edit.rs), in niko86/laterite-forge since
+  #1111, so a crates.io consumer now), and one xcheck helper. For them the source-byte coordinate system is load-bearing
   ([[dec-parse-cell-representation]]'s "two coordinate systems" doctrine
   is untouched here); for the validator it is pure weight.
 - **The accessor seam already exists.** #844/#846 moved consumers onto
@@ -184,5 +184,5 @@ exactly as [[dec-parse-cell-representation]]'s was:
 [[dec-emit-streamed-verdict]] · [[laterite-ags4-parse]] · [[crate-map]] ·
 repo: rust-packages/laterite-ags4-parse/src/lib.rs ·
 repo: rust-packages/laterite-ags4-core/src/index.rs ·
-repo: rust-packages/laterite-ags4-forge/src/edit.rs ·
+[forge `src/edit.rs`](https://github.com/niko86/laterite-forge/blob/main/src/edit.rs) ·
 repo: rust-packages/laterite-ags4-validator/src/parse.rs

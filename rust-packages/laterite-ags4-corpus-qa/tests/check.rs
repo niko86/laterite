@@ -1,24 +1,16 @@
-//! `check` answers exactly what `laterite-ags4-forge check` answers (#1109).
+//! `check`: the two-engine comparison over real files (#1109).
 //!
-//! The two-engine comparison is moving out of forge, and the claim that makes
-//! the move safe is that nothing changed on the way: same verdicts, same
-//! per-rule counts, same document. Both commands are thin calls into
-//! `laterite_ags4_parity::check`, so this test runs the two BINARIES side by
-//! side over vendored python-ags4 files and compares their whole output — the
-//! one place a wiring difference (a flag dropped, a different oracle, a
-//! different validator option) would show.
+//! `check` came here from forge's `check` subcommand. Until forge left this
+//! workspace (#1111) this test ran the two binaries side by side and compared
+//! their whole output; that comparison retired with forge's binary. What stays
+//! is the shape a caller reads: a sweep reports every file and at least one
+//! rule count, and a single file keeps the schema-2 document with `.verdict`
+//! straight off it.
 //!
-//! The forge binary is read from beside this crate's own, which `cargo test
-//! --workspace` (the CI test job) always builds in the same invocation. Run on
-//! its own, this crate does not build forge, so a missing binary FAILS with the
-//! command to build it rather than passing on half the comparison. This test
-//! retires with forge's `check`.
-//!
-//! python-ags4 is optional QA here as everywhere else: with no oracle both
-//! commands give a Rust-only verdict, and that still has to match. But a run
-//! that compared only the Rust half says so on stderr, every time — a green
-//! tick that checked half the claim must not look like one that checked all of
-//! it.
+//! python-ags4 is optional QA here as everywhere else: with no oracle the
+//! verdict is Rust-only. A run that checked only the Rust half says so on
+//! stderr, every time — a green tick that checked half the claim must not look
+//! like one that checked all of it.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,21 +19,6 @@ use serde_json::Value;
 
 fn corpus_qa() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_laterite-ags4-corpus-qa"))
-}
-
-fn forge() -> PathBuf {
-    let p = corpus_qa().with_file_name(format!(
-        "laterite-ags4-forge{}",
-        std::env::consts::EXE_SUFFIX
-    ));
-    assert!(
-        p.exists(),
-        "no forge binary at {} — this test compares against it. Build it \
-         (`cargo build -p laterite-ags4-forge`, same profile) or run \
-         `cargo test --workspace`, which builds both.",
-        p.display()
-    );
-    p
 }
 
 fn vendored(name: &str) -> PathBuf {
@@ -86,17 +63,16 @@ fn say_what_was_compared(doc: &Value, what: &str) {
         let _ = writeln!(
             std::io::stderr(),
             "NOTE ({what}): python-ags4 was unavailable, so only the Rust half \
-             was compared — both commands gave Rust-only verdicts and the python \
-             side of the claim went UNCHECKED on this run."
+             was checked — the verdicts are Rust-only and the python side of \
+             the claim went UNCHECKED on this run."
         );
     }
 }
 
 #[test]
-fn a_sweep_matches_forge_verdict_for_verdict_and_count_for_count() {
+fn a_sweep_reports_every_file_and_its_rule_counts() {
     let files: Vec<PathBuf> = FILES.iter().map(|f| vendored(f)).collect();
-    let (ours_code, ours) = run(&corpus_qa(), &files);
-    let (theirs_code, theirs) = run(&forge(), &files);
+    let (_code, ours) = run(&corpus_qa(), &files);
     say_what_was_compared(&ours, "sweep");
 
     // The positive control: an empty sweep would match trivially.
@@ -106,26 +82,17 @@ fn a_sweep_matches_forge_verdict_for_verdict_and_count_for_count() {
         entries.iter().any(|f| f["rust_rule_counts"]
             .as_object()
             .is_some_and(|m| !m.is_empty())),
-        "no file raised a rule, so the counts went uncompared: {ours:#}"
-    );
-
-    assert_eq!(ours, theirs, "corpus-qa check and forge check disagree");
-    assert_eq!(
-        ours_code, theirs_code,
-        "same verdicts, different exit codes"
+        "no file raised a rule, so the counts went unreported: {ours:#}"
     );
 }
 
 #[test]
-fn a_single_file_keeps_forges_single_file_document() {
+fn a_single_file_keeps_the_single_file_document() {
     let file = vec![vendored("4.1-rule8-1.ags")];
-    let (ours_code, ours) = run(&corpus_qa(), &file);
-    let (theirs_code, theirs) = run(&forge(), &file);
+    let (_code, ours) = run(&corpus_qa(), &file);
     say_what_was_compared(&ours, "single file");
 
     // Schema 2 is the one-file shape a caller reads `.verdict` straight off.
     assert_eq!(ours["schema"], 2, "{ours:#}");
     assert!(ours["verdict"].is_string(), "{ours:#}");
-    assert_eq!(ours, theirs, "corpus-qa check and forge check disagree");
-    assert_eq!(ours_code, theirs_code, "same verdict, different exit code");
 }

@@ -111,7 +111,7 @@ the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag
 ## Performance
 
 Node 24, macOS arm64, hot files, mean of 5 warm runs. Fixtures are synthetic,
-spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123 groups**,
+spec-valid AGS4 from [`ags4-forge`](https://github.com/niko86/laterite-forge) — the `wide` scaffold: **123 groups**,
 realistic type mix, zero findings.
 
 | File (123 groups) |            `read` |        `validate` | `read` + typed tables |

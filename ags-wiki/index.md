@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-10-06
-counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concepts: 31, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 41}
+generated: 2026-10-21
+counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 9, design: 38}
 ---
 # AGS Wiki — Content Catalog
 
@@ -15,18 +15,18 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | Groups | 177 |
 | Types | 17 |
 | Observations | 61 |
-| Tools | 31 |
-| Concepts | 31 |
+| Tools | 30 |
+| Concepts | 30 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
-| Test Strategies | 11 |
-| Design | 41 |
-| **Total (live)** | **434** |
+| Test Strategies | 9 |
+| Design | 38 |
+| **Total (live)** | **427** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 40 · `confirmed` 19 · `drafted` 345 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 1 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 37 · `confirmed` 18 · `drafted` 343 · `hypothesis` 2 · `proposed` 1 · `ratified` 6 · `refuted` 1 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -343,7 +343,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | [[laterite-ags4-diff]] | drafted | crate |
 | [[laterite-ags4-emit]] | drafted | crate |
 | [[laterite-ags4-excel]] | drafted | crate |
-| [[laterite-ags4-forge]] | drafted | cli |
 | [[laterite-ags4-hostopts]] | drafted | crate |
 | [[laterite-ags4-merge]] | drafted | crate |
 | [[laterite-ags4-parity]] | drafted | crate |
@@ -374,7 +373,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | [[abi3-perf]] | drafted |
 | [[agent-first-cli-contract]] | drafted |
 | [[arrow-c-ffi-allocator-ownership]] | drafted |
-| [[bs5930-soil-descriptions]] | drafted |
 | [[core-perf-baseline]] | drafted |
 | [[coverage-campaign]] | drafted |
 | [[crate-dependency-graph]] | reviewed |
@@ -470,8 +468,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | [[strat-ags-dfwg-upstream-list]] | confirmed | [rule-19-group-name-format, rule-06-comma-no-embedded-crlf, rule-07-heading-order, rule-01-ascii, rule-08-typed-values] |
 | [[strat-cp1252-rule1]] | confirmed | [rule-01-ascii] |
 | [[strat-elrg-recognition]] | confirmed | [rule-09-unknown-headings, rule-15-unit-group] |
-| [[strat-forge-divergence-mining-campaign]] | proposed | [rule-10a-key-uniqueness, rule-10c-parent-child, rule-08-typed-values, rule-05-quoting, rule-16-abbr-defined] |
-| [[strat-forge-rule10a-relational]] | confirmed | [rule-10a-key-uniqueness] |
 | [[strat-o27-rule20-ondisk]] | confirmed | [rule-20-file-fset] |
 | [[strat-o8-dup-heading-refuted]] | confirmed | [rule-07-heading-order, rule-09-unknown-headings] |
 | [[strat-parity-matrix]] | confirmed | [rule-01-ascii, rule-05-quoting, rule-08-typed-values, rule-07-heading-order] |
@@ -490,7 +486,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | [[core-emit-layering-inversion]] | accepted | — |
 | [[data-single-source-audit]] | accepted | — |
 | [[dec-ags4-censor-leaf]] | accepted | — |
-| [[dec-ags4-forge-evolutionary-dogfood]] | accepted | — |
 | [[dec-ags4-merge-semantics]] | accepted | — |
 | [[dec-beta-claim]] | accepted | — |
 | [[dec-cdn-configuration]] | accepted | — |
@@ -508,8 +503,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 61, tools: 31, concept
 | [[dec-engine-tiering]] | accepted | — |
 | [[dec-example-header-environment]] | accepted | — |
 | [[dec-facade-parity]] | accepted | — |
-| [[dec-forge-audience-boundary]] | accepted | — |
-| [[dec-forge-type-axis-instrument]] | accepted | — |
 | [[dec-landing-build-shared-tokens]] | accepted | — |
 | [[dec-laterite-ags4-types-leaf]] | accepted | — |
 | [[dec-launcher-contract]] | accepted | — |

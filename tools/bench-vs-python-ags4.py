@@ -10,15 +10,16 @@ could repeat. This is that run.
 Fixture stability
 -----------------
 `forge scale --size N --scaffold wide --seed 0` is byte-identical across
-machines, so the rungs are already fixed. What is NOT fixed is forge itself: a
-change to the generator silently produces different data, and the numbers then
-move for reasons that have nothing to do with the engine. So each rung's
+machines, so the rungs are already fixed. What is NOT fixed is forge itself —
+the release binary `tools/fetch_forge.py` pins: a new release can silently
+produce different data, and the numbers then move for reasons that have nothing
+to do with the engine. So each rung's
 SHA-256 is pinned in `tools/readme-bench-fixtures.json` and verified before
 timing. A drifted fixture is a hard error, not a warning — comparing against
 different data is worse than not comparing.
 
-Use `--update-manifest` deliberately, when the generator was *meant* to change,
-and re-measure the whole table in the same run.
+Use `--update-manifest` deliberately, when a forge pin bump was *meant* to change
+the bytes, and re-measure the whole table in the same run.
 
 Disk
 ----
@@ -128,13 +129,6 @@ REPO = Path(__file__).resolve().parent.parent
 # runners that want their own cache directory.
 OUT_DIR = REPO / "output" / "readme-bench"
 MANIFEST = REPO / "tools" / "readme-bench-fixtures.json"
-FORGE = (
-    REPO
-    / "rust-packages"
-    / "target"
-    / "release"
-    / ("laterite-ags4-forge.exe" if sys.platform == "win32" else "laterite-ags4-forge")
-)
 
 # The README's rungs. Seed 0 and the `wide` scaffold everywhere — the point is a
 # FIXED file, not a varied one.
@@ -182,15 +176,13 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def ensure_forge() -> None:
-    if FORGE.exists():
-        return
-    print("building laterite-ags4-forge (release) — first run only...")
-    subprocess.run(
-        ["cargo", "build", "--release", "-p", "laterite-ags4-forge"],
-        cwd=REPO / "rust-packages",
-        check=True,
-    )
+def forge() -> Path:
+    """The pinned forge release binary (`tools/fetch_forge.py`) — fetched and
+    checksum-verified on first use, never built from source here."""
+    sys.path.insert(0, str(REPO / "tools"))
+    import fetch_forge
+
+    return fetch_forge.forge_path()
 
 
 def fixture(size: str) -> Path:
@@ -204,11 +196,11 @@ def fixture(size: str) -> Path:
         print(f"  unpacking {packed.name} ...")
         unpack(packed)
     if not path.exists():
-        ensure_forge()
+        bin_ = forge()
         print(f"  generating {path.name} ...")
         subprocess.run(
             [
-                str(FORGE),
+                str(bin_),
                 "scale",
                 "--size",
                 size,

@@ -2,7 +2,8 @@
 """Emit python-ags4 AGS4.check_file results as rule-keyed JSON.
 
 Contract (consumed by `laterite-ags4-parity`'s `PyOracle`, and through
-it by `laterite-ags4-forge` and `laterite-ags4-corpus-qa`):
+it by `laterite-ags4-corpus-qa`; forge, in niko86/laterite-forge, carries
+its own copy of this wrapper):
   stdout : {"AGS Format Rule N": [{"line","group","desc"}, ...], ...}
            (only "AGS Format Rule ..." keys; Metadata/Summary dropped)
   exit 0 : no rule findings

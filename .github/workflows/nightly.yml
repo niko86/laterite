@@ -88,8 +88,8 @@ jobs:
       #      every PR, and they cover 69% of it — a number nobody could see until
       #      the separate wasm step below existed, because the exclusion here was
       #      read as "unmeasurable" rather than "measured elsewhere".
-      #   2. Dev-only QA tooling (xcheck, parity, forge, corpus-qa, perf,
-      #      compliance) — harnesses and CLIs that are never shipped to a user.
+      #   2. Dev-only QA tooling (xcheck, parity, corpus-qa, perf, compliance)
+      #      — harnesses and CLIs that are never shipped to a user.
       #
       # Category 2 is not cosmetic. When parity/forge/corpus-qa/perf/compliance
       # landed on public (#57, #60) they added ~7.3k lines at 43-73% covered, and
@@ -111,7 +111,6 @@ jobs:
             --exclude laterite-node \
             --exclude laterite-ags4-xcheck \
             --exclude laterite-ags4-parity \
-            --exclude laterite-ags4-forge \
             --exclude laterite-ags4-corpus-qa \
             --exclude laterite-ags4-perf \
             --exclude laterite-ags4-compliance \

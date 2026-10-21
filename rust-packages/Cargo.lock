@@ -2217,26 +2217,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "laterite-ags4-forge"
-version = "0.11.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "laterite-ags4-emit",
- "laterite-ags4-parity",
- "laterite-ags4-parse",
- "laterite-ags4-types",
- "laterite-ags4-validator",
- "laterite-cliutil",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tempfile",
- "toml 1.1.6+spec-1.1.0",
-]
-
-[[package]]
 name = "laterite-ags4-hostopts"
 version = "0.3.4"
 dependencies = [

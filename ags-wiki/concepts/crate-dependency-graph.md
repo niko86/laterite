@@ -43,7 +43,6 @@ flowchart TD
   subgraph L3["L3 · trust model + host options + tools"]
     laterite_ags4_compliance[laterite-ags4-compliance]
     laterite_ags4_corpus_qa[laterite-ags4-corpus-qa]
-    laterite_ags4_forge[laterite-ags4-forge]
     laterite_ags4_hostopts[laterite-ags4-hostopts]
     laterite_ags4_parity[laterite-ags4-parity]
     laterite_ags4_perf[laterite-ags4-perf]
@@ -103,12 +102,6 @@ flowchart TD
   laterite_ags4_emit --> laterite_ags4_validator
   laterite_ags4_excel --> laterite_ags4_core
   laterite_ags4_excel --> laterite_ags4_emit
-  laterite_ags4_forge --> laterite_ags4_emit
-  laterite_ags4_forge --> laterite_ags4_parity
-  laterite_ags4_forge --> laterite_ags4_parse
-  laterite_ags4_forge --> laterite_ags4_types
-  laterite_ags4_forge --> laterite_ags4_validator
-  laterite_ags4_forge --> laterite_cliutil
   laterite_ags4_hostopts --> laterite_ags4_emit
   laterite_ags4_hostopts --> laterite_ags4_validator
   laterite_ags4_merge --> laterite_ags4_emit
@@ -186,24 +179,23 @@ flowchart TD
 
 | crate | layer | ship-deps (out) | dependents (in) | transitive |
 |---|---|--:|--:|--:|
-| `laterite-ags4-parse` | L0 | 0 | 17 | 0 |
-| `laterite-ags4-types` | L0 | 0 | 13 | 0 |
+| `laterite-ags4-parse` | L0 | 0 | 16 | 0 |
+| `laterite-ags4-types` | L0 | 0 | 12 | 0 |
 | `laterite-ags4-reference` | L0 | 2 | 8 | 2 |
-| `laterite-cliutil` | L0 | 0 | 4 | 0 |
+| `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
-| `laterite-ags4-validator` | L2 | 3 | 14 | 3 |
-| `laterite-ags4-emit` | L2 | 4 | 10 | 4 |
+| `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
+| `laterite-ags4-emit` | L2 | 4 | 9 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
 | `laterite-ags4-excel` | L2 | 2 | 5 | 7 |
 | `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
 | `laterite-ags4-hostopts` | L3 | 2 | 6 | 5 |
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
-| `laterite-ags4-parity` | L3 | 2 | 3 | 5 |
+| `laterite-ags4-parity` | L3 | 2 | 2 | 5 |
 | `laterite-ags4-compliance` | L3 | 3 | 0 | 8 |
 | `laterite-ags4-corpus-qa` | L3 | 5 | 0 | 9 |
-| `laterite-ags4-forge` | L3 | 6 | 0 | 7 |
 | `laterite-ags4-perf` | L3 | 4 | 0 | 5 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
@@ -218,11 +210,11 @@ flowchart TD
 - **Layering inversions (ship edge to a higher layer):** none — the graph respects its layering.
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
-  - `laterite-ags4-parse` (in-degree 17)
-  - `laterite-ags4-validator` (in-degree 14)
-  - `laterite-ags4-types` (in-degree 13)
-  - `laterite-ags4-emit` (in-degree 10)
+  - `laterite-ags4-parse` (in-degree 16)
+  - `laterite-ags4-validator` (in-degree 13)
+  - `laterite-ags4-types` (in-degree 12)
   - `laterite-ags4-core` (in-degree 9)
+  - `laterite-ags4-emit` (in-degree 9)
   - `laterite-ags4-reference` (in-degree 8)
   - `laterite-ags4-hostopts` (in-degree 6)
 - **Crates with no layer assignment (add one to `gen_crate_graph.py`):**

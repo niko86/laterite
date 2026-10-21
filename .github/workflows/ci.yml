@@ -1254,8 +1254,8 @@ jobs:
   # addon).
   #
   # The nightly coverage run excludes MORE than this, and deliberately so: it also
-  # drops the dev-only QA crates (xcheck, parity, forge, corpus-qa, perf,
-  # compliance) so its floor measures the shipped engine over a stable denominator.
+  # drops the dev-only QA crates (xcheck, parity, corpus-qa, perf, compliance)
+  # so its floor measures the shipped engine over a stable denominator.
   # They are excluded from that MEASUREMENT, not from testing — this job is the
   # test authority for them, and it must keep running them.
   test:

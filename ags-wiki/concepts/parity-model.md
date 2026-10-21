@@ -5,7 +5,7 @@ status: reviewed
 tags: [concept]
 ags_editions: []
 repo_refs: {parity: "rust-packages/laterite-ags4-parity/src/verdict.rs"}
-related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, laterite-ags4-forge, laterite-ags4-parity, surface-census, demo-state-sweep]
+related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, laterite-ags4-parity, surface-census, demo-state-sweep]
 sources: []
 ---
 # parity model
@@ -84,7 +84,7 @@ stateDiagram-v2
 Followed end-to-end by the [[traceability-chain]]; surfaced as the
 dogfood ACTION list; the spine of [[rust-vs-python-ags4-parity]] and
 [[observations-coverage-map]]. `classify`/`reconcile` are extracted
-into [[laterite-ags4-parity]] so [[laterite-ags4-forge]] manufactures divergences
+into [[laterite-ags4-parity]] so [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) manufactures divergences
 against the *identical* verdict semantics ([[evolutionary-dogfooding]]),
 with [[parity-confidence-model]] tightening the triage-bias limitation
 below. The parity arc's deliberate non-closures (residual `compat`
@@ -92,4 +92,4 @@ gaps we have a position on but haven't actioned) are parked in
 [[compat-decisions-held]].
 
 ## Related
-[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]] · [[demo-state-sweep]]
+[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[laterite-ags4-parity]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]] · [[demo-state-sweep]]

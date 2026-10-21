@@ -132,7 +132,7 @@ release, in beta together with every other surface.
 
 ## Performance
 
-Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+Synthetic, spec-valid AGS4 from [`ags4-forge`](https://github.com/niko86/laterite-forge) — the `wide` scaffold: **123
 groups**, realistic type mix, zero findings. macOS arm64 (Apple Silicon), hot
 in-memory bytes, median of 10 warm runs. The facade re-exports the engine, so
 these are the engine's numbers.

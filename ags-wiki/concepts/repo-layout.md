@@ -25,7 +25,7 @@ but each is a distinct, single-purpose unit (a deployable, a data set, a tool gr
 
 | dir | what's in it | notes |
 |---|---|---|
-| `rust-packages/` | the **AGS4 Rust workspace** — every shipped crate (the engine, validator, emit, the PyO3 + napi glue, wasm, the forge/parity/perf harnesses) + the `lat` binary | the source of truth for the toolchain; mapped in [[crate-map]]. The experimental `.ags5db` crates were decoupled out of this tree |
+| `rust-packages/` | the **AGS4 Rust workspace** — every shipped crate (the engine, validator, emit, the PyO3 + napi glue, wasm, the parity/corpus-qa/perf harnesses) + the `lat` binary | the source of truth for the toolchain; mapped in [[crate-map]]. The experimental `.ags5db` crates were decoupled out of this tree |
 | `packages/` | the **Python package**: `laterite` (the AGS4 base wheel) | thin Python over the Rust wheel; the AGS5 packages were decoupled out of this tree |
 | `web/` | the **web validator app** (browser SQL-over-AGS via the wasm build) | its own front-end project |
 | `ags-wiki/` | the **knowledge base** (this vault) — rules, groups, the O-N divergence catalogue, design decisions, concepts | LLM-maintained; see `AGS-WIKI.md` |

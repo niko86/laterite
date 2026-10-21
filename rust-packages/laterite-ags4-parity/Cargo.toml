@@ -17,8 +17,9 @@
 # module carries the two-engine report documents, and they render through
 # the shared report contract like every other document in both consumers.
 #
-# Published since #1108: forge is leaving this repo, and a crate outside the
-# workspace can only depend on what crates.io holds. So this carries its own
+# Published since #1108: forge left this repo for niko86/laterite-forge
+# (#1111), and a crate outside the workspace can only depend on what crates.io
+# holds. So this carries its own
 # version and rides the per-crate cascade like the engine crates — and the
 # python oracle takes its wrapper script and uv project from the caller, since
 # a registry copy has no repo root to find them in.

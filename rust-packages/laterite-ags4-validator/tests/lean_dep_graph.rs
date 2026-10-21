@@ -1,8 +1,8 @@
 //! Lean dep-graph guard (the engine-purity invariant).
 //!
 //! `laterite-ags4-validator` is the clean-room engine that everything embeds —
-//! the shipped `lat` binary, `ags4-parity`, `ags4-corpus-qa`,
-//! `ags4-forge`, and (via PyO3) `laterite-py`. Dependencies are
+//! the shipped `lat` binary, `ags4-parity`, `ags4-corpus-qa`, and (via
+//! PyO3) `laterite-py`. Dependencies are
 //! transitive: if any of these heavy / FFI-coupling crates leaked into
 //! the engine's *normal* dep graph, every consumer would inherit it —
 //! most damagingly, `pyo3` would make the shipped `lat` binary link
@@ -29,7 +29,7 @@ use std::process::Command;
 ///   and require a Python runtime (the thing dec-rust-drives-python
 ///   forbids). The single most important entry.
 /// - `polars` — Rust↔Python ABI coupling the engine must stay free of.
-/// - `walkdir` / `rayon` — dev/QA-only crates (corpus-qa/forge) that
+/// - `walkdir` / `rayon` — dev/QA-only crates (corpus-qa) that
 ///   would bloat the engine if they leaked in.
 /// - `ratatui` — the TUI framework; it lives in the `lat` crate
 ///   behind that crate's opt-in `tui` feature. Since the CLI split the

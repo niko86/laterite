@@ -150,7 +150,8 @@ presentation crate, the `laterite-ags4-parse` leaf (`lib.rs` + `scan.rs`), the
 DuckDB-free core, the `laterite-ags4-validator` numbered-rules engine, and the
 `laterite-ags4-emit` orchestrator + byte writer are now swept — **the near-term
 engine queue is complete**. What remains unswept is the QA/dev tooling
-(`forge`, `corpus-qa`, `perf`, `parity`, `xcheck`) and the host bindings
+(`corpus-qa`, `perf`, `parity`, `xcheck`; forge's `edit.rs` row above went
+with forge to niko86/laterite-forge) and the host bindings
 (`laterite-py`, `laterite-node`, `laterite-ags4-wasm`), which
 [[coverage-campaign]] sequences next.
 

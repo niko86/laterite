@@ -96,15 +96,15 @@ encoding_rs = "0.8"
 # CLI presentation primitives: the animated spinner, the aligned UTF8
 # finding table, rich-style coloured JSON — all via the shared
 # `laterite-cliutil` crate, which is the single source of truth for them
-# (also used by laterite-ags4-{corpus-qa,forge,parity}, so the QA tools and
+# (also used by laterite-ags4-{corpus-qa,parity}, so the QA tools and
 # the product binary render findings the same way). It pulls
 # comfy-table/indicatif/
 # serde_json + (transitively) crossterm for terminal capability
 # detection; none of that touches the validator library now.
 laterite-cliutil = { path = "../laterite-cliutil", version = "0.1.0", features = ["clap"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-# The subcommand parser (#430). Same version the sibling CLIs (ags4-forge /
-# ags4-corpus-qa) use; `env` keeps the NO_COLOR-style env wiring available.
+# The subcommand parser (#430). Same version the sibling CLI (ags4-corpus-qa)
+# uses; `env` keeps the NO_COLOR-style env wiring available.
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 # Interactive passphrase prompt for `lock` / `unlock` (behind `transport`). We
 # NEVER take a --password flag (argv leaks into `ps`/history); the precedence is

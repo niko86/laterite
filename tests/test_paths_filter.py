@@ -352,7 +352,7 @@ def test_corpus_fires_on_what_moves_findings(
         "web/docs-site/docs/index.md",
         "ags-wiki/start-here.md",
         "rust-packages/laterite-node/src/lib.rs",
-        "rust-packages/laterite-ags4-forge/src/main.rs",
+        "rust-packages/laterite-ags4-perf/src/main.rs",
     ],
 )
 def test_corpus_skips_what_cannot(filters: dict[str, list[str]], path: str) -> None:

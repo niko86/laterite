@@ -9,21 +9,21 @@ artifact: laterite-cliutil
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-cliutil"
-related: [parity-model, laterite-cli, laterite-ags4-forge, agent-first-cli-contract]
+related: [parity-model, laterite-cli, agent-first-cli-contract]
 sources: []
 ---
 # laterite-cliutil
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
 > [!note] **Cleared for crates.io** — `laterite-cliutil` declares `publish = true`, so it is a public API under semver, not an internal detail. It is versioned on its own line.
-> **Used by** — [[laterite-ags4-corpus-qa]], [[laterite-ags4-forge]], [[laterite-ags4-parity]], [[laterite-cli]].
+> **Used by** — [[laterite-ags4-corpus-qa]], [[laterite-ags4-parity]], [[laterite-cli]].
 <!-- END GENERATED: crate-card -->
 
 ## What it is
 > [!quote] Shared CLI crate: Spinner, progress bars, styled tables, colour gate, OutputMode, --readme. Single source for the gogcli-style UX; deliberately pulls NO walkdir/rayon/ratatui (validator lean-dep-graph guarantee).
 
 ## Inputs / outputs
-> [!quote] In: used as a Rust crate dependency. Out: Spinner/progress/styled-table/colour-gate/OutputMode primitives shared by the CLIs. No I/O of its own; deliberately pulls no walkdir/rayon/ratatui. Gains a `report` module (`Ctx`/`Report`/`emit`/`Plan` lifted from `repo:rust-packages/laterite-ags4-corpus-qa/src/output.rs`) so [[laterite-ags4-forge]] and [[laterite-ags4-corpus-qa]] share one report scaffold — the [[agent-first-cli-contract]] in crate form.
+> [!quote] In: used as a Rust crate dependency. Out: Spinner/progress/styled-table/colour-gate/OutputMode primitives shared by the CLIs. No I/O of its own; deliberately pulls no walkdir/rayon/ratatui. Gains a `report` module (`Ctx`/`Report`/`emit`/`Plan` lifted from `repo:rust-packages/laterite-ags4-corpus-qa/src/output.rs`) so [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) and [[laterite-ags4-corpus-qa]] share one report scaffold — the [[agent-first-cli-contract]] in crate form.
 
 ## Where it lives
 `repo:rust-packages/laterite-cliutil`
@@ -34,7 +34,7 @@ flowchart LR
   crawl[laterite-ags4-corpus-qa] --> ags4check[lat]
   crawl --> py[py-ags4-check-json]
   ags4check --> cliutil[laterite-cliutil]
-  forge[laterite-ags4-forge] --> cliutil
+  forge["laterite-ags4-forge<br/>own repo: niko86/laterite-forge"] --> cliutil
   ags5db[ags5db] --> cliutil
 ```
 
@@ -45,4 +45,4 @@ cross-check, and [[agent-first-cli-contract]] for the behavioural
 contract these primitives encode.
 
 ## Related
-[[parity-model]] · [[laterite-cli]] · [[laterite-ags4-forge]] · [[agent-first-cli-contract]] · [[crate-map]]
+[[parity-model]] · [[laterite-cli]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[agent-first-cli-contract]] · [[crate-map]]

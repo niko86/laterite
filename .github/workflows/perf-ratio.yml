@@ -8,7 +8,7 @@
 #
 # Two checkouts, deliberately inverted from perf-probe.yml's single one:
 # the PRIMARY checkout is this workflow's own SHA — the instrument (the
-# gate script, the bench harness, forge's sources, the fixture manifest,
+# gate script, the bench harness, the forge pin, the fixture manifest,
 # and the committed baseline the check compares against) — and `.measured`
 # is the ref whose WHEEL gets measured. What varies between a seed and a
 # check is the wheel; the instrument stays the family's own. Both SHAs are
@@ -80,7 +80,7 @@ jobs:
         with:
           toolchain: stable
 
-      # sccache + mold so the maturin + forge compiles hit the shared cache.
+      # sccache + mold so the maturin compile hits the shared cache.
       - uses: ./.github/actions/build-accel
 
       - name: Install uv
@@ -107,8 +107,10 @@ jobs:
           (cd .measured && uv sync)
           (cd .measured/packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
 
-      - name: Build forge (fixture generator, from the instrument tree)
-        run: (cd rust-packages && cargo build --release -p laterite-ags4-forge)
+      # The instrument tree's forge pin (tools/fetch_forge.py): a pinned,
+      # checksum-verified release binary, never a source build.
+      - name: Fetch forge (fixture generator, the instrument's pinned release)
+        run: uv run --no-project python tools/fetch_forge.py
 
       # The SHIPPED dep shape plus the comparison target: wheel + pandas<3 +
       # python-ags4, NO pyarrow — the pyarrow-free default is the measured
