@@ -537,3 +537,76 @@ fn the_debug_renderings_show_what_they_are_supposed_to_show() {
     }
     assert!(one.contains("PROJ_ZZZZ"), "got: {one}");
 }
+
+/// Each rule's findings, in the order the report holds them.
+fn by_rule(report: &ags4::Report) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut out = std::collections::BTreeMap::<String, Vec<String>>::new();
+    for f in report.findings() {
+        out.entry(f.rule().to_string()).or_default().push(format!(
+            "{:?}|{}",
+            f.line(),
+            f.description()
+        ));
+    }
+    out
+}
+
+/// `max_findings_per_rule` has to reach the engine: a builder that stored the cap
+/// and never passed it on would return the full report, and nothing else here
+/// would notice. Every expectation is read off the uncapped run of the same file,
+/// so no count is written down by hand.
+#[test]
+fn a_findings_cap_keeps_each_rules_first_n_and_every_count() {
+    let mut text = String::from(CLEAN);
+    text.push_str(WELL_FORMED_TAIL);
+    // LF line endings break Rule 2a once per line, so one rule has plenty to cut.
+    let lf = text.replace("\r\n", "\n");
+    let run = |cap: Option<usize>| {
+        let v = ags4::validate_str(&lf).warnings(true).fyi(true);
+        match cap {
+            Some(n) => v.max_findings_per_rule(n),
+            None => v,
+        }
+        .run()
+        .expect("fixture validates")
+    };
+    let full = run(None);
+    let full_rules = by_rule(&full);
+    assert!(
+        full_rules.values().any(|v| v.len() > 2),
+        "no rule repeats, so a cap has nothing to cut and this proves nothing"
+    );
+    assert!(full.truncated().is_empty(), "nothing is cut without a cap");
+
+    for cap in [0, 1, 2] {
+        let capped = run(Some(cap));
+        for sev in [
+            ags4::Severity::Error,
+            ags4::Severity::Warning,
+            ags4::Severity::Fyi,
+        ] {
+            assert_eq!(capped.count(sev), full.count(sev), "cap {cap}: {sev:?}");
+        }
+        assert_eq!(capped.is_valid(), full.is_valid(), "cap {cap}");
+
+        let kept: std::collections::BTreeMap<_, _> = full_rules
+            .iter()
+            .map(|(rule, v)| (rule.clone(), v[..v.len().min(cap)].to_vec()))
+            .filter(|(_, v)| !v.is_empty())
+            .collect();
+        assert_eq!(by_rule(&capped), kept, "cap {cap}: the findings held");
+
+        let mut cut: Vec<_> = capped
+            .truncated()
+            .iter()
+            .map(|t| (t.rule().to_string(), t.shown(), t.total()))
+            .collect();
+        cut.sort();
+        let expected: Vec<_> = full_rules
+            .iter()
+            .filter(|(_, v)| v.len() > cap)
+            .map(|(rule, v)| (rule.clone(), cap, v.len()))
+            .collect();
+        assert_eq!(cut, expected, "cap {cap}: the rules named as cut");
+    }
+}
