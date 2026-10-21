@@ -653,6 +653,12 @@ pub struct Sidecar {
     /// The validation this registers.
     pub validation: ValidationStamp,
     /// Group code → byte range of its section in the source.
+    ///
+    /// Written in sorted key order (#1132). A `HashMap` iterates in an order seeded
+    /// per process, so the same file certified twice gave two certs that differ in
+    /// bytes. The field stays a `HashMap` because it is public API; only the
+    /// serialisation is ordered. Reading accepts any order, so older certs still read.
+    #[serde(serialize_with = "serialize_sorted")]
     pub groups: HashMap<String, Vec<Range>>,
     /// Section order as in the source file.
     pub order: Vec<String>,
@@ -671,6 +677,16 @@ pub struct Sidecar {
     /// A default would write the second meaning over the first.
     #[serde(default)]
     pub defines: Option<Vec<String>>,
+}
+
+/// Serialise `Sidecar::groups` by key, so a cert's bytes do not depend on the hash seed.
+fn serialize_sorted<S: serde::Serializer>(
+    groups: &HashMap<String, Vec<Range>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut entries: Vec<_> = groups.iter().collect();
+    entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+    serializer.collect_map(entries)
 }
 
 /// Verdict of a cheap, I/O-free remote freshness check ([`Sidecar::is_fresh_for_remote`]).
@@ -2050,5 +2066,100 @@ mod tests {
             sc.defines.as_deref(),
             Some(&["AAAA".to_string(), "BBBB".to_string()][..])
         );
+    }
+
+    /// Enough groups that two hash seeds iterating them the same way is not a
+    /// coincidence a test could pass on. Codes are written in REVERSE sorted order,
+    /// so neither file order nor insertion order is the order the cert must use.
+    fn many_groups() -> Vec<u8> {
+        let mut s = String::new();
+        for i in (0..24).rev() {
+            let code = format!("G{i:03}");
+            write!(
+                s,
+                "\"GROUP\",\"{code}\"\n\"HEADING\",\"{code}_ID\"\n\"UNIT\",\"\"\n\
+                 \"TYPE\",\"ID\"\n\"DATA\",\"R{i}\"\n\n"
+            )
+            .unwrap();
+        }
+        s.into_bytes()
+    }
+
+    /// #1132: the same file and stamp mint the same certificate BYTES in two
+    /// processes. `groups` is a `HashMap`, and std seeds each process's hasher from
+    /// the OS, so only a second process reproduces what a second `lat certify` sees.
+    /// The test re-runs itself as the child, which prints its cert and stops.
+    #[test]
+    fn two_processes_mint_byte_identical_certificates() {
+        const CHILD: &str = "LATERITE_CORE_CERT_BYTES_CHILD";
+        const NAME: &str = "index::tests::two_processes_mint_byte_identical_certificates";
+        if std::env::var_os(CHILD).is_some() {
+            let json = Sidecar::assemble(&many_groups(), stamp())
+                .unwrap()
+                .to_json()
+                .unwrap();
+            let mut hex = String::with_capacity(json.len() * 2);
+            for b in json {
+                write!(hex, "{b:02x}").unwrap();
+            }
+            // Leading newline: libtest has already written `test <name> ... ` with none.
+            println!("\nCERT:{hex}");
+            return;
+        }
+        let mint = || {
+            let out = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "child failed: {out:?}");
+            let hex = String::from_utf8(out.stdout)
+                .unwrap()
+                .lines()
+                .find_map(|l| l.strip_prefix("CERT:").map(str::to_owned))
+                .expect("the child ran this test and printed its cert");
+            let bytes: Vec<u8> = (0..hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+                .collect();
+            String::from_utf8(bytes).unwrap()
+        };
+        let first = mint();
+        assert_eq!(first, mint(), "two mints of one file differ in bytes");
+    }
+
+    /// #1132: a cert written before groups were sorted — keys in whatever order the
+    /// minting process's hash map gave — still reads, and is still fresh for its file.
+    #[test]
+    fn a_cert_with_unsorted_groups_still_reads_and_is_fresh() {
+        let bytes = many_groups();
+        let sc = Sidecar::assemble(&bytes, stamp()).unwrap();
+        let compact = serde_json::to_string(&sc).unwrap();
+        let sorted: std::collections::BTreeMap<_, _> = sc.groups.iter().collect();
+        let sorted_text = serde_json::to_string(&sorted).unwrap();
+        let reversed_text = format!(
+            "{{{}}}",
+            sorted
+                .iter()
+                .rev()
+                .map(|(k, v)| format!(
+                    "{}:{}",
+                    serde_json::to_string(k).unwrap(),
+                    serde_json::to_string(v).unwrap()
+                ))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert_ne!(sorted_text, reversed_text);
+        assert!(
+            compact.contains(&sorted_text),
+            "the cert writes its groups sorted"
+        );
+        let old = compact.replace(&sorted_text, &reversed_text);
+        assert!(old.contains(&reversed_text), "the old-order cert was built");
+
+        let back = Sidecar::from_json(old.as_bytes()).unwrap();
+        assert_eq!(back, sc, "an old-order cert reads to the same sidecar");
+        assert!(back.is_fresh_for(&bytes), "and is still fresh for its file");
     }
 }

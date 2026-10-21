@@ -86,6 +86,9 @@
       },
       {
         "text": "**A dev or build of the browser app no longer rewrites its vendored icons (#1106).** The committed icons carried an older `lucide-static` licence header than the lockfile pins, so every build changed all of them. They now match the locked version, and CI fails when `sync-assets` would change any committed copy it maintains."
+      },
+      {
+        "text": "**Certifying the same file twice gives byte-identical `.ags.idx` files (#1132).** The certificate's `groups` index was written in hash-map order, which changes from one process to the next, so two certificates with the same content differed in bytes and could not be compared by hash. Groups are now written sorted by code. Existing certificates still read and stay fresh."
       }
     ],
     "security": [
