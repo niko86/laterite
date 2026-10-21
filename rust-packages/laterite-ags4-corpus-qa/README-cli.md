@@ -40,6 +40,7 @@ time*.
     laterite-ags4-corpus-qa run      --root <DIR> (--all | --sample N | --pick)   # all three
     laterite-ags4-corpus-qa baseline (--out <f> | --check <f>)   # findings drift gate
     laterite-ags4-corpus-qa censor   --out-dir <DIR> [--sample N] [--redact "..."]  # anonymise
+    laterite-ags4-corpus-qa check    <path>... [--no-oracle] [--timeout S]  # both engines, no corpus
     laterite-ags4-corpus-qa --readme        # this document
     laterite-ags4-corpus-qa <cmd> --help    # full flags
 
@@ -58,6 +59,20 @@ formations (`GEOL_FORM`/`GEOL_BGS` — location-revealing offshore), strips
 custom) columns/groups + their orphaned DICT/ABBR definitions, and applies
 any `--redact "<substring>"` keyword safety-net. Writes hash-named files +
 a source-stripped manifest (a drop-in for `validate`/`baseline`).
+
+`check` compares laterite with python-ags4 on the files you name, with no
+corpus dir and no run artifacts: each engine's rule set, its **per-rule
+finding counts**, and the parity verdict. The verdict stays presence-only;
+the counts sit beside it because one side saying a rule nine times and the
+other saying it once is the same verdict and a very different file. A
+**directory** is walked recursively for `.ags` files (extension match is
+case-insensitive) and the report says how many other entries it walked
+past; a file named directly is checked whatever its extension. One file
+named directly emits the single-file document (schema 2); a directory or
+more than one path emits the sweep document — a verdict tally, the
+scanned/skipped counts, and one entry per file (dropped by `--compact`).
+Without `uv`+`python-ags4` (or with `--no-oracle`) every verdict is
+`RUST_ONLY`, and the run says so on stderr.
 
 ## Output (global flags, gogcli-style)
 
@@ -100,8 +115,8 @@ The resolved location is echoed on stderr (`manifest → …`).
 ## Exit codes
 
     0  success / no triage items
-    1  triage items present (validate) or parity actions (parity/run)
-    3  I/O — share unreachable / manifest or report missing
+    1  triage items present (validate) or parity actions (parity/run/check)
+    3  I/O — share unreachable / manifest or report missing / check path missing
     5  bad args (e.g. no selection mode, --pick without `tui`, or
        --pick with --no-input / no terminal)
 
@@ -122,6 +137,9 @@ The resolved location is echoed on stderr (`manifest → …`).
     # Freeze a findings baseline, then drift-check after a code change
     laterite-ags4-corpus-qa baseline --out baselines/corpus.json
     laterite-ags4-corpus-qa baseline --check baselines/corpus.json   # exit 1 on drift
+
+    # Both engines over a delivery folder: the verdict tally, as JSON
+    laterite-ags4-corpus-qa check deliveries/ --json | jq '.counts'
 
     # Anonymise the whole corpus for sharing (+ a known client name)
     laterite-ags4-corpus-qa censor --out-dir corpus/clean --redact "Acme Geotech"

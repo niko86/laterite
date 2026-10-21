@@ -138,8 +138,8 @@ const BY_SIGNATURE = new Map<string, CountEntry>(
  *  Every tier counts, FYI included, because the sweep counts every tier: it
  *  measures both engines with all of them on so a difference means something,
  *  and since #1024 the demo's own `validate` call asks for FYI too, so the
- *  page holds the findings forge measured. Until then both halves dropped the
- *  FYI tier, which held only while no swept state raised one; O-61's
+ *  page holds the findings the sweep measured. Until then both halves dropped
+ *  the FYI tier, which held only while no swept state raised one; O-61's
  *  did-you-mean raises one in nearly all of them. The generator's
  *  `laterite_signature` is the other half of this agreement. */
 function signatureOf(findings: readonly Finding[]): string {

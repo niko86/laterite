@@ -4,7 +4,7 @@
   "python_ags4_version": "1.2.0",
   "engines": {
     "laterite": "the in-process Rust validator, warnings and FYI ON",
-    "note": "forge validates with both tiers enabled so the Rust side is tier-comparable to python-ags4, which reports several of them at error tier. That is why laterite-only tier findings appear here at all, and why they are triaged rather than counted as disagreements about the file."
+    "note": "the check validates with both tiers enabled so the Rust side is tier-comparable to python-ags4, which reports several of them at error tier. That is why laterite-only tier findings appear here at all, and why they are triaged rather than counted as disagreements about the file."
   },
   "scope": {
     "exhaustive_to": 1,

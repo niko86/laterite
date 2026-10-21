@@ -116,6 +116,7 @@ flowchart TD
   laterite_ags4_merge --> laterite_ags4_reference
   laterite_ags4_merge --> laterite_ags4_types
   laterite_ags4_parity --> laterite_ags4_validator
+  laterite_ags4_parity --> laterite_cliutil
   laterite_ags4_perf --> laterite_ags4_emit
   laterite_ags4_perf --> laterite_ags4_parse
   laterite_ags4_perf --> laterite_ags4_types
@@ -188,7 +189,7 @@ flowchart TD
 | `laterite-ags4-parse` | L0 | 0 | 17 | 0 |
 | `laterite-ags4-types` | L0 | 0 | 13 | 0 |
 | `laterite-ags4-reference` | L0 | 2 | 8 | 2 |
-| `laterite-cliutil` | L0 | 0 | 3 | 0 |
+| `laterite-cliutil` | L0 | 0 | 4 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 14 | 3 |
@@ -199,8 +200,8 @@ flowchart TD
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
 | `laterite-ags4-hostopts` | L3 | 2 | 6 | 5 |
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
-| `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
-| `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
+| `laterite-ags4-parity` | L3 | 2 | 3 | 5 |
+| `laterite-ags4-compliance` | L3 | 3 | 0 | 8 |
 | `laterite-ags4-corpus-qa` | L3 | 5 | 0 | 9 |
 | `laterite-ags4-forge` | L3 | 6 | 0 | 7 |
 | `laterite-ags4-perf` | L3 | 4 | 0 | 5 |

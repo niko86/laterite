@@ -82,6 +82,30 @@ pub enum Commands {
     /// tokenised — and write hash-named files + a source-stripped
     /// manifest to --out-dir, so the cleaned corpus is shareable.
     Censor(CensorArgs),
+    /// Compare laterite with python-ags4 on real files, no corpus dir:
+    /// each engine's rules, per-rule finding counts, and the parity
+    /// verdict, for a file, several files, or a directory (recursive).
+    Check(CheckArgs),
+}
+
+/// `check` — the two-engine comparison over named files. Every flag is
+/// the one `laterite-ags4-forge check` takes, because the command is the
+/// same call into `laterite_ags4_parity::check` (#1109).
+#[derive(Args)]
+pub struct CheckArgs {
+    /// The .ags file(s) to dual-validate. A directory is walked
+    /// recursively for `.ags` files, and several paths may be given at
+    /// once. One file in gives the single-file document; a directory or
+    /// more than one path gives the sweep document (a verdict tally plus
+    /// one entry per file).
+    #[arg(required = true)]
+    pub paths: Vec<PathBuf>,
+    /// python-ags4 per-file timeout (seconds).
+    #[arg(long, default_value_t = 120)]
+    pub timeout: u64,
+    /// Skip python-ags4 entirely (Rust-only).
+    #[arg(long)]
+    pub no_oracle: bool,
 }
 
 #[derive(Args)]
@@ -325,8 +349,8 @@ const HELP_EPILOG: &str = "--readme  print the full CLI guide (what each
 
 exit codes:
   0  success / no triage items
-  1  triage items present (validate) or parity actions (parity/run)
-  3  I/O — share unreachable / manifest or report missing
+  1  triage items present (validate) or parity actions (parity/run/check)
+  3  I/O — share unreachable / manifest or report missing / check path missing
   5  bad args (e.g. no selection mode, --pick without `tui`, or
      --pick with --no-input / no terminal)
 

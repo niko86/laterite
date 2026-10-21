@@ -9,148 +9,19 @@
 //! the `run` loop by the adaptive Beta–Bernoulli confidence ledger
 //! ([`crate::confidence`]). A missing oracle degrades to a Rust-only verdict
 //! (optional QA), never an error.
+//!
+//! The pipeline itself lives in `laterite_ags4_parity::check` since #1109,
+//! where `laterite-ags4-corpus-qa check` runs the same code; this module
+//! re-exports it so forge's call sites are unchanged, and keeps the tests
+//! that hold forge's own generator to it.
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-
-use laterite_ags4_parity::{Parity, PyOracle, RustResult, classify, rust_rule_counts};
-
-/// One candidate's dual-validation outcome.
-#[derive(Debug, Clone)]
-pub struct Outcome {
-    pub rust: RustResult,
-    /// `Ok(rules)` / `Err(reason)` from python, or `None` when the
-    /// oracle was unavailable / not consulted (Rust-only run).
-    pub python: Option<Result<BTreeSet<String>, String>>,
-    /// `classify(rust, python)` when python ran; `None` for Rust-only.
-    pub verdict: Option<Parity>,
-    /// Bundled edition the file was judged against (`"4.2"`, …) +
-    /// how it was resolved, for the report.
-    pub dict_used: String,
-    /// How many findings each side raised per rule. Carried for the
-    /// report only — the verdict above never sees them (#654). Empty on a
-    /// side that did not run or hard-errored — and empty on BOTH from the
-    /// evolutionary loop, which declines to carry them per candidate (the
-    /// reason is at that call site). So empty means "not carried here",
-    /// never "the validator found nothing".
-    pub rust_counts: BTreeMap<String, u64>,
-    pub python_counts: BTreeMap<String, u64>,
-}
-
-impl Outcome {
-    pub fn rust_rules(&self) -> Vec<String> {
-        match &self.rust {
-            RustResult::Rules(s) => s.iter().cloned().collect(),
-            _ => Vec::new(),
-        }
-    }
-    pub fn python_rules(&self) -> Vec<String> {
-        match &self.python {
-            Some(Ok(s)) => s.iter().cloned().collect(),
-            _ => Vec::new(),
-        }
-    }
-}
-
-/// Run the Rust validator in-process. `include_fyi`/`include_warnings`
-/// ON so Rust is tier-comparable to python (Rule 1 is FYI in Rust);
-/// `check_files` ON so Rule-20 on-disk matches python's always-on stat
-/// (O-27). A validator *panic* becomes `RustResult::Panic` (a found
-/// panic is a top finding, never a loop crash).
-pub fn rust_check(path: &Path) -> (RustResult, String) {
-    let (r, _counts, dict) = rust_check_counted(path);
-    (r, dict)
-}
-
-/// The same run, keeping the per-rule counts for the report. `rust_check`
-/// is this with the counts dropped — one code path, so a Rust-only run and
-/// a dual-validated one can never disagree about what the validator said.
-pub fn rust_check_counted(path: &Path) -> (RustResult, BTreeMap<String, u64>, String) {
-    let mut opts = laterite_ags4_validator::CheckOptions::default();
-    opts.include_fyi = true;
-    opts.include_warnings = true;
-    opts.check_files = true;
-
-    let p = path.to_path_buf();
-    let res = catch_unwind(AssertUnwindSafe(|| {
-        laterite_ags4_validator::check_file_with_dict(&p, &opts)
-    }));
-    match res {
-        Ok(Ok((
-            laterite_ags4_validator::findings::Collected {
-                findings: found, ..
-            },
-            dict,
-            _res,
-        ))) => (
-            RustResult::from_findings(&found),
-            rust_rule_counts(&found),
-            format!("{dict:?}"),
-        ),
-        Ok(Err(e)) => (
-            RustResult::from_validator_error(&e),
-            BTreeMap::new(),
-            "-".to_string(),
-        ),
-        Err(_) => (RustResult::Panic, BTreeMap::new(), "-".to_string()),
-    }
-}
-
-/// The python-ags4 bridge for forge: the repo-root-anchored
-/// `tools/py_ags4_check_json.py`, built once and reused (it spawns its
-/// own subprocess per `check`). `Some((oracle, version))` on success
-/// (the version keys the confidence ledger — an oracle bump cold-starts
-/// trust); `None` ⇒ unavailable → callers degrade to Rust-only.
-pub fn build_oracle(timeout_secs: u64) -> Option<(PyOracle, String)> {
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let wrapper = repo.join("tools/py_ags4_check_json.py");
-    let oracle = PyOracle::new("uv", wrapper, repo, Duration::from_secs(timeout_secs));
-    // One self-check: if uv/python-ags4 isn't importable, treat the
-    // oracle as absent (optional QA — same policy as corpus-qa).
-    match oracle.selfcheck() {
-        Ok(sc) => Some((oracle, sc.python_ags4.unwrap_or_else(|| "unknown".into()))),
-        Err(_) => None,
-    }
-}
-
-/// Dual-validate `path`. When `oracle` is `Some`, python runs and the
-/// shared `classify` (with the O-2/O-3/O-26/O-30/O-34 reconcile arms)
-/// produces the verdict; otherwise it's a Rust-only outcome.
-pub fn dual_validate(path: &Path, oracle: Option<&PyOracle>) -> Outcome {
-    let (rust, rust_counts, dict_used) = rust_check_counted(path);
-    match oracle {
-        Some(o) => {
-            // One python run answers both questions: the counts for the
-            // report, its keys for the verdict.
-            let counted = o.check_counts(path);
-            let python_counts = counted.clone().unwrap_or_default();
-            let py = counted.map(|c| c.into_keys().collect());
-            let verdict = classify(&rust, &py);
-            Outcome {
-                rust,
-                python: Some(py),
-                verdict: Some(verdict),
-                dict_used,
-                rust_counts,
-                python_counts,
-            }
-        }
-        None => Outcome {
-            rust,
-            python: None,
-            verdict: None,
-            dict_used,
-            rust_counts,
-            python_counts: BTreeMap::new(),
-        },
-    }
-}
+pub use laterite_ags4_parity::check::{Outcome, build_oracle, dual_validate, rust_check};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use laterite_ags4_parity::RustResult;
+
     use crate::ops::{Injection, synth_combined, synth_injected};
     use crate::synth::{Scaffold, synth};
 

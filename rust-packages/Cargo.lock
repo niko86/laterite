@@ -2263,8 +2263,10 @@ name = "laterite-ags4-parity"
 version = "0.11.0"
 dependencies = [
  "laterite-ags4-validator",
+ "laterite-cliutil",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

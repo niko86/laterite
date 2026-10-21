@@ -9,9 +9,14 @@
 //! O-Ns" claim across two maintenance points). It also hosts the
 //! seedable `Rng`/`reservoir` so deterministic sampling is shared.
 //!
+//! [`check`] is the two-engine comparison over real files — both engines'
+//! rules, per-rule counts, the verdict — that `laterite-ags4-corpus-qa check`
+//! and `laterite-ags4-forge check` each run as one call (#1109).
+//!
 //! Depends *on* `laterite-ags4-validator`, never the reverse — the validator
 //! library's lean dep-graph guarantee is untouched.
 
+pub mod check;
 pub mod oracle;
 pub mod rng;
 pub mod verdict;

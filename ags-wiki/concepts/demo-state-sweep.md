@@ -14,7 +14,7 @@ repo_refs:
   notes: "repo:web/landing/demo/divergence-notes.json"
   counts: "repo:web/landing/demo/python-counts.json"
   lookup: "repo:web/landing/demo/divergence.ts"
-related: [parity-model, laterite-ags4-forge, validator-site, O-53, O-61]
+related: [parity-model, laterite-ags4-corpus-qa, laterite-ags4-parity, validator-site, O-53, O-61]
 sources: []
 ---
 # demo state sweep: what both engines say about every state the demo can reach
@@ -47,9 +47,12 @@ reason it is not enumerated as a lever: it reaches no new state, it returns to
 an old one, and that is the stronger thing to check.
 
 `repo:tools/gen_demo_state_map.py` **dual-validates and triages**. It runs
-[[laterite-ags4-forge]]'s `check` over the emitted directory — one command that
+[[laterite-ags4-corpus-qa]]'s `check` over the emitted directory — one command that
 runs both engines and reports per-rule counts — matches every difference
-against a known documented one, and renders the map.
+against a known documented one, and renders the map. Until #1109 that command
+was `laterite-ags4-forge check`; both are one call into
+[[laterite-ags4-parity]]'s `check` module, and every state's answer
+regenerated unchanged when the generator moved across.
 
 ## What "every state" can honestly mean
 
@@ -224,7 +227,7 @@ Three things make it honest rather than merely convenient:
 - **The signature is keyed on every tier, FYI included.** The sweep runs both
   engines with every tier on, because that is what makes a difference mean
   anything, and since #1024 the demo's own `validate` call asks for FYI too, so
-  the page holds the findings forge measured. Until then the demo took the wasm
+  the page holds the findings the sweep measured. Until then the demo took the wasm
   default of FYI off and both halves dropped the tier, with a guard that failed
   the run if a swept state raised a laterite FYI; [[O-61]]'s did-you-mean
   raised one in nearly every state, and the owner chose to show the tier
@@ -241,7 +244,7 @@ wrong — levers do not compose, and orphaning a `SAMP` row then deleting the
 
 ```bash
 # Two prerequisites, each refused by name with this exact line if missing:
-(cd rust-packages && cargo build --release -p laterite-ags4-forge)  # runs BOTH engines
+(cd rust-packages && cargo build --release -p laterite-ags4-corpus-qa)  # runs BOTH engines
 (cd web && npm ci)                                   # Vite resolves the demo's seed
 
 uv run --no-sync python tools/gen_demo_state_map.py           # regenerate
@@ -259,4 +262,4 @@ collapses them into one red X. It is also much lighter than `parity` — it need
 the `python_ags4` package, not the clone of upstream's test suite.
 
 ## Related
-[[parity-model]] · [[laterite-ags4-forge]] · [[validator-site]] · [[laterite-ags4-parity]] · [[observations-coverage-map]] · [[mutation-sweep]]
+[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[validator-site]] · [[laterite-ags4-parity]] · [[observations-coverage-map]] · [[mutation-sweep]]

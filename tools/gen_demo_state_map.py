@@ -14,8 +14,8 @@ cannot land silently.
 `web/scripts/sweep-demo-states.mjs` enumerates the states and emits each one
 **through the demo's own emitter**, loaded through Vite rather than
 reimplemented — so every file here is provably reachable rather than merely
-plausible. This script dual-validates them with `laterite-ags4-forge check`,
-triages each difference, and renders the map.
+plausible. This script dual-validates them with `laterite-ags4-corpus-qa
+check`, triages each difference, and renders the map.
 
 ## What "every state" honestly means
 
@@ -63,7 +63,10 @@ WEB = ROOT / "web"
 MAP = ROOT / "web" / "landing" / "demo" / "state-map.json"
 NOTES = ROOT / "web" / "landing" / "demo" / "divergence-notes.json"
 COUNTS = ROOT / "web" / "landing" / "demo" / "python-counts.json"
-FORGE = "laterite-ags4-forge"
+#: The two-engine check (#1109). It was `laterite-ags4-forge check` until forge
+#: began leaving this repo; corpus-qa's `check` is the same call into
+#: `laterite-ags4-parity`, so the map it produces is the map forge produced.
+CHECKER = "laterite-ags4-corpus-qa"
 
 
 class Reader(TypedDict):
@@ -265,20 +268,20 @@ def emit_states(out_dir: Path) -> dict:
 
 
 def dual_validate(out_dir: Path) -> dict:
-    binary = shutil.which(FORGE) or str(
-        ROOT / "rust-packages" / "target" / "release" / FORGE
+    binary = shutil.which(CHECKER) or str(
+        ROOT / "rust-packages" / "target" / "release" / CHECKER
     )
     if not Path(binary).exists():
-        binary = str(ROOT / "rust-packages" / "target" / "debug" / FORGE)
+        binary = str(ROOT / "rust-packages" / "target" / "debug" / CHECKER)
     if not Path(binary).exists():
         raise SystemExit(
-            f"gen_demo_state_map: no {FORGE} binary. It is what runs BOTH "
-            f"engines, so there is nothing to compare without it:\n"
-            f"    (cd rust-packages && cargo build --release -p {FORGE})"
+            f"gen_demo_state_map: no {CHECKER} binary. Its `check` is what runs "
+            f"BOTH engines, so there is nothing to compare without it:\n"
+            f"    (cd rust-packages && cargo build --release -p {CHECKER})"
         )
-    # Say which one. Three programs answer to a forge-shaped name here — a
-    # PATH install, a release build and a debug build — and a stale one
-    # produces a map that looks exactly like a fresh one.
+    # Say which one. Three programs answer to this name here — a PATH
+    # install, a release build and a debug build — and a stale one produces a
+    # map that looks exactly like a fresh one.
     print(f"gen_demo_state_map: dual-validating with {binary}", file=sys.stderr)
     # BOTH sides unfiltered, which is the whole basis of a difference meaning
     # anything. The python bridge defaults to error-tier rule keys only —
@@ -294,7 +297,7 @@ def dual_validate(out_dir: Path) -> dict:
     # A non-zero exit means "divergences found", which is the normal case here.
     if not proc.stdout.strip():
         print(proc.stderr, file=sys.stderr)
-        raise SystemExit("gen_demo_state_map: forge produced no report")
+        raise SystemExit(f"gen_demo_state_map: {CHECKER} check produced no report")
     return json.loads(proc.stdout)
 
 
@@ -308,7 +311,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
         meta = by_id.get(state_id)
         if meta is None:
             unknown.append(
-                f"forge validated {state_id!r}, which the manifest does not list"
+                f"the check validated {state_id!r}, which the manifest does not list"
             )
             continue
         validated.add(state_id)
@@ -356,7 +359,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
         )
 
     # The other direction, which is the one that goes quiet: a state the
-    # enumerator emitted and forge never validated would simply be absent from
+    # enumerator emitted and the check never validated would simply be absent from
     # the map, and a shorter map reads exactly like a smaller state space.
     missing = sorted(set(by_id) - validated)
     if missing:
@@ -375,7 +378,7 @@ def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[st
         "engines": {
             "laterite": "the in-process Rust validator, warnings and FYI ON",
             "note": (
-                "forge validates with both tiers enabled so the Rust side is "
+                "the check validates with both tiers enabled so the Rust side is "
                 "tier-comparable to python-ags4, which reports several of them "
                 "at error tier. That is why laterite-only tier findings appear "
                 "here at all, and why they are triaged rather than counted as "
@@ -548,7 +551,7 @@ def laterite_signature(rust_rule_counts: dict[str, int]) -> str:
 
     The two engines are compared here with every tier on, which is what makes a
     difference mean anything (see `dual_validate`), and since #1024 the demo's
-    `validate` call asks for FYI too, so the page holds the same tiers forge
+    `validate` call asks for FYI too, so the page holds the same tiers the check
     measured. The browser's half is `signatureOf` in divergence.ts, which keys
     on every finding the engine returns for the same reason. Until #1024 the
     demo left FYI off and both halves dropped the tier; that held only while no
