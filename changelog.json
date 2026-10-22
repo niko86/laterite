@@ -23,6 +23,9 @@
       },
       {
         "text": "**`laterite-ags4-parity` and `laterite-cliutil` join the crates.io publish set (#1108).** `laterite-ags4-parity` (the laterite/python-ags4 verdict model and the oracle that runs python-ags4) and `laterite-cliutil` (the shared CLI table, spinner, colour gate and report contract) carry their own versions, starting at 0.1.0, and are released like the other engine crates. Both declare `rust-version` 1.88, which `comfy-table` 8 requires. The oracle no longer looks for its wrapper script beside the crate: `check::build_oracle` and `check::run` take the wrapper and the uv project that runs it from the caller."
+      },
+      {
+        "text": "**`laterite-ags4-parity`: `check::run_with` takes the caller's oracle (#1157).** It is `check::run` for a caller that probes python-ags4 itself, for instance to say why it is missing: it takes an `Option<&PyOracle>`, never runs a self-check of its own, and with `None` checks Rust-only without printing a note. The reports and exit codes match `check::run`, which is unchanged."
       }
     ],
     "changed": [
