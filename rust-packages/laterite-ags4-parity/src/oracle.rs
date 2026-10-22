@@ -1,17 +1,19 @@
 //! `PyOracle` — the python-ags4 subprocess bridge.
 //!
 //! Spawns `uv run python <wrapper> …` with cwd = the caller's uv project
-//! (so `uv run` resolves that project's deps). The body of [`PyOracle::check`]
-//! is the verbatim former `parity.rs::run_py`; [`PyOracle::selfcheck`]
-//! is the verbatim former inline `--selfcheck` probe — both extracted
-//! so `laterite-ags4-corpus-qa` and `laterite-ags4-forge` share one bridge. The
+//! (so `uv run` resolves that project's deps). [`PyOracle::check`] began as
+//! the former `parity.rs::run_py` and [`PyOracle::selfcheck`] as the former
+//! inline `--selfcheck` probe — both extracted so `laterite-ags4-corpus-qa`
+//! and `laterite-ags4-forge` share one bridge, and both now run through one
+//! timeout-bounded spawn (#1158). The
 //! caller keeps the *policy* (warn/skip/fail on drift/unavailable);
 //! this type is just the mechanism.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsStr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
 /// The python-ags4 release the parity catalogue (OBSERVATIONS
@@ -34,6 +36,13 @@ pub enum OracleError {
     /// The `uv` executable itself couldn't be spawned — the former
     /// `Err(e) =>` arm; carries the spawn error text.
     Unavailable(String),
+}
+
+/// Why a bounded run produced no output; each caller maps it to its own error.
+enum Bounded {
+    Spawn(std::io::Error),
+    Timeout,
+    Wait(std::io::Error),
 }
 
 /// Result of the `--selfcheck` probe.
@@ -75,19 +84,16 @@ impl PyOracle {
     /// former `run()` probe arms exactly: success → `Ok(SelfCheck)`
     /// (the caller compares `python_ags4` vs [`EXPECTED_PYAGS4`]),
     /// ran-but-non-zero → `NotImportable`, spawn-failed → `Unavailable`.
+    ///
+    /// Bounded by the same `timeout` as each file (#1158): on a fresh
+    /// checkout this is the run that builds the venv, so it is the one most
+    /// likely to stall, and an expiry is `Unavailable` rather than a hang.
     pub fn selfcheck(&self) -> Result<SelfCheck, OracleError> {
-        let probe = Command::new(&self.uv)
-            .args(["run", "python"])
-            .arg(&self.wrapper)
-            .arg("--selfcheck")
-            .current_dir(&self.project)
-            .stderr(Stdio::null())
-            .output();
-        match probe {
-            Ok(o) if o.status.success() => {
+        match self.run_bounded(&[OsStr::new("--selfcheck")]) {
+            Ok((status, out)) if status.success() => {
                 // The wrapper emits {"ok":true,"python_ags4":"<ver>"}.
                 let v: serde_json::Value =
-                    serde_json::from_slice(&o.stdout).unwrap_or(serde_json::Value::Null);
+                    serde_json::from_str(&out).unwrap_or(serde_json::Value::Null);
                 let python_ags4 = v
                     .get("python_ags4")
                     .and_then(|s| s.as_str())
@@ -95,13 +101,61 @@ impl PyOracle {
                 Ok(SelfCheck { python_ags4 })
             }
             Ok(_) => Err(OracleError::NotImportable),
-            Err(e) => Err(OracleError::Unavailable(e.to_string())),
+            Err(Bounded::Spawn(e)) => Err(OracleError::Unavailable(e.to_string())),
+            Err(Bounded::Timeout) => Err(OracleError::Unavailable(format!(
+                "self-check timed out after {:?}",
+                self.timeout
+            ))),
+            Err(Bounded::Wait(e)) => Err(OracleError::Unavailable(format!("wait: {e}"))),
         }
     }
 
+    /// `uv run python <wrapper> <args…>` in the caller's project, stdout
+    /// captured, bounded by `self.timeout`.
+    ///
+    /// On expiry the child is killed and its stdout reader is left behind
+    /// rather than joined: `uv run`'s python is a grandchild that outlives
+    /// the kill and holds the pipe open, so a join would wait on it anyway.
+    fn run_bounded(&self, args: &[&OsStr]) -> Result<(ExitStatus, String), Bounded> {
+        let mut child = Command::new(&self.uv)
+            .args(["run", "python"])
+            .arg(&self.wrapper)
+            .args(args)
+            .current_dir(&self.project)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(Bounded::Spawn)?;
+
+        // Read stdout on a thread so a large/slow writer can't deadlock
+        // the timeout poll.
+        let mut stdout = child.stdout.take().expect("piped stdout");
+        let reader = std::thread::spawn(move || {
+            let mut s = String::new();
+            let _ = stdout.read_to_string(&mut s);
+            s
+        });
+
+        let start = Instant::now();
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(st)) => break st,
+                Ok(None) => {
+                    if start.elapsed() >= self.timeout {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(Bounded::Timeout);
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(e) => return Err(Bounded::Wait(e)),
+            }
+        };
+        Ok((status, reader.join().unwrap_or_default()))
+    }
+
     /// Run the wrapper on one file with the hard timeout. Returns the
-    /// set of rule labels python flagged, or an error reason. (Verbatim
-    /// body of the former `parity.rs::run_py`.)
+    /// set of rule labels python flagged, or an error reason.
     ///
     /// Presence only — what the verdict is allowed to see. A caller that
     /// wants to *show* how many times each rule fired asks
@@ -121,43 +175,13 @@ impl PyOracle {
         // its deps), so the target must be absolute — it's relative to
         // the *harness* cwd, not the project.
         let target_abs = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
-        let mut child = Command::new(&self.uv)
-            .args(["run", "python"])
-            .arg(&self.wrapper)
-            .arg("--encoding-fallback")
-            .arg(&target_abs)
-            .current_dir(&self.project)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("spawn `{} run python`: {e}", self.uv))?;
-
-        // Read stdout on a thread so a large/slow writer can't deadlock
-        // the timeout poll.
-        let mut stdout = child.stdout.take().expect("piped stdout");
-        let reader = std::thread::spawn(move || {
-            let mut s = String::new();
-            let _ = stdout.read_to_string(&mut s);
-            s
-        });
-
-        let start = Instant::now();
-        let status = loop {
-            match child.try_wait() {
-                Ok(Some(st)) => break st,
-                Ok(None) => {
-                    if start.elapsed() >= self.timeout {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        let _ = reader.join();
-                        return Err("timeout".to_string());
-                    }
-                    std::thread::sleep(Duration::from_millis(50));
-                }
-                Err(e) => return Err(format!("wait: {e}")),
-            }
-        };
-        let out = reader.join().unwrap_or_default();
+        let (status, out) = self
+            .run_bounded(&[OsStr::new("--encoding-fallback"), target_abs.as_os_str()])
+            .map_err(|e| match e {
+                Bounded::Spawn(e) => format!("spawn `{} run python`: {e}", self.uv),
+                Bounded::Timeout => "timeout".to_string(),
+                Bounded::Wait(e) => format!("wait: {e}"),
+            })?;
 
         let v: serde_json::Value = serde_json::from_str(out.trim())
             .map_err(|_| format!("non-JSON output (exit {:?})", status.code()))?;
