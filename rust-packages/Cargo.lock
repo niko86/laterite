@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.17.3"
+version = "0.17.4"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.20.5"
+version = "0.20.6"
 dependencies = [
  "arrow",
  "criterion",
@@ -2240,7 +2240,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "laterite-ags4-validator",
  "laterite-cliutil",
