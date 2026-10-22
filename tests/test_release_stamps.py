@@ -43,11 +43,17 @@ def _stamp(crate: str, live: str, stamped: str, part: str, **kw):
 
 
 def _1128():
-    """The #1128 tree against the registry as it stood (emit 0.20.4, hostopts 0.3.3)."""
+    """The #1128 tree against the registry as it stood (emit 0.20.4, hostopts 0.3.3).
+
+    The parts are what `collect()` derived when that tree was replayed against
+    the rewound registry: emit owed a minor for the validator move its API
+    names; hostopts only re-pinned emit within ^0.20, a manifest edit that
+    owes nothing.
+    """
     return report_of(
         rs,
         _stamp(EMIT, "0.20.4", "0.20.5", "minor"),
-        _stamp(HOSTOPTS, "0.3.3", "0.3.4", "patch", code_changed=True),
+        _stamp(HOSTOPTS, "0.3.3", "0.3.4", "none"),
     )
 
 
@@ -56,7 +62,7 @@ def test_emit_0_20_5_is_an_under_bump_and_hostopts_0_3_4_is_not():
     assert [s.crate for s in reading.under] == [EMIT]
     assert reading.under[0].stamped_part == "patch"
     assert reading.under[0].required == "minor"
-    assert HOSTOPTS not in [s.crate for s in reading.under]
+    assert [s.crate for s in reading.over] == [HOSTOPTS]
 
 
 def test_an_over_bump_passes_and_is_reported():
@@ -162,7 +168,7 @@ def test_the_gate_passes_an_over_bump_and_names_it(monkeypatch, capsys):
     assert f"over-bump   {HOSTOPTS} 0.3.3 -> 0.4.0" in out
 
 
-def test_an_unreachable_crate_passes_the_gate_as_unmeasured(monkeypatch, capsys):
+def test_an_unreachable_crate_passes_the_gate_and_is_named(monkeypatch, capsys):
     report = report_of(rs, replace(DEFAULT, registry_state="unknown"))
     code, out = _check_stamps(monkeypatch, capsys, report)
     assert code == 0

@@ -363,7 +363,7 @@ jobs:
           cat /tmp/stamps.txt
           if [ "$code" = "5" ]; then
             echo "refused=true" >> "$GITHUB_OUTPUT"
-            echo "::error title=publish refused (#1147)::an owed stamp is under-bumped or unmeasured; nothing was dispatched"
+            echo "::error title=publish refused (#1147)::an owed stamp is under-bumped, or a crate was unreachable or unmeasured; nothing was dispatched"
             {
               echo "### Publish refused (#1147)"
               echo '```'
