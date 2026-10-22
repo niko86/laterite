@@ -283,8 +283,11 @@ equivalent per-stamp PR review.
     run in two places. ci.yml's repo-gates run `--check-stamps`, which fails
     on an under-bump and names an over-bump, a stamp with no publish-commit
     baseline and an unreachable crate without failing. The nightly's publish
-    step refuses the **whole** owed set on an under-bump or on any crate it
-    could not measure, then fails the job after the cut PR has opened. It
+    step refuses the **whole** owed set on an under-bump, on any crate it
+    could not measure, or on an owed stamp with no publish-commit baseline
+    (#1155): the gate skips that stamp, but the publisher would upload it
+    unjudged. A first publish has nothing to measure from and does not
+    refuse. The step fails the job after the cut PR has opened. It
     covers engine crates and the facade, and has no escape hatch. A wrong
     patch already on the registry is out of its reach: the cure there is a
     yank.

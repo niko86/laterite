@@ -18,9 +18,11 @@ The modes map one-to-one onto the job's steps:
 * `--bumps`   — `<crate> <part>` rows for the PR mode's bump loop.
 * `--publish-owed` — the crates whose stamp should be on the registry and is
   not; any output means "cancel any stale queued run and dispatch a fresh one".
-  Exits 5 with no output when any stamp is under-bumped or any crate went
-  unmeasured (#1147): the publisher uploads every stamp the registry lacks, so
-  one bad stamp refuses the whole set.
+  Exits 5 with no output when any stamp is under-bumped, any crate went
+  unmeasured (#1147), or an owed stamp has no publish commit to measure from
+  (#1155): the publisher uploads every stamp the registry lacks, so one bad
+  stamp refuses the whole set. A first publish has nothing to measure from and
+  does not refuse.
 * `--render`  — the human report + the cut view, for the step summary.
 * `--cascade` — after the owed bumps are applied, bump every engine crate whose
   published pins the moved floors left behind (a patch, or a minor when its
@@ -301,7 +303,11 @@ def main() -> int:
     # The whole set, not the bad stamp: `publish_crates.py` uploads every
     # stamp the registry lacks, so dispatching for the good ones would carry
     # the bad one with them — #1128's emit 0.20.5 went up beside validator.
-    if owed and (reading.under or reading.unreachable or reading.unmeasured):
+    # An unbased stamp is skipped by the gate, not cleared by it (#1155): the
+    # publisher would upload it unjudged.
+    if owed and (
+        reading.under or reading.unreachable or reading.unmeasured or reading.unbased
+    ):
         print(
             "publish refused (#1147): nothing dispatched for "
             + ", ".join(owed)

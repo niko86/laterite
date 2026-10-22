@@ -237,3 +237,38 @@ def test_a_clean_owed_set_dispatches_and_prints_its_counts(
     code, out, err = _publish_owed(monkeypatch, capsys, tmp_path, report)
     assert (code, out) == (0, f"{VALIDATOR}\n")
     assert "stamps: 1 checked, 0 skipped, 0 unreachable" in err
+
+
+# --- #1155: a stamp with no publish-commit baseline is not uploaded unchecked ---
+
+
+def test_a_stamp_commit_baseline_refuses_the_whole_owed_set(
+    monkeypatch, capsys, tmp_path
+):
+    """Skipped means unjudged; the publisher would upload it all the same."""
+    unbased = _stamp(EMIT, "0.20.4", "0.20.5", "patch", baseline_kind="stamp")
+    report = report_of(rs, unbased, _validator_owed())
+    code, out, err = _publish_owed(monkeypatch, capsys, tmp_path, report)
+    assert (code, out) == (ec.EXIT_PUBLISH_REFUSED, "")
+    assert f"skipped     {EMIT}: no publish-commit baseline" in err
+
+
+def test_a_first_publish_alone_does_not_refuse(monkeypatch, capsys, tmp_path):
+    """Nothing exists to measure a first publish from, so it cannot be held."""
+    first = replace(
+        DEFAULT,
+        crate=EMIT,
+        registry_state="new",
+        published_live="",
+        baseline_kind="",
+        cut_action="publish",
+    )
+    code, out, _ = _publish_owed(monkeypatch, capsys, tmp_path, report_of(rs, first))
+    assert (code, out) == (0, f"{EMIT}\n")
+
+
+def test_the_pr_gate_still_passes_a_stamp_commit_baseline(monkeypatch, capsys):
+    unbased = _stamp(EMIT, "0.20.4", "0.20.5", "patch", baseline_kind="stamp")
+    code, out = _check_stamps(monkeypatch, capsys, report_of(rs, unbased))
+    assert code == 0
+    assert f"skipped     {EMIT}: no publish-commit baseline" in out
