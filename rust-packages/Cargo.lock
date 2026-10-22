@@ -2240,7 +2240,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "laterite-ags4-validator",
  "laterite-cliutil",
