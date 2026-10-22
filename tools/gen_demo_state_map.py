@@ -302,6 +302,15 @@ def dual_validate(out_dir: Path) -> dict:
 
 
 def build_map(manifest: dict, report: dict, version: str) -> tuple[dict, list[str]]:
+    # A sweep python-ags4 never saw compares nothing: every state would read as
+    # a laterite-only difference. A self-check timeout once reported itself as
+    # 223 untriaged states this way (#1158).
+    if not report.get("oracle"):
+        raise SystemExit(
+            f"gen_demo_state_map: {CHECKER} ran Rust-only, so python-ags4 was not "
+            "consulted and there is nothing to compare. Is python-ags4 installed, "
+            "and did the oracle's self-check finish?"
+        )
     by_id = {s["id"]: s for s in manifest["states"]}
     states, shapes, count_diffs, unknown = [], {}, [], []
     validated: set[str] = set()

@@ -212,3 +212,12 @@ def test_a_collision_needing_two_overrides_stops_the_run(gen, committed):
         doc["states"].append(twin)
     _, problems = gen.build_python_counts(doc)
     assert any("hold both at once" in p for p in problems), problems
+
+
+def test_a_sweep_python_ags4_never_saw_stops_the_run(gen):
+    """With no oracle every state reads as a laterite-only difference, so the
+    run must name the missing oracle rather than report the divergences
+    (#1158: a self-check timeout surfaced as 223 untriaged states)."""
+    report = {"oracle": False, "files": []}
+    with pytest.raises(SystemExit, match="python-ags4 was not consulted"):
+        gen.build_map({"states": []}, report, "1.2.0")

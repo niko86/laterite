@@ -26,6 +26,13 @@ use std::time::{Duration, Instant};
 /// `ags-wiki/insights/oracle-drift-pin`.
 pub const EXPECTED_PYAGS4: &str = "1.2.0";
 
+/// How long the self-check may run before the oracle counts as unavailable
+/// (#1158). Its own bound, not the per-file one: on a fresh checkout the
+/// first `uv run` installs the project before python starts, and CI's first
+/// probe outlasted the per-file timeout and dropped a sweep to Rust-only.
+/// Generous so an install fits; finite so a real hang still ends.
+pub const DEFAULT_PROBE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
 /// Why the oracle couldn't be consulted at all (the caller maps these
 /// to its own "skip — optional QA, exit 0" policy verbatim).
 #[derive(Debug)]
@@ -63,6 +70,7 @@ pub struct PyOracle {
     wrapper: PathBuf,
     project: PathBuf,
     timeout: Duration,
+    probe_timeout: Duration,
 }
 
 impl PyOracle {
@@ -77,7 +85,15 @@ impl PyOracle {
             wrapper,
             project,
             timeout,
+            probe_timeout: DEFAULT_PROBE_TIMEOUT,
         }
+    }
+
+    /// Bound the self-check by `timeout` instead of [`DEFAULT_PROBE_TIMEOUT`].
+    #[must_use]
+    pub fn with_probe_timeout(mut self, timeout: Duration) -> Self {
+        self.probe_timeout = timeout;
+        self
     }
 
     /// Probe `uv run python <wrapper> --selfcheck` once. Maps the
@@ -85,11 +101,10 @@ impl PyOracle {
     /// (the caller compares `python_ags4` vs [`EXPECTED_PYAGS4`]),
     /// ran-but-non-zero → `NotImportable`, spawn-failed → `Unavailable`.
     ///
-    /// Bounded by the same `timeout` as each file (#1158): on a fresh
-    /// checkout this is the run that builds the venv, so it is the one most
-    /// likely to stall, and an expiry is `Unavailable` rather than a hang.
+    /// Bounded by the probe timeout (#1158), so an expiry is `Unavailable`
+    /// rather than a hang.
     pub fn selfcheck(&self) -> Result<SelfCheck, OracleError> {
-        match self.run_bounded(&[OsStr::new("--selfcheck")]) {
+        match self.run_bounded(&[OsStr::new("--selfcheck")], self.probe_timeout) {
             Ok((status, out)) if status.success() => {
                 // The wrapper emits {"ok":true,"python_ags4":"<ver>"}.
                 let v: serde_json::Value =
@@ -104,19 +119,23 @@ impl PyOracle {
             Err(Bounded::Spawn(e)) => Err(OracleError::Unavailable(e.to_string())),
             Err(Bounded::Timeout) => Err(OracleError::Unavailable(format!(
                 "self-check timed out after {:?}",
-                self.timeout
+                self.probe_timeout
             ))),
             Err(Bounded::Wait(e)) => Err(OracleError::Unavailable(format!("wait: {e}"))),
         }
     }
 
     /// `uv run python <wrapper> <args…>` in the caller's project, stdout
-    /// captured, bounded by `self.timeout`.
+    /// captured, bounded by `timeout`.
     ///
     /// On expiry the child is killed and its stdout reader is left behind
     /// rather than joined: `uv run`'s python is a grandchild that outlives
     /// the kill and holds the pipe open, so a join would wait on it anyway.
-    fn run_bounded(&self, args: &[&OsStr]) -> Result<(ExitStatus, String), Bounded> {
+    fn run_bounded(
+        &self,
+        args: &[&OsStr],
+        timeout: Duration,
+    ) -> Result<(ExitStatus, String), Bounded> {
         let mut child = Command::new(&self.uv)
             .args(["run", "python"])
             .arg(&self.wrapper)
@@ -141,7 +160,7 @@ impl PyOracle {
             match child.try_wait() {
                 Ok(Some(st)) => break st,
                 Ok(None) => {
-                    if start.elapsed() >= self.timeout {
+                    if start.elapsed() >= timeout {
                         let _ = child.kill();
                         let _ = child.wait();
                         return Err(Bounded::Timeout);
@@ -176,7 +195,10 @@ impl PyOracle {
         // the *harness* cwd, not the project.
         let target_abs = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
         let (status, out) = self
-            .run_bounded(&[OsStr::new("--encoding-fallback"), target_abs.as_os_str()])
+            .run_bounded(
+                &[OsStr::new("--encoding-fallback"), target_abs.as_os_str()],
+                self.timeout,
+            )
             .map_err(|e| match e {
                 Bounded::Spawn(e) => format!("spawn `{} run python`: {e}", self.uv),
                 Bounded::Timeout => "timeout".to_string(),
