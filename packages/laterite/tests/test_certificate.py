@@ -316,6 +316,28 @@ def test_a_file_changed_since_validate_is_validated_again(tmp_path):
     assert _engine_runs() - before == 1
 
 
+@pytest.mark.parametrize("door", ["path", "data"])
+def test_a_handle_whose_cert_cannot_answer_still_mints_from_its_run(
+    tmp_path, frozen_clock, door
+):
+    # #1131: the cert measured a warning, so it cannot answer a warnings request and
+    # the engine runs. It runs on the handle's own parse, once the bytes still match
+    # the cert, so the mint can reuse that run. It used to re-read the source for the
+    # engine, leaving the mint nothing to reuse and the rules to run a second time.
+    import json
+
+    src = _write(tmp_path, text=WITH_WARNING)
+    cert = lat.read(src).certify(tmp_path / "first.idx")
+    source = {"path": src} if door == "path" else {"data": src.read_bytes()}
+    before = _engine_runs()
+    h = lat.read(**source, index=cert).validate(fyi=True)
+    assert not h.report.certified
+    assert h.report.revalidate_reason == "tier_not_clean_warnings"
+    reused = h.certify_bytes()
+    assert _engine_runs() - before == 1, "certify ran the rules again"
+    assert json.loads(reused) == json.loads(lat.read(src).certify_bytes())
+
+
 # --- consume (validate-skip) -----------------------------------------------
 
 

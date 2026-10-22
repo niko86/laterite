@@ -119,5 +119,10 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.15.1", opt
 ratatui = { version = "0.30", optional = true }
 crossterm = { version = "0.29", optional = true }
 
+# Test-only: `tests/cli_vouched_memory.rs` reads one child's peak resident set
+# through `wait4`, which std does not expose. Already in the lockfile.
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"
+
 [lints]
 workspace = true

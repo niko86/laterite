@@ -312,41 +312,43 @@ def _pin(args: argparse.Namespace) -> Edition | None:
 def _with_cert(args: argparse.Namespace) -> dict:
     """`--index <cert>`: give a `.ags.idx` certificate first refusal at the verdict.
 
-    The cert POLICY is the library's — :func:`laterite.read` fails fast when the
-    cert's bytes don't match the file, and ``.validate()`` decides whether the cert
-    may stand in for a rules pass — not a second hand-written copy here. The CLI
-    adds only the binary's recovery posture: a cert that cannot be trusted is a
+    The cert POLICY is the library's — :func:`laterite.validate` with ``index=``
+    fails fast when the cert's bytes don't match the file, and decides whether the
+    cert may stand in for a rules pass — not a second hand-written copy here. The
+    CLI adds only the binary's recovery posture: a cert that cannot be trusted is a
     NOTE, not an error. Re-validating is always safe; refusing to run because a
     cert went stale would not be.
+
+    The verdict door, not ``read(index=).validate()`` (#1131): a handle must parse
+    the file, and read() hashes it before validate() hashes it again. This door
+    hashes it once, as it streams, and parses it only if the rules must run.
 
     Imported lazily on purpose. This module is otherwise native-only, and pulling
     polars + duckdb in would tax every `lat validate` for a flag almost nobody
     passes.
     """
-    from . import Ags4Error, StaleCertError, read
+    from . import Ags4Error, StaleCertError, validate
 
     try:
-        handle = read(args.file, index=args.index, encoding=args.encoding)
-    except StaleCertError as e:
-        print(f"note: --index not used ({e}); running the full check", file=sys.stderr)
-        return _engine(args)
-    except Ags4Error as e:
-        # Un-validatable input (missing, not AGS4, bad edition) — the same
-        # `{ok: False}` shape `run_check` returns, so the caller is none the wiser.
-        return {"ok": False, "error": str(e), "exit_code": e.exit_code}
-
-    try:
-        report = handle.validate(
+        report = validate(
+            args.file,
+            index=args.index,
             dict_version=_pin(args),
             warnings=not args.no_warnings,
             fyi=args.show_fyi,
             warnings_as_errors=args.warnings_as_errors,
             check_files=args.check_files,
+            encoding=args.encoding,
             dictionary=args.dict,
             dict_replace=args.dict_replace,
             max_findings_per_rule=args.max_findings_per_rule,
-        ).report
+        )
+    except StaleCertError as e:
+        print(f"note: --index not used ({e}); running the full check", file=sys.stderr)
+        return _engine(args)
     except Ags4Error as e:
+        # Un-validatable input (missing, not AGS4, bad edition, bad --dict) — the
+        # same `{ok: False}` shape `run_check` returns, so the caller is none the wiser.
         return {"ok": False, "error": str(e), "exit_code": e.exit_code}
 
     if report.certified:

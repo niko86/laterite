@@ -71,8 +71,8 @@ skips the **parse** as well as the rules. That is a different operation, not a
 faster spelling of the same one: there is no handle afterwards, and nothing to
 query.
 
-In Python, this door also compares the file's size with the cert's before
-reading it. When the cert vouches, it hashes the file as it streams rather than
+On every surface, this door also compares the file's size with the cert's
+before reading it. When the cert vouches, it hashes the file as it streams rather than
 holding it, so the check's memory does not grow with the file. The file is read
 whole only when the rules have to run.
 

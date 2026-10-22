@@ -605,29 +605,57 @@ impl Validate {
                 CertInput::Bytes(b) => b,
             };
             let sidecar = cert::parse_cert(raw)?;
+            let cannot_validate = |e: laterite_ags4_validator::ValidatorError| {
+                Error::with_source(validator_kind(e.kind()), "cannot validate", e)
+            };
 
             // The bytes the certificate is judged against, and the world it may
             // look at. Only a real path has a world — the same rule the engine
             // applies, restated here because the source is ours to classify.
-            let (bytes, world) = match &self.source {
-                Source::Path(p) => (
-                    std::fs::read(p).map_err(|e| {
+            let outcome = match &self.source {
+                // A path goes through the door that reads the file itself (#1131): a
+                // cert of another size is settled before a byte is read, and one that
+                // vouches is checked against a hash taken as the file streams, so the
+                // file is never held. Not `named`: a stale cert revalidates, as it
+                // does for bytes.
+                Source::Path(p) => {
+                    let cannot_read = |e: std::io::Error| {
                         Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
-                    })?,
-                    WorldScope::OnDisk(p.clone()),
-                ),
-                Source::Bytes(b) => (b.clone(), WorldScope::None),
-                Source::Text(s) => (s.clone().into_bytes(), WorldScope::None),
+                    };
+                    let file = std::fs::File::open(p).map_err(cannot_read)?;
+                    laterite_ags4_trust::check_reader(laterite_ags4_trust::ReaderRequest {
+                        file,
+                        opts: &opts,
+                        cert: Some(&sidecar),
+                        world: WorldScope::OnDisk(p.clone()),
+                        compat: None,
+                        named: false,
+                    })
+                    .map_err(|e| match e {
+                        laterite_ags4_trust::ReaderError::Io(e) => cannot_read(e),
+                        laterite_ags4_trust::ReaderError::Validate(e) => cannot_validate(e),
+                        stale @ laterite_ags4_trust::ReaderError::StaleCert => {
+                            Error::with_source(ErrorKind::InvalidArgument, "cannot validate", stale)
+                        }
+                    })?
+                }
+                Source::Bytes(b) => laterite_ags4_trust::check(laterite_ags4_trust::Request {
+                    bytes: b,
+                    opts: &opts,
+                    cert: Some(&sidecar),
+                    world: WorldScope::None,
+                    compat: None,
+                })
+                .map_err(cannot_validate)?,
+                Source::Text(s) => laterite_ags4_trust::check(laterite_ags4_trust::Request {
+                    bytes: s.as_bytes(),
+                    opts: &opts,
+                    cert: Some(&sidecar),
+                    world: WorldScope::None,
+                    compat: None,
+                })
+                .map_err(cannot_validate)?,
             };
-
-            let outcome = laterite_ags4_trust::check(laterite_ags4_trust::Request {
-                bytes: &bytes,
-                opts: &opts,
-                cert: Some(&sidecar),
-                world,
-                compat: None,
-            })
-            .map_err(|e| Error::with_source(validator_kind(e.kind()), "cannot validate", e))?;
 
             return Ok(Report::new(
                 laterite_ags4_validator::findings::Collected {

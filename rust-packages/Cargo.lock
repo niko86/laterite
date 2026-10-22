@@ -2405,6 +2405,7 @@ dependencies = [
  "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-cliutil",
+ "libc",
  "mimalloc",
  "ratatui",
  "rpassword",

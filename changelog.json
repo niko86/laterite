@@ -56,6 +56,9 @@
       },
       {
         "text": "**The vendored python-ags4 test corpus moved to `rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/` (#1110).** It sat under `laterite-ags4-forge/`, but this repo's own gates read it. It now sits beside the drift baseline frozen over it, with the files unchanged. The validator's fixture-corpus invariant test read a path that never existed and skipped, so it never checked a file. It now reads the corpus and fails if it is missing."
+      },
+      {
+        "text": "**A vouched `--index` validate hashes the file as it streams on every surface, and a handle read with a cert keeps its run for `certify()` (#1131).** `lat validate --index`, Node's `validate(file, { index })` and the `laterite` crate's `validate(path).index(..)` no longer hold the whole file when the certificate vouches, as Python's `validate(path, index=)` already did not. The Python and Node `lat validate --index` no longer build a handle first, so a vouched run never parses the file and hashes it once. In Python, a handle read with `index=` whose cert cannot answer `validate()` runs the rules on the parse it holds, so a following `certify()` reuses that run instead of running the rules a second time."
       }
     ],
     "deprecated": [],

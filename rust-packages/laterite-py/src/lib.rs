@@ -194,8 +194,8 @@ fn validate(
     // bytes that are already in hand instead of reading the file a second time.
     strict_cert: bool,
     // The parse a read handle already holds of this source, under this decoder
-    // (#1090). Used only when no cert is offered: a cert is checked against BYTES,
-    // and the parse alone cannot show it any.
+    // (#1090). With a cert, used only once the bytes are shown to match it (#1131):
+    // a cert is checked against BYTES, and the parse alone cannot show it any.
     retained: Option<&laterite_ags4_parse::ParsedFile>,
     max_findings_per_rule: Option<usize>,
 ) -> Result<Checked, (i32, String, String)> {
@@ -260,6 +260,53 @@ fn validate(
             ),
         )
     };
+
+    // A handle that carries a cert, and whose question the cert cannot answer for any
+    // bytes, runs the engine whatever the hash says (#1131). Matching bytes are the ones
+    // read() checked the cert against, and so the ones the handle parsed: run the engine
+    // on that parse, as the cert-less branch above does, and the run is a Measurement a
+    // later mint can reuse. Hashing is all the bytes are needed for, so a path streams.
+    // A cert that would vouch, or bytes that no longer match, take the doors below,
+    // which say why in `decide`'s own order.
+    if let (Some(parsed), Some(c)) = (retained, cert) {
+        let world = path.map_or(WorldScope::None, |p| {
+            WorldScope::OnDisk(std::path::PathBuf::from(p))
+        });
+        let answer = laterite_ags4_trust::split_options(&opts, world.clone())
+            .map(|(q, _)| c.answers(&q, &laterite_ags4_trust::engine_id(None)));
+        if let Ok(laterite_ags4_trust::Decision::Revalidate(reason)) = answer {
+            let fresh = match (path, text, data) {
+                (Some(p), _, _) => {
+                    let file = std::fs::File::open(Path::new(p)).map_err(|e| io_err(p, &e))?;
+                    let size = file.metadata().map_err(|e| io_err(p, &e))?.len();
+                    c.size_matches(size)
+                        && c.is_fresh_for_reader(file).map_err(|e| io_err(p, &e))?
+                }
+                (None, Some(t), _) => c.is_fresh_for(t.as_bytes()),
+                (None, None, Some(d)) => c.is_fresh_for(d),
+                (None, None, None) => false,
+            };
+            if fresh {
+                let (out, measured) =
+                    laterite_ags4_trust::check_parsed_measured(parsed, &opts, world)
+                        .map_err(|e| map_err(&e))?;
+                count_engine_run();
+                return Ok(Checked {
+                    file: path.map_or_else(
+                        || if text.is_some() { "<text>" } else { "<bytes>" }.to_string(),
+                        str::to_string,
+                    ),
+                    dict_version: out.dict_version.as_str().to_string(),
+                    resolution: out.resolution.as_str().to_string(),
+                    findings: out.findings,
+                    truncated: out.truncated,
+                    certified: false,
+                    revalidate_reason: Some(reason.as_str().to_string()),
+                    measured,
+                });
+            }
+        }
+    }
 
     // A path with a cert goes through the door that reads the file itself (#1097): the
     // size settles a cert of another size before a byte is read, and a cert that
