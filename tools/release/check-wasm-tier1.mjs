@@ -135,8 +135,14 @@ const EXPECTED_CLASSES = {
 // every surface ships, so they sit on the ungated path by design. The raise is
 // the smallest round step that clears the artifact that change produced; the
 // ceilings stay below the precache cap above.
-const MAX_GZIP_BYTES = 950 * 1024; // tier 1 839.2 (2026-08-16)
-const MAX_RAW_BYTES = 2400 * 1024; // tier 1 2093.9 (2026-08-16)
+//
+// Raised again, both axes, in 2026-10 (an owner decision, not a leak): after
+// #1024 the round step left so little headroom that ordinary engine changes kept
+// tripping it, and #1132's few-KiB sort was enough. The new step leaves a
+// margin for ordinary growth that is still a fraction of what `arrow` or `excel`
+// adds, and the raw ceiling stays well below the precache cap.
+const MAX_GZIP_BYTES = 1000 * 1024; // tier 1 839.2 (2026-08-16)
+const MAX_RAW_BYTES = 2500 * 1024; // tier 1 2093.9 (2026-08-16)
 
 checkWasmArtifact({
   label: "wasm-tier1",
