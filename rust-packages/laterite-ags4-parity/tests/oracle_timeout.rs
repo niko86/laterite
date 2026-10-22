@@ -10,9 +10,21 @@
 #![cfg(unix)]
 
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use laterite_ags4_parity::{OracleError, PyOracle};
+
+/// One test at a time. Each writes a script and then runs it; on Linux a
+/// fork from the other test, landing while that write is still open, hands
+/// the child the write handle and the exec fails with ETXTBSY ("Text file
+/// busy"). That is what failed this file's first CI run.
+fn serial() -> MutexGuard<'static, ()> {
+    static SERIAL: Mutex<()> = Mutex::new(());
+    SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 /// A stand-in for `uv` running `body`. The sleeps in it are children of the
 /// shell, not an `exec`: like the python `uv run` starts, they outlive a kill of
@@ -36,6 +48,7 @@ fn oracle(dir: &Path, uv: &Path, per_file: Duration) -> PyOracle {
 
 #[test]
 fn a_selfcheck_that_never_answers_is_unavailable_after_the_probe_timeout() {
+    let _serial = serial();
     let tmp = tempfile::tempdir().expect("tempdir");
     let uv = fake_uv(tmp.path(), "sleep 20");
     // A per-file timeout the probe must NOT be using: the run ends at the
@@ -66,6 +79,7 @@ fn a_selfcheck_that_never_answers_is_unavailable_after_the_probe_timeout() {
 fn a_selfcheck_slower_than_a_file_still_answers() {
     // The CI shape: the first `uv run` installs the project before python
     // starts, so the probe outlasts the per-file timeout and is still healthy.
+    let _serial = serial();
     let tmp = tempfile::tempdir().expect("tempdir");
     let uv = fake_uv(
         tmp.path(),
