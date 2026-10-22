@@ -104,9 +104,12 @@ describe("a vouched validate holds a buffer, not the file (#1131)", () => {
     expect(vouched.code).toBe(0);
     expect(vouched.stdout).toBe("true");
     // The positive control: no cert, so the engine runs and the bytes are held.
+    // Half the file, not all of it: the engine holds about one copy, so a floor
+    // at the full size sat on the edge and the idle child's own noise flipped it
+    // (#1156's first CI run). Half still clears the vouched ceiling of a quarter.
     const engine = run(`validate(${file})`);
     expect(engine.code).toBe(0);
-    expect(engine.rss - idle.rss).toBeGreaterThanOrEqual(size);
+    expect(engine.rss - idle.rss).toBeGreaterThanOrEqual(size / 2);
     expect(vouched.rss).toBeLessThan(idle.rss + size / 4);
   });
 
@@ -117,7 +120,8 @@ describe("a vouched validate holds a buffer, not the file (#1131)", () => {
     expect(vouched.stderr).toContain("rule engine skipped");
     const engine = peak([BIN, "validate", ags]);
     expect(engine.code).toBe(0);
-    expect(engine.rss - idle.rss).toBeGreaterThanOrEqual(size);
+    // Half the file, for the reason given in the library case above.
+    expect(engine.rss - idle.rss).toBeGreaterThanOrEqual(size / 2);
     expect(vouched.rss).toBeLessThan(idle.rss + size / 4);
   });
 });
