@@ -279,15 +279,12 @@ WITH_WARNING = CLEAN.replace('"Draft","4.2"', '"Draft","4.9.9"')
 
 @pytest.mark.parametrize("text", [CLEAN, WITH_WARNING], ids=["clean", "warning"])
 def test_a_reused_report_mints_the_same_certificate(tmp_path, frozen_clock, text):
-    # Compared as JSON, not as bytes: the `groups` index serialises from a hash map, so
-    # its keys come out in a different order from one mint to the next even when
-    # nothing is reused. Every value, the clock included, must match.
-    import json
-
+    # Compared as bytes: the `groups` index is written in sorted order (#1132), so two
+    # mints of one file agree byte for byte, the clock included.
     src = _write(tmp_path, text=text)
     reused = lat.read(src).validate(fyi=True).certify_bytes()
     alone = lat.read(src).certify_bytes()
-    assert json.loads(reused) == json.loads(alone)
+    assert reused == alone
     if text is WITH_WARNING:
         sc = lat._laterite_native.Sidecar.from_json(reused)
         assert sc.errors == 0 and sc.warnings, "the fixture must carry a warning"
