@@ -77,6 +77,7 @@ pub fn laterite_ags4_parity::check::build_oracle(std::path::PathBuf, std::path::
 pub fn laterite_ags4_parity::check::collect_ags(&std::path::Path, bool, &mut alloc::vec::Vec<std::path::PathBuf>, &mut usize)
 pub fn laterite_ags4_parity::check::dual_validate(&std::path::Path, core::option::Option<&laterite_ags4_parity::oracle::PyOracle>) -> laterite_ags4_parity::check::Outcome
 pub fn laterite_ags4_parity::check::run(&[std::path::PathBuf], &std::path::Path, &std::path::Path, u64, bool, &laterite_cliutil::report::Ctx) -> core::io::error::Result<i32>
+pub fn laterite_ags4_parity::check::run_with(&[std::path::PathBuf], core::option::Option<&laterite_ags4_parity::oracle::PyOracle>, &laterite_cliutil::report::Ctx) -> core::io::error::Result<i32>
 pub fn laterite_ags4_parity::check::rust_check(&std::path::Path) -> (laterite_ags4_parity::verdict::RustResult, alloc::string::String)
 pub fn laterite_ags4_parity::check::rust_check_counted(&std::path::Path) -> (laterite_ags4_parity::verdict::RustResult, alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String)
 pub fn laterite_ags4_parity::check::verdict_parts(core::option::Option<&laterite_ags4_parity::verdict::Parity>) -> (alloc::string::String, alloc::string::String)

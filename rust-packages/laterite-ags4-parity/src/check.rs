@@ -252,21 +252,11 @@ pub fn run(
     no_oracle: bool,
     ctx: &Ctx,
 ) -> io::Result<i32> {
-    let mut files: Vec<PathBuf> = Vec::new();
-    let mut skipped = 0usize;
-    for p in paths {
-        if !p.exists() {
-            eprintln!("error: file not found: {}", p.display());
-            return Ok(3);
-        }
-        collect_ags(p, true, &mut files, &mut skipped);
-    }
-    files.sort();
-    files.dedup();
-    if files.is_empty() {
-        eprintln!("error: no .ags file among the given path(s)");
+    // The paths before the probe: a missing one is reported without paying
+    // for a self-check first.
+    let Some((files, skipped)) = gather(paths) else {
         return Ok(3);
-    }
+    };
     let oracle = if no_oracle {
         None
     } else {
@@ -275,10 +265,58 @@ pub fn run(
     if oracle.is_none() && !no_oracle {
         note("check: python-ags4 unavailable — Rust-only verdict (optional QA)");
     }
+    validate_and_emit(paths, &files, skipped, oracle.as_ref(), *ctx)
+}
+
+/// [`run`] with the caller's oracle, for a caller that probes python-ags4
+/// itself so it can say why it is missing (#1157). Nothing is probed here,
+/// and `None` is a Rust-only run with no note: the caller has already said
+/// why. Same reports and exit codes as [`run`].
+///
+/// # Errors
+/// Only a failure to write the report to stdout.
+pub fn run_with(paths: &[PathBuf], oracle: Option<&PyOracle>, ctx: &Ctx) -> io::Result<i32> {
+    let Some((files, skipped)) = gather(paths) else {
+        return Ok(3);
+    };
+    validate_and_emit(paths, &files, skipped, oracle, *ctx)
+}
+
+/// The `.ags` files under `paths`, sorted and deduplicated, with how many
+/// non-`.ags` files a directory walk skipped. `None` (after saying why) for
+/// a path that does not exist or no file to check.
+fn gather(paths: &[PathBuf]) -> Option<(Vec<PathBuf>, usize)> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut skipped = 0usize;
+    for p in paths {
+        if !p.exists() {
+            eprintln!("error: file not found: {}", p.display());
+            return None;
+        }
+        collect_ags(p, true, &mut files, &mut skipped);
+    }
+    files.sort();
+    files.dedup();
+    if files.is_empty() {
+        eprintln!("error: no .ags file among the given path(s)");
+        return None;
+    }
+    Some((files, skipped))
+}
+
+/// Dual-validate `files` and emit the report; the exit code is 1 on a
+/// parity action, else 0.
+fn validate_and_emit(
+    paths: &[PathBuf],
+    files: &[PathBuf],
+    skipped: usize,
+    oracle: Option<&PyOracle>,
+    ctx: Ctx,
+) -> io::Result<i32> {
     let reports: Vec<CheckReport> = files
         .iter()
         .map(|f| {
-            let outcome = dual_validate(f, oracle.as_ref());
+            let outcome = dual_validate(f, oracle);
             CheckReport::new(f.display().to_string(), &outcome, oracle.is_some())
         })
         .collect();
@@ -287,12 +325,12 @@ pub fn run(
     // must not have to learn a new shape to keep working.
     if reports.len() == 1 && paths.len() == 1 && paths[0].is_file() {
         let action = reports[0].is_action();
-        emit(&reports[0], ctx)?;
+        emit(&reports[0], &ctx)?;
         return Ok(i32::from(action));
     }
     let sweep = CheckSweepReport::new(reports, oracle.is_some(), skipped);
     let action = sweep.is_action();
-    emit(&sweep, ctx)?;
+    emit(&sweep, &ctx)?;
     Ok(i32::from(action))
 }
 
