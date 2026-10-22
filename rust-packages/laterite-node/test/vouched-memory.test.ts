@@ -10,8 +10,12 @@ import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { read } from "../ts/index";
+
+// Each test spawns three children over a multi-MB file; under CI coverage that
+// overruns vitest's stock 5 s. The timeout is a ceiling, not a delay.
+vi.setConfig({ testTimeout: 60_000 });
 
 const pkgDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const BIN = join(pkgDir, "bin.mjs");
