@@ -91,8 +91,8 @@ fires from a `createEffect` gated on engine readiness.
 **Two artifacts, two gates.** Two `wasm-pack` runs in
 `repo:.github/workflows/deploy-validator.yml`; tier 2 takes `--out-name
 ags4_wasm_full` and a dynamic import. Tier 1's gate is
-`repo:tools/release/check-wasm-tier1.mjs` (#352) — 940 KiB gzip / 2350 KiB raw,
-both axes, ~12% headroom, over the same instrument
+`repo:tools/release/check-wasm-tier1.mjs` (#352) — a gzip and a raw ceiling,
+set with ~12% headroom when it landed (the gate records each raise since), over the same instrument
 `repo:tools/release/check-wasm-slim.mjs` drives
 (`repo:tools/release/wasm-artifact-gate.mjs`). It landed BEFORE the artifact had
 a consumer, so the 839.2 / 2093.9 measurement this design rests on has been held
@@ -290,7 +290,7 @@ from the precache.
 > both engines is caught FIRST by the cap, which refuses tier 2 with a build
 > warning (`… is 5.31 MB, and won't be precached`) — a warning, not a failure, so
 > the e2e is still the only check that *fails*. Both ceilings then move together:
-> raising `check-wasm-tier1.mjs`'s 2350 KiB raw ceiling above the cap would
+> raising `check-wasm-tier1.mjs`'s raw ceiling above the cap would
 > quietly stop the engine being precached at all.
 >
 > Also built differently from the line above: tier 2 is a **static** import in

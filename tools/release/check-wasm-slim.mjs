@@ -101,8 +101,13 @@ const EXPECTED_CLASSES = {
 // diff of named builds against main confirmed that is where the growth sits, not a
 // duplicated dependency. The raise is that growth plus a modest margin; gzip
 // still clears its own ceiling and was left alone.
-const MAX_GZIP_BYTES = 870 * 1024;
-const MAX_RAW_BYTES = 2180 * 1024;
+//
+// Raised again, both axes, in 2026-10 (an owner decision, not a leak): each raise
+// above was sized to clear one change, so the next ordinary change was always a
+// few KiB from the line. This step buys breathing room
+// instead. It is still well short of what any heavy dependency weighs.
+const MAX_GZIP_BYTES = 910 * 1024;
+const MAX_RAW_BYTES = 2280 * 1024;
 
 checkWasmArtifact({
   label: "wasm-slim",
