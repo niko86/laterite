@@ -680,13 +680,17 @@ pub struct Sidecar {
 }
 
 /// Serialise `Sidecar::groups` by key, so a cert's bytes do not depend on the hash seed.
+///
+/// Sorts the codes as `&str`, not the entries: each element type gets its own copy
+/// of std's sort, and a new one over `(&String, &Vec<Range>)` (or a `BTreeMap`) was
+/// enough to push the browser wasm past `check-wasm-tier1.mjs`.
 fn serialize_sorted<S: serde::Serializer>(
     groups: &HashMap<String, Vec<Range>>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    let mut entries: Vec<_> = groups.iter().collect();
-    entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
-    serializer.collect_map(entries)
+    let mut codes: Vec<&str> = groups.keys().map(String::as_str).collect();
+    codes.sort_unstable();
+    serializer.collect_map(codes.into_iter().map(|code| (code, &groups[code])))
 }
 
 /// Verdict of a cheap, I/O-free remote freshness check ([`Sidecar::is_fresh_for_remote`]).
