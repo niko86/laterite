@@ -99,6 +99,7 @@ pub fn laterite_ags4_parity::oracle::PyOracle::check(&self, &std::path::Path) ->
 pub fn laterite_ags4_parity::oracle::PyOracle::check_counts(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String>
 pub fn laterite_ags4_parity::oracle::PyOracle::new(&str, std::path::PathBuf, std::path::PathBuf, core::time::Duration) -> Self
 pub fn laterite_ags4_parity::oracle::PyOracle::selfcheck(&self) -> core::result::Result<laterite_ags4_parity::oracle::SelfCheck, laterite_ags4_parity::oracle::OracleError>
+pub fn laterite_ags4_parity::oracle::PyOracle::with_probe_timeout(self, core::time::Duration) -> Self
 impl core::marker::Freeze for laterite_ags4_parity::oracle::PyOracle
 impl core::marker::Send for laterite_ags4_parity::oracle::PyOracle
 impl core::marker::Sync for laterite_ags4_parity::oracle::PyOracle
@@ -119,6 +120,7 @@ impl core::marker::Unpin for laterite_ags4_parity::oracle::SelfCheck
 impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::SelfCheck
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::SelfCheck
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+pub const laterite_ags4_parity::oracle::DEFAULT_PROBE_TIMEOUT: core::time::Duration
 pub const laterite_ags4_parity::oracle::EXPECTED_PYAGS4: &str
 pub mod laterite_ags4_parity::rng
 pub struct laterite_ags4_parity::rng::Rng(_)
@@ -279,6 +281,7 @@ pub fn laterite_ags4_parity::oracle::PyOracle::check(&self, &std::path::Path) ->
 pub fn laterite_ags4_parity::oracle::PyOracle::check_counts(&self, &std::path::Path) -> core::result::Result<alloc::collections::btree::map::BTreeMap<alloc::string::String, u64>, alloc::string::String>
 pub fn laterite_ags4_parity::oracle::PyOracle::new(&str, std::path::PathBuf, std::path::PathBuf, core::time::Duration) -> Self
 pub fn laterite_ags4_parity::oracle::PyOracle::selfcheck(&self) -> core::result::Result<laterite_ags4_parity::oracle::SelfCheck, laterite_ags4_parity::oracle::OracleError>
+pub fn laterite_ags4_parity::oracle::PyOracle::with_probe_timeout(self, core::time::Duration) -> Self
 impl core::marker::Freeze for laterite_ags4_parity::oracle::PyOracle
 impl core::marker::Send for laterite_ags4_parity::oracle::PyOracle
 impl core::marker::Sync for laterite_ags4_parity::oracle::PyOracle
@@ -313,6 +316,7 @@ impl core::marker::Unpin for laterite_ags4_parity::oracle::SelfCheck
 impl core::marker::UnsafeUnpin for laterite_ags4_parity::oracle::SelfCheck
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parity::oracle::SelfCheck
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parity::oracle::SelfCheck
+pub const laterite_ags4_parity::DEFAULT_PROBE_TIMEOUT: core::time::Duration
 pub const laterite_ags4_parity::EXPECTED_PYAGS4: &str
 pub fn laterite_ags4_parity::classify(&laterite_ags4_parity::verdict::RustResult, &core::result::Result<alloc::collections::btree::set::BTreeSet<alloc::string::String>, alloc::string::String>) -> laterite_ags4_parity::verdict::Parity
 pub fn laterite_ags4_parity::reservoir<T, I: core::iter::traits::iterator::Iterator<Item = T>>(I, usize, &mut laterite_ags4_parity::rng::Rng) -> alloc::vec::Vec<T>
