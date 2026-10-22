@@ -1404,10 +1404,24 @@ jobs:
           set -euo pipefail
           norm=.github/rulesets/normalize.jq
           snapshot=.github/rulesets/main-protection.expected.json
+          rotate="rotate GH_RULESET_TOKEN: a fine-grained PAT on this repo with administration: read"
+          # The read stands alone, not piped into jq: under pipefail jq's exit
+          # masked gh's, and an error body crashed the normaliser instead of
+          # naming the 401 (#1149).
+          if ! gh api "repos/${GITHUB_REPOSITORY}/rulesets/19425032" > live.json 2> api.err; then
+            cat api.err >&2
+            echo "::error title=ruleset unreadable (#1149)::$(tr '\n' ' ' < api.err)— ${rotate}"
+            exit 1
+          fi
+          # A token without admin read gets the ruleset minus its bypass list,
+          # the very field the drift check exists to hold.
+          if ! jq -e 'has("bypass_actors")' live.json > /dev/null; then
+            echo "::error title=ruleset read without bypass_actors (#1149)::the token can read the ruleset but not who may bypass it — ${rotate}"
+            exit 1
+          fi
           # Normalise BOTH sides through the SAME filter so formatting / key order
           # can never cause a false diff — only governance content can.
-          gh api "repos/${GITHUB_REPOSITORY}/rulesets/19425032" \
-            | jq -S -f "$norm" > live.normalized.json
+          jq -S -f "$norm" live.json > live.normalized.json
           jq -S -f "$norm" "$snapshot" > expected.normalized.json
           if ! diff -u expected.normalized.json live.normalized.json; then
             echo "::error::The 'main protection' ruleset (19425032) drifted from ${snapshot}. If the change was intentional, regenerate it: gh api repos/${GITHUB_REPOSITORY}/rulesets/19425032 | jq -S -f ${norm} > ${snapshot}"
