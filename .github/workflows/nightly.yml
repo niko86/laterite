@@ -345,8 +345,9 @@ jobs:
           ITEMS="$(cat /tmp/items.txt)" python3 tools/issue_tracker.py --tracker release
       # Every stamp the publish would upload is first held to its required part
       # (#1147): #1128 stamped emit 0.20.5 as a patch over a breaking dep move,
-      # and this step published it unattended. An under-bump, or a crate the
-      # registry or the render could not measure, refuses the WHOLE set (exit
+      # and this step published it unattended. An under-bump, a crate the
+      # registry or the render could not measure, or an owed stamp with no
+      # publish commit to measure from (#1155) refuses the WHOLE set (exit
       # 5) — publish_crates.py uploads every stamp the registry lacks, so
       # there is no dispatching around one. The refusal is recorded rather
       # than failed here, so the cut PR below still opens with the re-bump an
@@ -363,7 +364,7 @@ jobs:
           cat /tmp/stamps.txt
           if [ "$code" = "5" ]; then
             echo "refused=true" >> "$GITHUB_OUTPUT"
-            echo "::error title=publish refused (#1147)::an owed stamp is under-bumped, or a crate was unreachable or unmeasured; nothing was dispatched"
+            echo "::error title=publish refused (#1147)::an owed stamp is under-bumped or has no publish-commit baseline, or a crate was unreachable or unmeasured; nothing was dispatched"
             {
               echo "### Publish refused (#1147)"
               echo '```'

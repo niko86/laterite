@@ -433,8 +433,9 @@ jobs:
       # published commit requires. It fails on an under-bump only. An
       # over-bump, a stamp with no publish-commit baseline and an unreachable
       # crate are each named and pass. It never renders an API diff, so a
-      # stamp whose delta needs one is reported as unmeasured, and the
-      # nightly's publish refuses it. Absolute rather than relative to a base:
+      # stamp whose delta needs one is reported as unmeasured. The nightly's
+      # publish refuses that one, and an owed stamp with no publish-commit
+      # baseline too (#1155). Absolute rather than relative to a base:
       # a PR adding code under a crate already stamped a patch makes that
       # stamp short without touching it.
       - name: stamps carry the part their change requires (#1147)

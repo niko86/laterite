@@ -1373,6 +1373,9 @@ class Stamps:
     unmeasured: list[tuple[str, str]] = field(default_factory=list)
     #: Level with the registry: nothing stamped, nothing to hold.
     level: list[str] = field(default_factory=list)
+    #: The skipped stamps that WILL publish: owed, with no publish commit to
+    #: measure from. A subset of `skipped`; the nightly refuses on it (#1155).
+    unbased: list[str] = field(default_factory=list)
 
     @property
     def checked(self) -> int:
@@ -1387,10 +1390,15 @@ def _unjudgeable(c: CrateStatus) -> str:
         return "never published, so there is no baseline"
     if c.registry_state == "yanked":
         return f"its stamp {c.version} is yanked and will not publish again"
+    if c.published_live and version_key(c.published_live) > version_key(c.version):
+        return f"the registry ({c.published_live}) is ahead of the tree ({c.version})"
+    return ""
+
+
+def _unbased(c: CrateStatus) -> str:
+    """Why an owed stamp has no publish commit to measure from, or ''."""
     if not c.published_live:
         return "no live published version to measure from"
-    if version_key(c.published_live) > version_key(c.version):
-        return f"the registry ({c.published_live}) is ahead of the tree ({c.version})"
     if c.baseline_kind != "publish":
         # A stamp-commit baseline may already carry the delta the registry has,
         # so a part measured from it can be too big or too small.
@@ -1425,6 +1433,11 @@ def stamp_reading(status: Report) -> Stamps:
         why = _unjudgeable(c)
         if why:
             reading.skipped.append((c.crate, why))
+            continue
+        why = _unbased(c)
+        if why:
+            reading.skipped.append((c.crate, why))
+            reading.unbased.append(c.crate)
             continue
         live, stamped, part = c.published_live, c.version, c.part_required
         stamp = Stamp(
