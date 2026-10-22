@@ -92,6 +92,9 @@
       },
       {
         "text": "**Certifying the same file twice gives byte-identical `.ags.idx` files (#1132).** The certificate's `groups` index was written in hash-map order, which changes from one process to the next, so two certificates with the same content differed in bytes and could not be compared by hash. Groups are now written sorted by code. Existing certificates still read and stay fresh."
+      },
+      {
+        "text": "**`laterite-ags4-parity`: a python-ags4 self-check that never answers no longer hangs its caller (#1158).** `PyOracle::selfcheck` waited on `uv run` with no bound, so a stalled `uv sync` or a python blocking on import hung `build_oracle` and everything that probes the oracle. It now has its own bound, `DEFAULT_PROBE_TIMEOUT` (set another with `PyOracle::with_probe_timeout`), longer than any per-file run because the first `uv run` on a fresh checkout installs the project. An expiry returns `OracleError::Unavailable` naming the timeout, so callers fall back to Rust-only."
       }
     ],
     "security": [
