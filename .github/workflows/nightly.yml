@@ -343,11 +343,36 @@ jobs:
           fi
           [ "$code" = "0" ] || exit "$code"
           ITEMS="$(cat /tmp/items.txt)" python3 tools/issue_tracker.py --tracker release
+      # Every stamp the publish would upload is first held to its required part
+      # (#1147): #1128 stamped emit 0.20.5 as a patch over a breaking dep move,
+      # and this step published it unattended. An under-bump, or a crate the
+      # registry or the render could not measure, refuses the WHOLE set (exit
+      # 5) — publish_crates.py uploads every stamp the registry lacks, so
+      # there is no dispatching around one. The refusal is recorded rather
+      # than failed here, so the cut PR below still opens with the re-bump an
+      # engine crate's under-bump owes; the last step fails the job on it.
       - name: publish owed -> dispatch a fresh run, cancelling any stale one
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          uv run --no-project python tools/release/engine_cut.py --publish-owed /tmp/status.json > /tmp/publish.txt
+          set +e
+          uv run --no-project python tools/release/engine_cut.py --publish-owed /tmp/status.json > /tmp/publish.txt 2> /tmp/stamps.txt
+          code=$?
+          set -e
+          cat /tmp/stamps.txt
+          if [ "$code" = "5" ]; then
+            echo "refused=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=publish refused (#1147)::an owed stamp is under-bumped, or a crate was unreachable or unmeasured; nothing was dispatched"
+            {
+              echo "### Publish refused (#1147)"
+              echo '```'
+              cat /tmp/stamps.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [ "$code" = "0" ] || exit "$code"
           if [ ! -s /tmp/publish.txt ]; then
             echo "no publish owed"
             exit 0
@@ -424,6 +449,13 @@ jobs:
           labels: no-changelog
           add-paths: rust-packages/**
           body-path: /tmp/pr-body.md
+      # Last, so the cut PR has already opened: a refused publish is a release
+      # someone has to act on, and `notify` only hears a failed job.
+      - name: fail the job — the owed publish was refused (#1147)
+        if: steps.publish.outputs.refused == 'true'
+        run: |
+          echo "the owed publish set was refused; the step summary names the stamps"
+          exit 1
 
   # Link + badge health check. ci.yml's `docs` job runs `mkdocs build --strict`,
   # which only validates INTERNAL links — this catches dead EXTERNAL links + dead

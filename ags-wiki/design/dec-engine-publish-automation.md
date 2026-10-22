@@ -269,6 +269,25 @@ equivalent per-stamp PR review.
     to one night. ~~The `crates` environment approval is unchanged.~~
     **Overtaken 2026-09-03** — the approval retired (section above); the
     cancel loop stays as defence against a run ever stuck `waiting` again.
+  - **A stamp is held to its required part (#1147).** An **under-bump** is a
+    stamped bump smaller than `required_part`, both measured from the
+    published baseline (the published tarball's commit). #1128 stamped
+    `laterite-ags4-emit` 0.20.5, a patch, over a move to `validator ^0.21`
+    that emit's API names. `required_part` already said minor. The cut owed
+    emit a bump, but the publish dispatch uploads every stamp the registry
+    lacks, so 0.20.5 went up beside the crates that were owed, and the
+    published facade stopped compiling. Coherence only asks whether
+    requirements can be satisfied, and the dispatch only asks whether a
+    version is on the registry, so neither could see it.
+    `repo:tools/release/release_status.py`'s `stamp_reading` is the one check,
+    run in two places. ci.yml's repo-gates run `--check-stamps`, which fails
+    on an under-bump and names an over-bump, a stamp with no publish-commit
+    baseline and an unreachable crate without failing. The nightly's publish
+    step refuses the **whole** owed set on an under-bump or on any crate it
+    could not measure, then fails the job after the cut PR has opened. It
+    covers engine crates and the facade, and has no escape hatch. A wrong
+    patch already on the registry is out of its reach: the cure there is a
+    yank.
 - **Rollout state: ~~answer-only, as the design row requires~~ PROMOTED to PR
   mode, 2026-09-03.** The design row's condition — the cut must be seen to
   agree with a human across real cuts before it acts — was met by the #849

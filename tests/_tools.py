@@ -106,6 +106,8 @@ def default_crate(rs: ModuleType):
         cut_action="none",
         cut_why="",
         api_delta_source="snapshot",
+        baseline_kind="publish",
+        part_why="",
     )
 
 
