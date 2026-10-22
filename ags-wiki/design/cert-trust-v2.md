@@ -420,6 +420,9 @@ Nine risks, none hidden:
    every tier on and the same question, was taken on that same parse, and the bytes
    being minted still parse equal to it. Neither bug can come back through it: no
    count crosses from Python, and a narrower run yields no measurement at all.
+   A handle read with a certificate yields one too when that cert cannot answer the
+   question (#1131): the engine runs on the handle's own parse, once the bytes still
+   hash to the cert.
 
 ## 8. Implementation plan (ordered; each step is its own PR)
 

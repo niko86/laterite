@@ -582,11 +582,15 @@ function readTable(headings: string[], rows: string[][]): string {
  * and it never reads it — so `tsc` was happy while the cert went nowhere. Passing
  * a cert for an entirely different file changed nothing at all.
  *
- * The cert policy is the LIBRARY's (`read({index})` freshness-checks it, and
- * `Ags4File.validate()` decides whether it may stand in for an engine run) — not a
- * second hand-written copy here. The CLI adds only the binary's own recovery
- * posture: a cert that cannot be trusted is a NOTE, not an error. Re-validating is
- * always safe; refusing to run because the cert went stale would not be.
+ * The cert policy is the LIBRARY's (`validate(file, {index})` freshness-checks it
+ * and decides whether it may stand in for an engine run) — not a second
+ * hand-written copy here. The CLI adds only the binary's own recovery posture: a
+ * cert that cannot be trusted is a NOTE, not an error. Re-validating is always
+ * safe; refusing to run because the cert went stale would not be.
+ *
+ * The verdict door, not `read(file, {index}).validate()` (#1131): a handle must
+ * parse the file, and `read` hashes it before `validate` hashes it again. This
+ * door hashes it once, as it streams, and parses it only if the rules must run.
  */
 function validateWithCert(
   file: string,
@@ -594,12 +598,7 @@ function validateWithCert(
   opts: Omit<ValidateOptions, "text">,
 ): Report {
   try {
-    // `.report` is optional only on a handle nobody validated yet; we just did.
-    const report = read(file, { index, encoding: opts.encoding }).validate(
-      opts,
-    ).report;
-    if (!report) throw new Error("validate() produced no report");
-    return report;
+    return validate(file, { ...opts, index });
   } catch (e) {
     if (!(e instanceof StaleCertError)) throw e;
     note(`note: --index not used (${e.message}); running the full check`);

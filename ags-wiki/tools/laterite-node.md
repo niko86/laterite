@@ -100,9 +100,11 @@ ID/X → Utf8). Engine crates reused unchanged:
   `--index <cert>` was accepted and dropped entirely (`ValidateOptions extends
   ReadOptions`, so `tsc` was happy while the certificate went nowhere — a cert
   minted for a *completely different file* changed nothing). `--index` is now
-  `validateWithCert`: `read(file, {index})` freshness-checks it and
-  `Ags4File.validate()` decides whether it may skip the engine — the SAME library
-  cert policy Python already had, not a second hand-written copy; the CLI adds
+  `validateWithCert`, which hands the cert to the library's `validate(file,
+  {index})` — the SAME library cert policy Python already had, not a second
+  hand-written copy. (It first went through `read(file, {index}).validate()`,
+  which parsed and hashed the file before the validate hashed it again; #1131
+  moved it to the verdict door, which streams the hash.) The CLI adds
   only the recovery posture (an untrustworthy cert is a stderr note, not an
   error). `lat certify`'s result also moved from stderr to **stdout**, matching
   the binary and uvx — it had been the one launcher where `CERT=$(lat certify

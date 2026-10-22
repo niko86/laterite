@@ -39,8 +39,8 @@ _CLEAN = (
 
 
 def _certified(path, cert) -> bool:
-    """Did the certificate stand in for the rule engine? — via the library, which is the
-    same code path `_cli._with_cert` drives."""
+    """Did the certificate stand in for the rule engine? — via the library's handle
+    door, whose trust decision `_cli._with_cert`'s verdict door shares."""
     return (
         laterite.read(str(path), index=str(cert))
         .validate(warnings=False)
@@ -75,6 +75,29 @@ def test_cli_index_skips_the_rule_engine(tmp_path, capsys):
     assert _cli.main(["validate", str(src), "--index", str(cert), "--no-warnings"]) == 0
     err = capsys.readouterr().err
     assert "rule engine skipped" in err, f"the skip must be announced, got: {err!r}"
+
+
+def test_cli_index_a_vouched_validate_never_parses_the_file(
+    tmp_path, capsys, monkeypatch
+):
+    """A cert that vouches needs a hash of the file and nothing else (#1131). The flag
+    used to build a handle first, so it parsed the whole file, and hashed it, before
+    the validate hashed it again."""
+    src, cert = _mint(tmp_path)
+    parses: list[object] = []
+    parse = laterite._laterite_native.parse_arrow
+
+    def counted(*args, **kwargs):
+        parses.append(args or kwargs)
+        return parse(*args, **kwargs)
+
+    monkeypatch.setattr(laterite._laterite_native, "parse_arrow", counted)
+    laterite.read(str(src))
+    assert len(parses) == 1, "the counter must see a parse"
+
+    assert _cli.main(["validate", str(src), "--index", str(cert), "--no-warnings"]) == 0
+    assert "rule engine skipped" in capsys.readouterr().err
+    assert len(parses) == 1, "a vouched --index parsed the file"
 
 
 def test_cli_index_auto_sentinel_does_not_disarm_the_skip(tmp_path, capsys):

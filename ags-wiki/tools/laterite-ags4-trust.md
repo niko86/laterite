@@ -71,8 +71,11 @@ certificate of another size is settled before any byte is read, one that would
 vouch (`Sidecar::answers`) is checked by hashing the file as it streams
 (`Sidecar::is_fresh_for_reader`), and anything else reads the file whole, once,
 for the engine. Same verdict and `revalidate_reason` as `check`; `named` makes a
-stale cert an error raised before the engine runs. `laterite-py`'s path door uses
-it; `lat`, Node and the facade still read the file whole and call `check`. `engine_id` exposes
+stale cert an error raised before the engine runs. Every path door with a cert
+uses it: `laterite-py`, Node, `lat` and the facade (#1131). A `laterite-py` read
+handle whose cert cannot answer its question (`Sidecar::answers`) hashes the bytes
+against the cert first, then runs `check_parsed_measured` on the parse it holds,
+so a later mint can reuse that run. `engine_id` exposes
 the engine identity (`ENGINE_FINGERPRINT`, optionally with a compat tag) that a
 certificate's freshness is judged against.
 

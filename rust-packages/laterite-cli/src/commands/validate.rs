@@ -3,9 +3,10 @@
 //! certificate to skip the engine (the cert logic lives in `cert`); minting
 //! moved to `lat certify`.
 
+use std::io::Read as _;
 use std::process::exit;
 
-use laterite_ags4_trust::{Request, check};
+use laterite_ags4_trust::{ReaderError, ReaderRequest, Request, check, check_reader};
 use laterite_ags4_validator::{CheckOptions, WorldScope, verdict::Verdict};
 use laterite_cliutil::{Spinner, write_atomic};
 
@@ -44,13 +45,11 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
     let path = args.file.as_path();
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
 
-    let bytes = match std::fs::read(path) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("error: read {}: {e}", path.display());
-            exit(3);
-        }
+    let read_failed = |e: &std::io::Error| -> ! {
+        eprintln!("error: read {}: {e}", path.display());
+        exit(3);
     };
+    let mut file = std::fs::File::open(path).unwrap_or_else(|e| read_failed(&e));
 
     // `--index <cert>` is OPT-IN and never auto-discovered: an `.ags.idx` lying beside a
     // file is not consent to trust it. A cert that cannot be read is not fatal — it just
@@ -69,13 +68,34 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
     let spinner = Spinner::start(&format!("validating {name}..."), quiet);
     // The world is OnDisk because we have a real path — but `check` only looks at it if
     // `--check-files` actually asked. Handing over a path is not the same as asking.
-    let outcome = check(Request {
-        bytes: &bytes,
-        opts: &opts,
-        cert: sidecar.as_ref(),
-        world: WorldScope::OnDisk(path.to_path_buf()),
-        compat: None,
-    });
+    let world = WorldScope::OnDisk(path.to_path_buf());
+    let outcome = if let Some(c) = sidecar.as_ref() {
+        // A cert goes through the door that reads the file itself (#1131): a cert of
+        // another size is settled before a byte is read, and one that vouches is checked
+        // against a hash taken as the file streams, so the file is never held. Not
+        // `named`: a stale cert here is a note, and the full check runs.
+        check_reader(ReaderRequest {
+            file,
+            opts: &opts,
+            cert: Some(c),
+            world,
+            compat: None,
+            named: false,
+        })
+    } else {
+        let mut bytes = Vec::new();
+        if let Err(e) = file.read_to_end(&mut bytes) {
+            read_failed(&e);
+        }
+        check(Request {
+            bytes: &bytes,
+            opts: &opts,
+            cert: None,
+            world,
+            compat: None,
+        })
+        .map_err(ReaderError::Validate)
+    };
     drop(spinner);
 
     let result = outcome.map(|o| {
@@ -172,9 +192,15 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
             }
             exit(code);
         }
-        Err(e) => {
+        Err(ReaderError::Io(e)) => read_failed(&e),
+        Err(ReaderError::Validate(e)) => {
             eprintln!("error: {e}");
             exit(e.exit_code());
+        }
+        // Only a `named` request is refused as stale, and this one is not.
+        Err(e @ ReaderError::StaleCert) => {
+            eprintln!("error: {e}");
+            exit(4);
         }
     }
 }
