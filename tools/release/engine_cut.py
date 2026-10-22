@@ -18,6 +18,9 @@ The modes map one-to-one onto the job's steps:
 * `--bumps`   — `<crate> <part>` rows for the PR mode's bump loop.
 * `--publish-owed` — the crates whose stamp should be on the registry and is
   not; any output means "cancel any stale queued run and dispatch a fresh one".
+  Exits 5 with no output when any stamp is under-bumped or any crate went
+  unmeasured (#1147): the publisher uploads every stamp the registry lacks, so
+  one bad stamp refuses the whole set.
 * `--render`  — the human report + the cut view, for the step summary.
 * `--cascade` — after the owed bumps are applied, bump every engine crate whose
   published pins the moved floors left behind (a patch, or a minor when its
@@ -50,6 +53,10 @@ EXIT_UNCONCLUDED = 3
 
 #: the cascade stopped making progress — the job must fail before the PR step.
 EXIT_CASCADE_STUCK = 4
+
+#: a stamp falls short of its required part, or a crate could not be
+#: measured — nothing is dispatched (#1147).
+EXIT_PUBLISH_REFUSED = 5
 
 
 def tokens(status: rs.Report) -> list[str]:
@@ -287,7 +294,23 @@ def main() -> int:
         for crate, part in bumps(status):
             print(f"{crate} {part}")
         return 0
-    for crate in publish_owed(status):
+    owed = publish_owed(status)
+    reading = rs.stamp_reading(status)
+    # Every run, so a night that dispatches says what it held to the rule.
+    print(rs.render_stamps(reading), file=sys.stderr)
+    # The whole set, not the bad stamp: `publish_crates.py` uploads every
+    # stamp the registry lacks, so dispatching for the good ones would carry
+    # the bad one with them — #1128's emit 0.20.5 went up beside validator.
+    if owed and (reading.under or reading.unreachable or reading.unmeasured):
+        print(
+            "publish refused (#1147): nothing dispatched for "
+            + ", ".join(owed)
+            + " — the publisher uploads every stamp the registry lacks, "
+            "the ones above included",
+            file=sys.stderr,
+        )
+        return EXIT_PUBLISH_REFUSED
+    for crate in owed:
         print(crate)
     return 0
 

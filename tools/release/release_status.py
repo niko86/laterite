@@ -195,6 +195,11 @@ class CrateStatus:
     cut_action: str
     cut_why: str
     api_delta_source: str
+    #: `publish` | `stamp` | '' — what `delta_baseline` was measured from. The
+    #: stamp check (#1147) trusts only `publish`, so it is a field, not a parse.
+    baseline_kind: str
+    #: Why `part_required` is what it is, whatever the cut does with it.
+    part_why: str
 
 
 @dataclass(frozen=True)
@@ -993,19 +998,23 @@ def collect(
         action, why = cut_action(
             state, tier, live, version, part, baseline_kind, bool(stale), delta.note
         )
+        # Computed for every crate, not only a bump: the stamp check (#1147)
+        # has to say why a stamp falls short, and that crate's action is
+        # whatever the cut made of it.
+        reasons = []
+        if added or removed:
+            reasons.append(f"API +{added} -{removed} since {live}")
+        if stale:
+            reasons.append("published pins left behind: " + "; ".join(stale))
+        if moves:
+            reasons.append(
+                "a dependency its API names moved incompatibly: " + "; ".join(moves)
+            )
+        if code and not (added or removed):
+            reasons.append("code changed with no API movement")
+        part_why = "; ".join(reasons)
         if action == "bump":
-            reasons = []
-            if added or removed:
-                reasons.append(f"API +{added} -{removed} since {live}")
-            if stale:
-                reasons.append("published pins left behind: " + "; ".join(stale))
-            if moves:
-                reasons.append(
-                    "a dependency its API names moved incompatibly: " + "; ".join(moves)
-                )
-            if code and not (added or removed):
-                reasons.append("code changed with no API movement")
-            why = "; ".join(reasons)
+            why = part_why
         crates.append(
             CrateStatus(
                 crate=crate,
@@ -1026,6 +1035,8 @@ def collect(
                 cut_action=action,
                 cut_why=why,
                 api_delta_source=delta.source,
+                baseline_kind=baseline_kind,
+                part_why=part_why,
             )
         )
     return Report(
@@ -1318,6 +1329,180 @@ def check_coherence(
     return 1 if introduced else 0
 
 
+def stamped_part(published: str, stamped: str) -> str:
+    """The part `stamped` moved over `published`: major | minor | patch | none."""
+    p, s = version_key(published), version_key(stamped)
+    if s <= p:
+        return "none"
+    if s[0] > p[0]:
+        return "major"
+    if s[:2] > p[:2]:
+        return "minor"
+    return "patch"
+
+
+@dataclass(frozen=True)
+class Stamp:
+    """One stamp held to the part its published baseline requires (#1147)."""
+
+    crate: str
+    live: str
+    stamped: str
+    stamped_part: str
+    required: str
+    why: str
+    tier: str = "engine"
+
+
+@dataclass(frozen=True)
+class Stamps:
+    """The stamp check's reading — the PR gate prints it, the publish step obeys it.
+
+    An under-bump is a stamped bump smaller than `required_part`, both measured
+    from the published baseline. `held` stamps carry exactly the part owed.
+    """
+
+    under: list[Stamp] = field(default_factory=list)
+    over: list[Stamp] = field(default_factory=list)
+    held: list[Stamp] = field(default_factory=list)
+    #: `(crate, why)` — a stamp with nothing trustworthy to measure it from.
+    skipped: list[tuple[str, str]] = field(default_factory=list)
+    #: The registry did not answer, so whether a stamp is owed is unknown.
+    unreachable: list[str] = field(default_factory=list)
+    #: `(crate, why)` — measured, but a missing API delta leaves it undecided.
+    unmeasured: list[tuple[str, str]] = field(default_factory=list)
+    #: Level with the registry: nothing stamped, nothing to hold.
+    level: list[str] = field(default_factory=list)
+
+    @property
+    def checked(self) -> int:
+        return len(self.under) + len(self.over) + len(self.held)
+
+
+def _unjudgeable(c: CrateStatus) -> str:
+    """Why `c`'s stamp cannot be held to anything, or '' when it can."""
+    if c.tier not in TIERS:
+        return f"tier is {c.tier!r}, not a recognised release tier"
+    if c.registry_state == "new":
+        return "never published, so there is no baseline"
+    if c.registry_state == "yanked":
+        return f"its stamp {c.version} is yanked and will not publish again"
+    if not c.published_live:
+        return "no live published version to measure from"
+    if version_key(c.published_live) > version_key(c.version):
+        return f"the registry ({c.published_live}) is ahead of the tree ({c.version})"
+    if c.baseline_kind != "publish":
+        # A stamp-commit baseline may already carry the delta the registry has,
+        # so a part measured from it can be too big or too small.
+        return f"no publish-commit baseline for {c.published_live}"
+    return ""
+
+
+def stamp_reading(status: Report) -> Stamps:
+    """Hold every stamp ahead of the registry to its `required_part` (#1147).
+
+    The cut never applies this to a stamp it did not make: `cut_action` sends
+    an insufficient engine stamp to `bump`, but `publish_crates.py` publishes
+    everything the registry lacks, so the bump never mattered — #1128's emit
+    0.20.5 went up beside the crates that were owed. And the facade's stamp is
+    published on identity alone.
+
+    An unmeasured API delta (#998) leaves the counts at +0 -0, so
+    `part_required` is then only a floor. A stamp short of that floor is
+    still an under-bump, and a minor stamp covers anything a 0.x signal can
+    ask; only the stamps in between are unmeasured.
+    """
+    reading = Stamps()
+    for c in status.engine_crates:
+        if c.registry_state == "unknown":
+            reading.unreachable.append(c.crate)
+            continue
+        if c.registry_state == "ok":
+            reading.level.append(c.crate)
+            continue
+        if c.registry_state == "skipped":
+            continue  # --no-registry: the caller says nothing was asked
+        why = _unjudgeable(c)
+        if why:
+            reading.skipped.append((c.crate, why))
+            continue
+        live, stamped, part = c.published_live, c.version, c.part_required
+        stamp = Stamp(
+            c.crate,
+            live,
+            stamped,
+            stamped_part(live, stamped),
+            part,
+            c.part_why,
+            c.tier,
+        )
+        if not covers(live, stamped, part):
+            reading.under.append(stamp)
+        elif c.api_delta_source == "unavailable":
+            if covers(live, stamped, "minor"):
+                reading.held.append(stamp)
+            else:
+                reading.unmeasured.append(
+                    (
+                        c.crate,
+                        f"{stamped} is a {stamp.stamped_part}; API delta unmeasured",
+                    )
+                )
+        elif ORDER.index(stamp.stamped_part) < ORDER.index(part):
+            reading.over.append(stamp)
+        else:
+            reading.held.append(stamp)
+    return reading
+
+
+def render_stamps(reading: Stamps) -> str:
+    """The stamp check's report; the counts line prints on every run, pass or fail."""
+    r = reading
+    lines = [
+        f"stamps: {r.checked} checked, {len(r.skipped)} skipped, "
+        f"{len(r.unreachable)} unreachable, {len(r.unmeasured)} unmeasured, "
+        f"{len(r.level)} level with the registry "
+        "(required part measured from each crate's published commit, #1147)"
+    ]
+
+    def row(tag: str, s: Stamp) -> str:
+        line = (
+            f"  {tag:<11} {s.crate} {s.live} -> {s.stamped} is a {s.stamped_part}; "
+            f"{s.required} owed"
+        )
+        return line + (f" ({s.why})" if s.why else "")
+
+    lines += [row("UNDER-BUMP", s) for s in r.under]
+    lines += [row("over-bump", s) + " — passes" for s in r.over]
+    lines += [f"  skipped     {crate}: {why}" for crate, why in r.skipped]
+    lines += [
+        f"  unreachable {crate}: the registry did not answer — nothing concluded"
+        for crate in r.unreachable
+    ]
+    lines += [f"  unmeasured  {crate}: {why}" for crate, why in r.unmeasured]
+    if r.under:
+        lines += [
+            "",
+            "An under-bumped stamp publishes a smaller number than its change",
+            "needs (#1128: emit 0.20.5 broke `laterite` 0.15.0). Re-stamp it:",
+        ]
+        # The facade carries the product number, which only a product cut
+        # moves (#1073), so bump_crate.py is not its remedy.
+        lines += [
+            f"  uv run --no-project python tools/release/bump_crate.py {s.crate} "
+            f"{s.required}   (from the published {s.live})"
+            if s.tier == "engine"
+            else f"  {s.crate}: re-cut the product release as a {s.required} "
+            "(tools/release/cut-release.sh)"
+            for s in r.under
+        ]
+    return "\n".join(lines)
+
+
+def _no_render(*_args: object, **_kwargs: object) -> None:
+    """The PR gate never renders: a cold `cargo public-api` build is minutes."""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument(
@@ -1335,6 +1520,11 @@ def main() -> int:
         "--check-coherence",
         action="store_true",
         help="gate: fail if this tree's floors strand a published crate's pins (#809)",
+    )
+    ap.add_argument(
+        "--check-stamps",
+        action="store_true",
+        help="gate: fail if a stamp is smaller than its required part (#1147)",
     )
     ap.add_argument(
         "--base",
@@ -1368,6 +1558,17 @@ def main() -> int:
                 return 0
             base_text = proc.stdout
         return check_coherence(fetch_index, base_text)
+
+    if args.check_stamps:
+        if args.no_registry:
+            print("stamps: --no-registry asked nothing, so nothing is concluded.")
+            return 0
+        # Absolute, not relative to a base: a PR that lands code under a crate
+        # already stamped a patch can be what makes the stamp too small, and
+        # that PR's own stamp line never moved.
+        reading = stamp_reading(collect(fetch=fetch_index, render=_no_render))
+        print(render_stamps(reading))
+        return 1 if reading.under else 0
 
     s = collect(fetch=None if args.no_registry else fetch_index)
     if args.json:
