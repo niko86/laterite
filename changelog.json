@@ -5,108 +5,119 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [
-      {
-        "text": "**`.at()` can filter on row identity: `ags.at(\"SAMP\", ids, by=\"_id\")` (#1093).** It keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child group the file's own DICT declares. Use it where `{group}_ID` is optional or absent: a blank `SAMP_ID` made `.at(\"SAMP\", …)` miss the children, and only raw SQL could reach them. Once a query filters by `_id`, `q[code]` raises for a group no filter reaches (the parent, a sibling, a grandchild) rather than return every row, and `.groups` leaves out a child with no ids. Under the default `by`, a `None` value warns, since a blank ID matches no row. It applies to `q[code]` and `q.frames()`. On a `.query()` base it raises, because that SQL names no group to tell `_id` from `_parent_id` by."
-      },
-      {
-        "text": "**`laterite-ags4-trust`: `check_parsed_measured` and `mint_measured` (#1096).** The first is `check_parsed` that also returns an opaque `Measurement` for a run with every tier on and no world check. The second mints from that measurement when it answers the mint's question for the same parse, and otherwise runs the engine as `mint` does. It returns a `Minted` carrying the result and whether the engine ran."
-      },
-      {
-        "text": "**`laterite-ags4-trust`: `check_reader` (#1097), and `laterite-ags4-core`: `Sidecar::is_fresh_for_reader` and `Sidecar::answers`.** `check_reader` is `check` for a file it reads itself: a certificate of another size is settled before any byte is read, and one that would vouch is checked against a hash taken as the file streams, so the file is never held. Same verdict and `revalidate_reason` as `check`. `ReaderRequest::named` makes a stale certificate the error `ReaderError::StaleCert`. `is_fresh_for_reader` is `is_fresh_for` over a stream; `answers` is `decide` without the format, size and content gates."
-      },
-      {
-        "text": "**A per-rule findings cap on every validate door (#1089).** `validate(..., max_findings_per_rule=N)` and `Ags4File.validate(max_findings_per_rule=N)` in Python, `lat validate --max-findings-per-rule N`, `{ maxFindingsPerRule: N }` in Node and the browser package, and `Validate::max_findings_per_rule` on the Rust facade. A rule keeps its first N findings and only counts the rest, so a file whose one defect repeats on every line no longer holds every finding in memory. The verdict, the exit code, `count` and the per-tier counts still cover every finding. `Report.truncated` (Python and Node), `report.truncated` (browser) and `Report::truncated` (facade) name the rules that were cut as `{rule: {shown, total}}`. The browser's map also names a rule that only its own cap on the rows it returns cut, with `shown` the rows returned (#1129). The JSON report gains a `truncated` key and the NDJSON report ends with one `{\"truncated\": ...}` record, both only when a rule was cut. `0` keeps no findings, only the counts. The default is no cap, and an uncapped report is unchanged. A capped run mints the same certificate as an uncapped one."
-      },
-      {
-        "text": "**`laterite-ags4-corpus-qa check` compares laterite with python-ags4 on real files (#1109).** Name a file, several files or a directory and it reports each engine's rules, per-rule finding counts and the parity verdict, with the same flags and output as `laterite-ags4-forge check`. Both commands now run the same code in `laterite-ags4-parity`. The demo-state sweep uses it, so the `parity` workflow no longer builds forge."
-      },
-      {
-        "text": "**`laterite-ags4-parity` and `laterite-cliutil` join the crates.io publish set (#1108).** `laterite-ags4-parity` (the laterite/python-ags4 verdict model and the oracle that runs python-ags4) and `laterite-cliutil` (the shared CLI table, spinner, colour gate and report contract) carry their own versions, starting at 0.1.0, and are released like the other engine crates. Both declare `rust-version` 1.88, which `comfy-table` 8 requires. The oracle no longer looks for its wrapper script beside the crate: `check::build_oracle` and `check::run` take the wrapper and the uv project that runs it from the caller."
-      },
-      {
-        "text": "**`laterite-ags4-parity`: `check::run_with` takes the caller's oracle (#1157).** It is `check::run` for a caller that probes python-ags4 itself, for instance to say why it is missing: it takes an `Option<&PyOracle>`, never runs a self-check of its own, and with `None` checks Rust-only without printing a note. The reports and exit codes match `check::run`, which is unchanged."
-      }
-    ],
-    "changed": [
-      {
-        "text": "**Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at."
-      },
-      {
-        "text": "**`Ags4File.validate()` no longer parses the file a second time.** It judges the parse `read()` already holds, so validating a handle costs the rule pass and little more memory. It therefore reports on the bytes the handle was read from, even if the file has changed on disk since. Passing an `encoding=` other than `read()`'s, or offering a certificate, still reads the source again."
-      },
-      {
-        "text": "**A keyed frame no longer goes through DuckDB.** `table(code, keys=True)`, `ags[code]` on a `read(keys=True)` handle, and the default `xn=\"string\"` mode build the frame straight from Arrow, as the unkeyed read already did, so fetching a group no longer leaves a DuckDB copy of it on the handle until `close()`. `sql()`, `.at()` and `.connection` load groups into the engine as before."
-      },
-      {
-        "text": "**`sql()` and `query(...).relation()` load only the groups the statement names (#1092).** A one-table query on a large file used to copy every group into DuckDB first; now it costs what its own tables cost. DuckDB's own parser reports the names. Where it cannot (`JOIN … USING`, several statements, a catalog query such as `SHOW TABLES`), every group is loaded, as before, so no result changes. SQL chained onto a returned relation that names a group the statement didn't needs a fresh `ags.sql()`; `.connection` still loads every group."
-      },
-      {
-        "text": "**`to_duckdb()` writes each group straight into the output file (#1095).** `Ags4File.to_duckdb(path)` and `laterite.to_duckdb(source, output)` used to load every group into the handle's DuckDB engine and then copy each one across, so the write held a copy of every group at once and left them all on the handle afterwards. Now groups go into the file one at a time and the handle's engine is left as it was. The output's tables, column types and `_id`/`_parent_id` values are unchanged. The write uses less memory and can take a little longer."
-      },
-      {
-        "text": "**A `Report` builds its findings on request.** The finding list, `to_json()` and `to_ndjson()` are rendered when called rather than held by every report, so a file with very many findings no longer costs memory for shapes nobody reads. Each call renders anew; keep the result if you need it twice. `read()` likewise no longer keeps a per-group list of line numbers; `line_numbers(code)` builds it when called."
-      },
-      {
-        "text": "**`certify()` after `validate(fyi=True)` runs the rules once (#1096).** `Ags4File.certify()` and `certify_bytes()` mint from the handle's latest report when that run had every tier on, used the same edition, dictionary and encoding, and had no `check_files`, instead of validating again. The report is the engine's own output on this handle, not a verdict the caller passes in, and it is used only if the source still parses exactly as the handle read it. Otherwise `certify()` validates as before. A report with errors still refuses with the same error, and the certificate is the same either way."
-      },
-      {
-        "text": "**`validate(path, index=…)` no longer holds the whole file to check the certificate (#1097).** A certificate of another size is reported stale before the file is read. When the certificate vouches, the SHA-256 is computed as the file streams, so the check's memory no longer grows with the file. The file is read whole only when the rules have to run. Verdicts and `revalidate_reason` are unchanged."
-      },
-      {
-        "text": "**Breaking: `laterite-ags4-validator` 0.21 caps findings in the engine (#1089).** `CheckOptions` gains `max_findings_per_rule` and is now `#[non_exhaustive]`: build it from `CheckOptions::default()` and set fields, since a struct literal no longer compiles outside the crate. `check_parsed`, `check_parsed_with_dict` and `check_file_with_dict` return `findings::Collected` (the kept `findings` plus the `truncated` map) where they returned `Findings`. `Verdict::of` takes the `Truncated` map as a second argument, and `findings_json`, `findings_json_value` and `findings_ndjson` take it too. Rule functions take any `findings::Sink`, which a plain `Findings` map still is. `check_file` keeps its signature and always keeps every finding. `laterite-ags4-trust` 0.19 adds `Outcome::truncated`. `laterite-ags4-emit` 0.20.5 and `laterite-ags4-hostopts` 0.3.4 ride along, because their published pins froze `^0.20`.",
-        "breaking": true
-      },
-      {
-        "text": "**The vendored python-ags4 test corpus moved to `rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/` (#1110).** It sat under `laterite-ags4-forge/`, but this repo's own gates read it. It now sits beside the drift baseline frozen over it, with the files unchanged. The validator's fixture-corpus invariant test read a path that never existed and skipped, so it never checked a file. It now reads the corpus and fails if it is missing."
-      },
-      {
-        "text": "**A vouched `--index` validate hashes the file as it streams on every surface, and a handle read with a cert keeps its run for `certify()` (#1131).** `lat validate --index`, Node's `validate(file, { index })` and the `laterite` crate's `validate(path).index(..)` no longer hold the whole file when the certificate vouches, as Python's `validate(path, index=)` already did not. The Python and Node `lat validate --index` no longer build a handle first, so a vouched run never parses the file and hashes it once. In Python, a handle read with `index=` whose cert cannot answer `validate()` runs the rules on the parse it holds, so a following `certify()` reuses that run instead of running the rules a second time."
-      }
-    ],
+    "added": [],
+    "changed": [],
     "deprecated": [],
-    "removed": [
-      {
-        "text": "**Breaking: the browser package's `maxPerRule` option is gone (#1089).** `validate(bytes, { maxFindingsPerRule: N })` replaces it. `maxPerRule` clipped only what crossed into JavaScript, after the engine had kept every finding, so a dirty file still filled the engine's memory. `maxFindingsPerRule` stops a rule keeping findings past the cap and only counts the rest, so memory stays bounded and the totals stay true. Passing `maxPerRule` is now refused as an unknown option, with the accepted options listed.",
-        "breaking": true
-      },
-      {
-        "text": "**`laterite-ags4-forge` leaves this repo for [niko86/laterite-forge](https://github.com/niko86/laterite-forge) (#1111).** Forge was never published from here; its code, history and design pages now live in that repo, which releases its binaries. The perf workflows and bench tools here run its pinned release binary through `tools/fetch_forge.py`, which checks the download against the release's `SHA256SUMS`, and never build it. The fixtures that binary mints match the hashes pinned in `tools/readme-bench-fixtures.json` unchanged."
-      }
-    ],
-    "fixed": [
-      {
-        "text": "**A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists."
-      },
-      {
-        "text": "**The nightly `docs-vs-released-duckdb` gate no longer fails on a NULL `_id`.** Since extension 0.15.0 a group the file's own DICT declares with no KEY heading reads with a NULL `_id`; the checker's JSON schema could not represent that and failed the whole run before comparing anything. It now parses the null, ignores it on a non-registry group (the reference mints no ids there), and reports it as a mismatch on a registry group."
-      },
-      {
-        "text": "**The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings."
-      },
-      {
-        "text": "**`.at(group, …)` raises `ValueError` when no group in the file carries `{group}_ID` (#1093).** It used to filter nothing and return every row. `.at(\"GEOL\", [\"BH01\"])` gave every borehole's geology, because no AGS group has a `GEOL_ID`. Code that loops over files should check `group in ags` first."
-      },
-      {
-        "text": "**Node `at()` throws when no group in the file carries `{group}_ID`, and can filter on row identity with `{ by: \"_id\" }`.** The Node half of #1093, matching Python. `at(\"GEOL\", …)` used to return every row, because no AGS group has a `GEOL_ID`; it now throws an `Ags4Error`. A `null` value warns, since a blank ID matches no row. `at(\"SAMP\", ids, { by: \"_id\" })` keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child the file's DICT declares. Once a subset filters by `_id`, `table(code)` rejects for a group no filter reaches, and `groups` leaves out a child with no ids. The exported `Filter` tuple is now `[group, by, values]`."
-      },
-      {
-        "text": "**A dev or build of the browser app no longer rewrites its vendored icons (#1106).** The committed icons carried an older `lucide-static` licence header than the lockfile pins, so every build changed all of them. They now match the locked version, and CI fails when `sync-assets` would change any committed copy it maintains."
-      },
-      {
-        "text": "**Certifying the same file twice gives byte-identical `.ags.idx` files (#1132).** The certificate's `groups` index was written in hash-map order, which changes from one process to the next, so two certificates with the same content differed in bytes and could not be compared by hash. Groups are now written sorted by code. Existing certificates still read and stay fresh."
-      },
-      {
-        "text": "**`laterite-ags4-parity`: a python-ags4 self-check that never answers no longer hangs its caller (#1158).** `PyOracle::selfcheck` waited on `uv run` with no bound, so a stalled `uv sync` or a python blocking on import hung `build_oracle` and everything that probes the oracle. It now has its own bound, `DEFAULT_PROBE_TIMEOUT` (set another with `PyOracle::with_probe_timeout`), longer than any per-file run because the first `uv run` on a fresh checkout installs the project. An expiry returns `OracleError::Unavailable` naming the timeout, so callers fall back to Rust-only."
-      }
-    ],
-    "security": [
-      {
-        "text": "**`rust_xlsxwriter` moves to 0.100, which writes XLSX through `zip` 9.** Three `zip` 8 advisories (RUSTSEC-2026-0367, -0368, -0369) cover archive extraction to disk. `calamine` still needs `zip` 8 to read XLSX, but it only reads entries in memory and never calls the affected `extract()`, so `cargo deny` now lists the three IDs as documented exceptions until `calamine` moves to `zip` 9."
-      }
-    ]
+    "removed": [],
+    "fixed": [],
+    "security": []
   },
   "releases": [
+    {
+      "version": "0.16.0",
+      "date": "2026-10-23",
+      "summary": "",
+      "added": [
+        {
+          "text": "**`.at()` can filter on row identity: `ags.at(\"SAMP\", ids, by=\"_id\")` (#1093).** It keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child group the file's own DICT declares. Use it where `{group}_ID` is optional or absent: a blank `SAMP_ID` made `.at(\"SAMP\", …)` miss the children, and only raw SQL could reach them. Once a query filters by `_id`, `q[code]` raises for a group no filter reaches (the parent, a sibling, a grandchild) rather than return every row, and `.groups` leaves out a child with no ids. Under the default `by`, a `None` value warns, since a blank ID matches no row. It applies to `q[code]` and `q.frames()`. On a `.query()` base it raises, because that SQL names no group to tell `_id` from `_parent_id` by."
+        },
+        {
+          "text": "**`laterite-ags4-trust`: `check_parsed_measured` and `mint_measured` (#1096).** The first is `check_parsed` that also returns an opaque `Measurement` for a run with every tier on and no world check. The second mints from that measurement when it answers the mint's question for the same parse, and otherwise runs the engine as `mint` does. It returns a `Minted` carrying the result and whether the engine ran."
+        },
+        {
+          "text": "**`laterite-ags4-trust`: `check_reader` (#1097), and `laterite-ags4-core`: `Sidecar::is_fresh_for_reader` and `Sidecar::answers`.** `check_reader` is `check` for a file it reads itself: a certificate of another size is settled before any byte is read, and one that would vouch is checked against a hash taken as the file streams, so the file is never held. Same verdict and `revalidate_reason` as `check`. `ReaderRequest::named` makes a stale certificate the error `ReaderError::StaleCert`. `is_fresh_for_reader` is `is_fresh_for` over a stream; `answers` is `decide` without the format, size and content gates."
+        },
+        {
+          "text": "**A per-rule findings cap on every validate door (#1089).** `validate(..., max_findings_per_rule=N)` and `Ags4File.validate(max_findings_per_rule=N)` in Python, `lat validate --max-findings-per-rule N`, `{ maxFindingsPerRule: N }` in Node and the browser package, and `Validate::max_findings_per_rule` on the Rust facade. A rule keeps its first N findings and only counts the rest, so a file whose one defect repeats on every line no longer holds every finding in memory. The verdict, the exit code, `count` and the per-tier counts still cover every finding. `Report.truncated` (Python and Node), `report.truncated` (browser) and `Report::truncated` (facade) name the rules that were cut as `{rule: {shown, total}}`. The browser's map also names a rule that only its own cap on the rows it returns cut, with `shown` the rows returned (#1129). The JSON report gains a `truncated` key and the NDJSON report ends with one `{\"truncated\": ...}` record, both only when a rule was cut. `0` keeps no findings, only the counts. The default is no cap, and an uncapped report is unchanged. A capped run mints the same certificate as an uncapped one."
+        },
+        {
+          "text": "**`laterite-ags4-corpus-qa check` compares laterite with python-ags4 on real files (#1109).** Name a file, several files or a directory and it reports each engine's rules, per-rule finding counts and the parity verdict, with the same flags and output as `laterite-ags4-forge check`. Both commands now run the same code in `laterite-ags4-parity`. The demo-state sweep uses it, so the `parity` workflow no longer builds forge."
+        },
+        {
+          "text": "**`laterite-ags4-parity` and `laterite-cliutil` join the crates.io publish set (#1108).** `laterite-ags4-parity` (the laterite/python-ags4 verdict model and the oracle that runs python-ags4) and `laterite-cliutil` (the shared CLI table, spinner, colour gate and report contract) carry their own versions, starting at 0.1.0, and are released like the other engine crates. Both declare `rust-version` 1.88, which `comfy-table` 8 requires. The oracle no longer looks for its wrapper script beside the crate: `check::build_oracle` and `check::run` take the wrapper and the uv project that runs it from the caller."
+        },
+        {
+          "text": "**`laterite-ags4-parity`: `check::run_with` takes the caller's oracle (#1157).** It is `check::run` for a caller that probes python-ags4 itself, for instance to say why it is missing: it takes an `Option<&PyOracle>`, never runs a self-check of its own, and with `None` checks Rust-only without printing a note. The reports and exit codes match `check::run`, which is unchanged."
+        }
+      ],
+      "changed": [
+        {
+          "text": "**Every package listing now links to the documentation site.** The crates.io facade carries `homepage` and `documentation`, the PyPI project a `Documentation` URL, and the npm package a docs homepage and an issues link — the same destinations the wasm package already pointed at."
+        },
+        {
+          "text": "**`Ags4File.validate()` no longer parses the file a second time.** It judges the parse `read()` already holds, so validating a handle costs the rule pass and little more memory. It therefore reports on the bytes the handle was read from, even if the file has changed on disk since. Passing an `encoding=` other than `read()`'s, or offering a certificate, still reads the source again."
+        },
+        {
+          "text": "**A keyed frame no longer goes through DuckDB.** `table(code, keys=True)`, `ags[code]` on a `read(keys=True)` handle, and the default `xn=\"string\"` mode build the frame straight from Arrow, as the unkeyed read already did, so fetching a group no longer leaves a DuckDB copy of it on the handle until `close()`. `sql()`, `.at()` and `.connection` load groups into the engine as before."
+        },
+        {
+          "text": "**`sql()` and `query(...).relation()` load only the groups the statement names (#1092).** A one-table query on a large file used to copy every group into DuckDB first; now it costs what its own tables cost. DuckDB's own parser reports the names. Where it cannot (`JOIN … USING`, several statements, a catalog query such as `SHOW TABLES`), every group is loaded, as before, so no result changes. SQL chained onto a returned relation that names a group the statement didn't needs a fresh `ags.sql()`; `.connection` still loads every group."
+        },
+        {
+          "text": "**`to_duckdb()` writes each group straight into the output file (#1095).** `Ags4File.to_duckdb(path)` and `laterite.to_duckdb(source, output)` used to load every group into the handle's DuckDB engine and then copy each one across, so the write held a copy of every group at once and left them all on the handle afterwards. Now groups go into the file one at a time and the handle's engine is left as it was. The output's tables, column types and `_id`/`_parent_id` values are unchanged. The write uses less memory and can take a little longer."
+        },
+        {
+          "text": "**A `Report` builds its findings on request.** The finding list, `to_json()` and `to_ndjson()` are rendered when called rather than held by every report, so a file with very many findings no longer costs memory for shapes nobody reads. Each call renders anew; keep the result if you need it twice. `read()` likewise no longer keeps a per-group list of line numbers; `line_numbers(code)` builds it when called."
+        },
+        {
+          "text": "**`certify()` after `validate(fyi=True)` runs the rules once (#1096).** `Ags4File.certify()` and `certify_bytes()` mint from the handle's latest report when that run had every tier on, used the same edition, dictionary and encoding, and had no `check_files`, instead of validating again. The report is the engine's own output on this handle, not a verdict the caller passes in, and it is used only if the source still parses exactly as the handle read it. Otherwise `certify()` validates as before. A report with errors still refuses with the same error, and the certificate is the same either way."
+        },
+        {
+          "text": "**`validate(path, index=…)` no longer holds the whole file to check the certificate (#1097).** A certificate of another size is reported stale before the file is read. When the certificate vouches, the SHA-256 is computed as the file streams, so the check's memory no longer grows with the file. The file is read whole only when the rules have to run. Verdicts and `revalidate_reason` are unchanged."
+        },
+        {
+          "text": "**Breaking: `laterite-ags4-validator` 0.21 caps findings in the engine (#1089).** `CheckOptions` gains `max_findings_per_rule` and is now `#[non_exhaustive]`: build it from `CheckOptions::default()` and set fields, since a struct literal no longer compiles outside the crate. `check_parsed`, `check_parsed_with_dict` and `check_file_with_dict` return `findings::Collected` (the kept `findings` plus the `truncated` map) where they returned `Findings`. `Verdict::of` takes the `Truncated` map as a second argument, and `findings_json`, `findings_json_value` and `findings_ndjson` take it too. Rule functions take any `findings::Sink`, which a plain `Findings` map still is. `check_file` keeps its signature and always keeps every finding. `laterite-ags4-trust` 0.19 adds `Outcome::truncated`. `laterite-ags4-emit` 0.20.5 and `laterite-ags4-hostopts` 0.3.4 ride along, because their published pins froze `^0.20`.",
+          "breaking": true
+        },
+        {
+          "text": "**The vendored python-ags4 test corpus moved to `rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests/` (#1110).** It sat under `laterite-ags4-forge/`, but this repo's own gates read it. It now sits beside the drift baseline frozen over it, with the files unchanged. The validator's fixture-corpus invariant test read a path that never existed and skipped, so it never checked a file. It now reads the corpus and fails if it is missing."
+        },
+        {
+          "text": "**A vouched `--index` validate hashes the file as it streams on every surface, and a handle read with a cert keeps its run for `certify()` (#1131).** `lat validate --index`, Node's `validate(file, { index })` and the `laterite` crate's `validate(path).index(..)` no longer hold the whole file when the certificate vouches, as Python's `validate(path, index=)` already did not. The Python and Node `lat validate --index` no longer build a handle first, so a vouched run never parses the file and hashes it once. In Python, a handle read with `index=` whose cert cannot answer `validate()` runs the rules on the parse it holds, so a following `certify()` reuses that run instead of running the rules a second time."
+        }
+      ],
+      "deprecated": [],
+      "removed": [
+        {
+          "text": "**Breaking: the browser package's `maxPerRule` option is gone (#1089).** `validate(bytes, { maxFindingsPerRule: N })` replaces it. `maxPerRule` clipped only what crossed into JavaScript, after the engine had kept every finding, so a dirty file still filled the engine's memory. `maxFindingsPerRule` stops a rule keeping findings past the cap and only counts the rest, so memory stays bounded and the totals stay true. Passing `maxPerRule` is now refused as an unknown option, with the accepted options listed.",
+          "breaking": true
+        },
+        {
+          "text": "**`laterite-ags4-forge` leaves this repo for [niko86/laterite-forge](https://github.com/niko86/laterite-forge) (#1111).** Forge was never published from here; its code, history and design pages now live in that repo, which releases its binaries. The perf workflows and bench tools here run its pinned release binary through `tools/fetch_forge.py`, which checks the download against the release's `SHA256SUMS`, and never build it. The fixtures that binary mints match the hashes pinned in `tools/readme-bench-fixtures.json` unchanged."
+        }
+      ],
+      "fixed": [
+        {
+          "text": "**A `v*` release tag now publishes to crates.io, as it already did to PyPI.** The release run dispatches the crates.io publish for the engine crates the cut stamped and the facade, so a release no longer needs a by-hand `publish-crates.yml` dispatch. `cut-release.sh X --ship` cuts every product tag on the merged release commit in one command, refusing to run off `main`, off the `release: X` commit, or on a facade stamped another version, and skipping a tag that already exists."
+        },
+        {
+          "text": "**The nightly `docs-vs-released-duckdb` gate no longer fails on a NULL `_id`.** Since extension 0.15.0 a group the file's own DICT declares with no KEY heading reads with a NULL `_id`; the checker's JSON schema could not represent that and failed the whole run before comparing anything. It now parses the null, ignores it on a non-registry group (the reference mints no ids there), and reports it as a mismatch on a registry group."
+        },
+        {
+          "text": "**The browser app's joins match a child to its parent when an optional KEY heading is blank (#1100).** The example `CHILD ⋈ PARENT` queries, the stratum template and the SQL and chart builders compared each KEY heading with `=`. A blank `SAMP_ID` reads as null, and null never equals null, so every `LLPL` row came back without its `SAMP` data and nothing said why. Each KEY pair is now joined with `IS NOT DISTINCT FROM`, which treats two nulls as a match; the SQL still names the KEY headings."
+        },
+        {
+          "text": "**`.at(group, …)` raises `ValueError` when no group in the file carries `{group}_ID` (#1093).** It used to filter nothing and return every row. `.at(\"GEOL\", [\"BH01\"])` gave every borehole's geology, because no AGS group has a `GEOL_ID`. Code that loops over files should check `group in ags` first."
+        },
+        {
+          "text": "**Node `at()` throws when no group in the file carries `{group}_ID`, and can filter on row identity with `{ by: \"_id\" }`.** The Node half of #1093, matching Python. `at(\"GEOL\", …)` used to return every row, because no AGS group has a `GEOL_ID`; it now throws an `Ags4Error`. A `null` value warns, since a blank ID matches no row. `at(\"SAMP\", ids, { by: \"_id\" })` keeps the `SAMP` rows whose `_id` is in `ids` and the rows of SAMP's direct children whose `_parent_id` is, including a child the file's DICT declares. Once a subset filters by `_id`, `table(code)` rejects for a group no filter reaches, and `groups` leaves out a child with no ids. The exported `Filter` tuple is now `[group, by, values]`."
+        },
+        {
+          "text": "**A dev or build of the browser app no longer rewrites its vendored icons (#1106).** The committed icons carried an older `lucide-static` licence header than the lockfile pins, so every build changed all of them. They now match the locked version, and CI fails when `sync-assets` would change any committed copy it maintains."
+        },
+        {
+          "text": "**Certifying the same file twice gives byte-identical `.ags.idx` files (#1132).** The certificate's `groups` index was written in hash-map order, which changes from one process to the next, so two certificates with the same content differed in bytes and could not be compared by hash. Groups are now written sorted by code. Existing certificates still read and stay fresh."
+        },
+        {
+          "text": "**`laterite-ags4-parity`: a python-ags4 self-check that never answers no longer hangs its caller (#1158).** `PyOracle::selfcheck` waited on `uv run` with no bound, so a stalled `uv sync` or a python blocking on import hung `build_oracle` and everything that probes the oracle. It now has its own bound, `DEFAULT_PROBE_TIMEOUT` (set another with `PyOracle::with_probe_timeout`), longer than any per-file run because the first `uv run` on a fresh checkout installs the project. An expiry returns `OracleError::Unavailable` naming the timeout, so callers fall back to Rust-only."
+        }
+      ],
+      "security": [
+        {
+          "text": "**`rust_xlsxwriter` moves to 0.100, which writes XLSX through `zip` 9.** Three `zip` 8 advisories (RUSTSEC-2026-0367, -0368, -0369) cover archive extraction to disk. `calamine` still needs `zip` 8 to read XLSX, but it only reads entries in memory and never calls the affected `extract()`, so `cargo deny` now lists the three IDs as documented exceptions until `calamine` moves to `zip` 9."
+        }
+      ]
+    },
     {
       "version": "0.15.0",
       "date": "2026-10-12",

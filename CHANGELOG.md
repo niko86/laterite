@@ -13,8 +13,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 | version | change |
 |---|---|
-| [Unreleased](#unreleased) | `laterite-ags4-validator` 0.21 caps findings in the engine (#1089). |
-| [Unreleased](#unreleased) | the browser package's `maxPerRule` option is gone (#1089). |
+| [0.16.0](#0160--2026-10-23) | `laterite-ags4-validator` 0.21 caps findings in the engine (#1089). |
+| [0.16.0](#0160--2026-10-23) | the browser package's `maxPerRule` option is gone (#1089). |
 | [0.14.0](#0140--2026-10-08) | the browser package's `compute_fixes` takes an options object |
 | [0.13.0](#0130--2026-09-30) | the parse leaf's cells are spans over one retained decoded buffer. |
 | [0.13.0](#0130--2026-09-30) | core’s read projection hands out spans behind accessors — `AgsGroup`’s public fields are gone. |
@@ -33,6 +33,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 | [0.6.0](#060--2026-07-04) | The 174 typed-graph classes moved to the `laterite.groups` submodule. |
 
 ## [Unreleased]
+
+## [0.16.0] — 2026-10-23
 
 ### Added
 
@@ -604,7 +606,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/niko86/laterite/releases/tag/v0.16.0
 [0.15.0]: https://github.com/niko86/laterite/releases/tag/v0.15.0
 [0.14.1]: https://github.com/niko86/laterite/releases/tag/v0.14.1
 [0.14.0]: https://github.com/niko86/laterite/releases/tag/v0.14.0
