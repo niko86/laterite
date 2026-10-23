@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.15.0"]
+# dependencies = ["laterite==0.16.0"]
 # ///
 """Docs example — run it with `uv run ex20_registry_graph.py`, from anywhere.
 

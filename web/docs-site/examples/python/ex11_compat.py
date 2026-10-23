@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite[compat]==0.15.0"]
+# dependencies = ["laterite[compat]==0.16.0"]
 # ///
 """Docs example — run it with `uv run ex11_compat.py`, from anywhere.
 
