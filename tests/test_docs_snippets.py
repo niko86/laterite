@@ -87,8 +87,12 @@ MARKER = re.compile(
 #: exactly like a fence nobody marked. One marker per JOB: `code` and `output`
 #: belong to `gen_doc_outputs.py`, whose own sweep walks the docs-site tree
 #: only, so those are attributed inside it and unread anywhere else this
-#: gate's wider corpus reaches (the READMEs, COMPAT.md).
-DOC_MARKER = re.compile(r"<!--\s*doc-(?P<job>[a-z-]+)\s*:(?P<rest>[^\n]*?)-->")
+#: gate's wider corpus reaches (the READMEs, COMPAT.md). It spans lines on
+#: purpose, unlike every reader: a wrapped marker is one no reader matches, so the
+#: sweep must see it to name it (#1164).
+DOC_MARKER = re.compile(
+    r"<!--\s*doc-(?P<job>[a-z-]+)\s*:(?P<rest>(?:(?!-->).)*?)-->", re.S
+)
 CENSUS_JOBS = {"code", "output"}
 #: The other doc-snippet reader's fence shape, for attribution only: a marker
 #: above a js/ts fence on a docs-site page is that gate's to act on.
@@ -152,7 +156,11 @@ def _scan_markers(text: str, in_docs: bool) -> tuple[int, int, list[str]]:
         seen += 1
         job = m.group("job")
         line = text[: m.start()].count("\n") + 1
-        if job == "snippet" and MARKER.match(text, m.start()):
+        if "\n" in m.group(0):
+            unread.append(
+                f"line {line}: `doc-{job}:` wraps across lines — no reader matches it"
+            )
+        elif job == "snippet" and MARKER.match(text, m.start()):
             if in_window(m, py_starts):
                 continue  # mine, and acted on
             if in_docs and in_window(m, node_starts):
@@ -199,6 +207,19 @@ def test_a_typoed_marker_is_named_not_ignored() -> None:
     assert (seen, attributed) == (1, 0)
     assert len(unread) == 1
     assert "doc-snipet" in unread[0]
+
+
+def test_a_marker_wrapped_across_lines_is_named_not_ignored() -> None:
+    # Every reader matches a marker on ONE line, so a wrapped one was read by
+    # nobody and reported by nobody: README's upstream-imports fence ran as code
+    # until a release night made the failure fatal (#1164).
+    seen, attributed, unread = _scan_markers(
+        "<!-- doc-snippet: skip — a reason\n   that wraps -->\n```python\nprint(1)\n```\n",
+        True,
+    )
+    assert (seen, attributed) == (1, 0)
+    assert len(unread) == 1
+    assert "wraps" in unread[0]
 
 
 def test_my_own_marker_in_its_window_is_acted_on_not_reported() -> None:

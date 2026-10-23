@@ -164,6 +164,8 @@ Key facts:
   A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
   reason likewise mandatory) exempts a fence from execution but never from
   resolution — the `dictionary=` typo lived in a block that would carry one.
+  It must sit on ONE line: every reader matches it that way, so a wrapped
+  marker exempts nothing, and the marker sweep names it as unread (#1164).
 - **Node's literal fences, and the two-gate split.** The same hole existed one
   surface along: 11 hand-typed fences plus the npm landing page's 4, none
   executed. `repo:rust-packages/laterite-node/test/docs-snippets.test.ts` closes
