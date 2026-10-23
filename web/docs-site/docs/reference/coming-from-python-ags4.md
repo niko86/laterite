@@ -16,6 +16,7 @@ For the task-shaped version (_how do I do X with the drop-in_), see
 pip install laterite[compat]
 ```
 
+<!-- doc-snippet: skip — the "before" line is UPSTREAM's import; `python_ags4` deliberately does not ship here (see below), so running this fence asserts the opposite of what it teaches -->
 ```python
 from python_ags4 import AGS4          # before
 from laterite.compat import AGS4      # after
