@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import NoReturn
 
 #: The pinned forge release. One line, on purpose — see the module docstring.
-FORGE_VERSION = "v0.1.0"
+FORGE_VERSION = "v0.2.0"
 
 REPO_URL = "https://github.com/niko86/laterite-forge"
 BIN = "laterite-ags4-forge"
