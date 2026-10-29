@@ -34,6 +34,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Security
+
+- **`zstd` moves to 0.14.3 (`zstd-safe` 8.2.0, `zstd-sys` 2.1.2), clearing four advisories (RUSTSEC-2026-0391, -0398, -0403, -0410).** None reaches laterite: `laterite-transport` compresses with `zstd::encode_all` and `decode_all`, which they do not affect, and the wasm build carries no zstd. A fifth, RUSTSEC-2026-0387 in `crypto-bigint` 0.5, arrives through `age`'s P-256 code, which the scrypt-only passphrase envelope never runs. `age` 0.12.1 is its latest release and offers no way out, so `cargo deny` lists it as a documented exception.
+
 ## [0.16.0] — 2026-10-23
 
 ### Added

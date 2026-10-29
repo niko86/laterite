@@ -24,6 +24,13 @@ ignore = [
     "RUSTSEC-2026-0367", # zip: SUID/SGID bits kept on extract
     "RUSTSEC-2026-0368", # zip: extract writes symlinks outside the destination
     "RUSTSEC-2026-0369", # zip: extract applies permissions through symlinks
+    # --- crypto-bigint 0.5 timing side channels, fixed in 0.7.6. It arrives via
+    # age → p256 (directly and through hpke). laterite-transport only ever
+    # builds age's scrypt recipient and identity, and refuses a non-scrypt
+    # envelope before decrypting, so no P-256 arithmetic runs on its secrets.
+    # age 0.12.1, its latest release, requires p256 ^0.13 with no feature to
+    # turn it off. Drop this when age moves past it.
+    "RUSTSEC-2026-0387", # crypto-bigint (via age's p256)
 ]
 
 [licenses]
