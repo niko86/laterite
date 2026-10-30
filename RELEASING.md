@@ -387,10 +387,12 @@ confirm after a release, and step 6 above says so.
 
 - **Drift-gate** `test_version_faithful.py`: reads the source files (no build)
   and fails CI if the shipped wheel version, the Rust workspace version, the npm
-  `package.json` version, its three `@laterite/native-*` pins, or the compat
-  `__version__` prefix in
+  `package.json` version, or the compat `__version__` prefix in
   `packages/laterite/python/laterite/compat/_impl.py` ever disagree — the net
-  for a bump that missed a surface.
+  for a bump that missed a surface. It also fails if `@laterite/native-*` pins
+  reappear in `package.json` (napi writes them at publish time, see
+  RELEASING-node.md) or if `napi.targets` stops matching `release.yml`'s
+  `build-node` matrix.
 - **Guard test** `test_compat_python_ags4_pin_stays_in_sync`: fails CI if the
   shipped version carries a PEP 440 `+local` segment (PyPI rejects those), if
   `compat.__version__`'s prefix drifts from the shipped version, or if the

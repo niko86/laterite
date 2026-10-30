@@ -251,9 +251,11 @@ also needs the ladder manifest (`tools/perf-ladder.py`).
 
 ## Distribution (P4)
 
-Ships as **`laterite`** on npm (unscoped); the native binary ships as three
-scoped platform packages `@laterite/native-{darwin-arm64,linux-x64-gnu,
-win32-x64-msvc}` (set via napi `packageName`), auto-selected through
+Ships as **`laterite`** on npm (unscoped); the native binary ships as one
+scoped platform package per `napi.targets` entry in
+`repo:rust-packages/laterite-node/package.json`
+(`@laterite/native-{darwin-arm64,linux-x64-gnu,linux-arm64-gnu,win32-x64-msvc}`,
+set via napi `packageName`), auto-selected through
 `optionalDependencies`. The TS layer is a **dual ESM+CJS** bundle (`tsup` →
 `dist/index.{mjs,cjs}` + `.d.ts`), and the napi loader is reached through a Node
 subpath-import (`#native`, the package.json `imports` field) so the seam

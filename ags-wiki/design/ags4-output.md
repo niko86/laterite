@@ -89,6 +89,11 @@ a **valid file in one call** instead of Rule 14/15/17 findings:
   fields the build can't know (`TRAN_PROD`/`TRAN_RECV`/`TRAN_STAT`, the date) as
   `"TBC"`/placeholder values for the caller to overwrite (**owner decision,
   2026-06-25** — stub-with-placeholders over leave-as-a-finding).
+  > [!note] **Reversed 2026-07-30 (#178).** A `TBC` stub still satisfies Rule 14,
+  > so a recipient could not tell an invented TRAN from a real one. TRAN is now
+  > written only from a caller-supplied `TranStamp`; with none, no TRAN is
+  > emitted and Rule 14 reports it (`EmitOpts::tran` in
+  > `repo:rust-packages/laterite-ags4-emit/src/emit.rs`).
 - **ABBR** — synthesized too, but only when the data uses PA picklist codes (Rule
   16): one row per distinct `(heading, code)` (PA cells split on the `TRAN_RCON`
   concatenator like Rule 16a), `ABBR_DESC` from the standard ABBR table via
@@ -96,8 +101,10 @@ a **valid file in one call** instead of Rule 14/15/17 findings:
 - **PROJ** is never synthesized (real project identity, not derivable) → a missing
   PROJ stays a Rule 13 finding.
 
-One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs::synthesise_metadata`
-(a new step before `write_ags4`, gated to AutoFix), so **all four surfaces** (PyO3,
+One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs::SynthAccumulator`
+(a new step before `write_ags4`, gated to AutoFix — the batch `synthesise_metadata`
+of this update has since become this streaming accumulator, pinned against the batch
+computation), so **all four surfaces** (PyO3,
 Node, both wasm paths) inherit it with zero per-binding work; `"report"`/`"strict"`
 are unchanged (they show/reject the gaps). Mirrors the existing forge synthesizer
 ([`src/synth/model.rs`](https://github.com/niko86/laterite-forge/blob/main/src/synth/model.rs) in niko86/laterite-forge, `collect_unit`/`collect_type`/`tran`)
@@ -161,7 +168,8 @@ behaviour needs a test as much as its presence does.
 
 The derivable/authorial boundary is unchanged and worth restating: UNIT and TYPE
 are pure functions of the data, ABBR comes from the standard table and only when PA
-codes are used, TRAN is a placeholder stub. **PROJ and DICT are never synthesised**
+codes are used, TRAN was a placeholder stub (since 2026-07-30, #178, it comes only
+from a caller-supplied `TranStamp` — see the note above). **PROJ and DICT are never synthesised**
 — a project identity and a schema extension are authorial facts, and a guessed
 `DICT_PGRP` would turn a loud Rule 18 error into a silent false statement about the
 data model that Rule 10's relational checks then trust.

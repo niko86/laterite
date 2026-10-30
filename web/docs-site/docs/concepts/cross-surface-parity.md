@@ -16,15 +16,18 @@ findings to compare. Its agreement is proven on what it actually does: that its
 ## How it's proven
 
 A **compliance harness** turns "the same engine" into a checkable property. Over a
-real corpus of AGS4 files, it runs every read surface and reduces each to the same
-currency (the set of `"AGS Format Rule N"` labels that fired), then asserts:
+real corpus of AGS4 files, it runs every read surface over the same files, then
+asserts:
 
 1. **The laterite surfaces agree exactly.** rust, python-laterite, node and wasm
-   must report a **byte-identical** rule floor on every file. A mismatch is a
-   binding or serialization bug, and it fails the check.
+   must report **identical findings** on every file: every rule, line, group,
+   message and field position, the same number of times. Agreeing on which rules
+   fired is not enough. A mismatch is a binding or serialization bug, and it fails
+   the check.
 2. **python-ags4 agrees, modulo the documented divergences.** The incumbent
-   `python-ags4` is compared too; the handful of deliberate, catalogued
-   differences reconcile, and only an _unexplained_ difference is flagged.
+   `python-ags4` is compared too, on which `"AGS Format Rule N"` labels fired
+   (all it reports). The handful of deliberate, catalogued differences reconcile,
+   and only an _unexplained_ difference is flagged.
 
 This runs two ways: a **per-PR gate** (the four in-repo surfaces, on every change
 that could move a finding) and a **full-matrix report** (all six, including the

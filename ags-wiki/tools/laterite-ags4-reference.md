@@ -179,14 +179,15 @@ set.
 
 ## Where it lives
 
-`repo:rust-packages/laterite-ags4-reference` — a **true leaf**: `serde` +
-`serde_json` (`preserve_order`, matching core's own pin, so key order stays
-declaration order) + `phf` at runtime, `phf_codegen` + `serde_json` at build
-time — **no workspace-crate dependency**, so it stays wasm-safe and
-embeddable anywhere. [[laterite-ags4-core]] depends on it for the union
-registry; [[laterite-ags4-validator]] depends on it for the dict projection +
-catalogue. Nothing in the leaf depends back on either — that's what keeps it
-a genuine leaf rather than a re-introduced cycle.
+`repo:rust-packages/laterite-ags4-reference` — **not a leaf**, but wasm-safe:
+its only workspace dependencies are the two wasm-clean leaves
+[[laterite-ags4-types]] and [[laterite-ags4-parse]], next to `serde`, `serde_json`
+(`preserve_order`, matching core's own pin, so key order stays declaration order),
+`phf` and a few small hashing/encoding crates at runtime, and `phf_codegen` +
+`serde_json` at build time (`repo:rust-packages/laterite-ags4-reference/Cargo.toml`
+lists them). [[laterite-ags4-core]] depends on it for the union registry;
+[[laterite-ags4-validator]] depends on it for the dict projection + catalogue.
+Nothing in it depends back on either, which keeps the graph acyclic.
 
 **Payoff partly taken (laterite-dev#475 follow-up, laterite-dev#493)**: `laterite-ags4-diff` now
 depends on this leaf directly instead of the whole validator (it only ever
