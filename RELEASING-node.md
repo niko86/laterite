@@ -1,8 +1,9 @@
 # Releasing `laterite` (npm) — platform setup + publish gotchas
 
 **Companion to [`RELEASING.md`](RELEASING.md).** The npm `laterite` package
-(`rust-packages/laterite-node`) ships with three per-platform native packages
-(`@laterite/native-darwin-arm64`, `@laterite/native-linux-x64-gnu`,
+(`rust-packages/laterite-node`) ships with one per-platform native package per
+`napi.targets` entry in its `package.json` (`@laterite/native-darwin-arm64`,
+`@laterite/native-linux-x64-gnu`, `@laterite/native-linux-arm64-gnu`,
 `@laterite/native-win32-x64-msvc`) as `optionalDependencies`. As of #372 it
 **shares the single project version** with the wheel + CLI:
 `tools/release/bump-version.sh` stamps `package.json` and regenerates
@@ -26,7 +27,7 @@ four); after that you add the trusted publishers and npm switches to OIDC
 deleted. `--provenance` works under both.
 
 1. **Create the `@laterite` org** on npm (free, for public packages). Done — it
-   owns the three scoped native packages.
+   owns the scoped native packages.
 2. ~~**Create a classic _Automation_ token**~~ — **NO LONGER POSSIBLE (checked
    2026-07-29).** npm has removed classic tokens from the UI: only *granular*
    access tokens can be created, and npm actively advises against the
@@ -71,7 +72,10 @@ Once the four packages exist on npm:
    Settings → *Trusted Publisher* → GitHub Actions, with Repository = the repo
    hosting `release.yml`, Workflow = `release.yml`, Environment = `npm`.
    **Done** — proven by `node-v0.7.0` and `node-v0.8.0` publishing cleanly on an
-   already-expired token, which only OIDC can explain.
+   already-expired token, which only OIDC can explain. A target added later
+   (`@laterite/native-linux-arm64-gnu`, first published at 0.11.0) needs the
+   same setup after its own first publish; see RELEASING.md on adding a
+   platform target.
 2. Next release uses OIDC with no workflow change (npm prefers the trusted
    publisher when `id-token` is present).
 3. **Delete the token from the job.** Done for `npm-publish` — it passes no
@@ -88,24 +92,24 @@ The npm package publishes on its own tag namespace, **`node-v*`** (a `node-v*`
 tag never builds wheels; a `v*` tag never publishes to npm) — but the version
 number is now unified, so you cut `node-v0.6.0` alongside `v0.6.0` from the same
 release (RELEASING.md step 3). The tag must match `package.json` `"version"` —
-`npm-publish`'s tag-check asserts it; `napi prepublish` syncs the three platform
+`npm-publish`'s tag-check asserts it; `napi pre-publish` syncs the platform
 packages to that version automatically.
 
 The `node-v*` tag triggers `release.yml`:
 
-- **`build-node`** — builds `laterite-node.<triple>.node` on each of the three
-  platform runners (linux/macOS/windows), uploads them as `node-<target>`
-  artifacts.
+- **`build-node`** — builds `laterite-node.<triple>.node` on one runner per
+  `napi.targets` entry (its matrix must match that list), uploads them as
+  `node-<target>` artifacts.
 - **`npm-publish`** (final `node-v*` tags only, no `rc`/`dev`) — downloads the
   artifacts, places them into the `@laterite/native-*` dirs (`napi
-  create-npm-dir` + `napi artifacts`), builds the dual ESM/CJS dist (`tsup`),
-  publishes the platform packages (`napi prepublish`), then `npm publish
+  create-npm-dirs` + `napi artifacts`), builds the dual ESM/CJS dist (`tsup`),
+  publishes the platform packages (`napi pre-publish`), then `npm publish
   --provenance` the main `laterite` package.
   - **The scoped `@laterite/native-*` packages must publish _public_.** Scoped
     packages default to **private** (a paid feature) → `npm publish` fails with
-    **`E402` — "you must sign up for private packages"**. `napi prepublish` has
+    **`E402` — "you must sign up for private packages"**. `napi pre-publish` has
     no `--access` flag, so the root `package.json` carries
-    `"publishConfig": { "access": "public" }`, which `napi create-npm-dir`
+    `"publishConfig": { "access": "public" }`, which `napi create-npm-dirs`
     **propagates** into every generated platform `package.json`. Don't remove it.
 
 ### Pre-releases
@@ -117,7 +121,7 @@ A tag containing `rc` or `dev` (e.g. `node-v0.2.0rc1`) builds the artifacts but
 
 The publish path can't be fully exercised without a real tag + the npm setup
 above, so treat the **first** `npm-publish` run as a shakedown: watch that `napi
-artifacts` places the three `.node`s correctly and that each `npm publish`
+artifacts` places every `.node` correctly and that each `npm publish`
 authenticates. If OIDC + napi misbehave, use the token fallback. Subsequent
 releases are routine.
 
@@ -153,7 +157,7 @@ only ever be redundant, and could never make the published pins more correct tha
 the tool that writes them. With nothing pinned, there is nothing unresolvable to
 lock.
 
-`test_version_faithful.py::test_node_package_and_native_deps_match` asserts the
+`test_version_faithful.py::test_node_package_and_native_deps_match_product` asserts the
 pins stay absent, and that `napi.targets` matches `release.yml`'s `build-node`
 matrix — the input napi actually derives them from.
 

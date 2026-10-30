@@ -334,6 +334,14 @@ Enforced conditions:
    from day one**; implementing signatures only widens what it accepts. A caller
    that needs attestation today gets a full engine run, never a false clean.
 
+   > [!note] **Not built.** Neither half shipped: `ValidationStamp` has no
+   > `signature` field (`repo:rust-packages/laterite-ags4-core/src/index.rs`), and
+   > there is no `TrustPolicy` — `Sidecar::decide` takes no policy argument (§8,
+   > PR 3's as-shipped note). So there is no fail-closed strict mode today: a cert
+   > named with `--index` is trusted on its seal, and a caller that needs
+   > attestation must not pass one. Reserving signing is now a future format
+   > change, not a field waiting to be filled.
+
 ## Performance: what the skip is worth (and why it survives being made honest)
 
 | file size | v1/v2 content-only skip (read + SHA-256) | full engine | speedup |
@@ -362,8 +370,8 @@ Nine risks, none hidden:
 
 1. **P4 (forgery) is open.** A hand-edited `.ags.idx` with a matching `sha256` still
    produces a false clean when explicitly named with `--index`. Mitigated only by:
-   opt-in, no autodiscovery, the "validation cache, not attestation" reframing, and a
-   fail-closed `RequireSigned` policy that today accepts nothing. **Signing remains
+   opt-in, no autodiscovery, and the "validation cache, not attestation" reframing.
+   (The fail-closed `RequireSigned` policy planned in §7 was not built.) **Signing remains
    deferred.** If a workflow ever ships `.ags` + `.ags.idx` across a trust boundary,
    this design does not cover it and signing must land first.
 2. **Purity classification is discipline at the I/O level.** The compile-error gate
@@ -402,7 +410,8 @@ Nine risks, none hidden:
    caught and still isn't.
 6. **`MintToken` is not unforgeable** against a determined in-workspace Rust author;
    it stops the accidental bypass (what actually happened, four times), not a
-   deliberate one.
+   deliberate one. (As shipped there is no `MintToken` at all — the mint takes no
+   verdict to guard; §8, PR 3.)
 7. **The external DuckDB extension is a different repository.** Its compliance with
    the one-door rule is contractual and owner-gated, not compiler-enforced. It
    currently consumes only the *location* claim, which keeps the blast radius to a

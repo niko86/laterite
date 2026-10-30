@@ -21,16 +21,25 @@ sources: []
 > record split → Rule 2a+3+5 ([[strat-rule6-embedded-cr]]); a valid
 > extended char → Rust FYI-only / python silent ([[O-01]]); an
 > unquoted field → python Rule **3** (or 4 by position) vs Rust Rule 5
-> ([[O-03]]). `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`
-> `reconcile()` whittles only **single documented rule-swaps**
-> (O-2/O-3/O-26/O-27) and only when the *entire* symmetric diff is
-> consumed — so a cascade leaves residue and a *known* root cause
-> classifies as a **false `RUST_ONLY`/`PYTHON_ONLY` ACTION**.
+> ([[O-03]]). `reconcile()` (then in corpus-qa's `parity.rs`) whittled only
+> **single documented rule-swaps** (O-2/O-3/O-26/O-27) and only when the
+> *entire* symmetric diff is consumed — so a cascade leaves residue and a
+> *known* root cause classifies as a **false `RUST_ONLY`/`PYTHON_ONLY`
+> ACTION**.
+
+> [!note] **Since:** `reconcile()` now lives in
+> `repo:rust-packages/laterite-ags4-parity/src/verdict.rs` (shared with forge),
+> and carries signature-narrow **O-35** arms for two cascades: a leading BOM
+> (python-only Rules 3 + 5) and the duplicate-heading rename (python-only Rule 9
+> beside an agreed Rule 7). The three cascades above still leave residue: the
+> lone CR (python's Rule 2a has no arm), the valid extended char, and the
+> unquoted field outside O-3's arm.
 
 ## Evidence (probe + matrix, both run)
-- `ags-wiki/.bootstrap/probes/RESULTS.md`: embedded-CR → `rust={6}` vs
+Both probe files live in the private dev satellite, not in this repo.
+- `probes/RESULTS.md`: embedded-CR → `rust={6}` vs
   `py={2a,3,5}` → unreconciled.
-- `ags-wiki/.bootstrap/probes/parity-matrix.md`: Rule 1-valid-extended
+- `probes/parity-matrix.md`: Rule 1-valid-extended
   → `RUST_ONLY {FYI Rule 1}` (no O-1 arm); Rule 5-unquoted →
   `RUST_ONLY` (`py={Rule 3}`, outside O-3's Rule-4-only arm).
 
