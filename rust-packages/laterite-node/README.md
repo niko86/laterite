@@ -13,7 +13,7 @@ npm install laterite
 > [What that means](https://docs.laterite.dev/reference/support/) ·
 > [tell us how it goes](https://docs.laterite.dev/feedback/).
 
-Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`). No build step, no Python, no toolchain.
+Prebuilt native binaries ship for linux-x64-gnu, linux-arm64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`). No build step, no Python, no toolchain.
 
 ## Read & validate
 

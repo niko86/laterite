@@ -147,3 +147,38 @@ def resolve_ref(raw: str) -> tuple[bool, str]:
         else:
             break
     return False, candidate
+
+
+#: What DEFINES a name in each language a `::symbol` suffix points into. A name
+#: that merely occurs in the file is not enough: `emit.rs::synthesise_metadata`
+#: kept resolving after the function became `SynthAccumulator`, because the name
+#: lived on as an `EmitOpts` field and in comments. Fields are deliberately not
+#: definitions here, since a struct literal's `name: value` line is
+#: indistinguishable from one by pattern, and admitting them would have passed
+#: that citation too. Python's second arm is a module-level binding (column 0,
+#: optionally annotated), which is how constants are cited.
+SYMBOL_DEFINITIONS = {
+    ".rs": (
+        r"\b(?:fn|struct|enum|trait|type|const|static|mod|union)\s+{name}\b"
+        r"|\bmacro_rules!\s*{name}\b"
+    ),
+    ".py": r"^\s*(?:async\s+)?(?:def|class)\s+{name}\b|^{name}\s*(?::[^=\n]*)?=(?!=)",
+}
+
+
+def cited_symbol(raw: str) -> str | None:
+    """The `::symbol` a ref ends in, with any prose punctuation it picked up
+    stripped first, or None if it names no symbol."""
+    r = raw.rstrip(TRAILING_PUNCT)
+    m = re.search(r"::([A-Za-z_][A-Za-z0-9_]*)$", r)
+    return m.group(1) if m else None
+
+
+def symbol_defined(path: Path, name: str) -> bool | None:
+    """Whether `path` DEFINES `name`, or None when its language has no entry
+    in `SYMBOL_DEFINITIONS` and so cannot be judged this way."""
+    pattern = SYMBOL_DEFINITIONS.get(path.suffix)
+    if pattern is None:
+        return None
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return re.search(pattern.replace("{name}", re.escape(name)), text, re.M) is not None

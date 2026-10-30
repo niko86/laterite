@@ -467,6 +467,14 @@ jobs:
           uv run --no-project python tools/check_spelled_counts.py
           --base "origin/${{ github.base_ref || 'main' }}"
 
+      # Absolute, not a ratchet like the count gate above: the defect is a
+      # release matrix gaining a target while a page it never touched keeps the
+      # old list, so only a whole-tree check sees it, and on the PR that adds
+      # the target. linux-arm64-gnu left four documents listing three, one of
+      # them the npm README.
+      - name: platform lists in docs match the release matrices
+        run: uv run --no-project python tools/check_platform_lists.py
+
       # Sibling of the gate above, and here for the same reason it is: no build,
       # a file walk, and an unconditional job so it cannot stop firing. A bare
       # `#N` is a claim that a number is OURS — #458 is the write-up of what

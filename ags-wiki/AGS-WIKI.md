@@ -85,7 +85,11 @@ happened, and crate-map's count is measured outright by lint C6b).
 
 **Citation grammar** (inline code span):
 - repo file/line — `` `repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs:352` ``
-- repo symbol — `` `repo:.../rules/mod.rs::run_all` ``
+- repo symbol — `` `repo:.../rules/mod.rs::run_all` ``. In a `.rs` or `.py`
+  file the symbol must be one the file DEFINES (a `fn`, type, `const`, `def`,
+  `class` or module-level name), not just a word in it: lint A15 fails a
+  citation to a function renamed under it, whose old name lives on in a field
+  or a comment.
 - OBSERVATIONS entry — `` `repo:OBSERVATIONS.md#o-33` ``
 - dictionary entry — `` `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=SAMP]` ``
 - spec PDF — `` `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8` `` (the PDF itself is not
