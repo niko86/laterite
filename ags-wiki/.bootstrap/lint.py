@@ -14,11 +14,14 @@ index.md exempt, A11-marked mentions filtered). A12 (2026-08-13, the
 week-33 shelf-read) resolves the frontmatter `location:` field on
 `type: source` pages — a declared path A1's citation grammar cannot
 see — and is HARD from the start (see its block for why it needed no
-grandfathering). The hard checks that
+grandfathering). A15 (2026-10-30, the week-44 shelf-read) holds a
+`::symbol` suffix to a DEFINITION in Rust and Python files, not just an
+occurrence of the word, and is HARD from the start on the same terms. The
+hard checks that
 drive the exit code are broken wikilinks / unbalanced mermaid / orphans /
 crate-map completeness / crate-map edge-correctness / erDiagram group codes /
 related-dangling / superseded-tombstone / owns-uniqueness / `location:`
-resolution (A12); the orphan check counts
+resolution (A12) / `::symbol` definitions (A15); the orphan check counts
 inbound links with index.md/log.md excluded (plan item D1, graduated to
 hard-fail once the backlog reached 0 in #451). Two are the C5
 mermaid-content checks (2026-07-10): the crate-map graph must name every
@@ -73,11 +76,14 @@ from typing import TYPE_CHECKING
 # re-deriving it locally is the drift this vault's checks exist to catch.
 from refs import (
     REPO_REF,
+    SYMBOL_DEFINITIONS,
     TRAILING_PUNCT,
     body_after_frontmatter,
+    cited_symbol,
     frontmatter_block,
     path_exists,
     resolve_ref,
+    symbol_defined,
 )
 
 if TYPE_CHECKING:
@@ -940,21 +946,24 @@ def anchor_problem(raw: str, resolved: str) -> str | None:
     `::symbol` suffix actually appears in the file. Skips globs/dirs (no single
     file to check) and `#anchor` (markdown, not validated here). Deliberately
     lenient: a symbol only has to appear as a word somewhere in the file, so a
-    rename is flagged but a moved-within-file symbol is not (refactor noise)."""
+    rename is flagged but a moved-within-file symbol is not (refactor noise).
+    A file in a language `SYMBOL_DEFINITIONS` covers is A15's instead, judged
+    by definition and HARD, so it is skipped here."""
     fp = REPO_ROOT / resolved
     if not fp.is_file():
         return None
     r = raw
     while r and r[-1] in TRAILING_PUNCT:
         r = r[:-1]
-    m = re.search(r"::([A-Za-z_][A-Za-z0-9_]*)$", r)
-    if m:
+    if sym := cited_symbol(r):
+        if fp.suffix in SYMBOL_DEFINITIONS:
+            return None
         try:
             text = fp.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return None
-        if re.search(rf"\b{re.escape(m.group(1))}\b", text) is None:
-            return f"symbol '{m.group(1)}' not found in {resolved}"
+        if re.search(rf"\b{re.escape(sym)}\b", text) is None:
+            return f"symbol '{sym}' not found in {resolved}"
         return None
     m = re.search(r":(\d+)(?:-(\d+))?$", r)
     if m:
@@ -1123,6 +1132,9 @@ ext_refs: list[str] = []
 bad_ext_refs: list[str] = []
 malformed_markers: list[str] = []
 anchor_issues: list[str] = []  # Tier-3: :line/::symbol suffix on a LIVE ref
+symbol_claims = 0  # A15: `::symbol` refs judged by definition
+symbol_unjudged = 0  # A15: …into a language SYMBOL_DEFINITIONS lacks
+symbol_issues: list[dict] = []  # A15: …naming nothing the file defines
 selector_claims = 0  # A13: `groups[code=…]` selectors resolved
 selector_skipped = 0  # A13: …seen but not resolvable (dead ref / glob code)
 selector_issues: list[str] = []  # A13: …naming an entry the dictionary lacks
@@ -1147,6 +1159,23 @@ for p in md:
                 anchor_issues.append(
                     f"{rel}:{line_at(txt, m.start())} -> repo:{raw}  ({ap})"
                 )
+            # A15 — see SYMBOL_DEFINITIONS in refs.py for why a mention is not
+            # enough.
+            if (sym := cited_symbol(raw)) and (REPO_ROOT / used).is_file():
+                defined = symbol_defined(REPO_ROOT / used, sym)
+                if defined is None:
+                    symbol_unjudged += 1
+                else:
+                    symbol_claims += 1
+                    if not defined:
+                        symbol_issues.append(
+                            {
+                                "file": rel,
+                                "line": line_at(txt, m.start()),
+                                "msg": f"repo:{raw}  (nothing named '{sym}' "
+                                f"is defined in {used})",
+                            }
+                        )
             # A13 — the selector trails the ref, past where REPO_REF stopped.
             if sm := SELECTOR.match(txt, m.end()):
                 code = sm.group(1)
@@ -1656,6 +1685,13 @@ print(
 )
 info_section("  findings", anchor_issues, limit=A_LIMIT)
 print(
+    f"\nA15 `::symbol` refs on a live `repo:` ref: {symbol_claims} judged by "
+    f"definition ({', '.join(sorted(SYMBOL_DEFINITIONS))}), {symbol_unjudged} "
+    f"into another language left to the word check above, "
+    f"{len(symbol_issues)} naming nothing the file defines (HARD, reported "
+    f"below)"
+)
+print(
     f"\nA13 `groups[code=…]` selectors on a live `repo:` ref: {selector_claims} "
     f"resolved against the dictionary's {len(DICT_GROUP_CODES)} group codes, "
     f"{selector_skipped} skipped (selector on a ref citing some other file, or "
@@ -1734,6 +1770,16 @@ if SINCE_REF:
         limit=A_LIMIT,
     )
     section(
+        "  NEW `::symbol` refs naming no definition (introduced by this diff)",
+        [
+            f"{d['file']}:{d['line']} -> {d['msg']}"
+            for d in symbol_issues
+            if d["file"] not in RATCHET_EXEMPT_FILES
+            and in_added_range(d["file"], d["line"])
+        ],
+        limit=A_LIMIT,
+    )
+    section(
         "  NEW unresolvable `location:` fields (introduced by this diff)",
         [
             f"{d['file']}:{d['line']} -> {d['msg']}"
@@ -1787,6 +1833,20 @@ else:
     section(
         "A12 `location:` fields that don't resolve (HARD)",
         [f"{d['file']}:{d['line']} -> {d['msg']}" for d in bad_locations],
+        limit=A_LIMIT,
+    )
+    # A15 is HARD from the day it lands, on A12's terms: its backlog was one
+    # citation (ags4-output.md's `emit.rs::synthesise_metadata`), repointed in
+    # #1169, so it starts at 0. It is the definition half of the Tier-3 symbol
+    # check, which stays report-only for the languages A15 does not cover.
+    section(
+        "A15 `::symbol` refs naming nothing the file defines (HARD; "
+        "log.md/index.md exempt)",
+        [
+            f"{d['file']}:{d['line']} -> {d['msg']}"
+            for d in symbol_issues
+            if d["file"] not in RATCHET_EXEMPT_FILES
+        ],
         limit=A_LIMIT,
     )
 
