@@ -1,9 +1,9 @@
 //! `laterite-ags4-compliance` (#169) — cross-surface findings-agreement harness.
 //!
 //! Reads one finding-set JSON per validation surface (`<surface>.json` in a
-//! results dir, emitted by the per-surface runners that PULL the PUBLISHED
-//! artifacts — `uv pip`/`npm`/duckdb `INSTALL`) and checks two invariants over
-//! python-ags4's 84 fixtures:
+//! results dir, emitted by `emit-rust` and `tools/compliance/emit_{python.py,js.mjs}`
+//! against the surfaces ci.yml builds — the `compliance` job, #1170) and checks
+//! two invariants over python-ags4's own test files:
 //!
 //!   1. **4-laterite identity (hard).** Every findings-emitting laterite surface
 //!      (rust / python-laterite / node / wasm) wraps the SAME engine, so over
@@ -57,18 +57,13 @@ struct SurfaceFile {
     /// "4-laterite floor identical".
     #[serde(default)]
     version: Option<String>,
-    /// RESIDUAL, named rather than left to look implemented: **no runner has ever
-    /// populated this.** It is `-` in every report ever printed.
-    ///
-    /// It is also the check we actually want: `version` is a PROXY for "the same
-    /// engine decided these", and a proxy is what this whole arc keeps finding
-    /// (laterite-dev#549). Two surfaces can share a version and still embed different engine
-    /// builds — exactly the false clean laterite-dev#550's `ENGINE_FINGERPRINT` exists to
-    /// prevent, one layer out. Populating it means each surface exposing that
-    /// fingerprint, which none does today.
-    ///
-    /// Kept, not deleted: it names a real gap, and a field that reads `-` is at
-    /// least visibly empty. Do NOT read its presence as evidence of anything.
+    /// The engine's build fingerprint (`ENGINE_FINGERPRINT`, a digest over every
+    /// rule source, the dictionary and the rules catalogue), COMPARED across the
+    /// laterite surfaces since #1170. `version` is a proxy for "the same engine
+    /// decided these": two surfaces can share one and embed different engine
+    /// builds. Two that share a fingerprint ARE the same engine, which is the
+    /// premise the identity check rests on. Every surface exposes it now; for
+    /// years none did, and this field read `-` in every report.
     #[serde(default)]
     engine_sha: Option<String>,
     results: Vec<FixtureFindings>,
@@ -302,6 +297,27 @@ fn load(dir: &PathBuf) -> Result<BTreeMap<String, SurfaceFile>, String> {
     Ok(out)
 }
 
+/// Each present laterite surface's engine fingerprint (`-` when it reported
+/// none), or `None` when all of them name the same one.
+fn fingerprint_split(surfaces: &BTreeMap<String, SurfaceFile>) -> Option<Vec<(String, String)>> {
+    let shas: Vec<(String, String)> = LATERITE
+        .iter()
+        .filter_map(|s| {
+            surfaces.get(*s).map(|sf| {
+                (
+                    (*s).to_string(),
+                    sf.engine_sha.clone().unwrap_or_else(|| "-".to_string()),
+                )
+            })
+        })
+        .collect();
+    let first = shas.first().map(|(_, v)| v.as_str());
+    let split = shas
+        .iter()
+        .any(|(_, v)| v == "-" || Some(v.as_str()) != first);
+    split.then_some(shas)
+}
+
 fn main() {
     // FATAL BY DEFAULT, opt OUT explicitly — the polarity matters. An
     // opt-IN `--require-surfaces` would leave the gate advisory unless someone
@@ -424,6 +440,16 @@ fn main() {
                 the SAME thing."
         );
     }
+    // The version check above compares a number a human bumps; this compares
+    // what the engine was built from. A surface that reports no fingerprint
+    // cannot vouch for its engine, so it splits rather than passing.
+    let engine_split = fingerprint_split(&surfaces);
+    if let Some(shas) = &engine_split {
+        println!("\n!! ENGINE SPLIT — the laterite surfaces embed different engine builds:");
+        for (name, sha) in shas {
+            println!("   {name:<16} {sha}");
+        }
+    }
     if !rep.binding_splits.is_empty() {
         println!(
             "\n!! BINDING SPLITS ({}) — laterite surfaces disagree on the finding floor:",
@@ -495,13 +521,14 @@ fn main() {
         && rep.actions.is_empty()
         && rep.fyi_splits.is_empty()
         && !version_split
+        && engine_split.is_none()
         && (!missing || allow_missing);
     println!(
         "\n{}",
         if ok {
             "COMPLIANCE OK"
         } else {
-            "COMPLIANCE FAIL (binding split, FYI split, version split, missing surface, or undocumented divergence)"
+            "COMPLIANCE FAIL (binding split, FYI split, version or engine split, missing surface, or undocumented divergence)"
         }
     );
     std::process::exit(i32::from(!ok));
@@ -743,5 +770,66 @@ mod tests {
         let r = compare(&idx, &fxs(&idx));
         assert_eq!(r.identical, 1, "rule floor still matches");
         assert_eq!(r.fyi_splits, vec!["a.ags".to_string()]);
+    }
+
+    fn surfaces_with(shas: &[(&str, Option<&str>)]) -> BTreeMap<String, SurfaceFile> {
+        shas.iter()
+            .map(|(s, sha)| {
+                (
+                    (*s).to_string(),
+                    SurfaceFile {
+                        surface: (*s).to_string(),
+                        version: Some("0.21.0".to_string()),
+                        engine_sha: sha.map(str::to_string),
+                        results: vec![],
+                    },
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn one_fingerprint_across_four_is_not_an_engine_split() {
+        let s = surfaces_with(
+            &LATERITE
+                .iter()
+                .map(|s| (*s, Some("abc")))
+                .collect::<Vec<_>>(),
+        );
+        assert!(fingerprint_split(&s).is_none());
+    }
+
+    #[test]
+    fn a_different_engine_build_is_an_engine_split() {
+        // Same version, different engine: the case the version check cannot see.
+        let s = surfaces_with(&[
+            ("rust", Some("abc")),
+            ("python-laterite", Some("abc")),
+            ("node", Some("abd")),
+            ("wasm", Some("abc")),
+        ]);
+        let split = fingerprint_split(&s).expect("must split");
+        assert!(split.contains(&("node".to_string(), "abd".to_string())));
+    }
+
+    #[test]
+    fn a_surface_reporting_no_fingerprint_cannot_vouch_for_its_engine() {
+        let s = surfaces_with(&[("rust", Some("abc")), ("wasm", None)]);
+        assert!(fingerprint_split(&s).is_some());
+        // ...even when it is the only one, which no comparison could otherwise catch.
+        let none = surfaces_with(&LATERITE.iter().map(|s| (*s, None)).collect::<Vec<_>>());
+        assert!(fingerprint_split(&none).is_some());
+    }
+
+    #[test]
+    fn python_ags4_is_not_held_to_the_engine_fingerprint() {
+        let mut s = surfaces_with(
+            &LATERITE
+                .iter()
+                .map(|s| (*s, Some("abc")))
+                .collect::<Vec<_>>(),
+        );
+        s.extend(surfaces_with(&[(REFERENCE, None)]));
+        assert!(fingerprint_split(&s).is_none());
     }
 }

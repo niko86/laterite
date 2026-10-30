@@ -39,6 +39,22 @@ Three bins:
 - `laterite-ags4-compliance` — the comparator (the primary bin).
 - `emit-rust` — the rust-surface runner; drives the validator engine directly
   and emits `rust.json` in the schema the comparator reads.
+
+  **The four-surface gate runs per PR in this repo** (#1170), as the `compliance`
+  job in `repo:.github/workflows/ci.yml`. It used to run only on the dev
+  satellite's own PRs, against that tree's engine, so nothing here held the
+  bindings to each other. Each surface is emitted by the job that already builds
+  it: `repo:tools/compliance/emit_python.py` in `build-ext`, and
+  `repo:tools/compliance/emit_js.mjs` in `node` and `ts-lint`. The `compliance`
+  job adds `emit-rust` and compares. A producer that fails leaves its surface
+  missing, which the comparator fails on by default. The python-ags4 leg is not
+  part of it: that compares laterite against the incumbent rather than the
+  bindings against each other, and nothing in it moves per change.
+
+  Each emitter reports the engine's version and `ENGINE_FINGERPRINT`, not its
+  package's version, and the comparator fails on a fingerprint split. Matching
+  versions show the surfaces shipped together; a matching fingerprint shows they
+  run the same rules, which is the premise the identity check rests on.
 - `duckdb-parse-check` (laterite-dev#458) — the duckdb *read/parse-agreement* leg: proves
   the read-only extension's `read_ags` produces the same content-addressed key
   set as the core reference (it compares a pre-computed JSON against the core
@@ -86,7 +102,7 @@ flowchart LR
   val[laterite-ags4-validator lib] --> comp[laterite-ags4-compliance]
   core[laterite-ags4-core] --> comp
   parity[laterite-ags4-parity] --> comp
-  comp -->|agreement report| ci[compliance CI gate]
+  comp -->|agreement report| ci[ci.yml compliance job]
   emit[tools/compliance/emit_duckdb.py] -->|duckdb-parse.json| dpc[duckdb-parse-check]
   core --> dpc
   dpc -->|key-set agreement| nightly[nightly.yml docs-vs-released-duckdb]

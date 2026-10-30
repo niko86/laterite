@@ -52,6 +52,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # python-ags4's own test files, vendored. The four-surface findings gate (#1170)
+  # reads them in four jobs, so the path is named once.
+  COMPLIANCE_FIXTURES: rust-packages/laterite-ags4-corpus-qa/vendor/pyags4-tests
 
 # Least privilege: both jobs only check out + build + test — no writes to the repo,
 # releases, or deployments. Scope the token down from the repo default.
@@ -84,6 +87,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       web: ${{ steps.filter.outputs.web }}
       corpus: ${{ steps.filter.outputs.corpus }}
+      compliance: ${{ steps.filter.outputs.compliance }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -325,6 +329,20 @@ jobs:
               # A dependency bump can move a finding without touching a crate.
               - 'rust-packages/Cargo.lock'
               - 'tools/check_corpus_drift.py'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/build-accel/**'
+            compliance:
+              # `compliance` = what can make the four laterite surfaces disagree
+              # (#1170): the engine and every binding (all of rust-packages/**,
+              # which also holds the vendored fixtures and the comparator), the
+              # Python package around the PyO3 binding, and the emitters. It
+              # widens build-ext, node and ts-lint as well as gating the
+              # `compliance` job, because each of them produces one surface's
+              # findings: a `packages/**`-only change moves the python surface and
+              # cannot be compared without the other three.
+              - 'rust-packages/**'
+              - 'packages/**'
+              - 'tools/compliance/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
 
@@ -887,12 +905,14 @@ jobs:
   # plus a freed slot on the 2-runner pool, not raw wall-clock.
   build-ext:
     needs: changes
-    # Runs whenever EITHER consumer runs: `code` (python) OR `docs` (docs). Same
-    # !cancelled() + filter-failed-means-run discipline as the other jobs.
+    # Runs whenever ANY consumer runs: `code` (python), `docs` (docs) or
+    # `compliance` (its python surface is emitted below). Same !cancelled() +
+    # filter-failed-means-run discipline as the other jobs.
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true'
-        || needs.changes.outputs.docs == 'true') }}
+        || needs.changes.outputs.docs == 'true'
+        || needs.changes.outputs.compliance == 'true') }}
     runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     env:
       UV_LINK_MODE: copy
@@ -933,6 +953,20 @@ jobs:
           path: packages/laterite/python/laterite/_laterite_native*.so
           if-no-files-found: error
           retention-days: 1
+      # The python-laterite surface of the four-surface gate (#1170), emitted
+      # here against the cdylib just built rather than in the python job, so it
+      # does not wait behind that job's suite. The `compliance` job compares it.
+      - name: compliance — emit the python-laterite surface
+        run: >
+          uv run --no-sync python tools/compliance/emit_python.py
+          --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
+      - name: Upload the python-laterite surface
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compliance-python-laterite
+          path: ${{ runner.temp }}/compliance/python-laterite.json
+          if-no-files-found: error
+          retention-days: 1
       - name: sccache stats
         if: always()
         shell: bash
@@ -952,9 +986,11 @@ jobs:
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
+    # `compliance` too: this job emits the node surface of the four-surface gate.
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
-        || needs.changes.outputs.node == 'true') }}
+        || needs.changes.outputs.node == 'true'
+        || needs.changes.outputs.compliance == 'true') }}
     # ubuntu-latest on every event, not the self-hosted pool. Off the pool's
     # sccache the Rust half compiles cold, but on a busy pool this job waited
     # longer for a runner than that costs, and leaving the pool frees a runner
@@ -995,6 +1031,22 @@ jobs:
       # — proves the native addon AND the shippable dual ESM/CJS bundle build.
       - name: Build (napi debug + tsup dist)
         run: npm run build:debug
+
+      # The node surface of the four-surface gate (#1170), against the addon and
+      # dist just built, before the suite so a test failure cannot also cost the
+      # `compliance` job its input.
+      - name: compliance — emit the node surface
+        working-directory: ${{ github.workspace }}
+        run: >
+          node tools/compliance/emit_js.mjs --surface node
+          --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
+      - name: Upload the node surface
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compliance-node
+          path: ${{ runner.temp }}/compliance/node.json
+          if-no-files-found: error
+          retention-days: 1
 
       # The napi loader (index.js) + types (index.d.ts) are committed (the
       # npm-publish job needs them and never runs `napi build`). `napi build`
@@ -1092,11 +1144,13 @@ jobs:
     # Runs when either TS surface (or its inputs) changed. Same !cancelled() +
     # filter-failed-means-run discipline as the other jobs. `node` covers the
     # laterite-node TS + the rust-packages/** wasm crates web's types derive from;
-    # `web` covers web/**.
+    # `web` covers web/**; `compliance` because this job emits the wasm surface
+    # of the four-surface gate.
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.node == 'true'
-        || needs.changes.outputs.web == 'true') }}
+        || needs.changes.outputs.web == 'true'
+        || needs.changes.outputs.compliance == 'true') }}
     # ubuntu-latest on every event, not the self-hosted pool. Off the pool's
     # sccache the Rust half compiles cold, but on a busy pool this job waited
     # longer for a runner than that costs, and leaving the pool frees a runner
@@ -1167,6 +1221,22 @@ jobs:
       - name: web — build wasm bindings (generates the .d.ts the type-aware rules need)
         working-directory: web
         run: npm run build:wasm:lint
+
+      # The wasm surface of the four-surface gate (#1170): the tier-1 build in
+      # web/src/wasm the step above just produced, which is the engine the
+      # browser app ships. Before the lints, so a lint failure cannot also cost
+      # the `compliance` job its input.
+      - name: compliance — emit the wasm surface
+        run: >
+          node tools/compliance/emit_js.mjs --surface wasm
+          --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
+      - name: Upload the wasm surface
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compliance-wasm
+          path: ${{ runner.temp }}/compliance/wasm.json
+          if-no-files-found: error
+          retention-days: 1
       - name: web — eslint + prettier
         working-directory: web
         run: |
@@ -1339,6 +1409,64 @@ jobs:
   # so it gates nothing until the `main protection` ruleset lists it
   # (.github/rulesets/main-protection.expected.json already does). Skipped on a
   # PR whose paths cannot move it, which reports success like `rust` does.
+  # The four-surface findings gate (#1170). rust, python-laterite, node and wasm
+  # wrap one engine, so over python-ags4's own test files they must report
+  # identical findings: every rule, line, group, message and field position, the
+  # same number of times, from one engine fingerprint. A split is a binding or
+  # serialisation bug, which each surface's own suite cannot see because it
+  # checks that surface against itself.
+  #
+  # It reuses the builds: build-ext, node and ts-lint each emit their surface's
+  # findings from what they already built and upload a small JSON, and this job
+  # adds the rust surface (the engine itself) and compares. A producer that
+  # failed or never ran leaves its JSON missing, and the comparator fails on a
+  # missing surface by default, so a broken producer reddens this job rather
+  # than shrinking the comparison to three.
+  #
+  # The python-ags4 comparison the same comparator can make stays out: it holds
+  # laterite against the incumbent library rather than the bindings against each
+  # other, and nothing in it moves per change.
+  compliance:
+    needs: [changes, build-ext, node, ts-lint]
+    # `!cancelled()` so a failed producer runs this job (and its missing surface
+    # fails it) rather than skipping it, which a required check reads as green.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.compliance == 'true') }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold (no-op off the pool). Only the comparator and the engine
+      # it drives are built, debug.
+      - uses: ./.github/actions/build-accel
+
+      - name: Download the python-laterite, node and wasm surfaces
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: compliance-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/compliance
+
+      - name: Four-surface findings agreement
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/compliance"
+          run() { cargo run -q --manifest-path rust-packages/Cargo.toml -p laterite-ags4-compliance --bin "$@"; }
+          run emit-rust -- "$COMPLIANCE_FIXTURES" "$OUT"
+          run laterite-ags4-compliance -- "$OUT"
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   corpus-drift:
     needs: changes
     # `!cancelled()` is load-bearing (see the rust job's note): a failed `needs`

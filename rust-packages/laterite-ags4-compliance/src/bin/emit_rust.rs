@@ -4,8 +4,8 @@
 //! Runs the in-workspace validator engine
 //! ([`laterite_ags4_validator::check_file`]) over a fixtures dir and writes
 //! `rust.json` in the exact shape the `laterite-ags4-compliance` comparator reads — the
-//! same schema the dev satellite's `tools/compliance/_worker.py` emits for the
-//! Python surfaces.
+//! same schema `tools/compliance/emit_python.py` and `emit_js.mjs` write for the
+//! other three surfaces.
 //! This is the *reference* engine every laterite surface (python-laterite /
 //! node / wasm / duckdb) wraps, so its rule FLOOR is the identity the
 //! 4-laterite check holds the bindings to (duckdb left findings in laterite-dev#458).
@@ -62,12 +62,16 @@ struct Surface {
     schema: u32,
     #[serde(rename = "surface")]
     kind: &'static str,
+    /// The ENGINE's version and build fingerprint, which every surface reports,
+    /// rather than this crate's own: the comparator holds the four surfaces to
+    /// one engine, and this crate carries the inert workspace number.
     version: &'static str,
+    engine_sha: &'static str,
     results: Vec<Fixture>,
 }
 
 /// Partition finding-keys into the rule FLOOR and the FYI labels — the same
-/// prefix split `_worker.py` applies to `Report.by_rule().keys()`.
+/// prefix split `emit_python.py` applies to `Report.by_rule().keys()`.
 fn split(labels: impl IntoIterator<Item = String>) -> (Vec<String>, Vec<String>) {
     let (mut floor, mut fyi) = (Vec::new(), Vec::new());
     for l in labels {
@@ -172,15 +176,17 @@ fn main() {
     let surface = Surface {
         schema: 1,
         kind: "rust",
-        version: env!("CARGO_PKG_VERSION"),
+        version: laterite_ags4_validator::VERSION,
+        engine_sha: laterite_ags4_validator::ENGINE_FINGERPRINT,
         results,
     };
     let path = out_dir.join("rust.json");
     std::fs::write(&path, serde_json::to_string(&surface).expect("serialize"))
         .expect("write rust.json");
     eprintln!(
-        "rust v{}: {} fixtures -> {}",
+        "rust engine {} ({}): {} fixtures -> {}",
         surface.version,
+        surface.engine_sha,
         surface.results.len(),
         path.display()
     );
@@ -197,7 +203,7 @@ mod tests {
             "FYI (Related to Rule 1)".to_string(),
             "AGS Format Rule 1".to_string(),
             "FYI".to_string(),
-            "something else".to_string(), // neither prefix → dropped, like _worker.py
+            "something else".to_string(), // neither prefix → dropped, like emit_python.py
         ]);
         assert_eq!(floor, ["AGS Format Rule 1", "AGS Format Rule 8"]); // sorted
         assert_eq!(fyi, ["FYI", "FYI (Related to Rule 1)"]);

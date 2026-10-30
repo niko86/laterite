@@ -106,6 +106,13 @@ only thing that shows the claim is not stale:
                           Falsified first the #786 way: a planted `_matches`
                           inversion on `.rs` paths produced 12768 mismatches.
                           `dot: true`, as above.
+  #1170 (compliance)    1860 paths x 61 patterns = 113460 pairs, exact agreement
+                        — the `compliance` filter joined for the four-surface
+                          findings gate: rust-packages, packages, the emitters,
+                          this workflow and build-accel. Falsified first the
+                          #786 way: a planted `_matches` inversion on `.rs`
+                          paths produced 12993 mismatches. `dot: true`, as
+                          above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are
@@ -426,6 +433,33 @@ def test_repo_gates_is_required() -> None:
         f"{RULESET.relative_to(REPO)} does not require `repo-gates`, so a PR "
         f"with a ruff violation or a stale render can merge. Required: "
         f"{sorted(contexts)}"
+    )
+
+
+def test_compliance_is_required_and_cannot_skip_on_a_failed_producer() -> None:
+    """The four-surface gate (#1170) must block a merge, and a producer that
+    failed must redden it rather than skip it.
+
+    Its inputs come from three other jobs. Without `!cancelled()` a failed
+    producer would SKIP `compliance`, and a skipped required check reads as
+    green, so the comparison would quietly stop on exactly the PR that broke a
+    surface. With it, the job runs, the surface's JSON is missing, and the
+    comparator fails on a missing surface by default.
+    """
+    workflow = yaml.safe_load(CI.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["compliance"]
+    assert {"build-ext", "node", "ts-lint"} <= set(job["needs"])
+    assert "!cancelled()" in job["if"]
+    ruleset = json.loads(RULESET.read_text(encoding="utf-8"))
+    contexts = {
+        check["context"]
+        for rule in ruleset["rules"]
+        if rule["type"] == "required_status_checks"
+        for check in rule["parameters"]["required_status_checks"]
+    }
+    assert "compliance" in contexts, (
+        f"{RULESET.relative_to(REPO)} does not require `compliance`, so a PR "
+        "that splits one surface's findings from the others can merge"
     )
 
 
