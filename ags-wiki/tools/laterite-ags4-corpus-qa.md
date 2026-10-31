@@ -97,8 +97,8 @@ flowchart LR
   parity --> py[py-ags4-check-json]
   crawl --> ags4check[lat]
   forge["laterite-ags4-forge<br/>own repo: niko86/laterite-forge"] --> parity
-  ags4check --> cliutil[laterite-cliutil]
-  ags5db[ags5db] --> cliutil
+  crawl --> cliutil[laterite-cliutil]
+  ags4check --> cliutil
 ```
 
 See [[crate-map]] for the workspace dependency graph.

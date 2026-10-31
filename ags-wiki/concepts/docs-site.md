@@ -101,10 +101,10 @@ Key facts:
   with a #518-shaped positive control that must go red, reports an unbuilt leg
   by name, and holds its allowlist entries stale-checked. Node leg in the
   `node` job, wasm leg in `ts-lint`.
-- **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
+- **A Python example is `uv run`-able on its own** — every one, plus the marimo tour.
   Each carries a PEP 723 `# /// script` header pinning
-  `requires-python` and an exact `laterite==<product>`, and the 15 that read a
-  file also carry a fixture arm that
+  `requires-python` and an exact `laterite==<product>`, and each that reads a
+  file also carries a fixture arm that
   fetches `repo:examples/sample_site.ags` from the raw GitHub URL when the
   repo-relative path is absent — so a reader with `uv` and no checkout gets a
   working run, and the code on the page stays the code you would type in a
@@ -553,7 +553,7 @@ flowchart LR
   cd["catalogue_data.py<br/>(families, provenance, TYPE_GLOSSARY)"] --> page
   cd --> cgate["tests/test_groups_catalogue_faithful.py<br/>(dev satellite, python job)"]
   page --> strict["mkdocs build --strict<br/>(docs job, builds the wheel)"]
-  strict --> art["web/dist/docs"]
+  strict --> art["web/docs-dist"]
   vite["vite build → web/dist"] --> art
   art -->|mirror only| pages["GitHub Pages /laterite/docs/"]
 ```
