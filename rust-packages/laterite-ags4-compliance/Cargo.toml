@@ -46,7 +46,7 @@ name = "laterite-ags4-compliance"
 path = "src/main.rs"
 
 # The rust leg of the findings harness — emits `rust.json` in the schema the
-# comparator reads (sibling to tools/compliance/_worker.py's Python surfaces).
+# comparator reads (sibling to tools/compliance/emit_python.py and emit_js.mjs).
 [[bin]]
 name = "emit-rust"
 path = "src/bin/emit_rust.rs"
