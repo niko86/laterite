@@ -124,23 +124,23 @@ exactly the page (`modality-register.md`) that had gone stale. The registry:
 
 | SSOT | Generator | Committed artifact | Faithfulness gate |
 |---|---|---|---|
-| `observations.json` *(dev satellite)* | `gen_observations.py` *(dev satellite)* | `repo:OBSERVATIONS.md` | dev-satellite faithfulness test |
-| `repo:rust-packages/laterite-ags4-validator/data` (5 official `.ags`) | `gen_dictionary.py` *(dev satellite)* | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | dev-satellite faithfulness test |
+| `repo:observations.json` | `repo:tools/gen_observations.py` | `repo:OBSERVATIONS.md` | `repo:.github/workflows/wiki-lint.yml` (`gen_observations.py --check`) |
+| `repo:rust-packages/laterite-ags4-validator/data` (5 official `.ags`) | `repo:tools/gen_dictionary.py` | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | `repo:tests/test_dictionary_faithful.py` |
 | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | `gen_sensitive_headings.py` *(dev satellite)* | `repo:rust-packages/laterite-ags4-core/data/sensitive_headings.json` | dev-satellite faithfulness test |
 | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | `repo:tools/generate_pyi.py` | `repo:packages/laterite/python/laterite/_laterite_native.pyi` | `repo:packages/laterite/tests/test_pyi_stubs_match_generator.py` |
 | the vault filesystem | `repo:ags-wiki/.bootstrap/reindex.py` | `repo:ags-wiki/index.md` | `repo:.github/workflows/wiki-lint.yml` (`reindex.py --check`) |
-| `repo:modality.json` | `repo:tools/gen_modality.py` | `repo:ags-wiki/concepts/modality-register.md` | dev-satellite faithfulness test (the DATA is gated on public — `repo:packages/laterite/tests/test_modality_parity.py`) |
+| `repo:modality.json` | `repo:tools/gen_modality.py` | `repo:ags-wiki/concepts/modality-register.md` | `repo:.github/workflows/ci.yml` repo-gates (`gen_modality.py --check`; the DATA is gated on public — `repo:packages/laterite/tests/test_modality_parity.py`) |
 | `repo:rust-packages/laterite-cli/README-cli.md` (== `lat --readme`) | `repo:tools/gen_wiki_cli.py` | `repo:ags-wiki/tools/laterite-cli.md` (verb-table block) | `repo:.github/workflows/wiki-lint.yml` (`gen_wiki_cli.py --check`) |
 | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | `repo:tools/gen_reference_groups.py` | `repo:ags-wiki/groups/*.md` (one page per dict group; the whole reference tier, D6) | `repo:.github/workflows/wiki-lint.yml` (`gen_reference_groups.py --check`) |
 | `repo:rust-packages/Cargo.toml` (+ each member manifest) | `repo:tools/gen_crate_graph.py` | `repo:ags-wiki/concepts/crate-dependency-graph.md` (the complete crate graph; its Cargo-dep read is also asserted `== lint.py::_crate_deps()` so the two manifest readers can't drift) | `repo:.github/workflows/wiki-lint.yml` (`gen_crate_graph.py --check`) |
 | `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json` | — (shipped group count pinned, not rendered) | keystone pages' "N groups / typed-graph classes" facts (`repo:ags-wiki/start-here.md`, `repo:ags-wiki/AGS-WIKI.md`, `repo:ags-wiki/tools/laterite-ags4-core.md`, `repo:ags-wiki/tools/laterite-node.md`, `repo:ags-wiki/sources/repo-authorities/ags-dictionary-json.md`) | dev-satellite faithfulness test |
-| `tools/vendor/laterite-duckdb-functions.json` *(dev satellite — a pinned vendored copy of the `laterite_ags4` extension's own `functions.json`, gated upstream against its `register_table()` calls)* | — (docs gated, not rendered) | `repo:web/docs-site/docs/reference/duckdb-functions.md` + `repo:modality.json` duckdb cells | dev-satellite faithfulness test |
+| `repo:tools/vendor/laterite-duckdb-functions.json` *(a pinned vendored copy of the `laterite_ags4` extension's own `functions.json`, gated upstream against its `register_table()` calls)* | — (docs gated, not rendered) | `repo:web/docs-site/docs/reference/duckdb-functions.md` + `repo:modality.json` duckdb cells | `repo:tools/check_duckdb_manifest.py` (ci.yml repo-gates) |
 
 A faithfulness gate guards *render drift* (the artifact can't diverge from its
 SSOT); it does **not** assert the SSOT's *data* is correct — that's a separate
 content gate (e.g. `repo:packages/laterite/tests/test_modality_parity.py` checks
 `modality.json`'s cells against the real cross-surface capabilities). The CLI
-verb table carries a second guard of that kind — `test_wiki_cli_faithful.py` also
+verb table carries a second guard of that kind — `repo:tests/test_wiki_cli_verbs.py` also
 cross-checks the README's verb list against `cli.rs`'s `SUBCOMMANDS`, so a verb
 can't reach the tool without reaching the (hand-`include_str!`'d) guide the docs
 render from.
@@ -197,7 +197,7 @@ flowchart LR
 - [[laterite-ags4-validator]] — `check_parsed_with_dict`, the door bug 4's fix consolidated onto
 - [[cert-trust-v2]] — the sibling "surfaces reach past the door" bug (WORLD, not CONTENT) that motivated this page's framing
 - [[O-42]] — the content guard bug 4's modalities disagreed on whether to run
-- ags4-output-value-gate — the general cross-surface output-VALUE gate (laterite-dev#519–525), sharing a crate with laterite-ags4-compliance
+- ags4-output-value-gate — the general cross-surface output-VALUE gate (laterite-dev#519–525), in its own crate, [[laterite-ags4-xcheck]]
 - [[vendored-authority-faithful]] — the content gate that closes the "Faithfulness gates" table's row-2 gap: `test_dictionary_faithful.py` proved render-drift, not that the vendored `.ags` files match their claimed source
 - [[pyo3-boundary]] · [[crate-map]] — the surfaces the properties run across
 - [[playwright-e2e]] — the browser end of the test pyramid

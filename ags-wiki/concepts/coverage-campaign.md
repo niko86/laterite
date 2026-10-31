@@ -240,8 +240,8 @@ end-to-end instead: the `wasm-engine` xcheck leg drives `build_ags4` and
 the real `.wasm` binary through Node. **The boundary is the floor of this
 measurement, not a backlog item.**
 
-> **Beware the denominator here.** `lib.rs` is ~45% `#[cfg(test)]` code and
-> llvm-cov counts it, as hits — so the headline rises whenever tests are
+> **Beware the denominator here.** `lib.rs` was then ~45% `#[cfg(test)]` code,
+> and llvm-cov counts that as hits — so the headline rises whenever tests are
 > added, whatever they assert. Measured separately, PRODUCTION lines went
 > **61.42% → 90.90%**; the whole-file figure the gate reads is 90.86%. They
 > agree here because the extraction moved real logic, but they would not have

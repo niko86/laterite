@@ -7,7 +7,7 @@ WHY THIS EXISTS
 ---------------
 Every cross-surface gate we owned compared *knob names against another hand-list*:
 `test_cross_surface_parity` (signatures), `test_modality_parity` (which I/O forms
-exist), `test_wiki_cli_faithful` (the README's verbs vs a const in `cli.rs`). All of
+exist), `test_wiki_cli_verbs` (the README's verbs vs a const in `cli.rs`). All of
 them can pass while two surfaces do entirely different things — and one of them can
 pass while a surface *does not implement the verb at all*.
 

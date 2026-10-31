@@ -268,7 +268,7 @@ mod tests {
     }
 
     /// The user-facing `SUBCOMMANDS` const (what the README documents, and what
-    /// `test_wiki_cli_faithful` gates the guide against) must be exactly clap's
+    /// `test_wiki_cli_verbs` gates the guide against) must be exactly clap's
     /// VISIBLE verbs — no more, no less.
     ///
     /// This closes the THIRD hand-list. `SUBCOMMANDS` used to drive the
