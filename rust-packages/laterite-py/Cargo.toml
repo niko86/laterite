@@ -120,7 +120,7 @@ laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.14.0", fea
 # arrow 59 (matching pyo3-arrow 0.18) for the emit *consume* direction:
 # read each cell out of the RecordBatch DuckDB streams in. ArrayFormatter
 # (default features) is the robust fallback for temporal/decimal columns.
-arrow = "59"
+arrow = "60"
 # abi3-py312: build against the CPython 3.12 limited API (stable ABI) so ONE
 # `cp312-abi3` wheel per platform runs on 3.12+. Feasible *because* the boundary
 # carries plain primitives, not pyo3-polars (no per-CPython polars ABI coupling).

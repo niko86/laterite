@@ -49,7 +49,7 @@ serde = { version = "1", default-features = false, features = ["std"] }
 # `ipc` module's StreamWriter framing — the framing laterite-node +
 # laterite-ags4-wasm used to each carry; laterite-py pairs the dep with
 # pyo3-arrow. v59 matches pyo3-arrow 0.18 so one build serves both hosts.
-arrow = { version = "59", default-features = false, optional = true }
+arrow = { version = "60", default-features = false, optional = true }
 
 [features]
 # Typed Apache Arrow emission: `arrow_cols` (typed columns) + `ipc` (frame a
