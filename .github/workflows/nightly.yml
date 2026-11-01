@@ -66,7 +66,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile). SHA-pinned; Dependabot bumps it.
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-llvm-cov
 
@@ -231,7 +231,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -290,7 +290,7 @@ jobs:
           # cut would conclude nothing, with no indication why.
           fetch-depth: 0
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       # ONE registry sweep; every later step reads this file, so the tracker,
@@ -311,7 +311,7 @@ jobs:
         run: rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
       - name: install cargo-public-api (only when a delta is unmeasured)
         if: steps.status.outputs.unmeasured != '0'
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           # The version ci.yml's publish-gates pins: its renderer is half of
           # what writes a snapshot line.
@@ -514,7 +514,7 @@ jobs:
       # sccache + mold so the maturin compile hits the warm cache.
       - uses: ./.github/actions/build-accel
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       - name: Install Python 3.12 / 3.13 / 3.14 via uv
@@ -594,14 +594,14 @@ jobs:
         with:
           toolchain: stable
       - uses: ./.github/actions/build-accel
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       - name: npm ci
         run: npm ci
       - name: Build (napi debug + tsup dist)
         run: npm run build:debug
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 24
       # No coverage: the per-PR Node 22 run owns the Codecov `node` report.
@@ -653,7 +653,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       # No version pin: the point is whatever `pip install laterite` resolves to
@@ -818,7 +818,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       - name: Docs examples run in the environment their own header declares
@@ -862,7 +862,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       # No version pin: the point is whatever `npm install laterite` resolves to
@@ -998,7 +998,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       # No version pin: the point is whatever `npm install @laterite/ags4-wasm`
@@ -1167,7 +1167,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       # Deliberately not `uv sync`: this leg imports `duckdb` and `pytest` and
@@ -1320,10 +1320,10 @@ jobs:
           targets: wasm32-unknown-unknown
       # sccache + mold if present (no-op off the pool — this job is GitHub-hosted).
       - uses: ./.github/actions/build-accel
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       - name: Install Python 3.14 via uv
@@ -1370,7 +1370,7 @@ jobs:
         run: uv run --no-sync python tools/xcheck/check_cli_content.py --require-legs all
       - name: upload observations on failure
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: xcheck-observations
           path: output/xcheck/
@@ -1518,7 +1518,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       - name: wiki-lint (whole vault, no ratchet)

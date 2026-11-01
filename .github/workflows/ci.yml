@@ -376,7 +376,7 @@ jobs:
           # watermark, so this is load-bearing and its absence fails loudly — the
           # same bargain changelog.yml struck for the same reason.
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
 
@@ -556,7 +556,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -645,19 +645,19 @@ jobs:
       # deploy-validator.yml uses it, and `cache-bin` (on by default) is what
       # keeps the two source-built cargo subcommands from being rebuilt every run.
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: rust-packages
 
       - name: install cargo-public-api + cargo-semver-checks
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           # cargo-public-api pinned for the same reason as the nightly: its
           # renderer is half of what writes a snapshot line.
           tool: cargo-public-api@0.52.0,cargo-semver-checks
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
 
@@ -883,7 +883,7 @@ jobs:
       # verified almost nothing cannot be mistaken for one that verified
       # everything.
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       - name: cargo package contents (crates.io allowlist)
@@ -928,7 +928,7 @@ jobs:
       # sccache + mold for the maturin (PyO3) build, if the runner has them.
       - uses: ./.github/actions/build-accel
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
       - name: Install Python 3.14 via uv
@@ -945,7 +945,7 @@ jobs:
       - name: Build native extension (maturin develop)
         run: (cd packages/laterite && uv run --no-sync maturin develop --uv)
       - name: Upload prebuilt cdylib
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: laterite-cdylib
           # Glob so the abi3 (`_laterite_native.abi3.so`) or interpreter-tagged
@@ -961,7 +961,7 @@ jobs:
           uv run --no-sync python tools/compliance/emit_python.py
           --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
       - name: Upload the python-laterite surface
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: compliance-python-laterite
           path: ${{ runner.temp }}/compliance/python-laterite.json
@@ -1013,7 +1013,7 @@ jobs:
       # where the napi build compiles cold.
       - uses: ./.github/actions/build-accel
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
 
@@ -1041,7 +1041,7 @@ jobs:
           node tools/compliance/emit_js.mjs --surface node
           --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
       - name: Upload the node surface
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: compliance-node
           path: ${{ runner.temp }}/compliance/node.json
@@ -1171,7 +1171,7 @@ jobs:
       # where the wasm crate compiles cold.
       - uses: ./.github/actions/build-accel
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
 
@@ -1231,7 +1231,7 @@ jobs:
           node tools/compliance/emit_js.mjs --surface wasm
           --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
       - name: Upload the wasm surface
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: compliance-wasm
           path: ${{ runner.temp }}/compliance/wasm.json
@@ -1448,7 +1448,7 @@ jobs:
       - uses: ./.github/actions/build-accel
 
       - name: Download the python-laterite, node and wasm surfaces
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: compliance-*
           merge-multiple: true
@@ -1493,7 +1493,7 @@ jobs:
         run: cargo build -p laterite-ags4-corpus-qa
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
 
@@ -1592,7 +1592,7 @@ jobs:
         # persistent runner home, so resolution stays warm locally; the
         # GitHub cache round-trip (+ the Windows tar/gzip save quirk) was
         # avoidable overhead.
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
 
@@ -1616,7 +1616,7 @@ jobs:
         # shadowing. The sync still installs laterite because the tests read
         # its distribution metadata (#1117). A missing artefact (build-ext
         # failed) 404s here → this required job goes red.
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: laterite-cdylib
           path: packages/laterite/python/laterite/
@@ -1817,7 +1817,7 @@ jobs:
       - uses: ./.github/actions/build-accel
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false
 
@@ -1907,7 +1907,7 @@ jobs:
       # No Rust toolchain / build-accel here any more: the cdylib is built once
       # in build-ext and downloaded below, so this job no longer compiles
       # anything — it is a pure Python (uv + mkdocs) job.
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Install Python 3.14 via uv
         # Pin the interpreter to the one build-ext built the cdylib against (the
         # python job pins 3.14 too). The shipped wheel is abi3, so a single .so
@@ -1923,7 +1923,7 @@ jobs:
       # tests. A missing artefact (build-ext failed) 404s here → this required
       # job goes red.
       - name: Download prebuilt cdylib
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: laterite-cdylib
           path: packages/laterite/python/laterite/
