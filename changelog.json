@@ -6,7 +6,11 @@
   "unreleased": {
     "summary": "",
     "added": [],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**The compiled dependency set moves forward.** `rust_xlsxwriter` 0.102 writes the XLSX export, `napi` 3.16 binds the npm addon, and `serde_json`, `toml` and `libc` take patch releases. `sha2` and `uuid` stay where they are, because their newer releases need a Rust newer than the published crates promise."
+      }
+    ],
     "deprecated": [],
     "removed": [],
     "fixed": [],
