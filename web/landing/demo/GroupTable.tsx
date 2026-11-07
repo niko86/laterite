@@ -289,7 +289,7 @@ export const GroupTable: Component<{
         const initialValue = cellValue(at.row, at.col);
         void navigator.clipboard
           .readText()
-          // eslint-disable-next-line solid/reactivity -- event-handler continuation: reading the pick and cell AT RESOLVE TIME is the #580 fix, not a missed tracking scope
+          // Reading the pick and cell AT RESOLVE TIME is the #580 fix.
           .then((value) => {
             const now = props.picked;
             if (!now || now.row !== at.row || now.col !== at.col) return;

@@ -21,7 +21,6 @@ export const Chart: Component<{
       import("echarts/charts"),
       import("echarts/components"),
       import("echarts/renderers"),
-      // eslint-disable-next-line solid/reactivity -- one-shot init after the dynamic import; the reactive redraw is the createEffect below, not this .then callback
     ]).then(([core, charts, components, renderers]) => {
       if (disposed) return;
       core.use([
