@@ -173,7 +173,7 @@ jobs:
       # Docker, macOS Tart, Windows VM) and resolves Python 3.14 from
       # the official python-build-standalone distribution.
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
 
@@ -300,7 +300,7 @@ jobs:
           $py = uv python find 3.14
           maturin build --release -i "$py" --out ../../dist
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: wheels-${{ matrix.target }}
           path: dist/
@@ -389,7 +389,7 @@ jobs:
           Copy-Item "rust-packages\target\${{ matrix.target }}\release\lat${{ matrix.ext }}" out\
           Compress-Archive -Path out\* -DestinationPath "laterite-binaries-${{ matrix.target }}.zip" -Force
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: binaries-${{ matrix.target }}
           path: |
@@ -413,7 +413,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artefacts/
           merge-multiple: true
@@ -448,12 +448,12 @@ jobs:
       # The committed post-install smoke (tools/wheel_smoke.py) at the tagged ref.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: wheels-x86_64-unknown-linux-gnu # the Linux wheel + sdist
           path: dist/
 
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: false
 
@@ -536,7 +536,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: dist/
           merge-multiple: true
@@ -575,7 +575,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           packages-dir: pypi/
 
@@ -642,7 +642,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           packages-dir: pypi/
 
@@ -709,7 +709,7 @@ jobs:
           rustup default stable-x86_64-pc-windows-msvc
           rustup target add ${{ matrix.target }}
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
 
@@ -729,7 +729,7 @@ jobs:
           npm ci
           npx napi build --platform --release --target ${{ matrix.target }}
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: node-${{ matrix.target }}
           path: rust-packages/laterite-node/*.node
@@ -760,7 +760,7 @@ jobs:
         working-directory: rust-packages/laterite-node
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       # The SAME npm the publish job installs, pinned identically. A rehearsal on
@@ -771,7 +771,7 @@ jobs:
         run: npm install -g 'npm@^11'
       - name: npm ci
         run: npm ci
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: rust-packages/laterite-node/artifacts
           pattern: node-*
@@ -833,7 +833,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -868,7 +868,7 @@ jobs:
 
       # Pull the three platform `.node`s built above, place them into the
       # per-platform npm dirs, and build the shippable dual ESM/CJS dist.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: rust-packages/laterite-node/artifacts
           pattern: node-*
@@ -948,7 +948,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
       - name: Install wasm-pack
@@ -989,7 +989,7 @@ jobs:
       - name: Prepare the publishable package
         run: tools/release/prepare-wasm-package.sh "$GITHUB_WORKSPACE/wasm-pkg"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm-pkg
           path: wasm-pkg/
@@ -1012,10 +1012,10 @@ jobs:
     needs: build-wasm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: wasm-pkg
           path: wasm-pkg
@@ -1045,7 +1045,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -1055,7 +1055,7 @@ jobs:
       - name: Upgrade npm (OIDC trusted-publishing support)
         run: npm install -g 'npm@^11'
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: wasm-pkg
           path: wasm-pkg

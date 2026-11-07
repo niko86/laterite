@@ -68,7 +68,6 @@ export const CoordinateMap: Component<{
       // The token overrides ride the same lazy boundary as leaflet.css — no
       // map on screen, no override bytes in the entry chunk (#410).
       import("./coordinate-map.css"),
-      // eslint-disable-next-line solid/reactivity -- one-shot init after the dynamic import; the reactive redraw is the createEffect below, not this .then callback
     ]).then(([leaflet]) => {
       if (disposed) return;
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- leaflet's type says .default is always present, but the ESM/CJS interop shape varies by bundler
