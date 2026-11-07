@@ -3,9 +3,16 @@
 # CI times nine is exactly the churn a batching config exists to avoid; security
 # updates still arrive promptly, outside both the schedule and the cooldown.
 #
-# Each CODE ecosystem groups its MINOR + PATCH updates into one PR and opens
-# MAJOR updates INDIVIDUALLY — so a single breaking bump can't drag a whole batch
-# red (which is exactly what sank the first cargo/npm grouped-everything PRs).
+# Each CODE ecosystem groups its MINOR + PATCH updates into one PR and its MAJOR
+# updates into a SECOND — so a breaking bump can't drag the routine batch red
+# (which is exactly what sank the first cargo/npm grouped-everything PRs). Majors
+# used to open one PR each; November 2026 brought eight PRs from one monthly run,
+# so they now share a PR, and one bad major can hold up only the other majors.
+#
+# No PR rebases itself when main moves (`rebase-strategy: disabled`). Each
+# rebase re-ran full CI on the shared runner pool, so a single merge to main
+# set every open dependency PR running at once. Comment `@dependabot rebase` on
+# the one about to be merged instead.
 # The 0.x caveat, ecosystem-split and both halves observed here: CARGO counts a
 # 0.x minor-position bump (zstd 0.13 → 0.14, #960) as MAJOR — solo PR, 30-day
 # cooldown — matching cargo's own caret semantics. NPM does NOT: a 0.x minor
@@ -32,6 +39,7 @@ updates:
       default-days: 7
     commit-message:
       prefix: ci
+    rebase-strategy: disabled
     groups:
       actions:
         patterns: ["*"]
@@ -46,15 +54,24 @@ updates:
       semver-major-days: 30
     commit-message:
       prefix: build
+    rebase-strategy: disabled
     groups:
       cargo:
         update-types: ["minor", "patch"]
+      cargo-major:
+        update-types: ["major"]
     # encoding_rs 0.8.40+ declares rust-version 1.88, above the 1.85 floor the
     # published crates promise, so every proposal fails check_msrv (#1029).
-    # Drop this when the floor is raised deliberately, not to make a bump pass.
+    # sha2 0.11.1 (1.88) and uuid 1.27+ (up to 1.89) are the same case, and
+    # failed the November cargo group the same way. Drop these when the floor is
+    # raised deliberately, not to make a bump pass.
     ignore:
       - dependency-name: "encoding_rs"
         versions: [">0.8.35"]
+      - dependency-name: "sha2"
+        versions: [">0.11.0"]
+      - dependency-name: "uuid"
+        versions: [">1.26.1"]
 
   # Python deps — the uv workspace (pyproject.toml + uv.lock at the repo root).
   - package-ecosystem: uv
@@ -65,9 +82,12 @@ updates:
       default-days: 7
     commit-message:
       prefix: build
+    rebase-strategy: disabled
     groups:
       python:
         update-types: ["minor", "patch"]
+      python-major:
+        update-types: ["major"]
 
   # npm packages — the Node addon + the SolidJS web frontend.
   - package-ecosystem: npm
@@ -81,6 +101,7 @@ updates:
       semver-major-days: 30
     commit-message:
       prefix: build
+    rebase-strategy: disabled
     groups:
       # vitest and @vitest/coverage-v8 are peers pinned to the same version —
       # bumped separately, `npm ci` fails ERESOLVE on BOTH PRs by construction
@@ -91,3 +112,6 @@ updates:
         update-types: ["major"]
       npm:
         update-types: ["minor", "patch"]
+      # Every other major. Listed after vitest-major so those still match first.
+      npm-major:
+        update-types: ["major"]
