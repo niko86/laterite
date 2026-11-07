@@ -380,15 +380,26 @@ jobs:
         with:
           enable-cache: false
 
+      # The ruff a contributor runs locally is the one uv.lock pins, so CI runs
+      # that one too. A bare `--with ruff` took PyPI's newest instead, and a
+      # release adding a rule failed every open PR on the day it shipped
+      # (ruff 0.17.4, during #1184) while every local run stayed green. New
+      # rules now arrive in the dependabot PR that bumps the lock.
+      - name: ruff version from uv.lock
+        run: |
+          pin=$(uv export --frozen --no-hashes --only-group dev --no-emit-project | grep -E '^ruff==')
+          echo "RUFF_PIN=${pin}" >> "$GITHUB_ENV"
+          echo "using ${pin}"
+
       # ruff lints the WHOLE repo, not the shipped package, so it has no reason
       # to wait for one to be built. Moving it here is also what let `code` drop
       # `tools/**`: while lint ran in the python job every linted file had to
       # fire that job, and here there is no filter to fire.
       - name: ruff check
-        run: uv run --no-project --with ruff ruff check .
+        run: uv run --no-project --with "$RUFF_PIN" ruff check .
 
       - name: ruff format --check
-        run: uv run --no-project --with ruff ruff format --check .
+        run: uv run --no-project --with "$RUFF_PIN" ruff format --check .
 
       # The generated-view drift gates. Each compares a rendered file against
       # the JSON it is rendered from; all are stdlib.
@@ -529,7 +540,7 @@ jobs:
       # and fails here; `-p no:benchmark` reproduces the runner's view.
       - name: repo-truth gates (buildless subset)
         run: >-
-          uv run --no-project --with pytest --with pyyaml --with ruff
+          uv run --no-project --with pytest --with pyyaml --with "$RUFF_PIN"
           pytest tests -m "not needs_env"
           -o addopts="" -p no:benchmark -q --tb=short
 
