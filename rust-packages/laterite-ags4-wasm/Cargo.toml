@@ -180,7 +180,7 @@ laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.14.0" }
 # core array/schema/record_batch crates; default-features=false drops
 # prettyprint->comfy-table and other host-only weight. v59 matches the
 # native pyo3-arrow 0.18 pin so one arrow version serves both hosts.
-arrow = { version = "59", default-features = false, features = ["ipc"], optional = true }
+arrow = { version = "60", default-features = false, features = ["ipc"], optional = true }
 wasm-bindgen = "0.2"
 # `Object::keys` for `decode_opts`' unknown-key enumeration (every options-taking
 # door, so not gateable), plus the `build_ags4_ipc` input walk under `arrow`:
