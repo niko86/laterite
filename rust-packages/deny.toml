@@ -17,13 +17,6 @@ ignore = [
     # age's i18n.toml inside a proc-macro at build time, so it never runs in
     # anything we ship. i18n-config and age are at their latest releases.
     "RUSTSEC-2026-0374", # basic-toml (via age's i18n-embed-fl)
-    # --- zip 8 extraction flaws, fixed in zip 9. All three live in
-    # ZipArchive::extract / ZipStreamReader::extract (unpacking to disk), which
-    # calamine never calls: it reads entries in memory. calamine 0.36 still pins
-    # zip ^8.6, so zip 8 stays in the tree. Drop these when calamine moves to 9.
-    "RUSTSEC-2026-0367", # zip: SUID/SGID bits kept on extract
-    "RUSTSEC-2026-0368", # zip: extract writes symlinks outside the destination
-    "RUSTSEC-2026-0369", # zip: extract applies permissions through symlinks
     # --- crypto-bigint 0.5 timing side channels, fixed in 0.7.6. It arrives via
     # age → p256 (directly and through hpke). laterite-transport only ever
     # builds age's scrypt recipient and identity, and refuses a non-scrypt

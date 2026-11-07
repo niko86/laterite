@@ -199,12 +199,15 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
             heading_count = None
         elif descriptor == "HEADING":
             heading_count = len(fields)
-        elif descriptor == "DATA" and heading_count is not None:
-            if len(fields) != heading_count:
-                raise Ags4Error(
-                    f"Line {lineno} of group {current_group!r} does not "
-                    "have the same number of entries as the HEADING row."
-                )
+        elif (
+            descriptor == "DATA"
+            and heading_count is not None
+            and len(fields) != heading_count
+        ):
+            raise Ags4Error(
+                f"Line {lineno} of group {current_group!r} does not "
+                "have the same number of entries as the HEADING row."
+            )
 
 
 def _strict_check_native(p: dict) -> None:
