@@ -20,7 +20,7 @@ name = "laterite-cli"
 # installs, so it belongs on the number people install by.
 version = "0.16.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "CLI validator for the AGS4 geotechnical transfer format"
 license = "MIT"
 publish = false

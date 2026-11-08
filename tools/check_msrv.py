@@ -32,6 +32,16 @@ fail the gate on a dev-dependency that is not part of the promise, and the
 tempting fix (raise `rust-version` until it passes) would break the promise in
 order to make the gate green.
 
+## Optional features too
+
+Each group is built twice: default features, then `--all-features`. The first
+version of this gate built defaults only, so an optional dependency could need a
+newer toolchain than the floor and nothing would notice. arrow 60 does (1.88,
+behind `laterite-ags4-types`'s and `laterite-ags4-emit`'s `arrow` feature, when
+the floor was 1.85), which is how the gap was found (#1188). Both builds, because
+features are additive: `--all-features` cannot see code behind
+`cfg(not(feature = ...))`.
+
 Usage:
     python tools/check_msrv.py
 """
@@ -100,23 +110,27 @@ def main() -> int:
                 f"`rustup toolchain install {version} --profile minimal`"
             )
         print(f"checking {len(crates)} crate(s) on {version}: {', '.join(crates)}")
-        proc = subprocess.run(
-            [
-                "cargo",
-                f"+{version}",
-                "check",
-                "--locked",
-                "--manifest-path",
-                str(WORKSPACE),
-                *[arg for crate in crates for arg in ("-p", crate)],
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
+        for features in ([], ["--all-features"]):
+            label = "all features" if features else "default features"
+            proc = subprocess.run(
+                [
+                    "cargo",
+                    f"+{version}",
+                    "check",
+                    "--locked",
+                    "--manifest-path",
+                    str(WORKSPACE),
+                    *[arg for crate in crates for arg in ("-p", crate)],
+                    *features,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode == 0:
+                continue
             print(
-                f"\ncheck_msrv: the publish set does NOT build on {version}, which its "
-                f"manifests promise.\n{proc.stderr.strip()}\n",
+                f"\ncheck_msrv: the publish set does NOT build on {version} with "
+                f"{label}, which its manifests promise.\n{proc.stderr.strip()}\n",
                 file=sys.stderr,
             )
             print(
@@ -127,12 +141,16 @@ def main() -> int:
                 file=sys.stderr,
             )
             failed += 1
+            break
 
     if failed:
         return 1
     total = sum(len(c) for c in by_version.values())
     floors = ", ".join(sorted(by_version))
-    print(f"check_msrv: OK — {total} crates build on their declared floor ({floors})")
+    print(
+        f"check_msrv: OK — {total} crates build on their declared floor ({floors}), "
+        "with default features and with --all-features"
+    )
     return 0
 
 

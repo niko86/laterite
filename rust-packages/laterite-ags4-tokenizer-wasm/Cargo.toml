@@ -21,7 +21,7 @@
 name = "laterite-ags4-tokenizer-wasm"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Tiny browser wasm: the shared AGS4 line tokenizer + field quoter"
 license = "MIT"
 publish = false

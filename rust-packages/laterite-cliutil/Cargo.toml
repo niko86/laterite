@@ -26,9 +26,7 @@
 name = "laterite-cliutil"
 version = "0.1.0"  # per-crate since #1108 — bump via tools/release/bump_crate.py
 edition = "2024"
-# 1.88, above the tier's 1.85: comfy-table 8 requires it, which check_msrv.py
-# found the day this crate joined the publish set (#1108).
-rust-version = "1.88"
+rust-version = "1.89"
 description = "Shared CLI presentation (spinner, table, colour, JSON) for the AGS4 CLI binaries"
 license = "MIT"
 repository.workspace = true

@@ -14,10 +14,7 @@
 name = "laterite-ags4-excel"
 version = "0.15.2"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
-# 1.88, not the workspace's usual 1.85: calamine, rust_xlsxwriter and zip all
-# require 1.88, so a lower promise here would send a 1.85 consumer a crate that
-# cannot compile. check_msrv.py builds this crate on exactly this floor.
-rust-version = "1.88"
+rust-version = "1.89"
 description = "AGS4 ↔ XLSX conversion (rough extraction from laterite-ags4-core; slated for rewrite into a general Excel library)"
 license = "MIT"
 repository.workspace = true

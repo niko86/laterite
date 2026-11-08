@@ -22,7 +22,7 @@
 name = "laterite-ags4-emit"
 version = "0.21.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "AGS4 producer — typed data -> valid AGS4 plaintext, DuckDB-free + wasm-safe"
 license = "MIT"
 repository.workspace = true
@@ -67,7 +67,7 @@ encoding_rs = "0.8"
 # (laterite-ags4-wasm, off an Arrow IPC stream) — so the conversion lives in one
 # place, not copied per host. default-features=false keeps it lean (no
 # csv/json/ipc/prettyprint→comfy-table); v59 matches every other arrow pin.
-arrow = { version = "59", default-features = false, optional = true }
+arrow = { version = "60", default-features = false, optional = true }
 
 [dev-dependencies]
 # Property tests for the writer's quote-escaping round-trip. Already vendored +

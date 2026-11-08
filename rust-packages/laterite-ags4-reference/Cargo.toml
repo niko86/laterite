@@ -16,7 +16,7 @@
 name = "laterite-ags4-reference"
 version = "0.16.1"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "AGS4 reference data: the multi-edition dictionary registry, single-sourced from ags_dictionary.json (a wasm-safe leaf)"
 license = "MIT"
 repository.workspace = true

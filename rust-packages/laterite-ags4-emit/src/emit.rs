@@ -1053,14 +1053,9 @@ impl SynthAccumulator {
         // Only when the caller supplied one. Without a stamp we emit NO TRAN
         // and let Rule 14 report it — see `EmitOpts::tran` for why a
         // placeholder is worse than an absence.
-        //
-        // `filter` rather than the `&& let` chain this obviously wants to be:
-        // let chains stabilised in 1.88, and this crate's `rust-version`
-        // promises 1.85. The nested-`if` alternative reads better but trips
-        // clippy's `collapsible_if`, whose suggested fix is the let chain
-        // again. Don't "simplify" this back — `msrv` in CI will catch it,
-        // which is how it was found.
-        if let Some(t) = tran.filter(|_| !self.present.contains("TRAN")) {
+        if let Some(t) = tran
+            && !self.present.contains("TRAN")
+        {
             let g = synth_tran(dict, t);
             self.units.extend(collect_units(std::iter::once(&g)));
             self.types.extend(collect_types(std::iter::once(&g)));

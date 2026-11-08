@@ -15,7 +15,7 @@
 name = "laterite-transport"
 version = "0.12.0"  # per-crate since #781 — bump via tools/release/bump_crate.py
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Shared zstd + age passphrase file transport (pack/unpack/lock/unlock)"
 license = "MIT"
 repository.workspace = true

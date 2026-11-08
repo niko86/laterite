@@ -27,7 +27,7 @@ name = "laterite-py"
 # that contains it.
 version = "0.16.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "PyO3 bindings exposing the clean-room laterite-ags4-validator engine to Python (laterite)"
 license = "MIT"
 publish = false
@@ -120,19 +120,19 @@ laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.14.0", fea
 # arrow 59 (matching pyo3-arrow 0.18) for the emit *consume* direction:
 # read each cell out of the RecordBatch DuckDB streams in. ArrayFormatter
 # (default features) is the robust fallback for temporal/decimal columns.
-arrow = "59"
+arrow = "60"
 # abi3-py312: build against the CPython 3.12 limited API (stable ABI) so ONE
 # `cp312-abi3` wheel per platform runs on 3.12+. Feasible *because* the boundary
 # carries plain primitives, not pyo3-polars (no per-CPython polars ABI coupling).
 # The floor is 3.12, not lower, because the generated #[pyclass(dict)] classes
 # need the 3.12 limited API (`dict` isn't exposed below it). Proven on
-pyo3 = { version = "0.29", features = ["extension-module", "chrono", "abi3-py312"] }
+pyo3 = { version = "0.30", features = ["extension-module", "chrono", "abi3-py312"] }
 # Zero-copy Arrow boundary for the read path: wraps the RecordBatch laterite-ags4-types
 # builds and hands it to Python as an Arrow PyCapsule (PyTable ->
 # __arrow_c_stream__), which polars ingests pyarrow-free. arrow 59 + pyo3 0.29
 # match our pins; the capsule protocol is the Arrow C Data Interface (NOT the
 # pyo3-polars ABI coupling), so the single cp312-abi3 wheel still holds.
-pyo3-arrow = "0.19"
+pyo3-arrow = "0.21"
 # MUST mirror laterite-ags4-validator's serde_json feature set: the CLI's
 # `--json` output is built with `preserve_order` (insertion-ordered
 # Map). Byte-faithful CLI JSON parity depends on this matching.

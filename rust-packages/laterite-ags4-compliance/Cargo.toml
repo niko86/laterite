@@ -19,7 +19,7 @@
 name = "laterite-ags4-compliance"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Cross-surface findings-agreement harness over python-ags4's fixtures (#169)"
 license = "MIT"
 publish = false

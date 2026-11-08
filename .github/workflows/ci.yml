@@ -579,7 +579,7 @@ jobs:
   # remedy for either being wrong is a version bump every consumer must follow.
   #
   # Its own job rather than steps on `rust` because it needs two extra
-  # toolchains (nightly for rustdoc JSON, 1.85 for the MSRV floor) and two extra
+  # toolchains (nightly for rustdoc JSON, 1.89 for the MSRV floor) and two extra
   # cargo subcommands. Putting that on the critical path of every PR to run a
   # check that only matters to ten of the twenty-four crates is a poor trade;
   # `rust` stays lean and this runs beside it.
@@ -633,23 +633,19 @@ jobs:
       # change, and each drift reddened a quiet `main` and read to the nightly
       # cut as removed API. Stdlib-only, so `python3` works before uv exists.
       #
-      # `1.85`: the `rust-version` most crates declare. It is a promise
+      # `1.89`: the `rust-version` every crate declares (#1188). It is a promise
       # to a stranger's toolchain, and until this job existed nothing tested it —
       # the first run found a let chain (stable in 1.88) in laterite-ags4-emit,
-      # so the promise had already been broken for a while.
-      #
-      # `1.88`: laterite-ags4-excel's own floor — its XLSX deps (calamine,
-      # rust_xlsxwriter, zip) all require 1.88, a fact nothing checked until the
-      # crate joined the publish set (dec-facade-parity phase 5). laterite-cliutil
-      # and laterite-ags4-parity share it since #1108 (comfy-table 8). check_msrv.py
-      # groups crates by declared floor and builds each group on its own, and it
-      # dies loudly here if a declared floor has no toolchain — so a third floor
-      # cannot pass silently, only fail asking for its install line.
+      # so the promise had already been broken for a while. The floor used to be
+      # split (1.85, with 1.88 for the XLSX and CLI-table crates); arrow 60 needed
+      # 1.88 as well, and 1.89 is the highest any dependency's newest release asked
+      # for, so it became one number. check_msrv.py groups crates by declared floor
+      # and dies loudly here if a floor has no toolchain, so a second floor cannot
+      # pass silently, only fail asking for its install line.
       - name: Install the nightly + MSRV toolchains
         run: |
           rustup toolchain install "$(python3 tools/check_public_api.py --print-toolchain)" --profile minimal
-          rustup toolchain install 1.85 --profile minimal
-          rustup toolchain install 1.88 --profile minimal
+          rustup toolchain install 1.89 --profile minimal
 
       # No build-accel: that turns on the self-hosted pool's sccache + mold, and
       # this job does not run there. Swatinem is the cache instead — same reason
@@ -672,9 +668,9 @@ jobs:
         with:
           enable-cache: false
 
-      # LIBRARIES ONLY — no `--all-targets`. A consumer on 1.85 compiles the
-      # library; they never build our benches, and `criterion` (a dev-dependency)
-      # requires 1.86. Widening this to --all-targets would fail on a dependency
+      # LIBRARIES ONLY — no `--all-targets`. A consumer compiles the library;
+      # they never build our benches, and a dev-dependency's floor is not part of
+      # the promise. Widening this to --all-targets would fail on a dependency
       # that is not part of the promise, and the obvious "fix" — raising
       # rust-version — would break the promise to make the gate green.
       - name: MSRV (the publish set builds on the rust-version it declares)
