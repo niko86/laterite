@@ -248,24 +248,24 @@ fn compare(idx: &Index, fixtures: &BTreeSet<String>) -> Report {
             .iter()
             .filter_map(|s| idx.get(*s).and_then(|m| m.get(fx)).map(fyi_set))
             .collect();
-        if let Some(first) = fyis.first() {
-            if !fyis.iter().all(|s| s == first) {
-                rep.fyi_splits.push(fx.clone());
-            }
+        if let Some(first) = fyis.first()
+            && !fyis.iter().all(|s| s == first)
+        {
+            rep.fyi_splits.push(fx.clone());
         }
 
         // (2) python-ags4 leg via classify (verbatim).
-        if let (Some(can), Some(pyf)) = (canonical, idx.get(REFERENCE).and_then(|m| m.get(fx))) {
-            if let Some(cf) = idx[can].get(fx) {
-                let verdict = classify(&floor_result(cf), &py_floor(pyf));
-                match &verdict {
-                    Parity::Agree => rep.py_agree += 1,
-                    Parity::KnownDivergence { observation, .. } => {
-                        rep.py_known.push((fx.clone(), observation.clone()));
-                    }
-                    Parity::PythonError { .. } => rep.py_error += 1,
-                    _ => rep.actions.push((fx.clone(), verdict)),
+        if let (Some(can), Some(pyf)) = (canonical, idx.get(REFERENCE).and_then(|m| m.get(fx)))
+            && let Some(cf) = idx[can].get(fx)
+        {
+            let verdict = classify(&floor_result(cf), &py_floor(pyf));
+            match &verdict {
+                Parity::Agree => rep.py_agree += 1,
+                Parity::KnownDivergence { observation, .. } => {
+                    rep.py_known.push((fx.clone(), observation.clone()));
                 }
+                Parity::PythonError { .. } => rep.py_error += 1,
+                _ => rep.actions.push((fx.clone(), verdict)),
             }
         }
     }

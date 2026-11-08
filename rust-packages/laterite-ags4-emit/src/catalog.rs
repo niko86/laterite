@@ -61,10 +61,10 @@ where
         for (ci, ty) in g.types().iter().enumerate() {
             if ty.trim() == "PU" {
                 for row in 0..g.row_count() {
-                    if let Some(v) = g.cell(row, ci).map(str::trim) {
-                        if !v.is_empty() {
-                            units.insert(v.to_string());
-                        }
+                    if let Some(v) = g.cell(row, ci).map(str::trim)
+                        && !v.is_empty()
+                    {
+                        units.insert(v.to_string());
                     }
                 }
             }

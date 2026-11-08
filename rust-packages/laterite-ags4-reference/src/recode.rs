@@ -564,10 +564,10 @@ pub fn plan_rewrite(files: &[ParsedFile], dict: &Dictionary<'_>, mapping: &Mappi
             if let Some(cc) = cc {
                 out.edits.push(edit(i, ABBR, r, cc, to.clone()));
             }
-            if let (Some(dc), Some(desc)) = (dc, dict.abbr_desc(h, to)) {
-                if value(g, r, dc) != desc {
-                    out.edits.push(edit(i, ABBR, r, dc, desc.to_string()));
-                }
+            if let (Some(dc), Some(desc)) = (dc, dict.abbr_desc(h, to))
+                && value(g, r, dc) != desc
+            {
+                out.edits.push(edit(i, ABBR, r, dc, desc.to_string()));
             }
         }
     }

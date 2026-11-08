@@ -1225,10 +1225,10 @@ fn collect_pa_cells(g: &OwnedGroup, seen: &mut BTreeSet<(String, String)>) {
         if ty.trim() == "PA" {
             let heading = g.headings.get(ci).map_or("", String::as_str);
             for row in &g.rows {
-                if let Some(cell) = row.get(ci) {
-                    if !cell.is_empty() {
-                        seen.insert((heading.to_string(), cell.clone()));
-                    }
+                if let Some(cell) = row.get(ci)
+                    && !cell.is_empty()
+                {
+                    seen.insert((heading.to_string(), cell.clone()));
                 }
             }
         }

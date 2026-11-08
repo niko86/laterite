@@ -119,10 +119,10 @@ impl App {
     }
 
     fn toggle_current(&mut self) {
-        if let Some(v) = self.state.selected() {
-            if let Some(&i) = self.visible.get(v) {
-                self.rows[i].sel = !self.rows[i].sel;
-            }
+        if let Some(v) = self.state.selected()
+            && let Some(&i) = self.visible.get(v)
+        {
+            self.rows[i].sel = !self.rows[i].sel;
         }
     }
 

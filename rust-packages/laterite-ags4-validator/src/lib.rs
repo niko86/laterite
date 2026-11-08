@@ -381,10 +381,11 @@ fn guard_4_0_4(
     kind: DictResolution,
     parsed: &parse::ParsedFile,
 ) -> (DictVersion, DictResolution, Option<&'static str>) {
-    if dv == DictVersion::V4_0_3 && kind != DictResolution::Forced {
-        if let Some(h) = first_post_4_0_3_heading(parsed) {
-            return (DictVersion::V4_0_4, DictResolution::GuessedPatch, Some(h));
-        }
+    if dv == DictVersion::V4_0_3
+        && kind != DictResolution::Forced
+        && let Some(h) = first_post_4_0_3_heading(parsed)
+    {
+        return (DictVersion::V4_0_4, DictResolution::GuessedPatch, Some(h));
     }
     (dv, kind, None)
 }

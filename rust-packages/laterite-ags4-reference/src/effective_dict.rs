@@ -310,10 +310,10 @@ impl<'a> EffectiveDict<'a> {
     fn fields_with_status(&self, group: &str, want: &str) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         for h in self.std.group_headings(group).iter() {
-            if let Some(e) = self.std.heading(group, h) {
-                if e.status.to_ascii_uppercase().contains(want) {
-                    out.push((*h).to_string());
-                }
+            if let Some(e) = self.std.heading(group, h)
+                && e.status.to_ascii_uppercase().contains(want)
+            {
+                out.push((*h).to_string());
             }
         }
         for h in self.file.headings(group) {
