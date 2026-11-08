@@ -376,64 +376,62 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings, dict: Dictionary<'_>
     //    into the TRAN DATA row's TRAN_DLIM / TRAN_RCON cell. The findings
     //    are line-only (whole-row), so re-derive the exact cell span from
     //    the ParsedFile, matching how rule_11 itself locates the column.
-    if found.contains_key(RULE_11A) || found.contains_key(RULE_11B) {
-        if let Some(tran) = parsed.groups.get("TRAN") {
-            if let Some(data) = tran.rows.first() {
-                let raw = line_text.get(&data.line).copied();
-                let mut insert = |col: &str, repl: &str, rule: &str, kind: FixKind, label: &str| {
-                    let (Some(ci), Some(raw)) = (tran.headings.iter().position(|h| h == col), raw)
-                    else {
-                        return;
-                    };
-                    // Only propose when the cell is actually empty (the
-                    // finding fired). field_span gives the inner span — for
-                    // an empty `""` field that's a zero-width point just
-                    // inside the quotes, exactly where the value belongs.
-                    let cur = tran.value_at(data, ci).unwrap_or("");
-                    if !cur.is_empty() {
-                        return;
-                    }
-                    // `ci` is TRAN_DLIM/TRAN_RCON's column index within the
-                    // TRAN group — bounded by TRAN's heading count
-                    // (dictionary-bounded), nowhere near u32::MAX.
-                    #[allow(clippy::cast_possible_truncation)]
-                    let Some((s, e)) = field_span(raw, ci as u32) else {
-                        return;
-                    };
-                    fixes.push(Fix {
-                        kind,
-                        label: label.to_string(),
-                        rule: rule.to_string(),
-                        line: Some(data.line),
-                        risk: FixRisk::Safe,
-                        edits: vec![SpanEdit {
-                            line: data.line,
-                            start: s,
-                            end: e,
-                            replacement: repl.to_string(),
-                            expected: String::new(), // empty cell
-                        }],
-                    });
-                };
-                if found.contains_key(RULE_11A) {
-                    insert(
-                        "TRAN_DLIM",
-                        "|",
-                        RULE_11A,
-                        FixKind::InsertTranDlim,
-                        "Insert the default record-link delimiter \"|\" into TRAN_DLIM (Rule 11a)",
-                    );
-                }
-                if found.contains_key(RULE_11B) {
-                    insert(
-                        "TRAN_RCON",
-                        "+",
-                        RULE_11B,
-                        FixKind::InsertTranRcon,
-                        "Insert the default record-link concatenator \"+\" into TRAN_RCON (Rule 11b)",
-                    );
-                }
+    if (found.contains_key(RULE_11A) || found.contains_key(RULE_11B))
+        && let Some(tran) = parsed.groups.get("TRAN")
+        && let Some(data) = tran.rows.first()
+    {
+        let raw = line_text.get(&data.line).copied();
+        let mut insert = |col: &str, repl: &str, rule: &str, kind: FixKind, label: &str| {
+            let (Some(ci), Some(raw)) = (tran.headings.iter().position(|h| h == col), raw) else {
+                return;
+            };
+            // Only propose when the cell is actually empty (the
+            // finding fired). field_span gives the inner span — for
+            // an empty `""` field that's a zero-width point just
+            // inside the quotes, exactly where the value belongs.
+            let cur = tran.value_at(data, ci).unwrap_or("");
+            if !cur.is_empty() {
+                return;
             }
+            // `ci` is TRAN_DLIM/TRAN_RCON's column index within the
+            // TRAN group — bounded by TRAN's heading count
+            // (dictionary-bounded), nowhere near u32::MAX.
+            #[allow(clippy::cast_possible_truncation)]
+            let Some((s, e)) = field_span(raw, ci as u32) else {
+                return;
+            };
+            fixes.push(Fix {
+                kind,
+                label: label.to_string(),
+                rule: rule.to_string(),
+                line: Some(data.line),
+                risk: FixRisk::Safe,
+                edits: vec![SpanEdit {
+                    line: data.line,
+                    start: s,
+                    end: e,
+                    replacement: repl.to_string(),
+                    expected: String::new(), // empty cell
+                }],
+            });
+        };
+        if found.contains_key(RULE_11A) {
+            insert(
+                "TRAN_DLIM",
+                "|",
+                RULE_11A,
+                FixKind::InsertTranDlim,
+                "Insert the default record-link delimiter \"|\" into TRAN_DLIM (Rule 11a)",
+            );
+        }
+        if found.contains_key(RULE_11B) {
+            insert(
+                "TRAN_RCON",
+                "+",
+                RULE_11B,
+                FixKind::InsertTranRcon,
+                "Insert the default record-link concatenator \"+\" into TRAN_RCON (Rule 11b)",
+            );
         }
     }
 
@@ -735,95 +733,95 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings, dict: Dictionary<'_>
     //    is then the only thing telling those rows apart, and a safe fix must
     //    not trade a Rule 16 finding for a Rule 10a one. Those cells keep their
     //    Rule 16 error and padding FYI; the rest of the file is still fixed.
-    if found.contains_key(RULE_16) {
-        if let Some(lookup) = AbbrLookup::of(parsed) {
-            let mut repairs: BTreeMap<(&str, &str), String> = BTreeMap::new();
-            for code in &parsed.group_order {
-                let g = &parsed.groups[code];
-                for (ci, ty) in g.types.iter().enumerate() {
-                    if ty.trim() != "PA" {
-                        continue;
-                    }
-                    let Some(hd) = g.headings.get(ci) else {
-                        continue;
-                    };
-                    for row in &g.rows {
-                        let Some(v) = g.value_at(row, ci) else {
-                            continue;
-                        };
-                        if repairs.contains_key(&(hd.as_str(), v)) {
-                            continue;
-                        }
-                        if let Some(r) = lookup.trim_repair(hd, v) {
-                            repairs.insert((hd.as_str(), v), r);
-                        }
-                    }
+    if found.contains_key(RULE_16)
+        && let Some(lookup) = AbbrLookup::of(parsed)
+    {
+        let mut repairs: BTreeMap<(&str, &str), String> = BTreeMap::new();
+        for code in &parsed.group_order {
+            let g = &parsed.groups[code];
+            for (ci, ty) in g.types.iter().enumerate() {
+                if ty.trim() != "PA" {
+                    continue;
                 }
-            }
-            // Greedy, in (heading, value) order: each candidate is judged with
-            // the ones already accepted applied, so two trims that are harmless
-            // alone but collide together cannot both get through.
-            let eff = EffectiveDict::build(parsed, dict);
-            let mut accepted: BTreeMap<(&str, &str), String> = BTreeMap::new();
-            for (key, repaired) in repairs {
-                accepted.insert(key, repaired);
-                if trims_merge_keys(parsed, &eff, &accepted) {
-                    accepted.remove(&key);
-                }
-            }
-            for ((hd, v), repaired) in accepted {
-                let mut edits = Vec::new();
-                for code in &parsed.group_order {
-                    let g = &parsed.groups[code];
-                    let Some(ci) = g.headings.iter().position(|h| h == hd) else {
-                        continue;
-                    };
-                    for row in &g.rows {
-                        if g.value_at(row, ci) != Some(v) {
-                            continue;
-                        }
-                        let Some(raw) = line_text.get(&row.line) else {
-                            continue;
-                        };
-                        // `ci` is a heading's column index within one AGS4
-                        // group — dictionary-bounded, nowhere near u32::MAX.
-                        #[allow(clippy::cast_possible_truncation)]
-                        let Some((s, e)) = field_span(raw, ci as u32) else {
-                            continue;
-                        };
-                        // The on-disk slice, not `v`: a quote inside a quoted
-                        // field is doubled there, and the guard compares bytes.
-                        let expected: String = raw
-                            .chars()
-                            .skip(s as usize)
-                            .take((e - s) as usize)
-                            .collect();
-                        edits.push(SpanEdit {
-                            line: row.line,
-                            start: s,
-                            end: e,
-                            replacement: repaired.replace('"', "\"\""),
-                            expected,
-                        });
-                    }
-                }
-                let Some(line) = edits.first().map(|ed| ed.line) else {
+                let Some(hd) = g.headings.get(ci) else {
                     continue;
                 };
-                let n = edits.len();
-                fixes.push(Fix {
-                    kind: FixKind::TrimAbbreviation,
-                    label: format!(
-                        "Trim the whitespace around abbreviation {v:?} → {repaired:?} under {hd} \
-                         ({n} cell{}, Rule 16)",
-                        if n == 1 { "" } else { "s" }
-                    ),
-                    rule: RULE_16.to_string(),
-                    line: Some(line),
-                    risk: FixRisk::Safe,
-                    edits,
-                });
+                for row in &g.rows {
+                    let Some(v) = g.value_at(row, ci) else {
+                        continue;
+                    };
+                    if repairs.contains_key(&(hd.as_str(), v)) {
+                        continue;
+                    }
+                    if let Some(r) = lookup.trim_repair(hd, v) {
+                        repairs.insert((hd.as_str(), v), r);
+                    }
+                }
             }
+        }
+        // Greedy, in (heading, value) order: each candidate is judged with
+        // the ones already accepted applied, so two trims that are harmless
+        // alone but collide together cannot both get through.
+        let eff = EffectiveDict::build(parsed, dict);
+        let mut accepted: BTreeMap<(&str, &str), String> = BTreeMap::new();
+        for (key, repaired) in repairs {
+            accepted.insert(key, repaired);
+            if trims_merge_keys(parsed, &eff, &accepted) {
+                accepted.remove(&key);
+            }
+        }
+        for ((hd, v), repaired) in accepted {
+            let mut edits = Vec::new();
+            for code in &parsed.group_order {
+                let g = &parsed.groups[code];
+                let Some(ci) = g.headings.iter().position(|h| h == hd) else {
+                    continue;
+                };
+                for row in &g.rows {
+                    if g.value_at(row, ci) != Some(v) {
+                        continue;
+                    }
+                    let Some(raw) = line_text.get(&row.line) else {
+                        continue;
+                    };
+                    // `ci` is a heading's column index within one AGS4
+                    // group — dictionary-bounded, nowhere near u32::MAX.
+                    #[allow(clippy::cast_possible_truncation)]
+                    let Some((s, e)) = field_span(raw, ci as u32) else {
+                        continue;
+                    };
+                    // The on-disk slice, not `v`: a quote inside a quoted
+                    // field is doubled there, and the guard compares bytes.
+                    let expected: String = raw
+                        .chars()
+                        .skip(s as usize)
+                        .take((e - s) as usize)
+                        .collect();
+                    edits.push(SpanEdit {
+                        line: row.line,
+                        start: s,
+                        end: e,
+                        replacement: repaired.replace('"', "\"\""),
+                        expected,
+                    });
+                }
+            }
+            let Some(line) = edits.first().map(|ed| ed.line) else {
+                continue;
+            };
+            let n = edits.len();
+            fixes.push(Fix {
+                kind: FixKind::TrimAbbreviation,
+                label: format!(
+                    "Trim the whitespace around abbreviation {v:?} → {repaired:?} under {hd} \
+                         ({n} cell{}, Rule 16)",
+                    if n == 1 { "" } else { "s" }
+                ),
+                rule: RULE_16.to_string(),
+                line: Some(line),
+                risk: FixRisk::Safe,
+                edits,
+            });
         }
     }
 
@@ -1201,16 +1199,16 @@ fn numeric_reformat(code: &str) -> Option<Box<dyn Fn(f64) -> String>> {
         ("SF", 1),    // 1 = sf
         ("DP", 2),    // 2 = dp
     ] {
-        if let Some(prefix) = c.strip_suffix(suffix) {
-            if !prefix.is_empty() && prefix.bytes().all(|b| b.is_ascii_digit()) {
-                if let Ok(n) = prefix.parse::<usize>() {
-                    return Some(match build {
-                        0 => Box::new(move |v| format_nsci(v, n)),
-                        1 => Box::new(move |v| format_nsf(v, n)),
-                        _ => Box::new(move |v| format_ndp(v, n)),
-                    });
-                }
-            }
+        if let Some(prefix) = c.strip_suffix(suffix)
+            && !prefix.is_empty()
+            && prefix.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(n) = prefix.parse::<usize>()
+        {
+            return Some(match build {
+                0 => Box::new(move |v| format_nsci(v, n)),
+                1 => Box::new(move |v| format_nsf(v, n)),
+                _ => Box::new(move |v| format_ndp(v, n)),
+            });
         }
     }
     None

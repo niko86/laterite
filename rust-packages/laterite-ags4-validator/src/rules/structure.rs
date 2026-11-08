@@ -131,16 +131,16 @@ fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut impl Sink) {
             // UNIT must sit immediately below HEADING. If HEADING is
             // absent, Rule 4 reports that; we only judge placement
             // when we have a HEADING to anchor to.
-            if let Some(hl) = g.heading_line {
-                if ul != hl + 1 {
-                    add(
-                        found,
-                        RULE_2B,
-                        Some(ul),
-                        &g.code,
-                        "UNIT row is misplaced — it must be immediately below the HEADING row.",
-                    );
-                }
+            if let Some(hl) = g.heading_line
+                && ul != hl + 1
+            {
+                add(
+                    found,
+                    RULE_2B,
+                    Some(ul),
+                    &g.code,
+                    "UNIT row is misplaced — it must be immediately below the HEADING row.",
+                );
             }
         }
     }
@@ -154,16 +154,16 @@ fn rule_2b(g: &crate::parse::ParsedGroup, found: &mut impl Sink) {
             "TYPE row missing from group.",
         ),
         Some(tl) => {
-            if let Some(ul) = g.unit_line {
-                if tl != ul + 1 {
-                    add(
-                        found,
-                        RULE_2B,
-                        Some(tl),
-                        &g.code,
-                        "TYPE row is misplaced — it must be immediately below the UNIT row.",
-                    );
-                }
+            if let Some(ul) = g.unit_line
+                && tl != ul + 1
+            {
+                add(
+                    found,
+                    RULE_2B,
+                    Some(tl),
+                    &g.code,
+                    "TYPE row is misplaced — it must be immediately below the UNIT row.",
+                );
             }
         }
     }

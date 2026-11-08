@@ -828,30 +828,29 @@ fn merged_type(
 
             // Promote: only when the whole clash lives in the nDP family. `collect`
             // into Option short-circuits to None the moment one code isn't nDP.
-            if opts.on_type_clash == TypeClashMode::Promote {
-                if let Some(places) = distinct
+            if opts.on_type_clash == TypeClashMode::Promote
+                && let Some(places) = distinct
                     .iter()
                     .map(|t| decimal_places(t))
                     .collect::<Option<Vec<usize>>>()
-                {
-                    let n = places.into_iter().max().expect("2+ distinct codes");
-                    let ty = format!("{n}DP");
-                    warnings.push(MergeWarning {
-                        kind: "type_promoted",
-                        group: Some(code.to_string()),
-                        heading: Some(heading.to_string()),
-                        message: format!(
-                            "files disagree on TYPE {distinct:?}; promoted to {ty} (the greatest \
+            {
+                let n = places.into_iter().max().expect("2+ distinct codes");
+                let ty = format!("{n}DP");
+                warnings.push(MergeWarning {
+                    kind: "type_promoted",
+                    group: Some(code.to_string()),
+                    heading: Some(heading.to_string()),
+                    message: format!(
+                        "files disagree on TYPE {distinct:?}; promoted to {ty} (the greatest \
                              precision declared) and zero-padded the lower-precision values — no \
                              digit is changed, but the merged file asserts {n} decimal places"
-                        ),
-                        case: None,
-                    });
-                    return Ok(TypeResolution {
-                        ty,
-                        pad_to: Some(n),
-                    });
-                }
+                    ),
+                    case: None,
+                });
+                return Ok(TypeResolution {
+                    ty,
+                    pad_to: Some(n),
+                });
             }
 
             // Widen — and promote's fallback for anything the nDP join can't reach.
@@ -1076,14 +1075,13 @@ fn reconcile_rows(
                 // never a revision, even when the column's TYPE widened around them
                 // (e.g. 2DP→X) — the type change would otherwise make equal bytes
                 // compare unequal across the type boundary.
-                if keyed && from_earlier_file {
-                    if let Some(old) = &order[slot][ui] {
-                        if old.value != v
-                            && parse_value(Some(&old.value), &old.ty) != parse_value(Some(v), &nt)
-                        {
-                            changed.push(h.clone());
-                        }
-                    }
+                if keyed
+                    && from_earlier_file
+                    && let Some(old) = &order[slot][ui]
+                    && old.value != v
+                    && parse_value(Some(&old.value), &old.ty) != parse_value(Some(v), &nt)
+                {
+                    changed.push(h.clone());
                 }
                 order[slot][ui] = Some(MCell {
                     value: v.to_string(),

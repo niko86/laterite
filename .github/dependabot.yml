@@ -56,22 +56,16 @@ updates:
       prefix: build
     rebase-strategy: disabled
     groups:
+      # laterite-py hands arrow data to Python through pyo3-arrow, and each
+      # pyo3-arrow release pins one arrow major and one pyo3 minor (numpy follows
+      # pyo3). Proposed apart, every one of them fails to build; arrow 60 did,
+      # twice (#1180, #1190). Listed first so these match before the groups below.
+      pyo3-arrow:
+        patterns: ["pyo3", "pyo3-*", "arrow", "arrow-*", "numpy"]
       cargo:
         update-types: ["minor", "patch"]
       cargo-major:
         update-types: ["major"]
-    # encoding_rs 0.8.40+ declares rust-version 1.88, above the 1.85 floor the
-    # published crates promise, so every proposal fails check_msrv (#1029).
-    # sha2 0.11.1 (1.88) and uuid 1.27+ (up to 1.89) are the same case, and
-    # failed the November cargo group the same way. Drop these when the floor is
-    # raised deliberately, not to make a bump pass.
-    ignore:
-      - dependency-name: "encoding_rs"
-        versions: [">0.8.35"]
-      - dependency-name: "sha2"
-        versions: [">0.11.0"]
-      - dependency-name: "uuid"
-        versions: [">1.26.1"]
 
   # Python deps — the uv workspace (pyproject.toml + uv.lock at the repo root).
   - package-ecosystem: uv

@@ -24,7 +24,7 @@
 name = "laterite-ags4-xcheck"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Cross-surface output-value agreement gate for the laterite AGS4 surfaces"
 license = "MIT"
 publish = false

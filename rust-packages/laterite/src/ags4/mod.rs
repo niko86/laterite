@@ -331,11 +331,6 @@ impl Read {
         // fall back rather than to fail: the whole-file parse is always correct,
         // so an index that cannot be trusted costs time, never accuracy.
         //
-        // Nested rather than a `let ... && ...` chain: let chains are stable in
-        // 1.88 and every crate here declares `rust-version = "1.85"`. That is a
-        // promise to a stranger's toolchain, and the publish gate builds on 1.85
-        // to keep it honest.
-        //
         // The index's offsets are into the ORIGINAL bytes. If an `encoding`
         // override transcoded them, the bytes being parsed are not the bytes the
         // index describes, and slicing would read from the wrong offsets — hence

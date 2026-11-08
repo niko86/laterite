@@ -343,31 +343,31 @@ pub fn ags4_str(value: &Cell, ags_type: &str) -> String {
     // YN values arrive from DuckDB as bool, but AGS4 spec wants the
     // letters `Y` / `N` (Rule 8 type check). `parse_value` does the
     // forward mapping; we do the reverse here.
-    if t == "YN" {
-        if let Cell::Bool(b) = value {
-            return (if *b { "Y" } else { "N" }).to_string();
-        }
+    if t == "YN"
+        && let Cell::Bool(b) = value
+    {
+        return (if *b { "Y" } else { "N" }).to_string();
     }
-    if t == "DT" {
-        if let Cell::Text(s) = value {
-            let trimmed = if let Some(idx) = s.find('.') {
-                let (head, tail) = s.split_at(idx);
-                if tail.trim_start_matches('.').chars().all(|c| c == '0') {
-                    head
-                } else {
-                    s.as_str()
-                }
+    if t == "DT"
+        && let Cell::Text(s) = value
+    {
+        let trimmed = if let Some(idx) = s.find('.') {
+            let (head, tail) = s.split_at(idx);
+            if tail.trim_start_matches('.').chars().all(|c| c == '0') {
+                head
             } else {
                 s.as_str()
-            };
-            if let Some(date_part) = trimmed.strip_suffix("T00:00:00") {
-                return date_part.to_string();
             }
-            // Otherwise keep the ISO 8601 `T` separator. The AGS4.1
-            // spec UNIT for DT columns is typically `yyyy-mm-ddThh:mm:ss`
-            // so this matches the validator's expected form.
-            return trimmed.to_string();
+        } else {
+            s.as_str()
+        };
+        if let Some(date_part) = trimmed.strip_suffix("T00:00:00") {
+            return date_part.to_string();
         }
+        // Otherwise keep the ISO 8601 `T` separator. The AGS4.1
+        // spec UNIT for DT columns is typically `yyyy-mm-ddThh:mm:ss`
+        // so this matches the validator's expected form.
+        return trimmed.to_string();
     }
     if t == "0DP" {
         if let Some(i) = value.as_i64() {

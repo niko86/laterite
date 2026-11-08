@@ -105,10 +105,10 @@ fn resolve_password(args: &PasswordArgs, prompt: &str) -> Result<String, i32> {
         })?;
         return Ok(s.trim_end_matches(['\r', '\n']).to_string());
     }
-    if let Ok(p) = std::env::var("LAT_TRANSPORT_PASSWORD") {
-        if !p.is_empty() {
-            return Ok(p);
-        }
+    if let Ok(p) = std::env::var("LAT_TRANSPORT_PASSWORD")
+        && !p.is_empty()
+    {
+        return Ok(p);
     }
     rpassword::prompt_password(prompt).map_err(|e| {
         eprintln!("error: reading passphrase: {e}");

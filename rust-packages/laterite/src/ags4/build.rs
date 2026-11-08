@@ -218,17 +218,17 @@ impl GroupData {
             ("units", self.units.as_ref()),
             ("types", self.types.as_ref()),
         ] {
-            if let Some(m) = meta {
-                if m.len() != width {
-                    return Err(Error::new(
-                        ErrorKind::InvalidArgument,
-                        format!(
-                            "{}: {what} has {} entries but the group declares {width} headings",
-                            self.code,
-                            m.len()
-                        ),
-                    ));
-                }
+            if let Some(m) = meta
+                && m.len() != width
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidArgument,
+                    format!(
+                        "{}: {what} has {} entries but the group declares {width} headings",
+                        self.code,
+                        m.len()
+                    ),
+                ));
             }
         }
         Ok(GroupInput {

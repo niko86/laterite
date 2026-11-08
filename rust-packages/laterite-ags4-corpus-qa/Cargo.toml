@@ -18,7 +18,7 @@
 name = "laterite-ags4-corpus-qa"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Crawl a share, dogfood the AGS4 validator, parity-check vs python-ags4"
 license = "MIT"
 publish = false

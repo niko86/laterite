@@ -324,10 +324,12 @@ fn render(d: &Doc) -> Vec<u8> {
             // embedded-CR dirt: splice a lone \r inside a quoted DATA cell of the
             // first group's first row (Rule 6). Placed mid-line, never as a
             // terminator, so `str::lines()` keeps it in-line.
-            if d.dirt.cr_in_cell && gi == 0 && ri == 0 {
-                if let Some(pos) = line.find("\",\"") {
-                    line.insert(pos + 3, '\r');
-                }
+            if d.dirt.cr_in_cell
+                && gi == 0
+                && ri == 0
+                && let Some(pos) = line.find("\",\"")
+            {
+                line.insert(pos + 3, '\r');
             }
             lines.push(line);
         }

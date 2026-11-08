@@ -15,7 +15,7 @@
 name = "laterite-ags4-censor"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "Shared AGS4 anonymisation/redaction engine (the scrub convergence leaf)"
 license = "MIT"
 publish = false

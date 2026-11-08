@@ -436,38 +436,38 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
     // --- detail popup (Enter) ------------------------------------------
     // The table truncates wide messages; this shows the full finding,
     // wrapped and scrollable, over a cleared centred panel.
-    if app.detail {
-        if let Some(r) = app.selected_frow() {
-            let label = |t| {
-                Span::styled(
-                    t,
-                    Style::default()
-                        .add_modifier(Modifier::BOLD)
-                        .fg(Color::Cyan),
-                )
-            };
-            let lines = vec![
-                Line::from(vec![
-                    label("Rule   "),
-                    Span::raw(format!("AGS Format Rule {}", r.rule)),
-                ]),
-                Line::from(vec![label("Line   "), Span::raw(r.line.clone())]),
-                Line::from(vec![label("Group  "), Span::raw(r.group.clone())]),
-                Line::from(""),
-                Line::from(r.desc.clone()),
-            ];
-            let area = centered_rect(80, 60, f.area());
-            let popup = Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .scroll((app.detail_scroll, 0))
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Finding — Esc/Enter close · ↑↓ scroll "),
-                );
-            f.render_widget(Clear, area);
-            f.render_widget(popup, area);
-        }
+    if app.detail
+        && let Some(r) = app.selected_frow()
+    {
+        let label = |t| {
+            Span::styled(
+                t,
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Cyan),
+            )
+        };
+        let lines = vec![
+            Line::from(vec![
+                label("Rule   "),
+                Span::raw(format!("AGS Format Rule {}", r.rule)),
+            ]),
+            Line::from(vec![label("Line   "), Span::raw(r.line.clone())]),
+            Line::from(vec![label("Group  "), Span::raw(r.group.clone())]),
+            Line::from(""),
+            Line::from(r.desc.clone()),
+        ];
+        let area = centered_rect(80, 60, f.area());
+        let popup = Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((app.detail_scroll, 0))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Finding — Esc/Enter close · ↑↓ scroll "),
+            );
+        f.render_widget(Clear, area);
+        f.render_widget(popup, area);
     }
 }
 

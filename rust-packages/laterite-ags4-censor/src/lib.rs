@@ -395,38 +395,38 @@ fn scrub_cell(
             v = token.to_string();
             tally.token += 1;
         }
-    } else if let Some(action) = code.and_then(|c| policy.action.get(c)) {
-        if !v.is_empty() {
-            match action {
-                Action::FileHash => {
-                    if v != file_id {
-                        v = file_id.to_string();
-                        tally.pseudonym += 1;
-                    }
+    } else if let Some(action) = code.and_then(|c| policy.action.get(c))
+        && !v.is_empty()
+    {
+        match action {
+            Action::FileHash => {
+                if v != file_id {
+                    v = file_id.to_string();
+                    tally.pseudonym += 1;
                 }
-                Action::Blank => {
-                    v.clear();
-                    tally.blank += 1;
-                }
-                Action::Token => {
-                    v = token.to_string();
-                    tally.token += 1;
-                }
-                Action::Pseudonym => {
-                    if let Some(p) = code.and_then(|c| pseudo.get(c)).and_then(|m| m.get(val)) {
-                        v.clone_from(p);
-                        tally.pseudonym += 1;
-                    }
-                }
-                Action::Brackets => {
-                    let (nv, k) = strip_brackets(&v, token);
-                    if k > 0 {
-                        v = nv;
-                        tally.brackets += k;
-                    }
-                }
-                Action::Skip => {}
             }
+            Action::Blank => {
+                v.clear();
+                tally.blank += 1;
+            }
+            Action::Token => {
+                v = token.to_string();
+                tally.token += 1;
+            }
+            Action::Pseudonym => {
+                if let Some(p) = code.and_then(|c| pseudo.get(c)).and_then(|m| m.get(val)) {
+                    v.clone_from(p);
+                    tally.pseudonym += 1;
+                }
+            }
+            Action::Brackets => {
+                let (nv, k) = strip_brackets(&v, token);
+                if k > 0 {
+                    v = nv;
+                    tally.brackets += k;
+                }
+            }
+            Action::Skip => {}
         }
     }
     // Keyword safety net over every kept cell, post-scrub.

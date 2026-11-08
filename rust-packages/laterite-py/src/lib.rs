@@ -373,12 +373,11 @@ fn validate(
     // genuinely for these bytes but cannot answer THIS question (a different
     // engine fingerprint, a tier it never measured, `check_files`) is not a
     // caller error, and falls through to the trust model's `revalidate_reason`.
-    if strict_cert {
-        if let Some(c) = cert {
-            if !c.is_fresh_for(&bytes) {
-                return Err(stale(&label));
-            }
-        }
+    if strict_cert
+        && let Some(c) = cert
+        && !c.is_fresh_for(&bytes)
+    {
+        return Err(stale(&label));
     }
 
     let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {

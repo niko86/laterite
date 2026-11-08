@@ -56,10 +56,10 @@ fn walk_subtree(
                 if !e.file_type().is_file() || !is_ags(e.path()) {
                     continue;
                 }
-                if let Some(max) = max_bytes {
-                    if e.metadata().map_or(0, |m| m.len()) > max {
-                        continue;
-                    }
+                if let Some(max) = max_bytes
+                    && e.metadata().map_or(0, |m| m.len()) > max
+                {
+                    continue;
                 }
                 out.push(e.path().to_path_buf());
             }

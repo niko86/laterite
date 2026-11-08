@@ -79,18 +79,18 @@ fn classify(code: &str) -> Check {
         ("SF", false, true),
         ("DP", false, false),
     ] {
-        if let Some(prefix) = c.strip_suffix(suffix) {
-            if !prefix.is_empty() && prefix.bytes().all(|b| b.is_ascii_digit()) {
-                if let Ok(n) = prefix.parse::<usize>() {
-                    return if is_sci {
-                        Check::Sci(n)
-                    } else if is_sf {
-                        Check::Sf(n)
-                    } else {
-                        Check::Dp(n)
-                    };
-                }
-            }
+        if let Some(prefix) = c.strip_suffix(suffix)
+            && !prefix.is_empty()
+            && prefix.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(n) = prefix.parse::<usize>()
+        {
+            return if is_sci {
+                Check::Sci(n)
+            } else if is_sf {
+                Check::Sf(n)
+            } else {
+                Check::Dp(n)
+            };
         }
     }
     Check::Skip
@@ -311,30 +311,31 @@ fn flag_duplicate_ids(
     use std::collections::HashMap;
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for row in &g.rows {
-        if let Some(v) = g.value_at(row, ci) {
-            if !v.is_empty() {
-                *counts.entry(v).or_default() += 1;
-            }
+        if let Some(v) = g.value_at(row, ci)
+            && !v.is_empty()
+        {
+            *counts.entry(v).or_default() += 1;
         }
     }
     for (ri, row) in g.rows.iter().enumerate() {
-        if let Some(v) = g.value_at(row, ci) {
-            if !v.is_empty() && counts.get(v).copied().unwrap_or(0) > 1 {
-                add_at(
-                    found,
-                    RULE_8,
-                    Some(row.line),
-                    code,
-                    format!("ID value {v:?} in this {ty} column is not unique."),
-                    Location {
-                        target: Target::Cell,
-                        field_index: Some(ci as u32),
-                        data_row: Some(ri as u32 + 1),
-                        ..Default::default()
-                    },
-                    Severity::Error,
-                );
-            }
+        if let Some(v) = g.value_at(row, ci)
+            && !v.is_empty()
+            && counts.get(v).copied().unwrap_or(0) > 1
+        {
+            add_at(
+                found,
+                RULE_8,
+                Some(row.line),
+                code,
+                format!("ID value {v:?} in this {ty} column is not unique."),
+                Location {
+                    target: Target::Cell,
+                    field_index: Some(ci as u32),
+                    data_row: Some(ri as u32 + 1),
+                    ..Default::default()
+                },
+                Severity::Error,
+            );
         }
     }
 }

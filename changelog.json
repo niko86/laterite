@@ -8,6 +8,13 @@
     "added": [],
     "changed": [
       {
+        "text": "**Breaking:** the `arrow` feature moves to arrow 60. In `laterite-ags4-types` 0.15.0 and `laterite-ags4-emit` 0.22.0, `build_column`, `record_batch_to_ipc`, `emit_ags4_from_arrow` and `ArrowGroup` now take and return arrow 60 types, so a consumer passing arrow 59 values must move too. `laterite-ags4-hostopts` 0.5.0 and `laterite-ags4-merge` 0.20.0 follow, because their APIs name the moved types. core, diff, excel, reference and validator take patch releases for the new pins. The wheel moves to pyo3 0.30 and pyo3-arrow 0.21 alongside, with no change to its Python API.",
+        "breaking": true
+      },
+      {
+        "text": "**Every crate now needs Rust 1.89.** The floor was 1.85, with 1.88 for the XLSX and CLI-table crates. arrow 60 needs 1.88 and `uuid`'s newest release needs 1.89, so the floor became one number, the highest any dependency asks for. `check_msrv.py` now also builds the optional features: before, the `arrow` feature could need a newer Rust than the floor and nothing would notice."
+      },
+      {
         "text": "**The compiled dependency set moves forward.** `rust_xlsxwriter` 0.102 writes the XLSX export, `napi` 3.16 binds the npm addon, and `serde_json`, `toml` and `libc` take patch releases. `sha2` and `uuid` stay where they are, because their newer releases need a Rust newer than the published crates promise."
       },
       {
