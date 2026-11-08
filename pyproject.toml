@@ -29,7 +29,9 @@ dev = [
     "marimo>=0.23.16",
     "pandas<3",
     "pytest>=9.1.1",
-    "pytest-benchmark>=5.2.3",
+    # 5.3.1 is the first that runs under pytest 9.2, which dropped the private
+    # `node._nodeid` 5.3.0 read; the benchmark fixture errored at setup (#1191).
+    "pytest-benchmark>=5.3.1",
     # Property-based testing. Drives `parse_value` totality + the
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
