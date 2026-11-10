@@ -661,18 +661,20 @@ def test_a_cascade_bump_whose_api_names_the_moved_dep_is_a_minor():
 def test_a_public_dep_moved_incompatibly_is_named():
     snap = "impl From<laterite_ags4_parse::ParseError> for laterite_ags4_validator::E"
     moves = rs.public_dep_moves(snap, {PARSE: "^0.13.0"}, {PARSE: "^0.14.0"})
-    assert len(moves) == 1
-    assert PARSE in moves[0]
-    assert rs.required_part(0, 0, False, False, bool(moves)) == "minor"
+    assert len(moves.public) == 1
+    assert PARSE in moves.public[0]
+    assert rs.required_part(0, 0, False, False, bool(moves.public)) == "minor"
     # The same move, code changed, would have been cut as a patch before.
-    assert rs.required_part(0, 0, True, False, bool(moves)) == "minor"
+    assert rs.required_part(0, 0, True, False, bool(moves.public)) == "minor"
 
 
-def test_a_private_dep_move_keeps_todays_verdict():
+def test_a_private_dep_move_keeps_todays_verdict_and_is_said():
     snap = "pub fn laterite_ags4_validator::validate(&str)"
     moves = rs.public_dep_moves(snap, {PARSE: "^0.13.0"}, {PARSE: "^0.14.0"})
-    assert moves == []
-    assert rs.required_part(0, 0, True, False, bool(moves)) == "patch"
+    assert moves.public == []
+    assert rs.required_part(0, 0, True, False, bool(moves.public)) == "patch"
+    # Judged private, not dropped: the report counts it.
+    assert moves.private == [f"{PARSE} ^0.13.0 -> ^0.14.0"]
 
 
 @pytest.mark.parametrize(
@@ -687,15 +689,80 @@ def test_a_private_dep_move_keeps_todays_verdict():
 )
 def test_an_incompatible_move_is_a_caret_break(base, head, moved):
     snap = "laterite_ags4_parse::X"
-    assert bool(rs.public_dep_moves(snap, {PARSE: base}, {PARSE: head})) is moved
+    moves = rs.public_dep_moves(snap, {PARSE: base}, {PARSE: head})
+    assert bool(moves.public) is moved
 
 
-def test_dep_requirements_resolve_workspace_floors():
+# #1194: third-party deps, and the crates a facade dep re-exports.
+
+# Lines in the shape `laterite-ags4-types`' committed snapshot has them: arrow's
+# types are named where they are DEFINED, never as `arrow::`.
+ARROW_SNAP = (
+    "pub fn laterite_ags4_types::arrow_cols::build_column(..) -> "
+    "core::result::Result<arrow_array::array::ArrayRef, arrow_schema::error::ArrowError>"
+)
+ARROW_LOCK = """
+[[package]]
+name = "arrow"
+version = "60.1.0"
+dependencies = ["arrow-array", "arrow-schema", "arrow-ipc"]
+
+[[package]]
+name = "serde_json"
+version = "1.0.145"
+dependencies = ["itoa", "serde", "serde_core"]
+"""
+
+
+def test_a_third_party_dep_named_through_its_reexports_is_public():
+    children = rs.lock_children(ARROW_LOCK)
+    moves = rs.public_dep_moves(ARROW_SNAP, {"arrow": "59"}, {"arrow": "60"}, children)
+    assert moves.public == ["arrow 59 -> 60"]
+
+
+def test_without_the_lock_a_reexporting_dep_reads_private():
+    # The pre-#1194 blind spot, kept as the witness the lock is what closes it.
+    moves = rs.public_dep_moves(ARROW_SNAP, {"arrow": "59"}, {"arrow": "60"})
+    assert moves.public == []
+    assert moves.private == ["arrow 59 -> 60"]
+
+
+def test_a_child_the_crate_depends_on_directly_is_not_claimed():
+    # `serde::` is in the API because of the crate's own `serde` dep; a
+    # serde_json major must not claim it through serde_json's lock children.
+    snap = "impl serde::ser::Serialize for laterite_x::Report"
+    children = rs.lock_children(ARROW_LOCK)
+    base = {"serde": "1", "serde_json": "1"}
+    head = {"serde": "1", "serde_json": "2"}
+    moves = rs.public_dep_moves(snap, base, head, children)
+    assert moves.public == []
+    assert moves.private == ["serde_json 1 -> 2"]
+
+
+def test_lock_children_merges_versions_and_drops_the_version_suffix():
+    lock = """
+[[package]]
+name = "a"
+version = "1.0.0"
+dependencies = ["b 1.0.0"]
+
+[[package]]
+name = "a"
+version = "2.0.0"
+dependencies = ["c"]
+"""
+    assert rs.lock_children(lock) == {"a": {"b", "c"}}
+
+
+def test_dep_requirements_read_every_dependency():
     crate = (
         "[dependencies]\n"
         "laterite-ags4-parse = { workspace = true }\n"
         'laterite-transport = { version = "0.12.0" }\n'
         'serde = "1"\n'
+        'arrow = { version = "60", default-features = false, optional = true }\n'
+        "shared = { workspace = true }\n"
+        'local = { path = "../local" }\n'
         "[dev-dependencies]\n"
         "laterite-ags4-emit = { workspace = true }\n"
     )
@@ -703,11 +770,35 @@ def test_dep_requirements_resolve_workspace_floors():
         "[workspace.dependencies]\n"
         'laterite-ags4-parse = { path = "p", version = "0.14.0" }\n'
         'laterite-ags4-emit = { path = "e", version = "0.20.0" }\n'
+        'shared = "0.3"\n'
     )
-    assert rs.dep_requirements(crate, ws) == {
+    got = rs.dep_requirements(crate, ws)
+    assert got.reqs == {
         PARSE: "0.14.0",
         "laterite-transport": "0.12.0",
+        "serde": "1",
+        "arrow": "60",
+        "shared": "0.3",
     }
+    # Nothing to compare for a bare path dep, so it is reported, not judged.
+    assert got.unread == ["local"]
+
+
+def test_the_report_says_what_the_dep_reading_left_out():
+    status = report_of(
+        rs,
+        default_crate(rs),
+        replace(
+            default_crate(rs),
+            crate="laterite-ags4-emit",
+            deps_moved_private=["rayon 1 -> 2"],
+            deps_unread=["local"],
+        ),
+    )
+    line = rs.dep_scope(status)
+    assert "1 incompatible move(s) judged private" in line
+    assert "1 dep(s) with no readable requirement not judged (local)" in line
+    assert line in rs.render(status)
 
 
 # Gap 3: a facade stamped ahead of crates.io is publish-owed.
