@@ -1186,17 +1186,15 @@ jobs:
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
       # --- laterite-node (npm bindings): lint + format, no wasm needed ---
+      # Installed here, linted after the wasm surface upload below: no check
+      # step may run ahead of that emit (tests/test_compliance_inputs_survive_lints.py).
       - name: node — install
         working-directory: rust-packages/laterite-node
         run: npm ci
-      - name: node — eslint + prettier
-        working-directory: rust-packages/laterite-node
-        run: |
-          npm run lint
-          npm run format:check
 
       # --- web (browser validator): build wasm bindings, then lint + format ---
       - name: web — install
+        id: web-install
         working-directory: web
         run: npm ci
       # The committed copies sync-assets refreshes on every dev and build (the
@@ -1225,7 +1223,11 @@ jobs:
       # Tier 1 stays optimized because the tier-1 ceiling step below measures
       # `src/wasm`. Deploy and e2e still run `build:wasm:all`.
       # tests/test_wasm_opt_scope.py keeps `--no-opt` to this one build.
+      # This step, the emit and the upload run after a failed sync-assets check
+      # too: a drifted icon is not an engine fault, and skipping the emit made
+      # `compliance` report the wasm surface MISSING on #1189.
       - name: web — build wasm bindings (generates the .d.ts the type-aware rules need)
+        if: ${{ !cancelled() && steps.web-install.outcome == 'success' }}
         working-directory: web
         run: npm run build:wasm:lint
 
@@ -1234,16 +1236,23 @@ jobs:
       # browser app ships. Before the lints, so a lint failure cannot also cost
       # the `compliance` job its input.
       - name: compliance — emit the wasm surface
+        if: ${{ !cancelled() && steps.web-install.outcome == 'success' }}
         run: >
           node tools/compliance/emit_js.mjs --surface wasm
           --fixtures "$COMPLIANCE_FIXTURES" --out "$RUNNER_TEMP/compliance"
       - name: Upload the wasm surface
+        if: ${{ !cancelled() && steps.web-install.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: compliance-wasm
           path: ${{ runner.temp }}/compliance/wasm.json
           if-no-files-found: error
           retention-days: 1
+      - name: node — eslint + prettier
+        working-directory: rust-packages/laterite-node
+        run: |
+          npm run lint
+          npm run format:check
       - name: web — eslint + prettier
         working-directory: web
         run: |

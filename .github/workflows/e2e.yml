@@ -91,6 +91,20 @@ jobs:
         # doesn't); it then fetches a matching wasm-bindgen + binaryen on first build.
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
+      # wasm-pack downloads binaryen and wasm-bindgen from GitHub releases on
+      # its first build. A releases outage (504s, #1189) then failed this job
+      # with nothing wrong in the tree. Cached, and the fallback key restores
+      # the last set when Cargo.lock moves, so a download happens only on a
+      # cold cache or a new wasm-bindgen.
+      - name: Point wasm-pack at a cacheable tool dir
+        run: echo "WASM_PACK_CACHE=$HOME/.wasm-pack-cache" >> "$GITHUB_ENV"
+      - name: Cache wasm-pack's downloaded tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.wasm-pack-cache
+          key: wasm-pack-tools-${{ runner.os }}-${{ hashFiles('rust-packages/Cargo.lock') }}
+          restore-keys: wasm-pack-tools-${{ runner.os }}-
+
       - name: Install Node
         # BEFORE the wasm build, which is `npm run` now — the scripts are where
         # the tier-1 feature list is written down, and spelling those flags out

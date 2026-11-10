@@ -28,6 +28,21 @@
 # week it shipped), 7 days for the rest (the yanked-next-day and
 # compromised-tarball classes are usually caught within days). uv supports only
 # the flat default, so every uv bump waits 7 days regardless of size.
+#
+# Fallout a dependency PR does not fix itself. Each of these went red in CI on a
+# bot PR (#1187, #1189, #1191). The fix is a commit pushed to the PR's branch:
+#   * `@napi-rs/cli` regenerates `rust-packages/laterite-node/index.js`, which
+#     the `node` job's drift check holds.
+#   * `lucide-static` writes its version into each icon's licence line:
+#     `npm run sync-assets` in web/ and commit the icons (`check:sync-assets`,
+#     which needs a clean tree).
+#   * An eslint plugin bump can orphan `eslint-disable` directives, which fail
+#     `--max-warnings 0`.
+#   * A pushed commit leaves the bot's changelog waiver (`check_changelog.py
+#     --actor`, which covers version moves only). A maintainer labels the PR
+#     `no-changelog` or the commit adds an entry.
+# A dep raising its minimum Rust past the crates' `rust-version` fails
+# `tools/check_msrv.py`. Either ignore it below or raise the floor.
 version: 2
 updates:
   # GitHub Actions used by the workflows.

@@ -103,6 +103,8 @@ cargo run -p laterite-ags4-corpus-qa -- check <file-or-dir>   # dual-validate ag
 
 ./tools/run_python_ags4_tests.sh                 # python-ags4's own suite vs laterite.compat
                                                  # (parity oracle; needs ../ags-python-library cloned from GitLab)
+
+uv run --no-project python tools/ci_failures.py <pr>   # a red PR: each failed check's step + error lines, one call
 ```
 
 **Run the gates before pushing, in this order.** `tools/check_changelog.py --base
