@@ -200,6 +200,11 @@ class CrateStatus:
     baseline_kind: str
     #: Why `part_required` is what it is, whatever the cut does with it.
     part_why: str
+    #: Deps that moved incompatibly but that the API snapshot does not name, so
+    #: the move was judged private (#1194). Said on every run, never dropped.
+    deps_moved_private: list[str]
+    #: Deps with no readable requirement (bare `path`/`git`): not judged at all.
+    deps_unread: list[str]
 
 
 @dataclass(frozen=True)
@@ -716,26 +721,56 @@ def snapshot_text(crate: str) -> str:
     )
 
 
-def dep_requirements(crate_manifest_text: str, workspace_text: str) -> dict[str, str]:
-    """laterite dep -> the requirement the crate PUBLISHES for it.
+def _workspace_requirements(workspace_text: str) -> dict[str, str]:
+    """Every `[workspace.dependencies]` entry -> its version requirement.
 
-    `[dependencies]` only: a dev-dependency never reaches a consumer, and a
-    build-dependency cannot put its types in the crate's API. A `workspace =
-    true` dep publishes the workspace floor, which is where most of them live.
+    Not `workspace_floors`: that one answers the coherence question, which is
+    about siblings only. A third-party dep declared once for the workspace
+    publishes this requirement too.
     """
-    floors = workspace_floors(workspace_text)
-    deps = tomllib.loads(crate_manifest_text).get("dependencies", {})
+    deps = tomllib.loads(workspace_text).get("workspace", {}).get("dependencies", {})
     out: dict[str, str] = {}
     for name, spec in deps.items():
-        if not name.startswith("laterite"):
-            continue
         if isinstance(spec, str):
             out[name] = spec
         elif isinstance(spec, dict) and isinstance(spec.get("version"), str):
             out[name] = spec["version"]
-        elif isinstance(spec, dict) and spec.get("workspace") and name in floors:
-            out[name] = floors[name]
     return out
+
+
+class DepRequirements(NamedTuple):
+    """What a crate publishes for each dep, and the deps that publish none."""
+
+    reqs: dict[str, str]
+    #: Deps with no readable version requirement (a bare `path` or `git` dep):
+    #: there is nothing to compare, so nothing is judged about them.
+    unread: list[str]
+
+
+def dep_requirements(crate_manifest_text: str, workspace_text: str) -> DepRequirements:
+    """Every dep -> the requirement the crate PUBLISHES for it.
+
+    `[dependencies]` only, optional ones included: a dev-dependency never
+    reaches a consumer, and a build-dependency cannot put its types in the
+    crate's API. Third-party deps count as much as siblings (#1194): arrow
+    59 -> 60 changed `laterite-ags4-types`' signatures for every consumer, and
+    a `laterite`-only filter read it as no move at all. A `workspace = true`
+    dep publishes the workspace requirement.
+    """
+    ws = _workspace_requirements(workspace_text)
+    deps = tomllib.loads(crate_manifest_text).get("dependencies", {})
+    reqs: dict[str, str] = {}
+    unread: list[str] = []
+    for name, spec in deps.items():
+        if isinstance(spec, str):
+            reqs[name] = spec
+        elif isinstance(spec, dict) and isinstance(spec.get("version"), str):
+            reqs[name] = spec["version"]
+        elif isinstance(spec, dict) and spec.get("workspace") and name in ws:
+            reqs[name] = ws[name]
+        else:
+            unread.append(name)
+    return DepRequirements(reqs, sorted(unread))
 
 
 def _caret_line(req: str) -> tuple[int, ...]:
@@ -748,43 +783,97 @@ def _caret_line(req: str) -> tuple[int, ...]:
     return (0, 0, patch)
 
 
+def lock_children(lock_text: str) -> dict[str, set[str]]:
+    """package -> the packages it depends on, across every version in the lock.
+
+    The lock writes a dependency as `name` or, when two versions coexist,
+    `name version`; only the name matters here.
+    """
+    out: dict[str, set[str]] = {}
+    for pkg in tomllib.loads(lock_text).get("package", []):
+        kids = {d.split(" ", 1)[0] for d in pkg.get("dependencies", [])}
+        out.setdefault(pkg["name"], set()).update(kids)
+    return out
+
+
+def api_paths(dep: str, children: dict[str, set[str]], direct: set[str]) -> set[str]:
+    """The crate paths through which `dep`'s types can reach a snapshot.
+
+    Its own, plus those of the crates it depends on: a facade crate re-exports
+    them, and the snapshot names the type where it is DEFINED. `arrow`'s
+    `RecordBatch` reaches `laterite-ags4-types`' snapshot as
+    `arrow_array::RecordBatch`, never `arrow::` (#1194). A child the crate also
+    depends on directly is left to that direct dep, so `serde_json` moving does
+    not claim the `serde::` paths the crate's own `serde` dep put there.
+    """
+    paths = {crate_path(dep)}
+    paths.update(crate_path(c) for c in children.get(dep, set()) - direct)
+    return paths
+
+
+class DepMoves(NamedTuple):
+    """An incompatible-move reading, with what it did not call public."""
+
+    #: Moved incompatibly AND named by the API: each forces a minor.
+    public: list[str]
+    #: Moved incompatibly, but no path of theirs is in the snapshot.
+    private: list[str]
+
+
 def public_dep_moves(
-    snapshot: str, base: dict[str, str], head: dict[str, str]
-) -> list[str]:
+    snapshot: str,
+    base: dict[str, str],
+    head: dict[str, str],
+    children: dict[str, set[str]] | None = None,
+) -> DepMoves:
     """The deps whose requirement moved incompatibly AND that the API names (#1073).
 
     The snapshot names a dep's types by their crate path but never its
     version, so validator 0.19.2's move from `parse ^0.13` to `^0.14` read +0
     -0 and was cut as a patch, while every signature naming a parse type had
     become a different type for its consumers. A dep the snapshot does not
-    name is private: its move changes nothing a consumer can see.
+    name is private: its move changes nothing a consumer can see. `children`
+    (from `lock_children`) lets a dep claim the crates it re-exports.
     """
-    return sorted(
-        f"{dep} {base[dep]} -> {req}"
-        for dep, req in head.items()
-        if dep in base
-        and _caret_line(base[dep]) != _caret_line(req)
-        and crate_path(dep) in snapshot
-    )
+    kids = children or {}
+    direct = set(head)
+    public: list[str] = []
+    private: list[str] = []
+    for dep, req in sorted(head.items()):
+        if dep not in base or _caret_line(base[dep]) == _caret_line(req):
+            continue
+        move = f"{dep} {base[dep]} -> {req}"
+        named = any(path in snapshot for path in api_paths(dep, kids, direct))
+        (public if named else private).append(move)
+    return DepMoves(public, private)
 
 
-def public_moves_since(since: str, crate: str) -> list[str]:
-    """`public_dep_moves` between the manifests at `since` and the working tree."""
+NO_MOVES = DepMoves([], [])
+
+
+def public_moves_since(since: str, crate: str) -> tuple[DepMoves, list[str]]:
+    """`public_dep_moves` between the manifests at `since` and the working tree.
+
+    Also returns the deps the reading could not judge, which the report counts.
+    """
     if not since:
-        return []
+        return NO_MOVES, []
     rel = crate_manifest(crate).relative_to(ROOT)
     base_crate = sh("git", "show", f"{since}:{rel}")
     base_ws = sh("git", "show", f"{since}:{ENGINE_MANIFEST.relative_to(ROOT)}")
     if not base_crate or not base_ws:
-        return []  # the crate did not exist there: nothing to have moved
+        return NO_MOVES, []  # the crate did not exist there: nothing to have moved
     try:
         base = dep_requirements(base_crate, base_ws)
     except tomllib.TOMLDecodeError:
-        return []
+        return NO_MOVES, []
     head = dep_requirements(
         crate_manifest(crate).read_text(), ENGINE_MANIFEST.read_text()
     )
-    return public_dep_moves(snapshot_text(crate), base, head)
+    lock = ENGINE_MANIFEST.with_name("Cargo.lock")
+    children = lock_children(lock.read_text()) if lock.is_file() else {}
+    moves = public_dep_moves(snapshot_text(crate), base.reqs, head.reqs, children)
+    return moves, sorted(set(base.unread) | set(head.unread))
 
 
 def required_part(
@@ -919,6 +1008,18 @@ def registry_scope(status: Report) -> str:
 DELTA_TAG = {"snapshot": "snapshot", "render": "render", "unavailable": "UNMEASURED"}
 
 
+def dep_scope(status: Report) -> str:
+    """What the public-dep reading judged private or could not read (#1194)."""
+    private = sum(len(c.deps_moved_private) for c in status.engine_crates)
+    unread = sorted({d for c in status.engine_crates for d in c.deps_unread})
+    tail = f" ({', '.join(unread)})" if unread else ""
+    return (
+        f"dep moves: {private} incompatible move(s) judged private (no path of theirs "
+        f"in the snapshot), {len(unread)} dep(s) with no readable requirement not "
+        f"judged{tail}."
+    )
+
+
 def delta_scope(status: Report) -> str:
     """Which measure each crate's API delta came from (#998), on every run."""
     sources = [c.api_delta_source for c in status.engine_crates]
@@ -993,8 +1094,8 @@ def collect(
         # it, so stale pins are only a fact about crates the registry already
         # has at their stamped version.
         stale = deps_behind(rows, live, floors) if state == "ok" else []
-        moves = public_moves_since(since, crate)
-        part = required_part(added, removed, code, bool(stale), bool(moves))
+        moves, unread = public_moves_since(since, crate)
+        part = required_part(added, removed, code, bool(stale), bool(moves.public))
         action, why = cut_action(
             state, tier, live, version, part, baseline_kind, bool(stale), delta.note
         )
@@ -1006,9 +1107,10 @@ def collect(
             reasons.append(f"API +{added} -{removed} since {live}")
         if stale:
             reasons.append("published pins left behind: " + "; ".join(stale))
-        if moves:
+        if moves.public:
             reasons.append(
-                "a dependency its API names moved incompatibly: " + "; ".join(moves)
+                "a dependency its API names moved incompatibly: "
+                + "; ".join(moves.public)
             )
         if code and not (added or removed):
             reasons.append("code changed with no API movement")
@@ -1037,6 +1139,8 @@ def collect(
                 api_delta_source=delta.source,
                 baseline_kind=baseline_kind,
                 part_why=part_why,
+                deps_moved_private=moves.private,
+                deps_unread=unread,
             )
         )
     return Report(
@@ -1136,6 +1240,7 @@ def render(s: Report) -> str:
     lines.append("  version whose tag was never cut is still invisible here.")
     lines.append(f"  {registry_scope(s)}")
     lines.append(f"  {delta_scope(s)}")
+    lines.append(f"  {dep_scope(s)}")
     return "\n".join(lines)
 
 

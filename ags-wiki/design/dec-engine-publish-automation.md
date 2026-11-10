@@ -245,7 +245,13 @@ equivalent per-stamp PR review.
     crate's committed API snapshot names the moved dep — the same rule the
     derivation now applies to any incompatible move of a dep the API names,
     which a version-free snapshot showed as `+0 −0` (validator 0.19.2 was cut
-    a patch over `parse ^0.13` → `^0.14`).
+    a patch over `parse ^0.13` → `^0.14`). Until #1194 that derivation read
+    only `laterite*` deps, by their own crate path, so arrow 59 → 60 in
+    types and emit went unseen. A snapshot names a type where it is
+    *defined* (`arrow_array::`, never `arrow::`). So every dep now counts,
+    and `Cargo.lock` lets a dep claim the crates it pulls in. Moves judged
+    private are counted on every report, along with deps that have no
+    readable requirement.
     At most one round per published engine crate: a round that adds no new
     crate, or the limit, fails the job before the PR step. The cut PR lists
     the cascade apart from the owed bumps, each with the floor that caused it.

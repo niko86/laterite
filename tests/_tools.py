@@ -108,6 +108,8 @@ def default_crate(rs: ModuleType):
         api_delta_source="snapshot",
         baseline_kind="publish",
         part_why="",
+        deps_moved_private=[],
+        deps_unread=[],
     )
 
 
