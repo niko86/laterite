@@ -47,7 +47,10 @@ Three bins:
   it: `repo:tools/compliance/emit_python.py` in `build-ext`, and
   `repo:tools/compliance/emit_js.mjs` in `node` and `ts-lint`. The `compliance`
   job adds `emit-rust` and compares. A producer that fails leaves its surface
-  missing, which the comparator fails on by default. The python-ags4 leg is not
+  missing, which the comparator fails on by default. A lint failing in the same
+  job does not: the build, emit and upload still run unless the install failed
+  (`repo:tests/test_compliance_inputs_survive_lints.py`). #1189 is why. The icon
+  drift there reported the wasm surface missing. The python-ags4 leg is not
   part of it: that compares laterite against the incumbent rather than the
   bindings against each other, and nothing in it moves per change.
 
