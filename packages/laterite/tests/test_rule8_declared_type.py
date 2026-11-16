@@ -9,6 +9,7 @@ Pinned on the issue's own repro:
 * a precision-only difference counts; matching and user-defined headings are silent;
 * the edition named is the one validation resolved, an explicit one included;
 * opt-in: without ``fyi=True`` the findings and the verdict are untouched.
+* (#1209) a user-defined heading is compared with its own DICT row's ``DICT_DTYP``.
 """
 
 from __future__ import annotations
@@ -190,3 +191,44 @@ def test_the_key_warning_is_native_only_too():
     errors = AGS4.check_file(io.StringIO(_loca_as_x().decode()))
     assert WARN8 not in errors
     assert not any("Rule" in k for k in errors), sorted(errors)
+
+
+# --- a user-defined heading against the file's own DICT (#1209) ---------------
+
+DICT_GROUP = (
+    '\n"GROUP","DICT"\n'
+    '"HEADING","DICT_TYPE","DICT_GRP","DICT_HDNG","DICT_STAT","DICT_DTYP","DICT_DESC"\n'
+    '"UNIT","","","","","",""\n'
+    '"TYPE","PA","X","X","PA","PT","X"\n'
+    '"DATA","HEADING","LNMC","LNMC_ZZZZ","OTHER","{dtyp}","Moisture by a house method"\n'
+)
+
+
+def _user_heading_with_dict(dtyp: str) -> bytes:
+    """``LNMC_MC`` renamed to the user-defined ``LNMC_ZZZZ`` (TYPE ``X``), with a
+    DICT row declaring it ``dtyp``."""
+    text = _build().replace('"LNMC_MC"\n', '"LNMC_ZZZZ"\n')
+    text = text.replace('"DATA","PA","PA"\n', '"DATA","PA","PA"\n"DATA","PT","PT"\n')
+    return _crlf(text + DICT_GROUP.format(dtyp=dtyp))
+
+
+def test_a_user_defined_heading_is_compared_with_its_dict_row():
+    rep = laterite.validate(_user_heading_with_dict("1DP"), fyi=True)
+    assert _fyi8(rep) == [
+        "LNMC.LNMC_ZZZZ is declared X; the file's own DICT type is 1DP."
+    ]
+    assert _warn8(rep) == []
+    # Agreeing with the DICT row, or a DICT row with no type, says nothing.
+    assert _fyi8(laterite.validate(_user_heading_with_dict("X"), fyi=True)) == []
+    assert _fyi8(laterite.validate(_user_heading_with_dict(""), fyi=True)) == []
+
+
+def test_the_dict_comparison_is_native_only_too():
+    import io
+
+    from laterite import compat as AGS4
+
+    retyped = AGS4.check_file(io.StringIO(_user_heading_with_dict("1DP").decode()))
+    agreeing = AGS4.check_file(io.StringIO(_user_heading_with_dict("X").decode()))
+    assert FYI8 not in retyped and WARN8 not in retyped
+    assert sorted(retyped) == sorted(agreeing)

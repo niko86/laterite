@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**A user-defined heading typed differently from its own DICT row is named** (#1209). The declared-type advisory (O-59) used to compare only standard headings with the dictionary edition. A heading the edition does not define for its group, but which the file's own DICT declares with a `DICT_DTYP`, is now compared with that row: with `fyi=True` / `--show-fyi` a TYPE row differing from it raises one `FYI (Related to Rule 8)` on the group, saying the comparison is with the file's DICT (`XLAB.XLAB_VAL is declared 2DP; the file's own DICT type is 1DP.`), and a KEY heading's raises `Warning (Related to Rule 8)`, shown by default. A standard heading is still judged against the edition only, and a blank TYPE cell or `DICT_DTYP` gives nothing. The verdict never moves. Native surfaces only, as before: `laterite.compat` withholds both labels."
+      }
+    ],
     "changed": [
       {
         "text": "**Breaking:** the `arrow` feature moves to arrow 60. In `laterite-ags4-types` 0.15.0 and `laterite-ags4-emit` 0.22.0, `build_column`, `record_batch_to_ipc`, `emit_ags4_from_arrow` and `ArrowGroup` now take and return arrow 60 types, so a consumer passing arrow 59 values must move too. `laterite-ags4-hostopts` 0.5.0 and `laterite-ags4-merge` 0.20.0 follow, because their APIs name the moved types. core, diff, excel, reference and validator take patch releases for the new pins. The wheel moves to pyo3 0.30 and pyo3-arrow 0.21 alongside, with no change to its Python API.",

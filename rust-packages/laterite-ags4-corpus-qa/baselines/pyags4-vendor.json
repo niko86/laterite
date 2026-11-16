@@ -2,7 +2,7 @@
   "schema": 1,
   "dict_version": "auto",
   "file_count": 83,
-  "finding_count": 951,
+  "finding_count": 953,
   "summary": {
     "clean": 1,
     "findings": 79,
@@ -4977,6 +4977,13 @@
         },
         {
           "rule": "FYI (Related to Rule 8)",
+          "line": 4,
+          "group": "PROJ",
+          "field_index": 8,
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 8)",
           "line": 102,
           "group": "SAMP",
           "field_index": 11,
@@ -5820,6 +5827,13 @@
           "line": 4,
           "group": "PROJ",
           "field_index": 0,
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 8)",
+          "line": 4,
+          "group": "PROJ",
+          "field_index": 8,
           "severity": "fyi"
         },
         {

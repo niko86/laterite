@@ -26,6 +26,7 @@
 //! O-11/O-12/O-13.
 
 use crate::dict::Dictionary;
+use crate::effective_dict::FileDict;
 use crate::findings::{Location, Severity, Sink, Target, add_at};
 use crate::parse::ParsedFile;
 
@@ -206,12 +207,19 @@ pub fn check(parsed: &ParsedFile, found: &mut impl Sink) {
 /// it per file lets that be caught before anyone combines.
 ///
 /// Compared against the BUNDLED standard edition, not `dict`: `dict` may carry
-/// a custom overlay, and a heading only the overlay or the file's DICT defines
-/// has no standard type to differ from. Any difference counts, precision
-/// included (`2DP` against `3DP` formats every value differently). A blank
-/// TYPE cell is left to Rules 4 and 17. One finding per heading, never per row.
+/// a custom overlay, and a heading only the overlay defines has no standard
+/// type to differ from. A heading the edition does not define for that group
+/// but the file's own DICT does is compared with that row's `DICT_DTYP`
+/// instead (#1209): the file has then stated a type twice, and a reader that
+/// binds columns from DICT gets the other one. The edition always wins for a
+/// standard heading, so a DICT row restating one never adds a second finding
+/// (that row is O-60's). Any difference counts, precision included (`2DP`
+/// against `3DP` formats every value differently). A blank TYPE cell is left
+/// to Rules 4 and 17, and a blank `DICT_DTYP` gives nothing to compare with.
+/// One finding per heading, never per row.
 ///
-/// Two tiers, by the heading's dictionary status. A KEY heading is a join
+/// Two tiers, by the heading's dictionary status (its `DICT_STAT` for a
+/// DICT-only heading). A KEY heading is a join
 /// column, so a departure there is a WARNING (`include_warnings`, on by default
 /// on every surface): the child and parent TYPE rows now have a way to
 /// disagree, and python-ags4's Rule 10c rejects a child whose TYPE row differs
@@ -232,6 +240,7 @@ pub(crate) fn declared_type(
     }
     let edition = dict.version();
     let standard = Dictionary::bundled(edition);
+    let file_dict = FileDict::from_parsed(parsed);
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         if g.type_line.is_none() {
@@ -247,14 +256,29 @@ pub(crate) fn declared_type(
             if declared.is_empty() || !seen.insert(heading.as_str()) {
                 continue;
             }
-            let Some(std_heading) = standard.heading(code, heading) else {
-                continue;
-            };
-            let expected = std_heading.ags_type.trim();
+            // `against` completes the message: which authority gave `expected`.
+            // A file's `DICT_STAT` is read the way the effective dictionary
+            // reads it, so `key` and `KEY+REQUIRED` hold KEY; the standard
+            // branch keeps the exact match O-59 has always made.
+            let (expected, key, against) =
+                if let Some(std_heading) = standard.heading(code, heading) {
+                    (
+                        std_heading.ags_type.trim(),
+                        std_heading.status.trim().eq_ignore_ascii_case("KEY"),
+                        format!("the {} dictionary", edition.as_str()),
+                    )
+                } else if let Some(fh) = file_dict.heading(code, heading) {
+                    (
+                        fh.ags_type.trim(),
+                        fh.status.to_ascii_uppercase().contains("KEY"),
+                        "the file's own DICT".to_string(),
+                    )
+                } else {
+                    continue;
+                };
             if expected.is_empty() || expected == declared {
                 continue;
             }
-            let key = std_heading.status.trim().eq_ignore_ascii_case("KEY");
             let (label, severity, shown, what) = if key {
                 (
                     RULE_8_WARN,
@@ -273,10 +297,7 @@ pub(crate) fn declared_type(
                 label,
                 g.type_line,
                 code,
-                format!(
-                    "{code}.{heading} {what} {declared}; the {} dictionary type is {expected}.",
-                    edition.as_str()
-                ),
+                format!("{code}.{heading} {what} {declared}; {against} type is {expected}."),
                 Location {
                     target: Target::Heading,
                     field_index: Some(ci as u32),
@@ -1170,7 +1191,8 @@ mod tests {
     fn matching_user_defined_and_blank_types_are_silent() {
         // Every standard heading as the dictionary types it.
         assert!(declared_fyis(&lnmc("X", ("LNMC_TEMP", "0DP")), "4.1.1").is_empty());
-        // A user-defined heading has no standard type, whatever it declares.
+        // A user-defined heading with no DICT row has nothing to differ from,
+        // whatever it declares.
         assert!(declared_fyis(&lnmc("X", ("LNMC_ZZZZ", "3SF")), "4.1.1").is_empty());
         // A blank TYPE cell is Rule 4/17's concern, not a type to compare.
         assert!(declared_fyis(&lnmc("", ("LNMC_TEMP", "")), "4.1.1").is_empty());
@@ -1183,6 +1205,106 @@ mod tests {
         let got = declared_fyis(&lnmc("1DP", ("LNMC_MC", "2DP")), "4.1.1");
         assert_eq!(got.len(), 1, "{got:?}");
         assert!(got[0].contains("declared 1DP"), "{got:?}");
+    }
+
+    // --- headings only the file's own DICT defines (#1209) -----------------
+
+    /// A DICT declaring the user-defined group XLAB (KEY `XLAB_ID`, `XLAB_VAL`)
+    /// with the given `DICT_DTYP`s, then XLAB with the given TYPE row. The DICT
+    /// group carries no TYPE row of its own, so only XLAB's is compared.
+    fn xlab(dict_id: &str, dict_val: &str, ty_id: &str, ty_val: &str) -> String {
+        format!(
+            "\"GROUP\",\"DICT\"\r\n\
+             \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_DTYP\"\r\n\
+             \"DATA\",\"GROUP\",\"XLAB\",\"\",\"\",\"\"\r\n\
+             \"DATA\",\"HEADING\",\"XLAB\",\"XLAB_ID\",\"KEY\",\"{dict_id}\"\r\n\
+             \"DATA\",\"HEADING\",\"XLAB\",\"XLAB_VAL\",\"OTHER\",\"{dict_val}\"\r\n\
+             \r\n\
+             \"GROUP\",\"XLAB\"\r\n\
+             \"HEADING\",\"XLAB_ID\",\"XLAB_VAL\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\
+             \"TYPE\",\"{ty_id}\",\"{ty_val}\"\r\n\
+             \"DATA\",\"A\",\"1.25\"\r\n"
+        )
+    }
+
+    #[test]
+    fn a_user_defined_heading_differing_from_its_dict_row_is_named() {
+        let f = declared(&xlab("ID", "1DP", "ID", "2DP"), "4.1.1", true, true);
+        assert_eq!(
+            descs(&f, RULE_8_FYI),
+            vec!["XLAB.XLAB_VAL is declared 2DP; the file's own DICT type is 1DP.".to_string()]
+        );
+        assert!(descs(&f, RULE_8_WARN).is_empty());
+        assert_eq!(
+            f.get(RULE_8_FYI).expect("the FYI")[0].severity,
+            Severity::Fyi
+        );
+        // FYI-tier, so FYIs off hides it.
+        let f = declared(&xlab("ID", "1DP", "ID", "2DP"), "4.1.1", true, false);
+        assert!(descs(&f, RULE_8_FYI).is_empty() && descs(&f, RULE_8_WARN).is_empty());
+    }
+
+    #[test]
+    fn a_dict_key_heading_departure_is_a_warning() {
+        // DICT_STAT says KEY, so the departure rides the warning tier, shown
+        // with FYIs off.
+        let f = declared(&xlab("ID", "1DP", "X", "1DP"), "4.1.1", true, false);
+        assert_eq!(
+            descs(&f, RULE_8_WARN),
+            vec![
+                "XLAB.XLAB_ID is a KEY heading declared X; the file's own DICT type is ID."
+                    .to_string()
+            ]
+        );
+        assert_eq!(
+            f.get(RULE_8_WARN).expect("the warning")[0].severity,
+            Severity::Warning
+        );
+        assert!(descs(&f, RULE_8_FYI).is_empty());
+    }
+
+    #[test]
+    fn matching_or_blank_dict_types_are_silent() {
+        let silent = |src: &str| {
+            let f = declared(src, "4.1.1", true, true);
+            descs(&f, RULE_8_FYI).is_empty() && descs(&f, RULE_8_WARN).is_empty()
+        };
+        assert!(silent(&xlab("ID", "1DP", "ID", "1DP")));
+        // Padding is not a different type, on either side.
+        assert!(silent(&xlab(" ID", "1DP ", "ID ", " 1DP")));
+        // A blank DICT_DTYP gives nothing to compare with.
+        assert!(silent(&xlab("", "", "X", "2DP")));
+        // A blank TYPE cell is Rule 4/17's concern.
+        assert!(silent(&xlab("ID", "1DP", "", "")));
+        // A DICT row binds its own group only: XLAB's row says nothing about
+        // a YLAB heading of the same name.
+        assert!(silent(
+            &xlab("ID", "1DP", "ID", "2DP")
+                .replace("\"GROUP\",\"XLAB\"\r\n", "\"GROUP\",\"YLAB\"\r\n")
+        ));
+    }
+
+    #[test]
+    fn a_standard_heading_is_judged_against_the_edition_only() {
+        // LNMC_MC is standard; a DICT row for it never replaces the edition.
+        let with_dict_row = |dict_dtyp: &str, mc_type: &str| {
+            format!(
+                "\"GROUP\",\"DICT\"\r\n\
+                 \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_DTYP\"\r\n\
+                 \"DATA\",\"HEADING\",\"LNMC\",\"LNMC_MC\",\"OTHER\",\"{dict_dtyp}\"\r\n\
+                 \r\n{}",
+                lnmc(mc_type, ("LNMC_TEMP", "0DP"))
+            )
+        };
+        // Agreeing with the DICT row but not the edition: named once, against
+        // the edition.
+        assert_eq!(
+            declared_fyis(&with_dict_row("1DP", "1DP"), "4.1.1"),
+            vec!["LNMC.LNMC_MC is declared 1DP; the 4.1.1 dictionary type is X.".to_string()]
+        );
+        // Agreeing with the edition but not the DICT row: silent.
+        assert!(declared_fyis(&with_dict_row("2DP", "X"), "4.1.1").is_empty());
     }
 }
 

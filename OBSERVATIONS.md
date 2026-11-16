@@ -837,7 +837,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
   the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Validation never collapses the variants. `fix` does when asked (#1024): `on_code_case="standard"` or an explicit `recode`, `merge`'s two options, rewrite the ABBR rows and every `PA` cell under the heading as one safe Rule 16 fix, and leave a set as written, reported as skipped, when the rewrite would give two rows one KEY.
 
-### O-59 [VARIANCE] A standard heading declared with a different data type from the dictionary gets a laterite-originated FYI (Related to Rule 8), a WARNING when the heading is KEY; python-ags4 has no such check
+### O-59 [VARIANCE] A heading declared with a different data type from the dictionary, or from the file's own DICT row for a user-defined heading, gets a laterite-originated FYI (Related to Rule 8), a WARNING when the heading is KEY; python-ags4 has no such check
 - **Observed** (#1013): a file can declare a standard heading with a
   different data type from the dictionary edition it is checked against —
   `LNMC_MC` as `1DP` where 4.1.1 types it `X`, or `CONS_INCE` as `2DP` where
@@ -869,8 +869,8 @@ O-N below is an internal decision or behavioural note, not for external circulat
   differently. The edition is the one validation resolved (explicit option,
   then `TRAN_AGS`, then the fallback). Headings the standard edition does
   not define for that group are never compared, including those that exist
-  only through the file's DICT or a custom overlay, and a blank TYPE cell
-  is left to other rules. The message describes this file only; it does
+  only through the file's DICT (until #1209, below) or a custom overlay, and
+  a blank TYPE cell is left to other rules. The message describes this file only; it does
   not mention merging. Rule 8 itself is unchanged, values are still judged
   against the declared type, and the verdict never moves. It is a new
   laterite-only label, so it shows as a rust-only label wherever dual
@@ -894,6 +894,20 @@ O-N below is an internal decision or behavioural note, not for external circulat
   (`GRAG.LOCA_ID is a KEY heading declared X; the 4.1.1 dictionary type is
   ID.`). `--no-warnings` hides it rather than demoting it. `laterite.compat`
   withholds both labels, for the reason it withheld the first.
+- **Our decision** (#1209, split from #1205): a heading the resolved
+  edition does not define for its group, but which the file's own DICT
+  declares for that group with a non-blank `DICT_DTYP`, is compared with
+  that row instead. A trimmed TYPE code differing from `DICT_DTYP` raises
+  the same finding on the same tiers, KEY read from `DICT_STAT` the way
+  the effective dictionary reads it, and the message says the comparison
+  is with the file's own DICT (`XLAB.XLAB_VAL is declared 2DP; the file's
+  own DICT type is 1DP.`). The file has then stated one heading's type
+  twice, and a reader that binds columns from DICT gets the other one. A
+  standard heading is still judged against the edition only, so a DICT row
+  restating one never adds a second finding ([[O-60]] names that row). A
+  blank TYPE cell or a blank `DICT_DTYP` gives nothing. Rule 8, the
+  verdict, `laterite.compat`'s output and the parity known-failures set
+  are unchanged.
 
 ### O-60 [VARIANCE] A DICT row that redeclares a standard group or heading gets a laterite-originated FYI (Related to Rule 18), a WARNING when it drops KEY or re-parents; python-ags4 has no such check
 - **Observed** (#1011): several exporters write a DICT row for every
