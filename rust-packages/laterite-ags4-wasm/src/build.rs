@@ -559,7 +559,9 @@ fn build_ipc_core(
 ///
 /// * `groups_json` — a JSON array of `{ code, headings, units?, types?, rows }`
 ///   (each row an array of cell values). The headings are the AGS headings;
-///   UNIT/TYPE fill from the chosen edition's dictionary where omitted.
+///   UNIT/TYPE fill from the chosen edition's dictionary where omitted; a
+///   heading the edition does not define fills from the input's own `DICT`
+///   group, and an inherited KEY from the parent group's.
 /// * `dict_version` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
 /// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`. `"autofix"`
 ///   repairs what the input contains. It does NOT mint the mandatory

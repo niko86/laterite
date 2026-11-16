@@ -494,7 +494,9 @@ function stagedWrite(bytes: Buffer, out: string): void {
 /**
  * Build valid AGS4 from your own data — the data→AGS4 door. Where `read` loads
  * an *existing* file, `buildAgs4` *constructs* a new one: it lays the groups out
- * in order, fills UNIT/TYPE from the chosen `dictVersion`, then runs the output
+ * in order, fills UNIT/TYPE from the chosen `dictVersion` (or, for a heading
+ * that edition does not define, from your own `DICT` group's row, and for an
+ * inherited KEY from the parent group's), then runs the output
  * through the validator (the `mode` knob on `opts` decides what happens to the
  * findings — `"autofix"` applies the safe fixes to what you wrote; `"report"`
  * merely records them). Minting the missing UNIT/TYPE/TRAN/ABBR catalogs is a

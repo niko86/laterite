@@ -107,8 +107,10 @@ impl Cell {
 /// rows.
 ///
 /// `UNIT` and `TYPE` are filled from the chosen edition unless you set them —
-/// which is what makes this a *data* door rather than a file-assembly one. Set
-/// them for a heading the standard dictionary does not know.
+/// which is what makes this a *data* door rather than a file-assembly one. A
+/// heading the standard dictionary does not know fills from the build's own
+/// `DICT` group when it declares one, and an inherited KEY from the parent
+/// group's; set them yourself for anything else.
 #[derive(Debug, Clone)]
 pub struct GroupData {
     code: String,
