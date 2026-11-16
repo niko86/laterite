@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 
 [manifest]
@@ -569,7 +569,7 @@ wheels = [
 
 [[package]]
 name = "laterite"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "packages/laterite" }
 dependencies = [
     { name = "duckdb" },
@@ -601,7 +601,7 @@ provides-extras = ["compat", "pyarrow", "all"]
 
 [[package]]
 name = "laterite-workspace"
-version = "0.16.0"
+version = "0.17.0"
 source = { virtual = "." }
 dependencies = [
     { name = "duckdb" },

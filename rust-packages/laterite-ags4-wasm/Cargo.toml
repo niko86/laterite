@@ -23,7 +23,7 @@ name = "laterite-ags4-wasm"
 # `wasm-pack` writes the published manifest FROM this line, and release.yml then
 # asserts the `wasm-v<tag>` matches it — so on the engine line the first
 # product-only release fails its own tag check.
-version = "0.16.0"
+version = "0.17.0"
 edition = "2024"
 rust-version = "1.89"
 description = "Browser wasm wrapper around the clean-room AGS4 validator"
@@ -107,7 +107,7 @@ censor = ["dep:laterite-ags4-censor", "dep:sha2", "dep:hex"]
 
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.21.1" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.21.2" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
 # ONE shared id maths every surface uses (byte-identical to the extension + wheel
@@ -135,7 +135,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse", version = "0.14.0" }
 # `build_ags4_ipc` path — the same conversion the native host uses, not a copy.
 # arrow's display fallback stays comfy-table-free. The JSON `build_ags4` door
 # needs none of it, which is why the feature moved off this line.
-laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.22.0" }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", version = "0.22.1" }
 # `hostopts` (#923, its own crate since #947): the shared option-normalisation
 # seam. Wasm-safe by the same argument as emit — it adds only what emit +
 # validator already pull; its path arm is structurally unused here (no fs).
@@ -172,7 +172,7 @@ laterite-ags4-excel = { path = "../laterite-ags4-excel", version = "0.15.3", fea
 # shared typed-column/record-batch builder both hosts emit through — is gated,
 # by ours, so the browser and the native PyCapsule path still cast
 # byte-identically wherever Arrow is in play.
-laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.15.0" }
+laterite-ags4-types = { path = "../laterite-ags4-types", version = "0.15.1" }
 # Arrow IPC framing only. The typed columns are built by the shared emitter
 # in laterite-ags4-types (arrow_cols); here we just StreamWriter that batch into an
 # IPC stream for duckdb-wasm (the native side hands the same batch to
