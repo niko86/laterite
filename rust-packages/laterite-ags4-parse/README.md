@@ -52,8 +52,10 @@ finding can be reported against the byte a tool wants to seek to, the line a
 human reads, and the column an editor highlights — without the rounding errors
 that reconstruction introduces once a file contains a multi-byte character.
 
-`parse_bytes` additionally handles encoding detection, so a Latin-1 file is not
-silently mangled into replacement characters before anything has looked at it.
+`parse_bytes` decodes with the encoding you pass it, and `resolve_encoding` turns
+a label such as `latin1` or `cp1252` into one, so a Latin-1 file is not silently
+mangled into replacement characters before anything has looked at it. Nothing
+guesses the encoding for you: name it, or the bytes are read as UTF-8.
 
 ## Scope
 

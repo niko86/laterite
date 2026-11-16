@@ -81,12 +81,14 @@ out of `core`, and **PR2** (laterite-dev#492) moved the rest — the per-edition
 the rules catalogue out of the validator, plus the bundled JSON data itself — into
 [[laterite-ags4-reference]], which now carries everything the DuckDB extension needs.
 The **repoint** itself — pointing the extension and `laterite-ags4-diff` at the leaf
-instead of the whole validator — is half done: laterite-dev#475's in-tree follow-up (laterite-dev#493)
+instead of the whole validator — is done in both places: laterite-dev#475's in-tree follow-up (laterite-dev#493)
 repointed `laterite-ags4-diff` (it only ever used `Dictionary`/`DictVersion`, never
 the rule engine) and, while there, also repointed [[laterite-py]]'s `build.rs` onto
 the leaf's `union_groups()`, retiring a third independent reader of the union JSON.
-The DuckDB extension's repoint is the **remaining** half — still-open, separate,
-owner/mirror-gated (its own repo, `niko86/laterite-duckdb`).
+The DuckDB extension's repoint, the other half, is done too, in its own repo:
+`niko86/laterite-duckdb` depends on `laterite-ags4-reference` rather than the
+validator since its commit 855b212 ("depend on the laterite-ags4-reference leaf,
+not the whole validator").
 
 ## Related
 

@@ -1,7 +1,8 @@
 # laterite-ags4-reference
 
 **AGS4** reference data as a dependency-light leaf: the multi-edition group
-dictionary, and the rules catalogue, both generated from one JSON source.
+dictionary, generated from `ags_dictionary.json`, and the rules catalogue,
+embedded from `rules_meta.json`.
 
 ```rust
 use laterite_ags4_reference::dict::{Dictionary, FALLBACK};
