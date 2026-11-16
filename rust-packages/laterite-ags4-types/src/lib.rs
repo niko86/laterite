@@ -706,10 +706,26 @@ pub fn format_nsf(f: f64, n: usize) -> String {
     if f == 0.0 {
         return format!("{:.*}", (n - 1).max(0) as usize, 0.0);
     }
-    // log10 of any finite f64 is bounded to roughly ±308 (f64's exponent
-    // range), always fits i32 regardless of `f`'s magnitude.
+    // The exponent must be the ROUNDED value's: rounding can carry into the
+    // next power of ten (9.96 @2SF is 10, not 9.x), and an exponent taken
+    // before rounding keeps one digit too many ("10.0"). Rule 8 judges a cell
+    // by `format_nsf(cell, n) == cell`, so that extra digit made the writer
+    // emit values its own validator rejects (#1204). `{:.Ne}` rounds exactly
+    // and reports the exponent after the carry. A cell that already has `n`
+    // figures never carries, so Rule 8's verdicts are unchanged.
+    //
+    // 0SF has no rounding to do; it keeps the unrounded value's exponent, as
+    // it always has. log10 of any finite f64 is bounded to roughly ±308
+    // (f64's exponent range), always fits i32 regardless of `f`'s magnitude.
     #[allow(clippy::cast_possible_truncation)]
-    let exp = f.abs().log10().floor() as i32;
+    let exp = if n == 0 {
+        f.abs().log10().floor() as i32
+    } else {
+        let sci = format!("{:.*e}", (n - 1) as usize, f);
+        sci.rsplit_once('e')
+            .and_then(|(_, e)| e.parse::<i32>().ok())
+            .unwrap_or_else(|| f.abs().log10().floor() as i32)
+    };
     let dp = n - exp - 1;
     if dp >= 0 {
         return format!("{:.*}", dp as usize, f);
@@ -724,12 +740,24 @@ pub fn format_nsf(f: f64, n: usize) -> String {
 /// nSCI expected form — scientific notation, one digit before the point and
 /// `n` after. Rust's `{:e}` already emits a single leading mantissa digit and
 /// a sign-less-or-minus exponent with no leading zero (`1.5e2`, `3.1e-5`) —
-/// exactly the AGS form, and LOWERCASE `e` (laterite-ags4-excel's uppercase `E` is
-/// the registered by-design divergence).
+/// the AGS form for `n >= 1`, and LOWERCASE `e` (laterite-ags4-excel's uppercase
+/// `E` is the registered by-design divergence). At `n == 0` the point is kept
+/// (`5.e1`).
 #[must_use]
 pub fn format_nsci(f: f64, n: usize) -> String {
     let n = n.min(MAX_NUMERIC_COUNT);
-    format!("{f:.n$e}")
+    let mut s = format!("{f:.n$e}");
+    // `{:.0e}` drops the point (`5e1`), but Rule 8's nSCI grammar wants one
+    // after the mantissa digit whatever `n` is — so at 0SCI the writer emitted
+    // values its own validator rejects (#1206). python-ags4 judges `5e1` the
+    // same way, so the writer moves, not the validator. Non-finite values
+    // have no `e` and are left as they were.
+    if n == 0
+        && let Some(i) = s.find('e')
+    {
+        s.insert(i, '.');
+    }
+    s
 }
 
 /// Presentation hint for a numeric AGS type: `'2DP'` → `Some("%.2f")`,
@@ -1168,6 +1196,35 @@ mod tests {
         assert_eq!(ags4_str(&Cell::from(100.0), "2SF"), "100");
         assert_eq!(ags4_str(&Cell::from(1234.0), "3SF"), "1230");
         assert_eq!(ags4_str(&Cell::from(10.0), "1SF"), "10");
+    }
+
+    #[test]
+    fn nsf_takes_its_exponent_from_the_rounded_value() {
+        // Rounding can carry a value into the next power of ten. The digit
+        // count must follow the rounded value, or the output carries one
+        // decimal too many and Rule 8 — which judges a cell by
+        // `format_nsf(cell, n) == cell` — rejects what the writer wrote (#1204).
+        for (x, want) in [
+            (9.96, "10"),
+            (-9.96, "-10"),
+            (0.0999, "0.10"),
+            (99.96, "100"),
+            (999.5, "1000"),
+        ] {
+            assert_eq!(format_nsf(x, 2), want, "format_nsf({x}, 2)");
+        }
+    }
+
+    #[test]
+    fn nsci_at_zero_places_keeps_the_point() {
+        // Rule 8's nSCI grammar wants a point after the mantissa digit even
+        // when no digits follow it; `{:.0e}` drops it (#1206).
+        assert_eq!(format_nsci(50.0, 0), "5.e1");
+        assert_eq!(format_nsci(-50.0, 0), "-5.e1");
+        assert_eq!(format_nsci(0.001, 0), "1.e-3");
+        // 1SCI and up were already in the grammar's form and stay as they were.
+        assert_eq!(format_nsci(50.0, 1), "5.0e1");
+        assert_eq!(format_nsci(-0.00123, 2), "-1.23e-3");
     }
 
     #[test]

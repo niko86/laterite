@@ -1888,6 +1888,31 @@ mod tests {
     }
 
     #[test]
+    fn rule_8_reformat_leaves_nothing_for_rule_8_to_find() {
+        // A fix Rule 8 then rejects is no fix. The two shapes that did this:
+        // 2SF values whose rounding carries into the next power of ten
+        // (#1204) and 0SCI, where the point went missing (#1206).
+        let src = "\"GROUP\",\"MOND\"\r\n\
+                   \"HEADING\",\"MOND_A\",\"MOND_B\",\"MOND_C\",\"MOND_D\",\"MOND_E\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"2SF\",\"2SF\",\"2SF\",\"2SF\",\"0SCI\"\r\n\
+                   \"DATA\",\"9.96\",\"-9.96\",\"0.0999\",\"99.96\",\"50\"\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found, Dictionary::bundled(FALLBACK));
+        let out = apply_fixes(src, parsed.has_bom, &fixes);
+        assert!(
+            out.contains("\"DATA\",\"10\",\"-10\",\"0.10\",\"100\",\"5.e1\""),
+            "got: {out:?}"
+        );
+        let (_, after) = check(&out);
+        assert!(
+            !after.contains_key(RULE_8),
+            "Rule 8 still fires: {:?}",
+            after.get(RULE_8)
+        );
+    }
+
+    #[test]
     fn rule_8_never_touches_non_numeric_cell() {
         // A non-numeric value under a numeric TYPE: Rule 8 flags it, but
         // it must NOT yield a ReformatNumeric fix (no safe rewrite).

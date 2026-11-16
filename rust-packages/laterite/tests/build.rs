@@ -165,6 +165,39 @@ fn an_explicit_unit_reaches_the_file() {
     assert_eq!(loca.types()[i], "2DP");
 }
 
+/// What the build writes under a significant-figure or scientific TYPE, its own
+/// validator accepts — from a number (the emitter formats it) and from a
+/// string (autofix reformats it). The cases are the ones that broke: 2SF
+/// rounding into the next power of ten (#1204) and 0SCI (#1206).
+#[test]
+fn sf_and_sci_cells_are_written_as_rule_8_expects_them() {
+    for (ty, input, want) in [
+        ("2SF", Cell::from(9.96), "10"),
+        ("2SF", Cell::from(-9.96), "-10"),
+        ("2SF", Cell::from(0.0999), "0.10"),
+        ("2SF", Cell::from(99.96), "100"),
+        ("2SF", Cell::from("9.96"), "10"),
+        ("0SCI", Cell::from(50.0), "5.e1"),
+        ("0SCI", Cell::from("50"), "5.e1"),
+    ] {
+        let loca = GroupData::new("LOCA", ["LOCA_ID", "LOCA_XTRA"])
+            .types(["ID", ty])
+            .row([Cell::from("BH01"), input.clone()]);
+        let built = ags4::build(vec![proj(), loca]).run().unwrap();
+
+        let doc = ags4::read_str(built.text()).run().unwrap();
+        let cell = doc.group("LOCA").unwrap().row(0).unwrap().cell("LOCA_XTRA");
+        assert_eq!(cell, Some(want), "{ty} {input:?}");
+        let rule_8: Vec<_> = built
+            .findings()
+            .iter()
+            .filter(|f| f.rule().contains("Rule 8"))
+            .map(ags4::Finding::description)
+            .collect();
+        assert!(rule_8.is_empty(), "{ty} {input:?}: {rule_8:?}");
+    }
+}
+
 /// The handle door. A document read in and built back out keeps its cells —
 /// cells cross as text, because a document's cells were already formatted when
 /// the file that carried them was written.
