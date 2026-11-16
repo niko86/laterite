@@ -28,6 +28,9 @@
       },
       {
         "text": "**A heading only your DICT group declares now takes its TYPE and UNIT from that DICT (#1205).** `build_ags4` filled a heading that neither `types=`/`units=` nor the standard edition defines with `X` and a blank UNIT, even when the DICT group in the same build declared it. A user-defined group's TYPE row then disagreed with its own DICT on every column, and the keys it repeats from its parent were typed differently from the parent's. Such a heading now takes its `DICT_DTYP` and `DICT_UNIT`, and a KEY heading the DICT leaves out takes the parent group's definition. Values are formatted against that TYPE, so under `autofix` a `2DP` column is written to two decimals. Your own `types=` and `units=` still win, and a build without a DICT group writes exactly the same bytes as before."
+      },
+      {
+        "text": "**`uuid` 1.29.2 and `toml` 1.2.1 take patch releases.** `uuid` is compiled into `laterite-ags4-core` and `laterite-ags4-reference`; `toml` is a build dependency of the validator only. Both stay within the crates' Rust 1.89 floor."
       }
     ],
     "deprecated": [],
