@@ -87,9 +87,9 @@ that merge is the release act, and the only human step left in an engine cut).
 ### Cutting a product release
 
 ```bash
+tools/release/cut-release.sh 0.12.0 --plan     # print the plan and stop; runs on any branch
 git switch -c release/0.12.0
 tools/release/cut-release.sh 0.12.0            # prints the plan, then stamps
-tools/release/cut-release.sh 0.12.0 --plan     # print the plan and stop
 ```
 
 One command. It first applies the **engine cut** — the owed per-crate bumps and

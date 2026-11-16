@@ -39,7 +39,7 @@
 #
 # Usage:
 #   tools/release/cut-release.sh 0.12.0           # step 1: stamp (release branch)
-#   tools/release/cut-release.sh 0.12.0 --plan    # print the plan and stop
+#   tools/release/cut-release.sh 0.12.0 --plan    # print the plan and stop (any branch)
 #   tools/release/cut-release.sh 0.12.0 --ship    # step 2: every tag (merged main)
 set -euo pipefail
 
@@ -115,10 +115,10 @@ if [ "$SHIP" -eq 1 ]; then
   exit 0
 fi
 
-[ "$branch" != "main" ] || die "refuse to cut on main — 'git switch -c release/$VERSION' first"
-[ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
-
 # --- the plan, before anything is stamped. -----------------------------------
+# It only reads, so it runs anywhere: "is a release owed, and what would it
+# stamp?" is asked from main far more often than from a release branch. The
+# branch and clean-tree refusals guard the stamping below, not the question.
 echo "=== what is unreleased ==="
 uv run --no-sync python tools/release/release_status.py
 echo
@@ -145,6 +145,9 @@ if [ "$PLAN_ONLY" -eq 1 ]; then
   echo "cut-release: --plan given, stopping before any stamp."
   exit 0
 fi
+
+[ "$branch" != "main" ] || die "refuse to cut on main — 'git switch -c release/$VERSION' first"
+[ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 
 # --- the engine cut, committed on its own so bump-version.sh (which refuses a
 #     dirty tree) stamps the product on top of it.
