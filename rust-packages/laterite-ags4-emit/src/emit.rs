@@ -5,7 +5,9 @@
 //!
 //!   1. resolve each heading's UNIT/TYPE — **hybrid**: the caller's
 //!      explicit value wins, else the per-edition standard dictionary fills,
-//!      else `""` / `"X"`;
+//!      else — when the build carries a DICT group — the file's own DICT row
+//!      for the heading, else, for a KEY the parent group defines, the
+//!      parent's, else `""` / `"X"` ([`declared_meta`]);
 //!   2. format each cell — typed values via `laterite_ags4_types::ags4_str` (the
 //!      canonical AGS4 string per type), string values verbatim (so the
 //!      *mode* below is the single owner of any canonicalisation);
@@ -21,6 +23,7 @@
 use laterite_ags4_parse::builder::ParsedFileBuilder;
 use laterite_ags4_types::{Cell, ags4_str};
 use laterite_ags4_validator::dict::Dictionary;
+use laterite_ags4_validator::effective_dict::EffectiveDict;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
@@ -397,7 +400,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
         // Per-group: the formatted copy is written and dropped before the
         // next group formats — no whole-file OwnedGroup slab exists
         // (dec-emit-streamed-verdict).
-        stream.push(owned_group(g, &dict))?;
+        stream.push(owned_group(g, &dict, stream.declared()))?;
     }
     stream.finish()
 }
@@ -420,26 +423,28 @@ pub fn emit_ags4_owned(groups: Vec<GroupInput>, opts: &EmitOpts) -> Result<EmitR
         // `g` is consumed per iteration: its cell rows free here, not at
         // return — and the formatted copy drops inside `push`, so input,
         // formatted copy and verdict never peak together.
-        stream.push(owned_group_consuming(g, &dict))?;
+        stream.push(owned_group_consuming(g, &dict, stream.declared()))?;
     }
     stream.finish()
 }
 
-/// The cell doors' DICT lookahead for [`RowOrder::Key`]: a formatted copy of
-/// each DICT group (a few rows, so the copy is cheap) recorded before the
-/// stream writes anything.
+/// The cell doors' DICT lookahead: a formatted copy of each DICT group (a few
+/// rows, so the copy is cheap) recorded before the stream writes anything, so
+/// a group the DICT defines resolves its UNIT/TYPE (#1205) and, under
+/// [`RowOrder::Key`], its keys from the DICT wherever it sits in `groups`. A
+/// build without a DICT does no work here.
 fn look_ahead_cells(stream: &mut EmitStream, groups: &[GroupInput], dict: &Dictionary) {
-    if stream.wants_dict_lookahead() {
-        for g in groups.iter().filter(|g| g.code == "DICT") {
-            stream.look_ahead(&owned_group(g, dict));
-        }
+    for g in groups.iter().filter(|g| g.code == "DICT") {
+        // DICT is a standard group: its own fill never reads a DICT.
+        stream.look_ahead(&owned_group(g, dict, None));
     }
 }
 
 /// Steps 1–2 for one group: resolve UNIT/TYPE (hybrid) + format every cell.
 /// `OwnedGroup` holds Strings; the writer borrows them for the write.
-fn owned_group(g: &GroupInput, dict: &Dictionary) -> OwnedGroup {
-    let (units, types) = resolved_meta(g, dict);
+/// `declared` is the stream's view of the file's DICT ([`EmitStream::declared`]).
+fn owned_group(g: &GroupInput, dict: &Dictionary, declared: Option<&EffectiveDict>) -> OwnedGroup {
+    let (units, types) = resolved_meta(g, dict, declared);
     let rows: Vec<Vec<String>> = g.rows.iter().map(|row| format_row(row, &types)).collect();
     OwnedGroup {
         code: g.code.clone(),
@@ -456,8 +461,12 @@ fn owned_group(g: &GroupInput, dict: &Dictionary) -> OwnedGroup {
 /// (Per-GROUP consumption alone does not get that: the measured TREL is one
 /// group of 2.4M rows, and its whole input was still live at the moment its
 /// last row formatted.)
-fn owned_group_consuming(g: GroupInput, dict: &Dictionary) -> OwnedGroup {
-    let (units, types) = resolved_meta(&g, dict);
+fn owned_group_consuming(
+    g: GroupInput,
+    dict: &Dictionary,
+    declared: Option<&EffectiveDict>,
+) -> OwnedGroup {
+    let (units, types) = resolved_meta(&g, dict, declared);
     let rows: Vec<Vec<String>> = g
         .rows
         .into_iter()
@@ -472,33 +481,117 @@ fn owned_group_consuming(g: GroupInput, dict: &Dictionary) -> OwnedGroup {
     }
 }
 
-fn resolved_meta(g: &GroupInput, dict: &Dictionary) -> (Vec<String>, Vec<String>) {
+fn resolved_meta(
+    g: &GroupInput,
+    dict: &Dictionary,
+    declared: Option<&EffectiveDict>,
+) -> (Vec<String>, Vec<String>) {
     resolved_meta_parts(
         &g.code,
         &g.headings,
         g.units.as_ref(),
         g.types.as_ref(),
         dict,
+        declared,
     )
 }
 
 /// [`resolved_meta`] over loose parts — shared with the Arrow door
 /// (`arrow_in`), whose group is not a [`GroupInput`], so the hybrid
 /// caller-wins/dictionary-fills resolution stays in exactly one place.
+///
+/// `declared` is `None` until the build has shown a DICT row, and then the
+/// fill is exactly the standard dictionary's: a build without a DICT writes
+/// the bytes it always did.
 pub(crate) fn resolved_meta_parts(
     code: &str,
     headings: &[String],
     units: Option<&Vec<String>>,
     types: Option<&Vec<String>>,
     dict: &Dictionary,
+    declared: Option<&EffectiveDict>,
 ) -> (Vec<String>, Vec<String>) {
+    let fill = |i: usize, meta: Meta| -> String {
+        let heading = &headings[i];
+        match declared {
+            Some(ed) => {
+                declared_meta(ed, code, heading, meta).unwrap_or_else(|| meta.fallback().into())
+            }
+            None => match meta {
+                Meta::Unit => dict_unit(dict, code, heading),
+                Meta::Type => dict_type(dict, code, heading),
+            },
+        }
+    };
     let resolved_units: Vec<String> = (0..headings.len())
-        .map(|i| resolve_meta(units, i, || dict_unit(dict, code, &headings[i])))
+        .map(|i| resolve_meta(units, i, || fill(i, Meta::Unit)))
         .collect();
     let resolved_types: Vec<String> = (0..headings.len())
-        .map(|i| resolve_meta(types, i, || dict_type(dict, code, &headings[i])))
+        .map(|i| resolve_meta(types, i, || fill(i, Meta::Type)))
         .collect();
     (resolved_units, resolved_types)
+}
+
+/// Which of a heading's two metadata rows a fill is for.
+#[derive(Clone, Copy)]
+enum Meta {
+    Unit,
+    Type,
+}
+
+impl Meta {
+    /// What a heading no dictionary defines gets: no unit, free text.
+    fn fallback(self) -> &'static str {
+        match self {
+            Meta::Unit => "",
+            Meta::Type => "X",
+        }
+    }
+}
+
+/// A heading's UNIT or TYPE as the build's dictionaries define it, once the
+/// build carries a DICT (#1205), or `None` for the [`Meta::fallback`].
+///
+/// The order: the standard edition's definition for this group, else the
+/// file's own DICT row for it, else — for a KEY the parent group defines —
+/// the parent's, walking up the declared parent chain. A user-defined group
+/// repeats its parent's keys, and before this the fill knew neither: every
+/// column of a DICT-defined group was written `X` and unitless, so its TYPE
+/// row contradicted its own DICT on every column and its keys were typed
+/// unlike the parent's.
+///
+/// The standard definition is authoritative wherever it exists, blank unit
+/// included, because a DICT row redeclaring a standard heading does not
+/// change it (O-60) — and it keeps every standard heading's fill exactly what
+/// it was without a DICT. A DICT row with a blank value falls through to the
+/// parent, since a blank `DICT_UNIT` or `DICT_DTYP` states nothing. The
+/// parent's definition comes from the dictionaries alone, never from a
+/// caller's per-group override, so a group's fill does not depend on the
+/// order the groups arrive in.
+fn declared_meta(ed: &EffectiveDict, code: &str, heading: &str, meta: Meta) -> Option<String> {
+    let mut group = code;
+    // A DICT that parents A on B and B on A is malformed but parses.
+    let mut walked: Vec<&str> = Vec::new();
+    loop {
+        if walked.contains(&group) {
+            return None;
+        }
+        walked.push(group);
+        if let Some(h) = ed.heading(group, heading) {
+            // Above the group itself, only a KEY is inherited.
+            if group != code && !h.status.to_ascii_uppercase().contains("KEY") {
+                return None;
+            }
+            let value = match meta {
+                Meta::Unit => h.unit,
+                Meta::Type => h.ags_type,
+            };
+            if !value.is_empty() || ed.std().heading(group, heading).is_some() {
+                return Some(value.to_string());
+            }
+        }
+        group = ed.parent(group).filter(|p| !p.is_empty())?;
+    }
 }
 
 fn format_row(row: &[Cell], types: &[String]) -> Vec<String> {
@@ -526,9 +619,16 @@ pub(crate) struct EmitStream<'a> {
     /// `Some` only under [`DictRows::Prune`]: the held DICT and what the
     /// output contains, which its rows are judged against at assembly.
     prune: Option<DictPrune>,
-    /// `Some` only under [`RowOrder::Key`]: the DICT rows pushed so far, the
-    /// key declarations of any group the standard registry does not know.
-    row_keys: Option<DictSeen>,
+    /// The DICT rows recorded so far: the UNIT/TYPE fill of a heading the
+    /// standard edition does not know reads them (#1205), and so do the key
+    /// declarations [`RowOrder::Key`] sorts a user-defined group by.
+    dict_seen: DictSeen,
+    /// The standard edition with [`Self::dict_seen`] layered over it — `None`
+    /// until a DICT row has been recorded, so a build without one fills from
+    /// the standard edition exactly as before.
+    declared: Option<EffectiveDict<'a>>,
+    /// [`RowOrder::Key`]: sort each group's rows by its keys.
+    sort_rows: bool,
     wrote_any: bool,
 }
 
@@ -636,7 +736,9 @@ impl<'a> EmitStream<'a> {
             dict,
             synth,
             prune: (opts.dict_rows == DictRows::Prune).then(DictPrune::default),
-            row_keys: (opts.row_order == RowOrder::Key).then(DictSeen::default),
+            dict_seen: DictSeen::default(),
+            declared: None,
+            sort_rows: opts.row_order == RowOrder::Key,
             wrote_any: false,
         }
     }
@@ -665,15 +767,21 @@ impl<'a> EmitStream<'a> {
     #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn push(&mut self, og: OwnedGroup) -> Result<(), EmitError> {
         let mut og = in_dictionary_order(og, self.dict);
-        if let Some(seen) = &mut self.row_keys {
+        if og.code == "DICT" && !self.dict_seen.looked_ahead {
+            self.record_dict(&og);
+        }
+        if self.sort_rows {
             // Sorted here, per group, because every door's rows meet here
             // and are already the strings the TYPE line describes; a merge
             // has finished reconciling by the time its groups arrive, so
             // ordering can never change which row won.
-            if og.code == "DICT" && !seen.looked_ahead {
-                seen.record(&og.headings, &og.rows);
-            }
-            sort_by_keys(&og.code, &og.headings, &og.types, &mut og.rows, seen);
+            sort_by_keys(
+                &og.code,
+                &og.headings,
+                &og.types,
+                &mut og.rows,
+                &self.dict_seen,
+            );
         }
         if let Some(prune) = &mut self.prune {
             if og.code == "DICT" {
@@ -687,20 +795,28 @@ impl<'a> EmitStream<'a> {
         self.write_group_folded(&og)
     }
 
-    /// Whether a one-call door should hand its DICT groups to
-    /// [`EmitStream::look_ahead`] before streaming — only under
-    /// [`RowOrder::Key`], so the default path does no extra work.
-    pub(crate) fn wants_dict_lookahead(&self) -> bool {
-        self.row_keys.is_some()
-    }
-
-    /// Record a DICT group's key declarations before any group is written.
+    /// Record a DICT group's declarations before any group is written.
     /// Called for every DICT up front, or for none.
     pub(crate) fn look_ahead(&mut self, dict_group: &OwnedGroup) {
-        if let Some(seen) = &mut self.row_keys {
-            seen.record(&dict_group.headings, &dict_group.rows);
-            seen.looked_ahead = true;
+        self.record_dict(dict_group);
+        self.dict_seen.looked_ahead = true;
+    }
+
+    fn record_dict(&mut self, dict_group: &OwnedGroup) {
+        self.dict_seen
+            .record(&dict_group.headings, &dict_group.rows);
+        let file = self.dict_seen.file_dict();
+        if !file.is_empty() {
+            self.declared = Some(EffectiveDict::new(*self.dict, file));
         }
+    }
+
+    /// The file's DICT over the standard edition, for a door to resolve the
+    /// next group's UNIT/TYPE with — `None` while no DICT row has been seen.
+    /// A one-call door has recorded every DICT ahead; a session only those
+    /// pushed so far.
+    pub(crate) fn declared(&self) -> Option<&EffectiveDict<'a>> {
+        self.declared.as_ref()
     }
 
     fn write_group_folded(&mut self, og: &OwnedGroup) -> Result<(), EmitError> {
@@ -791,10 +907,11 @@ pub fn emit_ags4_unchecked(
     let opts = unchecked_opts(edition);
     let dict = Dictionary::bundled(edition);
     let mut stream = EmitStream::new(&opts, &dict);
+    look_ahead_cells(&mut stream, &groups, &dict);
     for g in groups {
         // Consuming, like `emit_ags4_owned`: unchecked exists for the
         // caller counting costs, so it takes the door with the lower peak.
-        stream.push(owned_group_consuming(g, &dict))?;
+        stream.push(owned_group_consuming(g, &dict, stream.declared()))?;
     }
     stream.finish_unchecked()
 }
@@ -1309,7 +1426,9 @@ mod tests {
         let dict = Dictionary::bundled(opts.edition);
         let mut stream = EmitStream::new(opts, &dict);
         for g in groups {
-            stream.push(owned_group(g, &dict)).expect("push");
+            stream
+                .push(owned_group(g, &dict, stream.declared()))
+                .expect("push");
         }
         let (built, emitted_len) = stream.assemble().expect("assemble");
         let bytes = &built.text.as_bytes()[..emitted_len];
@@ -3183,5 +3302,188 @@ mod tests {
                 .map(|(h, c)| ((*h).to_string(), (*c).to_string()))
                 .collect();
         assert_eq!(got, want);
+    }
+
+    // ---- #1205: a heading only the file's own DICT declares ----
+
+    /// The issue's XLAB group, one row.
+    fn xlab() -> GroupInput {
+        sample_child(
+            "XLAB",
+            &[
+                ("SPEC_REF", "1"),
+                ("SPEC_DPTH", "1.10"),
+                ("XLAB_VAL", "12.345"),
+            ],
+        )
+    }
+
+    /// A full-width DICT: one `GROUP` row per `(group, parent)`, then one
+    /// `HEADING` row per `(group, heading, status, type, unit)`.
+    fn full_dict(groups: &[(&str, &str)], headings: &[[&str; 5]]) -> GroupInput {
+        let cols = [
+            "DICT_TYPE",
+            "DICT_GRP",
+            "DICT_HDNG",
+            "DICT_STAT",
+            "DICT_DTYP",
+            "DICT_DESC",
+            "DICT_UNIT",
+            "DICT_EXMP",
+            "DICT_PGRP",
+        ];
+        let mut rows: Vec<Vec<&str>> = Vec::new();
+        for (g, parent) in groups {
+            rows.push(vec!["GROUP", g, "", "", "", "A user group", "", "", parent]);
+        }
+        for [g, h, stat, ty, unit] in headings {
+            rows.push(vec!["HEADING", g, h, stat, ty, h, unit, "", ""]);
+        }
+        let rows: Vec<&[&str]> = rows.iter().map(Vec::as_slice).collect();
+        rows_of("DICT", &cols, &rows)
+    }
+
+    /// The issue's DICT: every XLAB column declared.
+    fn xlab_dict() -> GroupInput {
+        full_dict(
+            &[("XLAB", "SAMP")],
+            &[
+                ["XLAB", "LOCA_ID", "KEY", "ID", ""],
+                ["XLAB", "SAMP_TOP", "KEY", "2DP", "m"],
+                ["XLAB", "SAMP_REF", "KEY", "X", ""],
+                ["XLAB", "SAMP_TYPE", "KEY", "PA", ""],
+                ["XLAB", "SAMP_ID", "KEY", "ID", ""],
+                ["XLAB", "SPEC_REF", "KEY", "X", ""],
+                ["XLAB", "SPEC_DPTH", "KEY", "2DP", "m"],
+                ["XLAB", "XLAB_VAL", "OTHER", "2DP", "kPa"],
+            ],
+        )
+    }
+
+    /// `(units, types)` of one emitted group.
+    fn emitted_meta(bytes: &[u8], code: &str) -> (Vec<String>, Vec<String>) {
+        let p = parse_bytes(bytes, encoding_rs::UTF_8).unwrap();
+        let g = &p.groups[code];
+        (g.units.clone(), g.types.clone())
+    }
+
+    #[test]
+    fn a_dict_declared_heading_takes_its_type_and_unit_from_the_dict() {
+        // The issue's reproduction, with the DICT both before and after the
+        // group it defines: the one-call doors read it ahead.
+        for groups in [
+            with(sample_chain(), [xlab(), xlab_dict()]),
+            with(sample_chain(), [xlab_dict(), xlab()]),
+        ] {
+            let r = emit_ags4(&groups, &synthesising(EmitMode::AutoFix)).unwrap();
+            let (units, types) = emitted_meta(&r.bytes, "XLAB");
+            assert_eq!(
+                types,
+                strings(&["ID", "2DP", "X", "PA", "ID", "X", "2DP", "2DP"])
+            );
+            assert_eq!(units, strings(&["", "m", "", "", "", "", "m", "kPa"]));
+            // The value now follows its declared 2DP like any typed heading.
+            assert_eq!(column(&r.bytes, "XLAB", "XLAB_VAL"), strings(&["12.35"]));
+        }
+    }
+
+    #[test]
+    fn a_callers_type_still_overrides_the_dict_row() {
+        let mut x = xlab();
+        x.types = Some(strings(&["", "", "", "", "", "", "", "3DP"]));
+        x.units = Some(strings(&["", "", "", "", "", "", "", "MPa"]));
+        let r = emit_ags4(
+            &with(sample_chain(), [x, xlab_dict()]),
+            &synthesising(EmitMode::Report),
+        )
+        .unwrap();
+        let (units, types) = emitted_meta(&r.bytes, "XLAB");
+        assert_eq!(types[7], "3DP");
+        assert_eq!(units[7], "MPa");
+        assert_eq!(types[1], "2DP", "a blank override still fills from DICT");
+    }
+
+    #[test]
+    fn a_key_heading_the_dict_omits_takes_the_parent_groups_type() {
+        // XLAB declares only its own columns; YLAB, XLAB's child, declares
+        // only its result. Every inherited key resolves up the chain: SAMP's
+        // from the standard SAMP, SPEC_DPTH from XLAB's DICT row.
+        let dict = full_dict(
+            &[("XLAB", "SAMP"), ("YLAB", "XLAB")],
+            &[
+                ["XLAB", "SPEC_REF", "KEY", "X", ""],
+                ["XLAB", "SPEC_DPTH", "KEY", "2DP", "m"],
+                ["XLAB", "XLAB_VAL", "OTHER", "2DP", "kPa"],
+                ["YLAB", "YLAB_RES", "OTHER", "1DP", "%"],
+            ],
+        );
+        let ylab = sample_child(
+            "YLAB",
+            &[
+                ("SPEC_REF", "1"),
+                ("SPEC_DPTH", "1.10"),
+                ("YLAB_RES", "4.0"),
+            ],
+        );
+        let r = emit_ags4(
+            &with(sample_chain(), [xlab(), ylab, dict]),
+            &synthesising(EmitMode::Report),
+        )
+        .unwrap();
+        let want_types = ["ID", "2DP", "X", "PA", "ID", "X", "2DP"];
+        let want_units = ["", "m", "", "", "", "", "m"];
+        for (code, last_type, last_unit) in [("XLAB", "2DP", "kPa"), ("YLAB", "1DP", "%")] {
+            let (units, types) = emitted_meta(&r.bytes, code);
+            assert_eq!(types[..7], strings(&want_types), "{code}");
+            assert_eq!(units[..7], strings(&want_units), "{code}");
+            assert_eq!(
+                (types[7].as_str(), units[7].as_str()),
+                (last_type, last_unit)
+            );
+        }
+    }
+
+    #[test]
+    fn the_groups_own_dict_row_wins_over_its_parents_definition() {
+        let dict = full_dict(
+            &[("XLAB", "SAMP")],
+            &[["XLAB", "SAMP_TOP", "KEY", "3DP", "mm"]],
+        );
+        let r = emit_ags4(
+            &with(sample_chain(), [xlab(), dict]),
+            &synthesising(EmitMode::Report),
+        )
+        .unwrap();
+        let (units, types) = emitted_meta(&r.bytes, "XLAB");
+        assert_eq!((types[1].as_str(), units[1].as_str()), ("3DP", "mm"));
+    }
+
+    #[test]
+    fn without_a_dict_an_undeclared_heading_stays_x_and_unitless() {
+        let r = emit_ags4(
+            &with(sample_chain(), [xlab()]),
+            &synthesising(EmitMode::Report),
+        )
+        .unwrap();
+        let (units, types) = emitted_meta(&r.bytes, "XLAB");
+        assert_eq!(types, strings(&["X"; 8]));
+        assert_eq!(units, strings(&[""; 8]));
+    }
+
+    #[test]
+    fn the_unchecked_door_fills_from_the_dict_like_the_judged_one() {
+        let groups = || with(sample_chain(), [xlab(), xlab_dict()]);
+        let judged = emit_ags4(
+            &groups(),
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..EmitOpts::default()
+            },
+        )
+        .unwrap()
+        .bytes;
+        let unchecked = emit_ags4_unchecked(groups(), DictVersion::V4_1_1).unwrap();
+        assert_eq!(unchecked, judged);
+        assert_eq!(emitted_meta(&unchecked, "XLAB").1[7], "2DP");
     }
 }

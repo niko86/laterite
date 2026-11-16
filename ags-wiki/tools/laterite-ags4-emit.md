@@ -52,7 +52,9 @@ Two layers, both public:
 - **`emit_ags4`** (`repo:rust-packages/laterite-ags4-emit/src/emit.rs`) — the
   host-agnostic orchestrator every surface actually calls: resolve UNIT/TYPE per
   heading (**hybrid** — the caller's explicit value wins, else the per-edition
-  standard dictionary fills, else `""` / `"X"`), format each cell
+  standard dictionary fills, else the build's own DICT row for the heading,
+  else for a KEY the parent group defines the parent's, else `""` / `"X"`;
+  the DICT steps run only when the build carries a DICT, #1205), format each cell
   (`laterite_ags4_types::ags4_str` for typed values, verbatim for strings), put
   each dictionary group's headings (and their cells) in dictionary order, with
   headings the dictionary does not know kept after them in arrival order, so no

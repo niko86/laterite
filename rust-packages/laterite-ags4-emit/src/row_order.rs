@@ -76,11 +76,13 @@ const UNSORTED: [&str; 5] = ["TRAN", "TYPE", "UNIT", "ABBR", "DICT"];
 
 /// The DICT rows known so far, kept owned so the effective dictionary of a
 /// group the standard registry does not know can be read when that group
-/// arrives; a standard group never needs them. The one-call doors hold every
-/// group, so they read the DICT ahead ([`DictSeen::looked_ahead`]) — merge
-/// writes its groups alphabetically, which puts DICT after any user group
-/// coded before it. A session door sees no group in advance, so there only a
-/// DICT pushed BEFORE such a group can key it.
+/// arrives — for its keys here, and for its UNIT/TYPE fill in the emit stream
+/// (#1205); a standard group reads them only for a heading its standard
+/// definition lacks. The one-call doors hold every group, so they read the
+/// DICT ahead ([`DictSeen::looked_ahead`]) — merge writes its groups
+/// alphabetically, which puts DICT after any user group coded before it. A
+/// session door sees no group in advance, so there only a DICT pushed BEFORE
+/// such a group can key it or fill it.
 #[derive(Default)]
 pub(crate) struct DictSeen {
     rows: Vec<[String; 8]>,
@@ -110,7 +112,7 @@ impl DictSeen {
         }
     }
 
-    fn file_dict(&self) -> FileDict {
+    pub(crate) fn file_dict(&self) -> FileDict {
         FileDict::from_rows(self.rows.iter().map(|r| DictRow {
             dict_type: &r[0],
             group: &r[1],
