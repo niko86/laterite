@@ -1217,11 +1217,13 @@ mod proptest_suite {
 
         /// Format↔validate inverse for nSCI: `format_nsci(x, n)` always
         /// produces a string `is_nsci(_, n)` accepts (Rust's `{:e}` emits
-        /// exactly one mantissa digit + the AGS exponent shape).
+        /// exactly one mantissa digit + the AGS exponent shape). `n` starts at
+        /// 0 because that is where `{:.0e}` drops the point the grammar
+        /// requires — a range starting at 1 hid it (#1206).
         #[test]
         fn format_nsci_is_accepted_by_is_nsci(
             x in prop::num::f64::NORMAL | prop::num::f64::ZERO | prop::num::f64::SUBNORMAL,
-            n in 1usize..=15,
+            n in 0usize..=15,
         ) {
             let formatted = format_nsci(x, n);
             prop_assert!(
@@ -1234,13 +1236,7 @@ mod proptest_suite {
         /// string) and its output is always a parseable plain decimal
         /// (never scientific — the validator rejects `1.0e2` under nSF), so
         /// Rule 8's `format_nsf(cell, n) == cell` comparison is well-formed.
-        ///
-        /// NOTE: a reparse-idempotence property (`format_nsf(parse(s), n)
-        /// == s`) does NOT hold and is the WRONG shape for sig-fig
-        /// formatting — round-tripping through f64 is lossy, and worse,
-        /// rounding can cross a decade boundary (0.997 @1SF → "1.0", which
-        /// reparses to 1.0 → "1"). The fixer formats the original cell once
-        /// and never reparses, so this is a non-issue in production.
+        /// Reparse-idempotence is the separate property below.
         #[test]
         fn format_nsf_is_deterministic_plain_decimal(
             x in -1e9f64..1e9,
@@ -1256,6 +1252,40 @@ mod proptest_suite {
             // Parses back to a finite number (Rule 8 reads it as a cell).
             let reparsed: f64 = once.parse().expect("plain decimal parses");
             prop_assert!(reparsed.is_finite());
+        }
+
+        /// What the writer emits under nSF, Rule 8 accepts: Rule 8 judges a
+        /// cell by `format_nsf(cell, n) == cell`, so the writer's output must
+        /// be a fixed point of the formatter. Rounding that carries into the
+        /// next power of ten is exactly where it was not (9.96 @2SF was
+        /// written "10.0", which Rule 8 expects as "10" — #1204), so the
+        /// second strategy aims straight at those decade edges: values just
+        /// below 10^e, either side of the point where `n` figures round up.
+        #[test]
+        fn format_nsf_output_is_a_fixed_point(
+            x in prop_oneof![
+                -1e9f64..1e9,
+                (-12i32..=9, 1.0f64..10.0, any::<bool>())
+                    .prop_map(|(e, m, neg)| if neg { -m } else { m } * 10f64.powi(e)),
+                (1usize..=12, -12i32..=9, 0.0f64..2.0, any::<bool>()).prop_map(
+                    |(k, e, t, neg)| {
+                        let v = 10f64.powi(e) * (1.0 - t * 10f64.powi(-i32::try_from(k).unwrap()));
+                        if neg { -v } else { v }
+                    }
+                ),
+            ],
+            n in 1usize..=12,
+        ) {
+            let once = format_nsf(x, n);
+            let reparsed: f64 = once.parse().expect("plain decimal parses");
+            prop_assert_eq!(
+                format_nsf(reparsed, n),
+                once.clone(),
+                "format_nsf({}, {}) = {:?} is not what Rule 8 expects of it",
+                x,
+                n,
+                once,
+            );
         }
 
         /// The pattern validators never panic on arbitrary input — they
