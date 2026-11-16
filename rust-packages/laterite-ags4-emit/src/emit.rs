@@ -1238,6 +1238,11 @@ fn collect_pa_cells(g: &OwnedGroup, seen: &mut BTreeSet<(String, String)>) {
 /// Distinct `(heading, code, desc)` triples from the accumulated PA cells
 /// (Rule 16). Each cell splits on `concat` (matching Rule 16a); the
 /// description is the standard ABBR table's, falling back to the code.
+///
+/// Each code is listed exactly as the cell holds it, untrimmed: Rule 16 looks
+/// a part up as written, so a trimmed listing made a padded cell fail against
+/// the very ABBR minted from it (#1203). Only an empty part is skipped — Rule
+/// 16 does not read one as an abbreviation either.
 fn abbreviations_from_pa_cells(
     pa_cells: &BTreeSet<(String, String)>,
     dict: &Dictionary,
@@ -1246,7 +1251,6 @@ fn abbreviations_from_pa_cells(
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
     for (heading, cell) in pa_cells {
         for code in cell.split(concat) {
-            let code = code.trim();
             if !code.is_empty() {
                 seen.insert((heading.clone(), code.to_string()));
             }
@@ -3033,5 +3037,151 @@ mod tests {
             column(&ordered(&groups(), RowOrder::Key), "SAMP", "LOCA_ID"),
             strings(&["BH1", "BH2"])
         );
+    }
+
+    // ---- sample-child fixtures for the synthesis tests ----
+
+    /// The SAMP keys every sample-child group repeats.
+    const KEYS: [&str; 5] = ["LOCA_ID", "SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID"];
+    const KEY_CELLS: [&str; 5] = ["BH1", "1.00", "1", "U", "S1"];
+
+    fn sample_chain() -> Vec<GroupInput> {
+        vec![
+            proj(),
+            rows_of("LOCA", &["LOCA_ID"], &[&["BH1"]]),
+            rows_of("SAMP", &KEYS, &[&KEY_CELLS]),
+        ]
+    }
+
+    /// A sample-child group: the SAMP keys, then `extra` headings and cells.
+    fn sample_child(code: &str, extra: &[(&str, &str)]) -> GroupInput {
+        let mut headings: Vec<&str> = KEYS.to_vec();
+        let mut cells: Vec<&str> = KEY_CELLS.to_vec();
+        for (h, v) in extra {
+            headings.push(h);
+            cells.push(v);
+        }
+        rows_of(code, &headings, &[&cells])
+    }
+
+    /// Opted-in synthesis with a stamped TRAN, so a build can reach error-free.
+    fn synthesising(mode: EmitMode) -> EmitOpts {
+        EmitOpts {
+            mode,
+            synthesise_metadata: true,
+            tran: Some(stamp()),
+            ..EmitOpts::default()
+        }
+    }
+
+    /// `groups` with `more` appended.
+    fn with(
+        mut groups: Vec<GroupInput>,
+        more: impl IntoIterator<Item = GroupInput>,
+    ) -> Vec<GroupInput> {
+        groups.extend(more);
+        groups
+    }
+
+    // ---- #1203: ABBR lists each PA code exactly as the cell holds it ----
+
+    const RULE_16: &str = "AGS Format Rule 16";
+
+    fn rucs(mode_cell: &str) -> GroupInput {
+        sample_child(
+            "RUCS",
+            &[
+                ("SPEC_REF", "1"),
+                ("SPEC_DPTH", "1.10"),
+                ("RUCS_MODE", mode_cell),
+            ],
+        )
+    }
+
+    fn abbr_codes(bytes: &[u8], heading: &str) -> Vec<String> {
+        emitted_group(bytes, "ABBR")
+            .2
+            .into_iter()
+            .filter(|r| r[0] == heading)
+            .map(|mut r| r.swap_remove(1))
+            .collect()
+    }
+
+    fn rule_16(f: &Findings) -> Vec<String> {
+        f.get(RULE_16)
+            .map(|v| v.iter().map(|x| x.desc.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn a_padded_pa_code_is_listed_as_written_and_passes_rule_16() {
+        for mode in [EmitMode::Report, EmitMode::AutoFix] {
+            let r = emit_ags4(
+                &with(sample_chain(), [rucs("Single shear ")]),
+                &synthesising(mode),
+            )
+            .unwrap();
+            assert_eq!(rule_16(&r.findings), Vec::<String>::new(), "{mode:?}");
+            // Whatever the mode did to the cell, ABBR agrees with it.
+            let cell = column(&r.bytes, "RUCS", "RUCS_MODE");
+            assert_eq!(abbr_codes(&r.bytes, "RUCS_MODE"), cell, "{mode:?}");
+            if mode == EmitMode::Report {
+                assert_eq!(cell, strings(&["Single shear "]));
+            }
+        }
+    }
+
+    #[test]
+    fn concatenated_codes_are_listed_per_part_as_written() {
+        let tran = || {
+            rows_of(
+                "TRAN",
+                &[
+                    "TRAN_ISNO",
+                    "TRAN_DATE",
+                    "TRAN_PROD",
+                    "TRAN_STAT",
+                    "TRAN_AGS",
+                    "TRAN_RECV",
+                    "TRAN_DLIM",
+                    "TRAN_RCON",
+                ],
+                &[&["1", "2026-07-30", "A", "FINAL", "4.1.1", "B", "|", "&"]],
+            )
+        };
+        for mode in [EmitMode::Report, EmitMode::AutoFix] {
+            let r = emit_ags4(
+                &with(sample_chain(), [tran(), rucs("Single shear &  Other")]),
+                &synthesising(mode),
+            )
+            .unwrap();
+            assert_eq!(rule_16(&r.findings), Vec::<String>::new(), "{mode:?}");
+            if mode == EmitMode::Report {
+                assert_eq!(
+                    abbr_codes(&r.bytes, "RUCS_MODE"),
+                    strings(&["  Other", "Single shear "])
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unpadded_codes_list_exactly_as_before() {
+        let cells: BTreeSet<(String, String)> =
+            [("H", "TP"), ("H", "A+B"), ("H", "A++C"), ("G", "X")]
+                .iter()
+                .map(|(h, v)| ((*h).to_string(), (*v).to_string()))
+                .collect();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let got: Vec<(String, String)> = abbreviations_from_pa_cells(&cells, &dict, "+")
+            .into_iter()
+            .map(|[h, c, _]| (h, c))
+            .collect();
+        let want: Vec<(String, String)> =
+            [("G", "X"), ("H", "A"), ("H", "B"), ("H", "C"), ("H", "TP")]
+                .iter()
+                .map(|(h, c)| ((*h).to_string(), (*c).to_string()))
+                .collect();
+        assert_eq!(got, want);
     }
 }

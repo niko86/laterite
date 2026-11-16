@@ -22,6 +22,9 @@
       },
       {
         "text": "**The validator's build script parses Cargo manifests with `toml` 1.2.** It reads them to decide which files `ENGINE_FINGERPRINT` covers, and the fingerprint is unchanged. `toml` is a build dependency only, and it needs no newer Rust than the crates' 1.89 floor."
+      },
+      {
+        "text": "**A synthesised ABBR now lists each `PA` code exactly as the cell holds it (#1203).** With `synthesise_metadata=True`, the minted ABBR trimmed each code while the cell kept its spaces, so in `mode=\"report\"` a cell such as `\"Single shear \"` failed Rule 16 against the ABBR built from it. Each code is now listed as written, split on the concatenation character but not trimmed, so the file passes Rule 16 in every mode. Empty codes are still skipped, and cells without surrounding whitespace give the same ABBR as before."
       }
     ],
     "deprecated": [],
