@@ -28,6 +28,7 @@ use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_types::{Cell, ags4_str, dt_to_unit_precision};
+use laterite_ags4_validator::effective_dict::EffectiveDict;
 use laterite_ags4_validator::{DictVersion, Dictionary};
 
 use crate::emit::{EmitStream, OwnedGroup, resolved_meta_parts};
@@ -185,38 +186,44 @@ pub struct ArrowGroup {
 /// than a string the caller wrote. The rendering is refused whenever it
 /// would lose information (a real time under a date-only unit), so a genuine
 /// mismatch still reaches the caller as a Rule 8 finding rather than being
-/// silently trimmed. Only headings in the **standard** dictionary carry a
-/// declared UNIT here; a DICT-defined heading's temporal columns keep
-/// Arrow's rendering rather than being guessed at.
+/// silently trimmed. The UNIT is the heading's resolved one — the caller's,
+/// the standard dictionary's, or the file's own DICT row (#1205); a heading
+/// none of them gives a UNIT keeps Arrow's rendering rather than being
+/// guessed at.
 pub fn emit_ags4_from_arrow(
     groups: Vec<ArrowGroup>,
     opts: &EmitOpts,
 ) -> Result<EmitResult, EmitError> {
     let dict = Dictionary::bundled(opts.edition);
     let mut stream = EmitStream::new(opts, &dict);
-    if stream.wants_dict_lookahead() {
-        // `RowOrder::Key` keys a DICT-defined group from the DICT, wherever it
-        // sits in `groups`. Converting a shallow copy (the batches are
-        // refcounted) leaves the group itself to stream in its place.
-        for g in groups.iter().filter(|g| g.code == "DICT") {
-            let copy = ArrowGroup {
-                code: g.code.clone(),
-                schema: g.schema.clone(),
-                batches: g.batches.clone(),
-                units: g.units.clone(),
-                types: g.types.clone(),
-            };
-            stream.look_ahead(&owned_group_from_arrow(copy, &dict));
-        }
-    }
+    look_ahead_arrow(&mut stream, &groups, &dict);
     for g in groups {
         // Consumed per iteration: a group's batches (our refs to them) drop
         // here, not at return — and the formatted `OwnedGroup` drops inside
         // `push` once its section is written, so no whole-file slab of
         // formatted cells ever exists (dec-emit-streamed-verdict).
-        stream.push(owned_group_from_arrow(g, &dict))?;
+        stream.push(owned_group_from_arrow(g, &dict, stream.declared()))?;
     }
     stream.finish()
+}
+
+/// A DICT-defined group fills its UNIT/TYPE (#1205) and, under
+/// `RowOrder::Key`, sorts by its keys from the DICT, wherever the DICT sits
+/// in `groups`. Converting a shallow copy (the batches are refcounted) leaves
+/// the group itself to stream in its place; a build without a DICT does no
+/// work here.
+fn look_ahead_arrow(stream: &mut EmitStream, groups: &[ArrowGroup], dict: &Dictionary) {
+    for g in groups.iter().filter(|g| g.code == "DICT") {
+        let copy = ArrowGroup {
+            code: g.code.clone(),
+            schema: g.schema.clone(),
+            batches: g.batches.clone(),
+            units: g.units.clone(),
+            types: g.types.clone(),
+        };
+        // DICT is a standard group: its own fill never reads a DICT.
+        stream.look_ahead(&owned_group_from_arrow(copy, dict, None));
+    }
 }
 
 /// A per-group push session over the streamed Arrow door — for a caller
@@ -226,9 +233,10 @@ pub fn emit_ags4_from_arrow(
 /// and its formatted cells drop inside `push`, exactly as the one-call
 /// door's loop drops them; [`emit_ags4_from_arrow`] IS this session driven
 /// over a `Vec`, and a test pins the two byte-identical — with one exception
-/// by construction: under [`crate::RowOrder::Key`] the one-call door reads
-/// the DICT ahead, while a session keys a DICT-defined group only from a
-/// DICT pushed before it.
+/// by construction: the one-call door reads the DICT ahead, while a session
+/// fills a DICT-defined heading's UNIT/TYPE, and under
+/// [`crate::RowOrder::Key`] keys a DICT-defined group, only from a DICT
+/// pushed before it.
 ///
 /// The caller owns `opts` and the bundled dictionary for `opts.edition`
 /// (the same pairing the one-call door constructs internally) and lends
@@ -251,7 +259,8 @@ impl<'a> ArrowEmitSession<'a> {
     /// Decode-and-write one group; its batches and formatted cells free on
     /// return.
     pub fn push(&mut self, g: ArrowGroup) -> Result<(), EmitError> {
-        self.stream.push(owned_group_from_arrow(g, self.dict))
+        self.stream
+            .push(owned_group_from_arrow(g, self.dict, self.stream.declared()))
     }
 
     pub fn finish(self) -> Result<EmitResult, EmitError> {
@@ -275,8 +284,9 @@ pub fn emit_ags4_from_arrow_unchecked(
     let opts = crate::emit::unchecked_opts(edition);
     let dict = Dictionary::bundled(edition);
     let mut stream = EmitStream::new(&opts, &dict);
+    look_ahead_arrow(&mut stream, &groups, &dict);
     for g in groups {
-        stream.push(owned_group_from_arrow(g, &dict))?;
+        stream.push(owned_group_from_arrow(g, &dict, stream.declared()))?;
     }
     stream.finish_unchecked()
 }
@@ -291,7 +301,11 @@ pub fn emit_ags4_from_arrow_unchecked(
 /// against the heading's resolved TYPE. The transient [`Cell`] for a typed
 /// scalar lives on the stack; the only heap allocation per cell is the final
 /// string itself.
-fn owned_group_from_arrow(g: ArrowGroup, dict: &Dictionary) -> OwnedGroup {
+fn owned_group_from_arrow(
+    g: ArrowGroup,
+    dict: &Dictionary,
+    declared: Option<&EffectiveDict>,
+) -> OwnedGroup {
     let headings: Vec<String> = g.schema.fields().iter().map(|f| f.name().clone()).collect();
 
     // Align a {heading → value} override map to the heading order; a heading
@@ -312,6 +326,7 @@ fn owned_group_from_arrow(g: ArrowGroup, dict: &Dictionary) -> OwnedGroup {
         unit_overrides.as_ref(),
         type_overrides.as_ref(),
         dict,
+        declared,
     );
 
     // Per column: the declared UNIT to render a temporal cell against, or
@@ -395,6 +410,7 @@ mod tests {
         let g = owned_group_from_arrow(
             arrow_group(code, schema, vec![batch]),
             &Dictionary::bundled(edition),
+            None,
         );
         g.rows[0][0].clone()
     }
@@ -463,7 +479,7 @@ mod tests {
             let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![col]).unwrap();
             let mut g = arrow_group("SAMP", schema, vec![batch]);
             g.units = Some(HashMap::from([("SAMP_DTIM".to_string(), unit.to_string())]));
-            let og = owned_group_from_arrow(g, &Dictionary::bundled(DictVersion::V4_2));
+            let og = owned_group_from_arrow(g, &Dictionary::bundled(DictVersion::V4_2), None);
             (og.units[0].clone(), og.rows[0][0].clone())
         };
         let month = Arc::new(TimestampMillisecondArray::from(vec![FIRST_OF_AUGUST_MS]));
@@ -636,6 +652,7 @@ mod tests {
                 vec![batch(vec!["A", "B"], vec![1.0, 2.0])],
             ),
             &dict(),
+            None,
         );
         assert_eq!(g.code, "LOCA");
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
@@ -665,6 +682,7 @@ mod tests {
                 vec![batch(vec!["A"], vec![1.0]), batch(vec!["B"], vec![2.0])],
             ),
             &dict(),
+            None,
         );
         assert_eq!(g.rows.len(), 2);
         assert_eq!(g.rows[1][0], "B");
@@ -675,7 +693,7 @@ mod tests {
     /// right headings.
     #[test]
     fn zero_batches_still_yields_the_headings() {
-        let g = owned_group_from_arrow(arrow_group("LOCA", schema2(), vec![]), &dict());
+        let g = owned_group_from_arrow(arrow_group("LOCA", schema2(), vec![]), &dict(), None);
         assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
         assert!(g.rows.is_empty());
     }
@@ -690,7 +708,7 @@ mod tests {
             .collect();
         let mut g = arrow_group("LOCA", schema2(), vec![]);
         g.units = Some(units);
-        let g = owned_group_from_arrow(g, &dict());
+        let g = owned_group_from_arrow(g, &dict(), None);
         assert_eq!(
             g.units,
             ["", "ft"],
@@ -997,5 +1015,74 @@ mod tests {
         let sessioned = session.finish().unwrap().bytes;
         assert_eq!(column(&sessioned, "LOCA"), ["BH1", "BH2", "BH10"]);
         assert_eq!(column(&sessioned, "XMON"), ["BH2", "BH1"]);
+    }
+
+    /// #1205 on the door `build_ags4` takes: a DICT-defined group's TYPE and
+    /// UNIT come from the DICT even when it arrives after the group, and a
+    /// session fills from a DICT pushed before the group.
+    #[test]
+    fn a_dict_defined_heading_fills_from_the_dict_on_the_arrow_door() {
+        use arrow::array::StringArray;
+
+        fn utf8(code: &str, headings: &[&str], rows: &[&[&str]]) -> ArrowGroup {
+            let schema = Schema::new(
+                headings
+                    .iter()
+                    .map(|h| Field::new(*h, DataType::Utf8, true))
+                    .collect::<Vec<_>>(),
+            );
+            let cols: Vec<ArrayRef> = (0..headings.len())
+                .map(|i| {
+                    Arc::new(StringArray::from(
+                        rows.iter().map(|r| r[i]).collect::<Vec<_>>(),
+                    )) as ArrayRef
+                })
+                .collect();
+            let batch = RecordBatch::try_new(Arc::new(schema.clone()), cols).expect("valid batch");
+            arrow_group(code, schema, vec![batch])
+        }
+        let proj = || utf8("PROJ", &["PROJ_ID"], &[&["P1"]]);
+        let xlab = || utf8("XLAB", &["LOCA_ID", "XLAB_VAL"], &[&["BH1", "1.5"]]);
+        let dict = || {
+            utf8(
+                "DICT",
+                &[
+                    "DICT_TYPE",
+                    "DICT_GRP",
+                    "DICT_HDNG",
+                    "DICT_STAT",
+                    "DICT_DTYP",
+                    "DICT_UNIT",
+                    "DICT_PGRP",
+                ],
+                &[
+                    &["GROUP", "XLAB", "", "", "", "", "LOCA"],
+                    &["HEADING", "XLAB", "XLAB_VAL", "OTHER", "1DP", "kPa", ""],
+                ],
+            )
+        };
+        let opts = EmitOpts {
+            mode: crate::EmitMode::Report,
+            ..EmitOpts::default()
+        };
+        let meta = |bytes: &[u8]| {
+            let p = laterite_ags4_validator::parse::parse_bytes(bytes, encoding_rs::UTF_8).unwrap();
+            let g = &p.groups["XLAB"];
+            (g.types.clone(), g.units.clone())
+        };
+        // LOCA_ID: undeclared in XLAB, so the parent LOCA's KEY definition.
+        let want = (
+            vec!["ID".to_string(), "1DP".to_string()],
+            vec![String::new(), "kPa".to_string()],
+        );
+        let late = emit_ags4_from_arrow(vec![proj(), xlab(), dict()], &opts).unwrap();
+        assert_eq!(meta(&late.bytes), want);
+
+        let d = Dictionary::bundled(opts.edition);
+        let mut session = ArrowEmitSession::new(&opts, &d);
+        for g in [proj(), dict(), xlab()] {
+            session.push(g).unwrap();
+        }
+        assert_eq!(meta(&session.finish().unwrap().bytes), want);
     }
 }

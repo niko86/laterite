@@ -2690,7 +2690,11 @@ def build_ags4(
       ``LOCA_ID``, ``LOCA_GL``).
 
     UNIT/TYPE are filled from the chosen dictionary edition and each cell is
-    formatted to its canonical AGS4 string. Order is preserved — pass an ordered
+    formatted to its canonical AGS4 string. A heading the edition does not
+    define takes its UNIT/TYPE from your ``DICT`` group's row for it
+    (``DICT_UNIT`` / ``DICT_DTYP``) when you pass one, and a KEY heading
+    inherited from the parent group takes the parent's; ``units=``/``types=``
+    still win over both. Order is preserved — pass an ordered
     mapping or a list of ``(code, frame)`` pairs, and put ``PROJ`` first.
 
     Each frame crosses into Rust zero-copy via the Arrow C-stream — **pyarrow-free
