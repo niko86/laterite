@@ -124,3 +124,9 @@ updates:
       # Every other major. Listed after vitest-major so those still match first.
       npm-major:
         update-types: ["major"]
+    ignore:
+      # TypeScript 7 fails `npm ci` with ERESOLVE in both directories (#1202):
+      # typescript-eslint, which both lint setups use, caps its typescript peer
+      # below 6.1. Drop this once a typescript-eslint release accepts 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
