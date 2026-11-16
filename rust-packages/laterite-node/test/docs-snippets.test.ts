@@ -25,6 +25,8 @@
 // finds that. Falsification proved the split rather than assuming it, and
 // exposed a hole in the process: the static gate scanned `docs/node/` only, so
 // the npm landing page was covered by neither. Its scope now includes it.
+// Neither catches an option key the API does not take, so this file also
+// type-checks the pages written in TypeScript (THE THIRD CHECK, at the end).
 //
 // A PAGE IS ONE PROGRAM, in document order, with `--8<--` includes replayed —
 // because that is how a reader reads it, and because Node's fragments are chained
@@ -132,11 +134,16 @@ function walk(dir: string): string[] {
   );
 }
 
-/** Fences in document order; an include contributes its example's source. */
-function fences(md: string): { kind: "include" | "literal"; src: string }[] {
+type Fence = { kind: "include" | "literal"; lang: "js" | "ts"; src: string };
+
+/** Fences in document order; an include contributes its example's source. An
+ *  include is a node example (`.mjs`), so it counts as `js` whatever the fence
+ *  around it says. */
+function fences(md: string): Fence[] {
   const text = readFileSync(md, "utf8");
-  const out: { kind: "include" | "literal"; src: string }[] = [];
+  const out: Fence[] = [];
   for (const m of text.matchAll(FENCE)) {
+    const lang = m[2] === "ts" ? "ts" : "js";
     const indent = m[1] ?? "";
     const raw = m[3];
     if (raw === undefined) continue;
@@ -152,7 +159,11 @@ function fences(md: string): { kind: "include" | "literal"; src: string }[] {
       if (!target.startsWith("node/")) continue;
       const f = join(exampleDir, target);
       if (existsSync(f))
-        out.push({ kind: "include", src: readFileSync(f, "utf8") });
+        out.push({
+          kind: "include",
+          lang: "js",
+          src: readFileSync(f, "utf8"),
+        });
       continue;
     }
     // A skip marker in the 300 chars before the fence exempts it. Used for the
@@ -164,7 +175,7 @@ function fences(md: string): { kind: "include" | "literal"; src: string }[] {
       continue;
     }
     SKIP.lastIndex = 0;
-    out.push({ kind: "literal", src: body });
+    out.push({ kind: "literal", lang, src: body });
   }
   return out;
 }
@@ -385,3 +396,72 @@ it("every page actually executed — none fell back", () => {
   }
   expect(ran.length).toBeGreaterThanOrEqual(4);
 });
+
+// THE THIRD CHECK: TYPES. Executing catches a call that throws and the static
+// gate catches a read of something absent; neither catches an option key the API
+// does not take, because JavaScript ignores an unknown key. The npm README shipped
+// `buildAgs4(…, { edition: "4.1.1" })` for exactly that reason: `EmitOptions` has
+// `dictVersion`, the example ran on the default, and a TypeScript reader who
+// copied it got a compile error. So a page written in TypeScript is also
+// type-checked, welded into one program as above, against the types
+// `npm install laterite` ships: `dist/index.d.ts`, reached through the same
+// `node_modules/laterite` symlink the run uses. `--strict`, because a reader's
+// project is as likely strict as not and a strict pass is the one that holds for
+// both. A page with any `js` fence (or a node-example include, which is `.mjs`)
+// is not type-checked, since plain JavaScript has no declared types to hold it
+// to; how many pages that leaves out prints on every run.
+const tsPages = pages.filter((p) => p.parts.every((f) => f.lang === "ts"));
+
+it("the type-check names the pages it leaves out", () => {
+  console.log(
+    `docs-snippets types: ${tsPages.length} TypeScript page(s) type-checked, ` +
+      `${pages.length - tsPages.length} page(s) with JavaScript fences not type-checked`,
+  );
+  // Zero is a bad witness here too: the npm README is all TypeScript.
+  expect(tsPages.length).toBeGreaterThanOrEqual(1);
+});
+
+it.each(tsPages.map((p) => [p.md.slice(repoRoot.length + 1), p] as const))(
+  "%s — its documented TypeScript type-checks",
+  (name, page) => {
+    const file = join(dir, `${name.replace(/[^\w]/g, "_")}.ts`);
+    writeFileSync(file, weld(page.parts.map((f) => f.src)));
+    const tsc = join(pkgDir, "node_modules", "typescript", "bin", "tsc");
+    try {
+      // A clean `--noEmit` run prints nothing, so empty output is the pass.
+      const out = execFileSync(
+        process.execPath,
+        [
+          tsc,
+          "--noEmit",
+          "--strict",
+          "--skipLibCheck",
+          "--target",
+          "ES2022",
+          "--module",
+          "esnext",
+          "--moduleResolution",
+          "bundler",
+          "--lib",
+          "ES2022",
+          "--types",
+          "node",
+          "--typeRoots",
+          join(pkgDir, "node_modules", "@types"),
+          file,
+        ],
+        { cwd: dir, encoding: "utf8" },
+      );
+      expect(out).toBe("");
+    } catch (e) {
+      const out = String((e as { stdout?: string }).stdout ?? e);
+      throw new Error(
+        `${name}: documented TypeScript does not type-check\n${out}`,
+        {
+          cause: e,
+        },
+      );
+    }
+  },
+  120_000,
+);
