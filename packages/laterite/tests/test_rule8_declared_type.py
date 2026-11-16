@@ -232,3 +232,46 @@ def test_the_dict_comparison_is_native_only_too():
     agreeing = AGS4.check_file(io.StringIO(_user_heading_with_dict("X").decode()))
     assert FYI8 not in retyped and WARN8 not in retyped
     assert sorted(retyped) == sorted(agreeing)
+
+
+# --- the warning is for a join key only ---------------------------------------
+
+
+def _core_typed(proj_id: str, core_top: str) -> bytes:
+    """PROJ, LOCA and CORE with PROJ_ID (``KEY+REQUIRED``) and CORE_TOP (KEY)
+    declared as given; no other group keys on either."""
+    frames = {
+        "PROJ": pl.DataFrame({"PROJ_ID": ["P1"]}),
+        "LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]}),
+        "CORE": pl.DataFrame({"LOCA_ID": ["BH1"], "CORE_TOP": [1.0]}),
+    }
+    text = (
+        laterite.build_ags4(
+            frames, dict_version="4.1.1", synthesise_metadata=True, tran=STAMP
+        )
+        .bytes.decode()
+        .replace("\r\n", "\n")
+    )
+    for old, new in [
+        ('"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n', proj_id),
+        ('"TYPE","ID","2DP"\n"DATA","BH1","1.00"\n', core_top),
+    ]:
+        assert text.count(old) == 1, old
+        text = text.replace(old, old.replace(*new))
+    return _crlf(
+        text.replace('"DATA","2DP","2DP"\n', '"DATA","2DP","2DP"\n"DATA","3DP","3DP"\n')
+    )
+
+
+def test_a_key_no_other_group_keys_on_is_an_fyi():
+    data = _core_typed(
+        ('"ID"', '"X"'), ('"2DP"\n"DATA","BH1","1.00"', '"3DP"\n"DATA","BH1","1.000"')
+    )
+    # Shown only with FYIs on: there is no parent or child copy to disagree with.
+    assert _warn8(laterite.validate(data)) == []
+    rep = laterite.validate(data, fyi=True)
+    assert _warn8(rep) == []
+    assert _fyi8(rep) == [
+        "PROJ.PROJ_ID is declared X; the 4.1.1 dictionary type is ID.",
+        "CORE.CORE_TOP is declared 3DP; the 4.1.1 dictionary type is 2DP.",
+    ]

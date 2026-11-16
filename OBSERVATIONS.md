@@ -837,7 +837,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
   the parity verdict reconciles it as this record. A non-standard spelling also keeps its [[O-43]] FYI, which now names the
   standard case variant. Validation never collapses the variants. `fix` does when asked (#1024): `on_code_case="standard"` or an explicit `recode`, `merge`'s two options, rewrite the ABBR rows and every `PA` cell under the heading as one safe Rule 16 fix, and leave a set as written, reported as skipped, when the rewrite would give two rows one KEY.
 
-### O-59 [VARIANCE] A heading declared with a different data type from the dictionary, or from the file's own DICT row for a user-defined heading, gets a laterite-originated FYI (Related to Rule 8), a WARNING when the heading is KEY; python-ags4 has no such check
+### O-59 [VARIANCE] A heading declared with a different data type from the dictionary, or from the file's own DICT row for a user-defined heading, gets a laterite-originated FYI (Related to Rule 8), a WARNING when the heading is a join key; python-ags4 has no such check
 - **Observed** (#1013): a file can declare a standard heading with a
   different data type from the dictionary edition it is checked against —
   `LNMC_MC` as `1DP` where 4.1.1 types it `X`, or `CONS_INCE` as `2DP` where
@@ -908,6 +908,29 @@ O-N below is an internal decision or behavioural note, not for external circulat
   blank TYPE cell or a blank `DICT_DTYP` gives nothing. Rule 8, the
   verdict, `laterite.compat`'s output and the parity known-failures set
   are unchanged.
+- **Our decision (2026-11-16, #1209)**: the WARNING goes to a **join
+  key** only. A heading is KEY when its status contains KEY, ignoring
+  case, on both the edition and the DICT path: the spec's status column
+  (`§3.2`, and the DICT group's notes on `DICT_STAT`) carries the KEY and REQUIRED flags,
+  so `KEY+REQUIRED` is both, and python-ags4's Rules 10a and 10c, as
+  observed, pick KEY headings by a case-insensitive match on the word.
+  Until now the edition path matched `KEY` exactly, so the `KEY+REQUIRED`
+  headings (`PROJ_ID`, the `ABBR_`, `DICT_`, `FILE_` keys)
+  took the FYI by accident. Reading them as KEY would have moved them to
+  the warning, yet none of them is KEY in any other group, and the
+  warning exists because a KEY typed apart from its parent's or child's
+  copy breaks the join ([[O-52]]). So the tier now follows the join: a
+  departure is a `Warning (Related to Rule 8)` when the heading is KEY in
+  its group and in at least one other group of the dictionary in effect,
+  the resolved edition plus each heading the file's own DICT declares
+  where the edition defines none for that group. `LOCA_ID` in a child
+  still warns, and so does `SAMP_TOP` in a user group the DICT keys on
+  it. A KEY no other group keys on, such as `PROJ_ID`, `CORE_TOP` or a
+  user group's own `XLAB_ID`, is the FYI, which moves the plain
+  single-group KEY headings down a tier. Declared parentage is not
+  consulted, so a heading two groups both key on counts whether or not
+  either names the other as parent. Labels, messages, compat's
+  withholding and the verdict are unchanged.
 
 ### O-60 [VARIANCE] A DICT row that redeclares a standard group or heading gets a laterite-originated FYI (Related to Rule 18), a WARNING when it drops KEY or re-parents; python-ags4 has no such check
 - **Observed** (#1011): several exporters write a DICT row for every

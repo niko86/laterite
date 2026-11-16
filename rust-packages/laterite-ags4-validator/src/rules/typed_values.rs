@@ -218,14 +218,15 @@ pub fn check(parsed: &ParsedFile, found: &mut impl Sink) {
 /// to Rules 4 and 17, and a blank `DICT_DTYP` gives nothing to compare with.
 /// One finding per heading, never per row.
 ///
-/// Two tiers, by the heading's dictionary status (its `DICT_STAT` for a
-/// DICT-only heading). A KEY heading is a join
-/// column, so a departure there is a WARNING (`include_warnings`, on by default
-/// on every surface): the child and parent TYPE rows now have a way to
-/// disagree, and python-ags4's Rule 10c rejects a child whose TYPE row differs
-/// from its parent's in a KEY column — on the TYPE line, as an orphan (O-52) —
-/// so a producer has to see it before delivery, not after `--show-fyi`. Any
-/// other heading stays an FYI (`include_fyi`). Neither tier moves the verdict.
+/// Two tiers. A JOIN KEY — KEY in its own group and in at least one other
+/// group of the dictionary in effect — gets a WARNING (`include_warnings`, on
+/// by default on every surface): the child and parent TYPE rows now have a way
+/// to disagree, and python-ags4's Rule 10c rejects a child whose TYPE row
+/// differs from its parent's in a KEY column — on the TYPE line, as an orphan
+/// (O-52) — so a producer has to see it before delivery, not after
+/// `--show-fyi`. A KEY no other group keys on (`PROJ_ID`, `CORE_TOP`) has no copy
+/// to disagree with, so it stays an FYI (`include_fyi`) with every other
+/// heading. Neither tier moves the verdict. See [`is_join_key`].
 // `ci` is a column index within one group, bounded far below u32::MAX.
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) fn declared_type(
@@ -257,20 +258,17 @@ pub(crate) fn declared_type(
                 continue;
             }
             // `against` completes the message: which authority gave `expected`.
-            // A file's `DICT_STAT` is read the way the effective dictionary
-            // reads it, so `key` and `KEY+REQUIRED` hold KEY; the standard
-            // branch keeps the exact match O-59 has always made.
             let (expected, key, against) =
                 if let Some(std_heading) = standard.heading(code, heading) {
                     (
                         std_heading.ags_type.trim(),
-                        std_heading.status.trim().eq_ignore_ascii_case("KEY"),
+                        is_key(std_heading.status),
                         format!("the {} dictionary", edition.as_str()),
                     )
                 } else if let Some(fh) = file_dict.heading(code, heading) {
                     (
                         fh.ags_type.trim(),
-                        fh.status.to_ascii_uppercase().contains("KEY"),
+                        is_key(&fh.status),
                         "the file's own DICT".to_string(),
                     )
                 } else {
@@ -279,7 +277,10 @@ pub(crate) fn declared_type(
             if expected.is_empty() || expected == declared {
                 continue;
             }
-            let (label, severity, shown, what) = if key {
+            // Only reached for a departure, so the cross-group scan runs per
+            // differing KEY heading, never per column.
+            let join = key && is_join_key(&standard, &file_dict, code, heading);
+            let (label, severity, shown, what) = if join {
                 (
                     RULE_8_WARN,
                     Severity::Warning,
@@ -308,6 +309,37 @@ pub(crate) fn declared_type(
             );
         }
     }
+}
+
+/// A status is KEY when it contains KEY, whatever the case: `KEY+REQUIRED`
+/// is both flags, as the spec's status column and python-ags4's Rules 10a/10c
+/// read it, and as the effective dictionary reads a file's `DICT_STAT`.
+fn is_key(status: &str) -> bool {
+    status.to_ascii_uppercase().contains("KEY")
+}
+
+/// `heading` is KEY in some group other than `code` in the dictionary in
+/// effect: the standard edition's groups, then every heading the file's own
+/// DICT declares for a group where the edition does not define that heading
+/// (so a user group keyed on `SAMP_TOP` joins the SAMP family, and two user
+/// groups keyed on one DICT heading join each other). The edition's own
+/// definition wins where it has one, so a DICT row restating a standard
+/// heading (O-60's) neither adds nor removes a join. Parentage is not
+/// consulted: a heading two groups both key on is one a combine or a
+/// parent/child lookup can join on, declared parent or not.
+fn is_join_key(standard: &Dictionary, file_dict: &FileDict, code: &str, heading: &str) -> bool {
+    standard.group_codes().any(|g| {
+        g != code
+            && standard
+                .heading(g, heading)
+                .is_some_and(|h| is_key(h.status))
+    }) || file_dict.groups().into_iter().any(|g| {
+        g != code
+            && standard.heading(g, heading).is_none()
+            && file_dict
+                .heading(g, heading)
+                .is_some_and(|h| is_key(&h.status))
+    })
 }
 
 fn unit_hint(chk: &Check, unit: &str) -> String {
@@ -1145,6 +1177,39 @@ mod tests {
     }
 
     #[test]
+    fn a_key_no_other_group_keys_on_is_an_fyi() {
+        // PROJ_ID's status is `KEY+REQUIRED`, which is KEY, but no other group
+        // keys on it, so there is no parent or child TYPE row for it to
+        // disagree with: the FYI, not the warning.
+        let src = "\"GROUP\",\"PROJ\"\r\n\
+                   \"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"X\"\r\n\
+                   \"DATA\",\"P1\"\r\n";
+        let f = declared(src, "4.1.1", true, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty());
+        assert_eq!(
+            descs(&f, RULE_8_FYI),
+            vec!["PROJ.PROJ_ID is declared X; the 4.1.1 dictionary type is ID.".to_string()]
+        );
+        // The same for a plain KEY only its own group carries: CORE_TOP.
+        let src = "\"GROUP\",\"CORE\"\r\n\
+                   \"HEADING\",\"LOCA_ID\",\"CORE_TOP\"\r\n\
+                   \"UNIT\",\"\",\"m\"\r\n\
+                   \"TYPE\",\"ID\",\"3DP\"\r\n\
+                   \"DATA\",\"BH1\",\"1.000\"\r\n";
+        let f = declared(src, "4.1.1", true, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty());
+        assert_eq!(
+            descs(&f, RULE_8_FYI),
+            vec!["CORE.CORE_TOP is declared 3DP; the 4.1.1 dictionary type is 2DP.".to_string()]
+        );
+        // FYI-tier, so warnings alone do not surface it.
+        let f = declared(src, "4.1.1", true, false);
+        assert!(descs(&f, RULE_8_WARN).is_empty() && descs(&f, RULE_8_FYI).is_empty());
+    }
+
+    #[test]
     fn each_tier_follows_its_own_switch() {
         // `--no-warnings` hides the KEY warning; it is not demoted to an FYI.
         let f = declared(&lnmc_keyed("X"), "4.1.1", false, true);
@@ -1246,14 +1311,56 @@ mod tests {
     }
 
     #[test]
-    fn a_dict_key_heading_departure_is_a_warning() {
-        // DICT_STAT says KEY, so the departure rides the warning tier, shown
-        // with FYIs off.
-        let f = declared(&xlab("ID", "1DP", "X", "1DP"), "4.1.1", true, false);
+    fn a_dict_key_no_other_group_keys_on_is_an_fyi() {
+        // DICT_STAT says KEY, but XLAB is the only group keyed on XLAB_ID.
+        let f = declared(&xlab("ID", "1DP", "X", "1DP"), "4.1.1", true, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty());
+        assert_eq!(
+            descs(&f, RULE_8_FYI),
+            vec!["XLAB.XLAB_ID is declared X; the file's own DICT type is ID.".to_string()]
+        );
+    }
+
+    /// A DICT declaring user-defined XLAB keyed on `SAMP_TOP` and `XLAB_ID`
+    /// (types from `dict`), plus — when `child` — a user-defined child XLAC
+    /// keyed on `XLAB_ID` too; then XLAB with TYPE row `ty`.
+    fn xlab_joined(dict: (&str, &str), child: bool, ty: (&str, &str)) -> String {
+        let xlac = if child {
+            "\"DATA\",\"HEADING\",\"XLAC\",\"XLAB_ID\",\"KEY\",\"ID\"\r\n"
+        } else {
+            ""
+        };
+        format!(
+            "\"GROUP\",\"DICT\"\r\n\
+             \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_DTYP\"\r\n\
+             \"DATA\",\"HEADING\",\"XLAB\",\"SAMP_TOP\",\"KEY\",\"{}\"\r\n\
+             \"DATA\",\"HEADING\",\"XLAB\",\"XLAB_ID\",\"KEY\",\"{}\"\r\n\
+             {xlac}\
+             \r\n\
+             \"GROUP\",\"XLAB\"\r\n\
+             \"HEADING\",\"SAMP_TOP\",\"XLAB_ID\"\r\n\
+             \"UNIT\",\"m\",\"\"\r\n\
+             \"TYPE\",\"{}\",\"{}\"\r\n\
+             \"DATA\",\"1.00\",\"A\"\r\n",
+            dict.0, dict.1, ty.0, ty.1
+        )
+    }
+
+    #[test]
+    fn a_dict_join_key_departure_is_a_warning() {
+        // SAMP_TOP is KEY in the standard SAMP family, so a user group keyed
+        // on it shares a join column with them: the warning, shown with FYIs
+        // off.
+        let f = declared(
+            &xlab_joined(("1DP", "ID"), false, ("2DP", "ID")),
+            "4.1.1",
+            true,
+            false,
+        );
         assert_eq!(
             descs(&f, RULE_8_WARN),
             vec![
-                "XLAB.XLAB_ID is a KEY heading declared X; the file's own DICT type is ID."
+                "XLAB.SAMP_TOP is a KEY heading declared 2DP; the file's own DICT type is 1DP."
                     .to_string()
             ]
         );
@@ -1261,7 +1368,21 @@ mod tests {
             f.get(RULE_8_WARN).expect("the warning")[0].severity,
             Severity::Warning
         );
+        // XLAB_ID: an FYI while only XLAB keys on it, the warning once the
+        // file's DICT keys a second user group on it.
+        let src = |child| xlab_joined(("2DP", "ID"), child, ("2DP", "X"));
+        let f = declared(&src(false), "4.1.1", true, true);
+        assert!(descs(&f, RULE_8_WARN).is_empty());
+        assert_eq!(descs(&f, RULE_8_FYI).len(), 1);
+        let f = declared(&src(true), "4.1.1", true, true);
         assert!(descs(&f, RULE_8_FYI).is_empty());
+        assert_eq!(
+            descs(&f, RULE_8_WARN),
+            vec![
+                "XLAB.XLAB_ID is a KEY heading declared X; the file's own DICT type is ID."
+                    .to_string()
+            ]
+        );
     }
 
     #[test]

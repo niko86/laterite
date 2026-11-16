@@ -202,7 +202,7 @@ parity tests assert on. The native `laterite.validate(...)` /
 `lat` CLI default `include_fyi=False`.
 
 One laterite advisory is withheld from `compat.check_file`, at both of
-its tiers: `FYI (Related to Rule 8)` and, for a KEY heading,
+its tiers: `FYI (Related to Rule 8)` and, for a join key,
 `Warning (Related to Rule 8)` — the declared-TYPE-differs-from-dictionary
 advisory (O-59), which also compares a user-defined heading's TYPE with
 the file's own DICT row for it. It is native-only, so compat's key set stays
