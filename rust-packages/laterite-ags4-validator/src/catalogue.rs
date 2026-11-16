@@ -41,7 +41,7 @@ const FYI_BEARING_RULES: &[&str] = &["1", "8", "10c", "16", "18"];
 /// a fallback dictionary its author never declared; O-45), and
 /// `rules/groups.rs::rule_16_case_collision` (Rule 16 — ABBR codes differing
 /// only by letter case in a file judged against 4.2 or later; O-58), and
-/// `rules/typed_values.rs::declared_type` (Rule 8 — a KEY heading declared with
+/// `rules/typed_values.rs::declared_type` (Rule 8 — a join KEY declared with
 /// a type other than the dictionary's; O-59). 8, 10c and 16 are redundant for
 /// the set-equality gate below, which already has them from the FYI list — they
 /// are here because this const's job is to name the WARNING emitters, and
