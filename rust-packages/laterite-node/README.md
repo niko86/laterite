@@ -43,7 +43,7 @@ const res = buildAgs4(
     ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
     ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
   ]),
-  { edition: "4.1.1", mode: "autofix" },
+  { dictVersion: "4.1.1", mode: "autofix" },
 );
 
 res.text; // the AGS4 document
@@ -103,7 +103,8 @@ npx laterite excel delivery.ags delivery.xlsx
 ```
 
 Verbs: `validate` (the default — a bare `lat <file>` runs it) · `read` · `fix` ·
-`diff` · `certify` · `rules` · `pack` / `unpack` / `lock` / `unlock` · `excel`. The
+`diff` · `merge` · `certify` · `rules` · `pack` / `unpack` / `lock` / `unlock` ·
+`excel`. The
 scriptable outputs (`validate --json` / `--ndjson`, `read --json` / `--csv`,
 `rules --json`) are **byte-identical** to the Rust binary; `lock` / `unlock` take
 the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag).

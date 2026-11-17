@@ -30,8 +30,9 @@ sources: []
 > [!important] **Published.** `laterite` shipped to npm at **0.1.0 (2026-06-15)**
 > This page claimed "not yet published to npm (that is P4)" for six weeks after it
 > stopped being true — the package tracks the product line (the `node-v*` tag
-> series is the record; 0.8.0 when this note was written), alongside the three
-> `@laterite/native-*` platform packages, and releases run from CI via OIDC with
+> series is the record; 0.8.0 when this note was written), alongside one
+> `@laterite/native-*` platform package per `napi.targets` entry in
+> `repo:rust-packages/laterite-node/package.json`, and releases run from CI via OIDC with
 > provenance. The npm package is a **released surface** on its own `node-v*` tag
 > train. See `repo:RELEASING-node.md`.
 
@@ -231,7 +232,8 @@ ci-and-runners → Coverage gate). TS: `npm test`
 **packaging smoke**: `npm pack`, then `read`/`table`/`validate`/`emitAgs4`
 against the *packed* dist + native binary through **both** the CJS and ESM
 entries — the artifact `npm install laterite` actually ships). The CI `node`
-job (`ci.yml`, paths-filtered) runs all four on the linux self-hosted runner.
+job (`ci.yml`, paths-filtered) runs all four on a GitHub-hosted `ubuntu-latest`
+runner, off the self-hosted pool (`repo:tests/test_paths_filter.py` pins that).
 
 The napi loader `index.js` + types `index.d.ts` are **committed**, not just
 gitignored build output: the `npm-publish` job consumes prebuilt `.node`s and
@@ -259,8 +261,8 @@ set via napi `packageName`), auto-selected through
 `optionalDependencies`. The TS layer is a **dual ESM+CJS** bundle (`tsup` →
 `dist/index.{mjs,cjs}` + `.d.ts`), and the napi loader is reached through a Node
 subpath-import (`#native`, the package.json `imports` field) so the seam
-survives bundling. `release.yml`'s `build-node` (a 3-runner matrix reusing the
-wheels/binaries runners) + `npm-publish` ride their **own** tag namespace
+survives bundling. `release.yml`'s `build-node` (a matrix with one runner per
+`napi.targets` entry, reusing the wheels/binaries runners) + `npm-publish` ride their **own** tag namespace
 `node-v*` — fully decoupled from the Python `v*` tags — gated like
 `pypi-publish` (final tags only, no `rc`/`dev`; the `npm` environment + the
 `NPM_TOKEN` secret for the first release, then npm trusted publishers). The

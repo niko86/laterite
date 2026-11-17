@@ -13,7 +13,8 @@ npm i @laterite/ags4-wasm
 The [web app](../surfaces/browser.md) is built on this same crate, which makes it
 a worked example rather than a demo: everything below is a practice taken from
 its source, with the reason it is done that way. (It compiles the crate itself,
-with every feature on; see [what's in the package](#whats-in-the-package).)
+twice: a slim build for the first load and a full build with every feature,
+loaded only when a page needs it; see [what's in the package](#whats-in-the-package).)
 
 ## What's in the package
 
