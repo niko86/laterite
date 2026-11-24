@@ -35,6 +35,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Security
+
+- **`zip` moves to 9.0.5, clearing RUSTSEC-2026-0548.** It does not reach laterite: the advisory is in `ZipStreamReader`, and `calamine` and `rust_xlsxwriter`, the two crates that bring `zip` in for the XLSX import and export, read with `ZipArchive` and write with `ZipWriter`. Two more, RUSTSEC-2026-0543 and RUSTSEC-2026-0555, declare `chrono` and `chrono-tz` unmaintained. They are maintenance notices with no upgrade available, and `arrow` requires both crates, so `cargo deny` lists them as documented exceptions.
+
 ## [0.17.0] — 2026-11-16
 
 ### Added
