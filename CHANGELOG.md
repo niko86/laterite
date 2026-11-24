@@ -35,6 +35,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Fixed
+
+- **The python-ags4 benchmark no longer refuses a release wheel as a debug build.** `tools/bench-vs-python-ags4.py` told the two apart by the native module's size, and the release module grew past its line, so the weekly perf-ratio gate stopped measuring. The module now states its own build profile and the tool reads that; a wheel too old to say is run with a note that its profile was not checked.
+
 ### Security
 
 - **`zip` moves to 9.0.5, clearing RUSTSEC-2026-0548.** It does not reach laterite: the advisory is in `ZipStreamReader`, and `calamine` and `rust_xlsxwriter`, the two crates that bring `zip` in for the XLSX import and export, read with `ZipArchive` and write with `ZipWriter`. Two more, RUSTSEC-2026-0543 and RUSTSEC-2026-0555, declare `chrono` and `chrono-tz` unmaintained. They are maintenance notices with no upgrade available, and `arrow` requires both crates, so `cargo deny` lists them as documented exceptions.

@@ -2002,6 +2002,10 @@ fn engine_fingerprint() -> &'static str {
 
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // The bench tools refuse to time a debug build, and only the compiler knows
+    // which this is: the module's size, the old tell, moves with every
+    // dependency bump. Underscored, so it stays out of the stub and the API.
+    m.add("_DEBUG_BUILD", cfg!(debug_assertions))?;
     m.add_function(wrap_pyfunction!(engine_version, m)?)?;
     m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(engine_runs, m)?)?;
