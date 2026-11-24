@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from _tools import load_tool
 
 REPO = Path(__file__).resolve().parents[1]
@@ -276,3 +278,35 @@ def test_reset_peak_accounting_is_linux_only() -> None:
 
     got = bench.reset_peak_accounting()
     assert got is sys.platform.startswith("linux")
+
+
+# --- the debug-build refusal ------------------------------------------------
+#
+# The build profile used to be inferred from the native module's size, and a
+# release build that grew past the line was refused as a debug one. The module
+# now states it, so these pin the three answers it can give.
+
+
+def _wheel(**native_attrs: object) -> SimpleNamespace:
+    return SimpleNamespace(_laterite_native=SimpleNamespace(**native_attrs))
+
+
+def test_release_build_is_admitted(capsys: pytest.CaptureFixture[str]) -> None:
+    bench.warn_if_debug_build(_wheel(_DEBUG_BUILD=False))
+    assert capsys.readouterr().err == ""
+
+
+def test_debug_build_is_refused(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        bench.warn_if_debug_build(_wheel(_DEBUG_BUILD=True))
+    assert exc.value.code == 1
+    assert "DEBUG build" in capsys.readouterr().err
+
+
+def test_a_wheel_without_the_flag_is_named_not_passed_silently(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # A wheel built before the flag existed cannot be asked. It runs, but the
+    # unchecked profile is said out loud rather than reported as a pass.
+    bench.warn_if_debug_build(_wheel())
+    assert "NOT checked" in capsys.readouterr().err

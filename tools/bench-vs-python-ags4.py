@@ -105,7 +105,6 @@ import gc
 import hashlib
 import json
 import os
-import pathlib
 import platform
 import re
 import statistics
@@ -307,24 +306,31 @@ def warn_if_debug_build(laterite_mod: ModuleType) -> None:
     """Refuse to publish numbers measured against a debug wheel.
 
     A debug build of the native module is roughly 5x slower across every path,
-    which looks exactly like a catastrophic regression and is not one. The tell
-    is size: the release abi3 module is a few MB, a debug one is tens.
+    which looks exactly like a catastrophic regression and is not one. The
+    module says which it is (`_DEBUG_BUILD`, the compiler's own
+    `debug_assertions`). This used to be inferred from the file's size, and a
+    release build that grew past the line was refused as a debug one — a proxy
+    fails on the day the thing it stands for moves.
+
+    A wheel built before the module carried the flag cannot be asked, and that
+    is said rather than passed over in silence.
     """
-    mod_file = laterite_mod.__file__
-    if mod_file is None:
-        return  # namespace package with no single file — nothing to size-check
-    native = list(pathlib.Path(mod_file).parent.glob("*.so"))
-    if not native:
+    native = getattr(laterite_mod, "_laterite_native", None)
+    debug = getattr(native, "_DEBUG_BUILD", None)
+    if debug is None:
+        print(
+            "note: this laterite wheel predates `_DEBUG_BUILD`, so its build "
+            "profile was NOT checked — a debug build here would read ~5x slow.",
+            file=sys.stderr,
+        )
         return
-    mb = max(f.stat().st_size for f in native) / 1e6
-    if mb > 25:
+    if debug:
         die(
-            f"the installed laterite native module is {mb:.0f} MB — that is a "
-            f"DEBUG build.\n"
-            f"       Every laterite timing would be ~5x slow and would read as a "
-            f"regression that is not real.\n"
-            f"       Rebuild first:  (cd packages/laterite && uv run --no-sync "
-            f"maturin develop --release --uv)"
+            "the installed laterite native module is a DEBUG build.\n"
+            "       Every laterite timing would be ~5x slow and would read as a "
+            "regression that is not real.\n"
+            "       Rebuild first:  (cd packages/laterite && uv run --no-sync "
+            "maturin develop --release --uv)"
         )
 
 
