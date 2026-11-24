@@ -24,6 +24,14 @@ ignore = [
     # age 0.12.1, its latest release, requires p256 ^0.13 with no feature to
     # turn it off. Drop this when age moves past it.
     "RUSTSEC-2026-0387", # crypto-bigint (via age's p256)
+    # --- chrono and chrono-tz declared unmaintained; every version is affected
+    # and there is no upgrade. This is a maintenance notice, not a vulnerability.
+    # chrono cannot leave the tree while arrow is in it (arrow-array, arrow-cast
+    # and pyo3-arrow require it, and arrow-array brings chrono-tz), so moving our
+    # own direct uses (the AGS DT/T types, the CLI) to another crate would not
+    # clear either ID. Drop these when arrow moves off chrono.
+    "RUSTSEC-2026-0543", # chrono (via arrow, and used directly)
+    "RUSTSEC-2026-0555", # chrono-tz (via arrow-array, pyo3)
 ]
 
 [licenses]
