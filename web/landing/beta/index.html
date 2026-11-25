@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>laterite is in beta</title>
+    <meta
+      name="description"
+      content="laterite, an open-source toolkit for the AGS4 geotechnical data format, is in public beta: one Rust engine behind Python, Node, DuckDB, the browser and the command line."
+    />
+    <link rel="canonical" href="https://laterite.dev/beta/" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="128x128"
+      href="/icons/icon-128.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="256x256"
+      href="/icons/icon-256.png"
+    />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#ece5e0"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#14100f"
+    />
+    <!-- The same stored-else-system theme script as the landing page's
+         index.html, for the same reason: no light flash for a dark reader,
+         and one storage key across the surfaces. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (
+            t === "dark" ||
+            (!t && matchMedia("(prefers-color-scheme: dark)").matches)
+          )
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

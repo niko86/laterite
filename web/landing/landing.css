@@ -13,6 +13,7 @@
 @source "./App.tsx";
 @source "./components";
 @source "./demo";
+@source "./beta";
 
 /* The exclusion half (#437), same reasoning as the app's entry: the root is
    auto-detected even where the sources above are explicit, so this build reads

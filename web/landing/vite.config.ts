@@ -79,5 +79,16 @@ export default defineConfig({
       "@shared": resolve(import.meta.dirname, "../src/shared"),
     },
   },
+  build: {
+    rollupOptions: {
+      // Two pages, one build: the landing page and the beta announcement at
+      // /beta/. Vite takes a lone index.html by default, so a second page has
+      // to be named or it is silently left out of dist.
+      input: {
+        main: resolve(import.meta.dirname, "index.html"),
+        beta: resolve(import.meta.dirname, "beta/index.html"),
+      },
+    },
+  },
   plugins: [solid(), tailwindcss(), noAppOnlyDependencies()],
 });
