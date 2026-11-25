@@ -66,6 +66,7 @@ dictionary, typed_values, relational, groups, references), dispatched from
 `lat rules` prints the same catalogue with each rule's severity and whether it
 is fixable; `lat rules --json` adds a description of what each one checks.
 
+<!-- BEGIN GENERATED: rules — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_rule_table.py -->
 | Rule | Covers |
 |---|---|
 | 1 | Character Set |
@@ -95,6 +96,7 @@ is fixable; `lat rules --json` adds a description of what each one checks.
 | 19a | HEADING Name Length and Character Set |
 | 19b | HEADING Name Structure and Cross-Group Borrowing |
 | 20 | File Attachments |
+<!-- END GENERATED: rules -->
 
 ## Test corpus
 
