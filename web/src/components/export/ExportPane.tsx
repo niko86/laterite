@@ -17,6 +17,12 @@ const MODES: { id: EmitMode; label: string }[] = [
 
 // A working example so the tab does something useful on first load: columns
 // are AGS headings; a typed float (12.3) canonicalises to 2DP on emit.
+//
+// It is a COMPLETE delivery — a full TRAN row and its own ABBR / UNIT / TYPE
+// groups — because the builder does not invent metadata unless asked. The
+// shorter example this replaced left those out and built a file with ten
+// findings under a heading that says "valid", which is what a first click saw.
+// e2e/export.spec.ts holds it to zero.
 const EXAMPLE = JSON.stringify(
   [
     {
@@ -24,7 +30,31 @@ const EXAMPLE = JSON.stringify(
       headings: ["PROJ_ID", "PROJ_NAME"],
       rows: [["P1", "Demo project"]],
     },
-    { code: "TRAN", headings: ["TRAN_DLIM", "TRAN_RCON"], rows: [["|", ";"]] },
+    {
+      code: "TRAN",
+      headings: [
+        "TRAN_ISNO",
+        "TRAN_DATE",
+        "TRAN_PROD",
+        "TRAN_STAT",
+        "TRAN_AGS",
+        "TRAN_RECV",
+        "TRAN_DLIM",
+        "TRAN_RCON",
+      ],
+      rows: [
+        [
+          "1",
+          "2026-01-15",
+          "Demo Site Investigations",
+          "Final",
+          "4.1.1",
+          "Demo Client",
+          "|",
+          "+",
+        ],
+      ],
+    },
     {
       code: "LOCA",
       headings: ["LOCA_ID", "LOCA_NATE", "LOCA_GL"],
@@ -37,6 +67,33 @@ const EXAMPLE = JSON.stringify(
       code: "GEOL",
       headings: ["LOCA_ID", "GEOL_TOP", "GEOL_BASE", "GEOL_LEG", "GEOL_GEOL"],
       rows: [["BH01", 0, 1.5, "101", "CLAY"]],
+    },
+    {
+      code: "ABBR",
+      headings: ["ABBR_HDNG", "ABBR_CODE", "ABBR_DESC"],
+      rows: [
+        ["GEOL_LEG", "101", "Clay"],
+        ["GEOL_GEOL", "CLAY", "Clay"],
+      ],
+    },
+    {
+      code: "UNIT",
+      headings: ["UNIT_UNIT", "UNIT_DESC"],
+      rows: [
+        ["m", "metre"],
+        ["yyyy-mm-dd", "year month day"],
+      ],
+    },
+    {
+      code: "TYPE",
+      headings: ["TYPE_TYPE", "TYPE_DESC"],
+      rows: [
+        ["ID", "Unique Identifier"],
+        ["X", "Text"],
+        ["PA", "Text listed in ABBR Group"],
+        ["2DP", "Value; required number of decimal places, 2"],
+        ["DT", "Date time in international format"],
+      ],
     },
   ],
   null,
