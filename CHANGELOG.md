@@ -35,6 +35,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-11-25
+
 ### Fixed
 
 - **`lat fix` names the right flag in its hint.** When risky fixes were withheld it printed "more fixable with `--fix-risky`", a flag `lat` does not have; it now says `--risky`.
@@ -645,7 +647,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/niko86/laterite/releases/tag/v0.17.1
 [0.17.0]: https://github.com/niko86/laterite/releases/tag/v0.17.0
 [0.16.0]: https://github.com/niko86/laterite/releases/tag/v0.16.0
 [0.15.0]: https://github.com/niko86/laterite/releases/tag/v0.15.0

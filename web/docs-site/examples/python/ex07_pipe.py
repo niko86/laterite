@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.17.0"]
+# dependencies = ["laterite==0.17.1"]
 # ///
 """Docs example — run it with `uv run ex07_pipe.py`, from anywhere.
 
