@@ -73,8 +73,9 @@ skip the rule engine.
     `lat validate <file>` for the findings table, and the exit code is `1`.
 
 The cert is **content-bound**: if the file changes by a single byte, the hash
-no longer matches and laterite silently falls back to a full validation, so a
-stale cert never yields a false "clean". Certify is a cache, not a trust
+no longer matches and the cert is not used. Python and Node refuse a stale cert
+you name (`StaleCertError`); `lat validate --index` says it was not used and
+runs the full check. Either way a stale cert never yields a false "clean". Certify is a cache, not a trust
 override: fast when the file is untouched, correct when it isn't.
 
 See also: [Certificate lifecycle](../concepts/certificate-lifecycle.md) · [Validate](../learn/validate.md).

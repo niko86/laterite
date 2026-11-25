@@ -65,7 +65,7 @@ if (!checked.report.isValid) {
 - **`.fix(opts)`** → a new repaired `Ags4File` (the fix log on `.fixReport`).
 - **`.diff(other)`** → a `RevisionDelta` of cell/row/group changes.
 - **`.certify(path?)`** → mints the `.ags.idx` validity certificate beside the
-  file (after a clean `.validate()`).
+  file. It runs the validation itself and refuses a file with errors.
 
 ## Query with SQL
 
