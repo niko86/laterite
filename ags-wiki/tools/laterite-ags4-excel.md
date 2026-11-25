@@ -78,7 +78,7 @@ own positional rows straight into the emitter instead of constructing an
 
 > [!warning] This is a **rough extraction**, not a designed library. The logic
 > was lifted verbatim out of `laterite-ags4-core::excel` to shed the dependency
-> weight, and is unchanged since.
+> weight, and has not been redesigned since (only adapted, as above, to #900).
 >
 > Today it is AGS4-specific (one sheet per group, AGS4 UNIT/TYPE pseudo-rows).
 > The intent — and the reason for the general name — is to grow it into a proper

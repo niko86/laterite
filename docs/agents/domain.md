@@ -15,7 +15,7 @@ wiki exists to prevent. What follows maps the skills' contract onto it.
 - **`ags-wiki/concepts/crate-map.md`** — the keystone. What each crate is, why it
   is a separate crate, and what depends on what. Read it before touching crate
   layout, the wheel/dep/build split, or the PyO3 / wasm boundary.
-- **`ags-wiki/design/dec-*.md`** — the ADRs, by another name. ~20 decision
+- **`ags-wiki/design/dec-*.md`** — the ADRs, by another name. Decision
   records: `dec-facade-parity`, `dec-rust-drives-python`, `dec-monorepo-structure`,
   `dec-dictionary-single-source`, `dec-ags-idx-certificate`, `dec-rust-api-crates-io`,
   and the rest. The other pages under `design/` are working design documents

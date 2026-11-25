@@ -126,7 +126,7 @@ reporting; and the `duckdb` surface in the tool shells out to the DuckDB CLI,
 which `pip install duckdb` does not ship — routing SQL through `--run-pages` would
 print a SKIP line on every machine for a language that is in fact gated, which
 reads as a hole where there is a handoff. `PAGE_RUNNER` names the owner per
-language, `None` meaning pending, and the census prints it: **adding a language to
+language, and the census prints it: **adding a language to
 the runnable set forces the same edit to say who executes it.**
 
 **Seeding superseded the plan to rewrite the SQL fences.** The grilling that
@@ -157,19 +157,20 @@ means something.
 ```javascript, and building one program per TAG would have handed the second half
 to Node without the first half's imports — a failure about this tool rather than
 about the page. The runner groups by surface and filters to the tags routed to
-it, which are not the same cut: `ts` reaches the Node surface and is still
-pending, so a surface can be half-claimed.
+it, which are not the same cut: a `ts` fence would reach the Node surface
+without being a Node program, so a surface can be half-claimed.
 
-**`ts` stays pending, and not for want of a runner.** A TypeScript fence's
+**`ts` is not run, and not for want of a runner.** A TypeScript fence's
 package is decided by the PAGE, not by the tag: the only one in the corpus is a
 type-only import on `reference/wasm-api.md`, whose package is the browser one.
 Running it under the Node surface would answer a question nobody asked, and a
 page-to-surface rule built for a single type declaration would be machinery
-bought for a case that does not exist. The census reports it as pending on every
-run, which is the claim that stays true either way. #519 carries the three ways
-to close it — page-to-surface routing, a type-only fence class, or type-CHECKING
-rather than executing — and the choice between them is a decision rather than an
-implementation detail, which is why it is on the tracker and not in this page.
+bought for a case that does not exist. #519 weighed the three ways to close it
+— page-to-surface routing, a type-only fence class, or type-CHECKING rather than
+executing — and settled on the second: `ts` is deliberately absent from
+`PAGE_RUNNER`, the census accepts a `ts` fence only as TYPE-ONLY (counted with
+prose), and it fails on one carrying an executable statement, because that would
+be a new case needing its own routing decision.
 
 **Two fences were marked because their twins already were.** Both Node tabs on
 `cookbook/merge-deliveries.md`, and the Node tab of an already-marked block on
@@ -229,8 +230,8 @@ how many lines it dropped.
   already asks that reader's question, so a page and the artefact a reader
   installs are checked together. The Node step follows the same `node_modules`
   symlink its neighbour re-points, so there is no second swap to keep in step.
-- What remains unrun is `ts` alone, and `PAGE_RUNNER` says so on every structural
-  run rather than leaving it to be inferred from silence.
+- What remains unrun is `ts` alone, by decision (#519): a type-only fence is
+  counted with prose, and an executable one fails the census.
 - **A runner that finds no pages fails.** Zero is the one result a green run
   cannot mean: a fence-regex change, a routing-table typo or a moved docs
   directory each empty the loop, and each would otherwise exit 0. This is
