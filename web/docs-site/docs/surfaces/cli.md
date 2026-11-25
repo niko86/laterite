@@ -34,6 +34,7 @@ you less. Scriptable output is the part you can diff.
 | `read <file> [group]` | dump a group's rows (table / `--csv` / `--json`), or list the group codes                                    |
 | `fix <file>`          | mechanically repair: safe fixes by default, `--risky` for the intent-guessing ones                           |
 | `diff <a> <b>`        | the KEY-aware / type-aware revision delta                                                                    |
+| `merge <files…>`      | merge two or more deliveries of one project into a single file                                               |
 | `certify <file>`      | mint the [`.ags.idx`](../concepts/certificate-lifecycle.md) validity certificate                             |
 | `rules`               | print the AGS4 rule catalogue                                                                                |
 | `pack` / `unpack`     | zstd-compress a file for transport, and restore it                                                           |

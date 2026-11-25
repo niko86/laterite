@@ -531,8 +531,8 @@ exist verbatim:
 
 **Not mirrored**: python-ags4's CLI (`ags4_cli`). laterite ships
 `lat` (Rust binary, byte-faithful JSON / NDJSON output) as
-a different CLI surface. See the README for the two-error-JSON-shape
-table.
+a different CLI surface, with its own JSON / NDJSON shapes
+(`lat --readme` documents them).
 
 ---
 
@@ -561,11 +561,18 @@ anyway.
 
 ## Upstream-reportable items
 
-The following observations are candidates for AGS-DFWG / python-ags4
-issues. None have been reported yet.
+The observations worth taking to the AGS-DFWG or to python-ags4 are flagged in
+the canon, and [`OBSERVATIONS.md`](OBSERVATIONS.md) renders them as its
+"Upstream-reportable" table. That table is generated, so it is the list to
+read; a copy here would only drift.
 
-| O-N | Tag | Subject |
-|---|---|---|
+Two are the most actionable for python-ags4: **O-38** (Rule 8 `DT`:
+python-ags4 forbids non-ISO UNITs) and **O-39** (Rule 10c: whether an empty
+parent KEY is "no entry" or a missing link). Both are real defects that affect
+real-world delivery files (European date formats, standalone samples), and
+both have small, well-scoped fixes.
+
+---|---|---|
 | O-1 | VARIANCE | Spec text says "ASCII" (0–127); de facto practice is 0–255 |
 | O-2 | BUG | python-ags4 Rule 6 is a no-op (`return ags_errors` body) |
 | O-4 | SPEC | "HEADING row missing" attribution: Rule 4 vs Rule 2b |

@@ -16,8 +16,9 @@ _revisions_ a later file made, plus any warnings.
 === "CLI"
 
     `lat merge <files…> --out <merged.ags>` reconciles two or more deliveries on
-    disk. The optional `--tran-issue` / `--tran-date` stamp the merged file's own
-    transmission record (it genuinely *is* a new transmission):
+    disk. The five `--tran-*` flags (issue, date, producer, recipient, status) stamp
+    the merged file's own transmission record (it genuinely *is* a new
+    transmission). They go together: pass all five or none.
 
     ```bash
     --8<-- "cli/merge_deliveries.sh:cmd"
