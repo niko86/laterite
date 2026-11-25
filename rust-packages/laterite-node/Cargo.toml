@@ -19,7 +19,7 @@ name = "laterite-node"
 #
 # `version()` is exported to JS from `CARGO_PKG_VERSION`, so on the engine line it
 # would report a number that is not the package the caller installed.
-version = "0.17.0"
+version = "0.17.1"
 edition = "2024"
 rust-version = "1.89"
 description = "Node-API (napi-rs) bindings exposing the laterite AGS4 engine to Node.js"
@@ -51,7 +51,7 @@ napi-derive = "3"
 # The engine — all DuckDB-free, pure Rust (same crates laterite-py + laterite-ags4-wasm
 # wrap). laterite-ags4-types `arrow` feature pulls the shared typed-Arrow builder
 # (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
-laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.21.2" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator", version = "0.21.3" }
 # The shared parse leaf (#168 Phase 3): text/bytes parse through the leaf
 # directly; its `ParseError` → ValidatorError via the Phase-2 `From` bridge so
 # the `thrown`/`classify` exit-code map is unchanged. Validator dep stays for
