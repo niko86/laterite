@@ -25,6 +25,9 @@ test("Export tab builds & downloads a valid .ags from the example", async ({
   expect(content).toContain("\r\n"); // CRLF (Rule 2a)
 
   await expect(page.getByText(/safe fix\(es\) applied/)).toBeVisible();
+  // "Valid" is the claim in this test's name and in the pane's own copy. Nothing
+  // held the example to it, and it shipped building a file with ten findings.
+  await expect(page.getByText("0 finding(s)", { exact: true })).toBeVisible();
 });
 
 test("Export Strict mode surfaces an error for an incomplete file", async ({
