@@ -262,9 +262,10 @@ reads under another. Stated plainly rather than papered over — it is the same 
 residual as the world-partition one below.
 
 **Residual (declared):** the partition itself is a human judgement made once per
-rule, enforced at the *knob* level (compile error) and at the *I/O* level (a CI gate
-greps `rules/*.rs` for `std::fs`/`std::env`/`SystemTime::now`/`Utc::now`/network calls
-outside the sanctioned world module). Rust has no effect system; a rule that performs
+rule, enforced at the *knob* level (compile error). At the *I/O* level it is a
+convention — `world.rs` states it, and no gate greps `rules/*.rs` for
+`std::fs`/`std::env`/`SystemTime::now`/`Utc::now`/network calls outside the
+sanctioned world module. Rust has no effect system; a rule that performs
 ambient I/O *and* passes the grep (e.g. via a helper crate) would be misclassified.
 This is discipline, not a type. Stated plainly.
 
@@ -375,8 +376,8 @@ Nine risks, none hidden:
    deferred.** If a workflow ever ships `.ags` + `.ags.idx` across a trust boundary,
    this design does not cover it and signing must land first.
 2. **Purity classification is discipline at the I/O level.** The compile-error gate
-   catches a new *knob*; the CI grep catches ambient `std::fs`/clock/network *in
-   `rules/*.rs`*. Neither catches a rule that reaches external state through a helper
+   catches a new *knob*; nothing mechanical catches ambient `std::fs`/clock/network *in
+   `rules/*.rs`*, nor a rule that reaches external state through a helper
    crate. No effect system, no proof.
 3. **The engine fingerprint covers the validator's own source + data, and — since
    laterite-dev#550 — every in-workspace crate the verdict is expressed through; it does not
@@ -446,7 +447,7 @@ format and deletes the predicates (`checker_matches`, `profile_covers`) the four
 call, so the workspace does not compile until every consumer has moved. Splitting them
 would have meant either a commit that does not build or a temporary
 compatibility shim — a second trust path, which is the exact thing this arc exists to
-remove. PRs 8–9 remain `todo`. Flip a row's status as its PR lands.
+remove. PR 8 remains `todo`; PR 9 is partly done. Flip a row's status as its PR lands.
 
 | PR | Scope | Status |
 |---|---|---|
@@ -458,7 +459,7 @@ remove. PRs 8–9 remain `todo`. Flip a row's status as its PR lands.
 | **PR 6** | **`laterite-node`.** Mirror of PR 5: drop the `assemble` factory and its `unwrap_or(0)` defaults; add `checkWithCert`/`mintCert`; delete the ~line-240 conjunction, `#mintCert`, `#requireCleanValidation`, `#lastCheckFiles`, `#lastForced` in `ts/ags4-file.ts`. Node CI typechecks separately (`tsc --noEmit`) — remember to run it. **As shipped:** `Report.fromCert` deleted for `get certified()`; `Ags4File.validate()` calls the native door directly (the certificate is a handle-scoped fact, not a public `ValidateOptions` knob); the node CLI's certified note moved to **stderr**, matching the binary and uvx, and its test harness moved to `spawnSync` because a stdout-only harness cannot see it. | done |
 | **PR 7** | **wasm.** `repo:rust-packages/laterite-ags4-wasm/src/certify.rs::certify` calls `trust::mint` with `WorldScope::None` — which it **cannot** construct otherwise (no filesystem, no path) — so the browser can no longer mint a cert asserting a world check it never performed, nor claim `warnings:0`/`fyi:0` without measuring. | done |
 | **PR 8** | **External DuckDB extension** (`niko86/laterite-duckdb`, owner-gated, separate repo). `src/cert.rs::sliced_group` must fall back to a whole-file parse when `group_spans(code).len() != 1` (today it would silently read a truncated first section — a real bug fix, not just a rebuild). If a verdict surface ever returns there, it must depend on `laterite-ags4-trust` and call `check()` — contractual, not compiler-enforced, because it is a different repository. | todo |
-| **PR 9** | **Wiki.** [[dec-ags-idx-certificate]] rewritten to this document (flips its `status` to `superseded`, `superseded_by: [cert-trust-v2]`); [[crate-map]] gains `laterite-ags4-trust`; new `observations.json` entries for (a) the encoding-dependent Rule 1 severity flip as a cert input, (b) redeclared-`GROUP` index truncation (bug 7), (c) `check_files` silently no-op'ing without a source (bug 2). `reindex.py` + `lint.py` (LINT CLEAN) + `log.md`. | todo |
+| **PR 9** | **Wiki.** [[dec-ags-idx-certificate]] rewritten to this document (flips its `status` to `superseded`, `superseded_by: [cert-trust-v2]`); [[crate-map]] gains `laterite-ags4-trust`; new `observations.json` entries for (a) the encoding-dependent Rule 1 severity flip as a cert input, (b) redeclared-`GROUP` index truncation (bug 7), (c) `check_files` silently no-op'ing without a source (bug 2). `reindex.py` + `lint.py` (LINT CLEAN) + `log.md`. | partly done — the supersession and the crate-map entry have landed |
 
 ## Related
 [[dec-ags-idx-certificate]] · [[crate-map]] · [[laterite-ags4-trust]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-cli]] · [[laterite-py]] · [[laterite-node]] · [[laterite-ags4-wasm]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-dictionary-single-source]] · [[strat-o27-rule20-ondisk]] · [[rule-20-file-fset]] · [[rule-families]] · [[O-42]] · [[modality-register]] · [[testing-strategy]] · [[dec-custom-dict-overlay]] · [[O-28]]

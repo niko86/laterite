@@ -75,7 +75,8 @@ through to string storage; unparseable values return `Value::Null`
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-types` — a true dependency **leaf**: chrono
-(no-clock, no-wasmbind) + `serde_json` only, none of `laterite-ags4-core`'s
+(no-clock, no-wasmbind) + `serde` + `serde_json`, plus `arrow` behind the optional
+`arrow` feature (the `arrow_cols` / `ipc` modules), and none of `laterite-ags4-core`'s
 wasm-hostile deps (age / zstd / calamine / rpassword / csv). Re-exported
 by `laterite-ags4-core` as `laterite_ags4_core::ags_types`
 (`repo:rust-packages/laterite-ags4-core/src/lib.rs`), and depended on directly by

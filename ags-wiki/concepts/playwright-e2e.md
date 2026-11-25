@@ -45,8 +45,9 @@ Key facts:
   Chromium work on darwin, so the suite is runnable locally before pushing, not
   only in CI.
 
-The suite is split by intent across two spec files (shared helpers in
-`repo:web/e2e/helpers.ts`):
+The suite is led by two spec files, described here (shared helpers in
+`repo:web/e2e/helpers.ts`); `web/e2e/` holds more beside them (layout, landing,
+merge, export, perf and others):
 
 - **`app.spec.ts` — engine output on fixtures:** the four tabs render; the clean
   sample validates to zero findings; an unknown-heading sample surfaces a Rule 9
@@ -103,7 +104,8 @@ assertion is only that the validator **processes the whole corpus without
 crashing**; rule-match is logged, not asserted, because the residual mismatches
 (~55/71 match) are documented engine-vs-python-ags4 divergences (`OBSERVATIONS.md`)
 and deliberately-OK fixtures, not regressions — the byte-exact engine parity is
-the separate `tools/run_python_ags4_tests.sh` oracle (~122/9).
+the separate `tools/run_python_ags4_tests.sh` oracle (its pass and
+known-failure counts are pinned in `parity-known-failures.json`).
 
 ## Why it matters
 
@@ -117,7 +119,7 @@ and it is gated on every web PR rather than discovered post-deploy.
 
 ```mermaid
 flowchart LR
-  build["wasm-pack + vite build → dist/"] --> preview["vite preview @ /laterite/"]
+  build["wasm-pack + vite build → dist/"] --> preview["vite preview @ VITE_BASE (default /)"]
   preview --> pw["Playwright (headless Chromium)"]
   fx["e2e/fixtures/*.ags"] --> pw
   pw --> assert["assert validator + Fix + Explore behaviour"]

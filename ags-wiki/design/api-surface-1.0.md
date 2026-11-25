@@ -65,7 +65,7 @@ One door per task:
 | `ags.register(name, frame)` | — | join your own frames in `sql()` |
 | `ags.headings/units/types/line_numbers(code)` | metadata | no engine spin-up |
 | `ags.text` / `ags.bytes` / `ags.save(path)` | byte-faithful AGS4 (text / UTF-8 bytes / file) | memoised; re-emitted from the retained Rust parse |
-| `build_ags4(groups)` → `BuildResult` | valid AGS4 from frames (`{code: df}` / `(code, df)` list) **or a typed PROJ graph** | the data→AGS4 door (construct + autofix + validate); `.text`/`.bytes`/`.save(path)`. The typed-graph form is walked depth-first like Node's `buildAgs4` (#214) — emits the PROJ-rooted subtree, **only the headings you set** (unset ones pruned, except KEY — matches the frames door); under autofix the missing UNIT/TYPE/TRAN metadata groups (and ABBR when PA codes are used) are synthesized so a sparse graph builds valid at the default edition (2026-06-25) |
+| `build_ags4(groups)` → `BuildResult` | valid AGS4 from frames (`{code: df}` / `(code, df)` list) **or a typed PROJ graph** | the data→AGS4 door (construct + autofix + validate); `.text`/`.bytes`/`.save(path)`. The typed-graph form is walked depth-first like Node's `buildAgs4` (#214) — emits the PROJ-rooted subtree, **only the headings you set** (unset ones pruned, except KEY — matches the frames door); under autofix the missing UNIT/TYPE/TRAN metadata groups (and ABBR when PA codes are used) were synthesized so a sparse graph builds valid at the default edition (2026-06-25); since 2026-07-24 that is opt-in (`synthesise_metadata`, default off, with TRAN from a caller-supplied stamp) — see [[ags4-output]] |
 | `validate(...)` → `Report.findings` | polars frame | text-level; `ags.validate()` chains + caches on `.report` |
 | `compat.*` | python-ags4 drop-in | same engine + backend switch, pandas default; `AGS4_to_dataframe`'s common path is Arrow-native since 2026-07-20 — see Dependencies below |
 | `transport.{pack,unpack,lock,unlock}` | — | content-agnostic (any file) |
@@ -100,7 +100,7 @@ feeds it as IPC.
   than python-ags4** on that bench's 3-group fixture (was ~2–7× slower before the
   Arrow move; reproducible via `tools/bench-vs-python-ags4.py`, which absorbed
   the old `bench_compat_dataframe.py`). The **published**
-  figure is **~3×** — the same call, measured across five file sizes on forge's
+  figure is the README's "Read → strings" table — the same call, measured across five file sizes on forge's
   123-group `wide` scaffold (`repo:packages/laterite/README.md`). Two fixtures, not
   two claims; quote the published one outside the wiki.
 - **pyarrow is an OPTIONAL accelerator, never a hard dependency.** `[compat,pyarrow]`
@@ -110,7 +110,7 @@ feeds it as IPC.
   `str`, the pandas-3 baseline — `object` stays the default, numpy, today's
   python-ags4-compatible dtype). Absent, the DuckDB `.df()` object hop above still
   runs; the explicit `pyarrow` backend / `ags.connection` route is unaffected. CI
-  proves both isolated shapes in `nightly.yml`'s release-wheel job
+  proves both isolated shapes in `nightly.yml`'s `wheel-smoke` job
   (`tools/compat_smoke.py` for `[compat]`, `tools/compat_pyarrow_smoke.py` for
   `[compat,pyarrow]`) — `ci.yml`'s wheel-smoke deliberately defers them to
   nightly, and its comment says so.

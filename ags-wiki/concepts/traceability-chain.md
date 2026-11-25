@@ -11,7 +11,7 @@ sources: []
 # traceability chain
 
 ## Definition
-> [!quote] Every rule traces: spec §4.1.1 → src/rules/<family>.rs::rule_N → tests/fixtures/ruleN_*.ags → tests/regression.rs::ruleN_*_flagged → OBSERVATIONS O-N. Lint enforces the triad; a missing leg is a gap.
+> [!quote] Every rule traces: spec §4.1.1 → src/rules/<family>.rs::rule_N → tests/fixtures/ruleN_*.ags → tests/regression.rs::ruleN_*_flagged → OBSERVATIONS O-N. The chain is a convention — nothing mechanical enforces it — and a missing leg is a gap.
 
 ## Why it matters
 Load-bearing for the test strategy: this is how the validator (or the parity harness) actually behaves — gaps surface as deltas against the spec (Phase A) and python-ags4 (Phase C/D).

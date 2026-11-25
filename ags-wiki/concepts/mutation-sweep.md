@@ -156,7 +156,7 @@ with forge to niko86/laterite-forge) and the host bindings
 [[coverage-campaign]] sequences next.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
-is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
+was tracked in **#127** (now closed) — retro-sweep opportunistically whenever a
 module is touched, rather than as one big pass.
 
 ## Other languages

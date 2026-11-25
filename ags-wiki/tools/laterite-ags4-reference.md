@@ -167,15 +167,15 @@ registry — `union_groups`, `ancestor_chain`, `inherited_key_names`), and the
 `keychain` module (`key_heading_names`, the content-addressed `_id`/
 `_parent_id` derivation — moved here from `laterite-ags4-core`, see below), and
 the `recode` module (#1010): the one rewrite of ABBR codes on request that
-`merge` calls and `fix` is to call (#1024). `resolve_mapping` finds the
+`merge` and `fix` both call (#1024). `resolve_mapping` finds the
 case-variant sets in the inputs' ABBR rows and turns a caller's `Recode` and
 `CodeCaseMode` into the mapping to apply — `Standard` acting only on a single
 standard match from `abbr_codes_ignoring_case`, never on input order;
 `plan_rewrite` turns a mapping into cell edits (every `PA` cell, part by part on
 the input's `TRAN_RCON`) and collapsed ABBR rows, and reports the KEY collisions
 it would cause, keyed by `key_heading_names`. It edits nothing itself, so each
-caller applies its own collision policy: merge refuses, `fix` is to skip the
-set.
+caller applies its own collision policy: merge refuses, `fix` skips the
+set and says so.
 
 ## Where it lives
 
@@ -204,7 +204,8 @@ follow-up, since it lives in its own repo (`niko86/laterite-duckdb`).
 being generated here did not stop three consumers hand-copying the same five
 strings anyway — `lat`'s `--dict-version` flag, `laterite-py`'s `emit_typed.rs`,
 and `laterite-ags4-corpus-qa`'s `validate.rs` each carried their own `match` table
-instead of calling `from_edition`. All three now ask this leaf directly; see
+instead of calling `from_edition`. All three now ask the shared [[laterite-ags4-hostopts]] resolver, which asks
+this leaf's `from_edition`; see
 [[edition-resolution]] and [[data-single-source-audit]] (row 2) for the full
 finding.
 

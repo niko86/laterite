@@ -282,9 +282,14 @@ preview lockup, or set "laterite" in Figtree 800 in `--laterite-900`.
 
 ## Font substitutions — please confirm
 
-The repos ship **no font binaries**; the site and app both fall back to system
-stacks, and the wordmark/social-preview headline is set in a licensed
-geometric-humanist face that isn't in the source.
+At delivery time the repos shipped **no font binaries** — the site and app fell
+back to system stacks, and the wordmark/social-preview headline was set in a
+licensed geometric-humanist face that isn't in the source. *(Since overtaken:
+the shipped site and app now self-host their faces — Figtree for display,
+Public Sans for UI/body, IBM Plex Mono — as tracked woff/woff2 files wired in
+`web/docs-site/docs/stylesheets/tokens.css` and `web/src/app.css`. The
+substitutions below describe THIS bundle's own `tokens/fonts.css`, which still
+loads them from the Google Fonts CDN.)*
 
 - **Rokkitt** (Google Fonts) stands in for the wordmark/display face — the closest free homage to Rockwell, which is what the mark reads as.
 - **IBM Plex Sans** replaces the platform system stack for UI and body copy.

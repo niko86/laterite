@@ -32,8 +32,9 @@ but each is a distinct, single-purpose unit (a deployable, a data set, a tool gr
 | `docs/` | `docs/agents/` — the agent-skill configuration docs (issue tracker, triage labels, domain layout) — plus the parity coverage map | small on purpose; the knowledge base itself is `ags-wiki/`, and the dated-report archive this row once promised (`docs/history/`) never existed in this repo |
 | `tools/` | dev/build/release/perf scripts; **`tools/release/`** is the publish machinery — version bumping, the wasm artifact gates, the package-contents manifest, trusted publishing, the public-API snapshots | every script is CI-wired or a documented utility |
 | `examples/` | runnable example scripts | the AGS5 examples (`create_ags5db`, `create_agsx`, `benchmark_scale`, …) went with the decouple, out of this tree |
+| `design/` | delivered design-system bundles and the site direction (see `design/README.md`) | reference material, not built |
 | `assets/` | brand icons (the curated/derived set the README + release pipeline use) | raw art exports are *not* kept here |
-| `tests/` | the **root pytest suite** — `test_dictionary_faithful.py` (the AGS4 dictionary-union faithfulness gate) | runs in CI's python job; the AGS5x/packaging/xml tests went with the decouple, out of this tree |
+| `tests/` | the **root pytest suite** — the repo's gate and faithfulness tests (`test_dictionary_faithful.py`, `test_version_faithful.py`, one per `tools/` gate, …) | runs in CI's python job; the AGS5x/packaging/xml tests went with the decouple, out of this tree |
 | `.github/` | CI workflows + composite actions (`build-accel`) + Dependabot | self-hosted-runner-aware; see ci-and-runners |
 
 ## Root files
@@ -55,7 +56,7 @@ allowlist, CI, and wiki `repo_refs` for a purely cosmetic gain.
 
 ## Why not reorganise the sparse dirs?
 
-Each terse directory (`tests/`, `examples/`, `assets/`) is a distinct,
+Each of `tests/`, `examples/` and `assets/` is a distinct,
 justified unit, and the paths are **encoded across the repo** — CI workflows,
 wiki `repo_refs`, and the release manifests under `tools/release/`. A top-level
 move would touch many files (the root `tests/`

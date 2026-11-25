@@ -54,10 +54,10 @@ to a credential that had expired five weeks earlier, and the answer was `E404`,
 which names neither fact. With nothing to fall back to, "the publisher is wrong"
 reports itself as an auth error instead of a missing package.
 
-`npm-publish` (the node train) still carries its token. By this same argument it is
-also dead weight — `node-v0.7.0` and `node-v0.8.0` both published on that expired
-token because OIDC was already covering those four packages — so drop it on the next
-`node-v*`, when a release can actually prove it.
+`npm-publish` (the node train) carried its token for longer, as the same dead
+weight — `node-v0.7.0` and `node-v0.8.0` both published on that expired token
+because OIDC was already covering those four packages. It has since been dropped:
+that job now publishes by OIDC only.
 
 ## Bootstrapping a new package name (how 0.8.1 actually shipped)
 
