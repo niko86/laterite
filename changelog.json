@@ -11,6 +11,9 @@
     "removed": [],
     "fixed": [
       {
+        "text": "**`lat fix` names the right flag in its hint.** When risky fixes were withheld it printed \"more fixable with `--fix-risky`\", a flag `lat` does not have; it now says `--risky`."
+      },
+      {
         "text": "**The web app's Export tab opens on an example that builds a valid file.** Its built-in example left out the TRAN details and the ABBR, UNIT and TYPE groups, so the first build a newcomer ran came back with ten findings. The example now carries them and builds clean."
       },
       {

@@ -139,7 +139,7 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
     }
     if !args.risky && outcome.risky_available > 0 {
         println!(
-            "{} more fixable with --fix-risky (intent-guessing fixes withheld)",
+            "{} more fixable with --risky (intent-guessing fixes withheld)",
             outcome.risky_available
         );
     }
