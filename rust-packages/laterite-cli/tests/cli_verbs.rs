@@ -396,14 +396,15 @@ fn fix_json_residual_counts_warnings_and_drives_the_exit_code() {
 fn fix_risky_hint_shows_only_when_risky_fixes_are_withheld() {
     // rule1_non_ascii has an intent-guessing (risky) transliteration fix that a
     // plain `fix` withholds — the hint must name it and its count. A clean file
-    // has no withheld fix and must NOT print the hint. Pins the
-    // `!risky && risky_available > 0` gate the sweep found unasserted.
+    // has no withheld fix and must NOT print the hint. The hint names the flag as
+    // the parser spells it: it used to say `--fix-risky`, which `lat` rejects.
+    // Pins the `!risky && risky_available > 0` gate the sweep found unasserted.
     let d = scratch();
     let risky = d.join("r1.ags");
     std::fs::copy(fixture("rule1_non_ascii.ags"), &risky).unwrap();
     let o = lat(["fix", risky.to_str().unwrap()]);
     assert!(
-        stdout(&o).contains("1 more fixable with --fix-risky"),
+        stdout(&o).contains("1 more fixable with --risky "),
         "risky hint missing: {}",
         stdout(&o)
     );
@@ -412,7 +413,7 @@ fn fix_risky_hint_shows_only_when_risky_fixes_are_withheld() {
     std::fs::copy(fixture("clean_minimal.ags"), &clean).unwrap();
     let c = lat(["fix", clean.to_str().unwrap()]);
     assert!(
-        !stdout(&c).contains("fix-risky"),
+        !stdout(&c).contains("more fixable with"),
         "hint shown for a file with no withheld fix: {}",
         stdout(&c)
     );

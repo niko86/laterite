@@ -37,6 +37,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ### Fixed
 
+- **`lat fix` names the right flag in its hint.** When risky fixes were withheld it printed "more fixable with `--fix-risky`", a flag `lat` does not have; it now says `--risky`.
 - **The web app's Export tab opens on an example that builds a valid file.** Its built-in example left out the TRAN details and the ABBR, UNIT and TYPE groups, so the first build a newcomer ran came back with ten findings. The example now carries them and builds clean.
 - **The python-ags4 benchmark no longer refuses a release wheel as a debug build.** `tools/bench-vs-python-ags4.py` told the two apart by the native module's size, and the release module grew past its line, so the weekly perf-ratio gate stopped measuring. The module now states its own build profile and the tool reads that; a wheel too old to say is run with a note that its profile was not checked.
 
