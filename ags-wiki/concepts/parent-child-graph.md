@@ -16,7 +16,7 @@ sources: []
 AGS §3.1: PROJ is the hierarchy root; a group has exactly one parent but many children; child↔parent linked by KEY fields (Rule 10c). **Ten groups are NOT in the hierarchy** (file submission/description): PROJ, TRAN, ABBR, DICT, TYPE, FILE, UNIT, LBSG, PREM, STND. PROJ/TRAN/ABBR/TYPE/UNIT always present (Rules 13-17); DICT if user-defined (Rule 18); FILE if associated files (Rule 20).
 
 ## Why it matters
-This hierarchy is the model's backbone: [[rule-10c-parent-child]] re-resolves every child's repeated KEY tuple upward through it ([[denormalised-child-rows]]), the validator's `PARENTLESS` set is defined against it ([[non-hierarchy-ten-vs-parentless-list]]), and every cross-edition group add/remove (ERES→ELRG, the 4.2 CPTx series — [[ags4-rules-frozen-dictionary-evolves]]) is a *mutation of this graph while the rules stay frozen*. Read it wrong and Rules 7/9/10a–10c all mis-fire. The diagram is generated mechanically from `ags5_dictionary.json`.
+This hierarchy is the model's backbone: [[rule-10c-parent-child]] re-resolves every child's repeated KEY tuple upward through it ([[denormalised-child-rows]]), the validator's `PARENTLESS` set is defined against it ([[non-hierarchy-ten-vs-parentless-list]]), and every cross-edition group add/remove (ERES→ELRG, the 4.2 CPTx series — [[ags4-rules-frozen-dictionary-evolves]]) is a *mutation of this graph while the rules stay frozen*. Read it wrong and Rules 7/9/10a–10c all mis-fire. The diagram is a hand-kept snapshot, not regenerated from `ags_dictionary.json`: it predates the groups later editions added.
 
 ## Diagram
 

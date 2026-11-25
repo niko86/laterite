@@ -212,8 +212,8 @@ as stable):
   `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, laterite-dev#359) the
   path fns wrap. Its consumers: `laterite-py` (`laterite.compat.AGS4_to_excel` / `excel_to_AGS4`),
   `laterite-node` (`toExcel` / `fromExcel`, laterite-dev#358), `laterite-ags4-wasm` (`ags4_to_xlsx` /
-  `xlsx_to_ags4`, the browser Excel surface, laterite-dev#359), and — each behind an off-by-default
-  `excel` feature — the `lat` binary and the [[laterite]] facade. It takes `laterite-ags4-core` with
+  `xlsx_to_ags4`, the browser Excel surface, laterite-dev#359), and — each behind an `excel`
+  feature, on by default for the `lat` binary and off by default for the [[laterite]] facade — those two. It takes `laterite-ags4-core` with
   `default-features = false` (Excel never needs `transport`; pulling `age`→getrandom blocked wasm32),
   and exposes a `wasm` feature (→ `rust_xlsxwriter/wasm`) so the browser build takes its clock from
   `js_sys::Date::now()` — the default `SystemTime::now()` traps on wasm32 stamping the workbook date.
@@ -240,8 +240,9 @@ as stable):
   `laterite-ags4-emit` — parked there because the published facade can only adopt from a published
   crate — and extracted once the tenancy taxed emit's release train (nothing in emit called it).
   Deps: `laterite-ags4-emit` (`EmitMode`) + `laterite-ags4-validator` (the dictionary + the
-  custom-dict overlay); sits above both, below the five callers (py, node, wasm, the CLI, and —
-  post-#930 — the facade). the KEY-aware, type-aware
+  custom-dict overlay); sits above both, below its callers (py, node, wasm, the CLI, corpus-qa and —
+  post-#930 — the facade).
+- [[laterite-ags4-diff]] — the KEY-aware, type-aware
   comparison of two parsed AGS4 files (`diff_parsed(a, b, dict, cap) -> RevisionDelta`; rows matched
   by the group's dictionary KEY headings, cells compared through `parse_value` so a formatting-only
   change — `"1.0"` → `"1.00"` — is suppressed). Extracted out of `laterite-ags4-wasm` so PyO3, the CLI
@@ -505,7 +506,7 @@ mod readme_doctests {}
 
 `cfg(doctest)` is what makes it side-effect-free: the module exists only while
 rustdoc collects doctests, so it is absent from a normal build **and** from the
-rendered docs.rs page. The crate's own `//!` docs — 82 lines on the facade —
+rendered docs.rs page. The crate's own `//!` docs
 are untouched, and the README stays the single copy of its example. No new CI:
 `cargo test --workspace` carries no `--lib` restriction, so it already runs them.
 

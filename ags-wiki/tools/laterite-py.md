@@ -27,11 +27,11 @@ sources: []
 
 The **PyO3 bindings** exposing the clean-room [[laterite-ags4-validator]] engine
 to Python. A thin boundary: every bit of AGS4 logic lives in the
-validator (parity-tested) or the local `emit` module; the Python side
-(`laterite/__init__.py`, `compat.py`, `_cli.py`) assembles
+validator (parity-tested) or the shared `laterite-ags4-emit` crate; the Python side
+(`laterite/__init__.py`, `compat/`, `_cli.py`) assembles
 narwhals/polars frames and the python-ags4-shaped dict from the
 primitives returned here. This is the native module behind the public
-[[laterite]] base wheel (the light, no-DuckDB AGS4 surface).
+[[laterite]] base wheel (the lean polars + DuckDB AGS4 surface).
 
 The boundary shape now splits by path: the typed read door (`parse_arrow`)
 and, since the 2026-07-20 compat perf pass, `compat.AGS4_to_dataframe`'s
@@ -51,7 +51,7 @@ from Python. Out: validation findings and parsed primitives. Two
 error-JSON shapes are preserved byte-faithfully — the Rust-CLI shape
 `{file, findings:{rule:[…]}}` is built *here* with the same
 `serde_json` (`preserve_order`) calls `lat` uses; the python-ags4
-`check_file` dict is assembled in `laterite/compat.py`.
+`check_file` dict is assembled in `laterite/compat/_impl.py`.
 
 ## Where it lives
 

@@ -17,8 +17,8 @@ sources: []
 
 ## Claim
 > [!divergence] The entire Rust↔python divergence catalogue
-> ([[observations-coverage-map|O-1..O-34]]) and all
-> `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` `reconcile`/
+> ([[observations-coverage-map|the O-N catalogue]], O-1..O-34 at the time) and all
+> `repo:rust-packages/laterite-ags4-parity/src/verdict.rs` `reconcile`/
 > `classify` arms (O-2/O-3/O-26/O-27/O-30/O-34) are encoded against
 > python-ags4 **1.2.0 source behaviour** (rule_6 no-op, rule_20
 > on-disk, default `rename_duplicate_headers` shielding O-8, …). It was
@@ -32,7 +32,7 @@ sources: []
 - Was `repo:pyproject.toml` `"python-ags4>=1.2.0"`; `--selfcheck`
   emitted only `{"ok":true}` (`tools/py_ags4_check_json.py`).
 - `reconcile()` arms are literal python-source assumptions:
-  `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` (O-2 Rule 6 no-op,
+  `repo:rust-packages/laterite-ags4-parity/src/verdict.rs` (O-2 Rule 6 no-op,
   O-3 Rule 5↔4, O-26 triple-19b, O-27 on-disk).
 
 ## What was done (this campaign)
@@ -45,7 +45,7 @@ sources: []
 >    entirely in the F2c arc — this loose-pin rationale is historical.)
 > 2. `tools/py_ags4_check_json.py --selfcheck` now emits
 >    `{"ok":true,"python_ags4":"<ver>"}`.
-> 3. `parity.rs` const `EXPECTED_PYAGS4="1.2.0"`; the `--selfcheck`
+> 3. const `EXPECTED_PYAGS4="1.2.0"` (now in `laterite-ags4-parity/src/oracle.rs`); the `--selfcheck`
 >    probe reads the version and prints a **loud stderr warning** on
 >    drift (still runs — parity is optional QA; the warning is the
 >    signal to re-probe + bump). Silent → loud.

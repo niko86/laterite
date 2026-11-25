@@ -357,7 +357,7 @@ deferred) was the owner's, 2026-06-25.
   `laterite-ags4-wasm` already depends on; well-tested.
 - **DT precision against the declared UNIT:** `laterite_ags4_types::dt_to_unit_precision(value,
   unit) -> Option<String>`, applied in `laterite-ags4-emit`'s Arrow transpose
-  (`group_from_arrow_with_meta_at_edition`) — NOT in the orchestrator's `format_cell`, which emits
+  (`owned_group_from_arrow`) — NOT in the orchestrator's `format_cell`, which emits
   strings verbatim so the validity mode stays the single owner of canonicalisation. A typed
   temporal column has no caller-authored string to preserve, so its precision is ours to set; a
   caller's own string is not. `None` means "leave it alone" — a malformed cell, a heading with no

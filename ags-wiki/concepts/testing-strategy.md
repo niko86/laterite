@@ -100,9 +100,9 @@ the strong signal lives near the top:
 | **mutation testing** | assertions that *cannot fail* — weak/missing, and coverage-blind | **no** | `cargo-mutants` (Rust), `mutmut`/`cosmic-ray` (Python), Stryker (JS) — run scoped, never per-commit |
 | human review | is this the *right* invariant | n/a | this doctrine + PR review |
 
-Only the bottom rung (coverage) and the top (review) are standing CI gates here;
-the middle two are the fit tooling for this stack but currently run **ad-hoc, not
-yet wired as gates**. Mutation testing is the automated form of the *manual*
+Coverage, review and the smell linters (ruff's `PT` and `B` sets, gated by
+`ruff check`) are standing CI gates here; mutation testing is the fit tooling for
+this stack but still runs **ad-hoc, not wired as a gate**. Mutation testing is the automated form of the *manual*
 mutation checks this page already leans on.
 The transferable lesson: **coverage says the line ran; only a
 surviving mutant proves a bug in that line would have failed the suite** — the

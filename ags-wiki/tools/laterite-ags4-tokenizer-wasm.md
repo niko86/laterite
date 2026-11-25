@@ -46,10 +46,12 @@ convergence.
 ## Inputs / outputs
 
 In: one AGS4 line `&str` (`tokenize_spans`) or one field value `&str`
-(`quote_field`). Out: for `tokenize_spans`, an `AgsSpan` array crossing to JS as
-`{text, start, end, valueStart, valueEnd}[]` (via `serde-wasm-bindgen`); for
-`quote_field`, the quoted `String`. The spans are byte-offset-preserving, which is
-what lets the editor map a token back to its exact position in the source line.
+(`quote_field`). Out: for `tokenize_spans`, an array crossing to JS as
+`{start, end, valueStart, valueEnd}[]` (via `serde-wasm-bindgen`; offsets only,
+no `text` — the caller already holds the line); for `quote_field`, the quoted
+`String`. The offsets are code points, converted from the scanner's bytes to match
+JS indexing, which is what lets the editor map a token back to its exact position
+in the source line.
 
 ## Where it lives
 

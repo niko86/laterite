@@ -42,8 +42,8 @@ breaking; or we add a `compat_python_ags4_errors=True` flag (default
 off) that opts in to the wrap.
 
 ### H-2 — Checker identity claim relaxation
-**What**: `Metadata.Checker` currently reads
-`"laterite (clean-room laterite_ags4_validator engine)"`. python-ags4 tests
+**What**: `Metadata.Checker` names laterite, its python-ags4 compat level and
+the clean-room engine (`_CHECKER_STRING` in `compat/_impl.py`). python-ags4 tests
 assert `"python_ags4 v1.2.0"`.
 
 **Closes**: ~6 tests (`test_rule_2`, `test_rule_2b_1`,
@@ -58,7 +58,7 @@ is a no-op except in the test-suite-pass-count axis.
 **To revisit when**: never, unless a `compat_python_ags4_identity=True`
 flag is added (and even then, opt-in, never default).
 
-### H-3 — 4 JSON-helper functions (still deferred)
+### ~~H-3 — 4 JSON-helper functions~~ — **CLOSED** (all four are implemented in `compat/_impl.py`)
 **What**: `utils.get_DICT_table_from_json_file`,
 `get_ABBR_table_from_json_file`, `get_TYPE_table_from_json_file`,
 `get_UNIT_table_from_json_file`. Each reads python-ags4's bundled
@@ -95,7 +95,7 @@ AGS4 file by piping it through `convert_to_text`.
 `test_convert_to_text_specifying_dictionary_version[X]` arms +
 `test_excel_to_AGS4`).
 
-### H-5 — `??FIELD??` placeholder markers in Rule 10b Empty REQUIRED
+### ~~H-5 — `??FIELD??` placeholder markers in Rule 10b Empty REQUIRED~~ — **CLOSED** (the engine now emits the python-ags4 form; `rules/relational.rs`)
 **What**: python-ags4 emits
 `Empty REQUIRED fields: DATA|SAMP_TYPE|??ABBR_CODE??|...` — inlining
 the failed DATA row with `??NAME??` placeholders where REQUIRED cells

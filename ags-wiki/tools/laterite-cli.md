@@ -66,7 +66,7 @@ Only `--quiet` is global (valid before or after the verb); `--json` / `--ndjson`
 ## Inputs / outputs
 > [!quote] In: an `.ags` path plus per-verb flags — the dictionary edition (`--dict-version auto|4.0.3…4.2`, resolved from `TRAN_AGS` by default) and source `--encoding`. Out: `validate` prints a findings table (Rule·Line·Group·Description) or `--json`/`--ndjson`, with typed exit codes (0 passed · 1 failed · 3 not-found · 4 not-AGS4 · 5 bad-args · 6 schema). Since #203 errors AND WARNINGs show by default (like a compiler); `--no-warnings` is errors-only, `--show-fyi` adds the FYI tier. Since #321 those are **display** dials only — what the run CONCLUDES is decided by errors alone, so exit 0 no longer means "no findings", and `--warnings-as-errors` (the compiler's `-Werror`, contradicting `--no-warnings`) is what makes a warning fatal. Every launcher reads one `laterite_ags4_validator::verdict::Verdict` for that answer rather than each deriving its own.
 
-`certify` mints the `.ags.idx` validity certificate for an error-clean file (`cert::mint_index`, skipped if the file still has errors) — the reason the CLI deps `laterite-ags4-core` (`default-features = false`, so no transport/age/zstd). It is the only opt-in cert-*minting* layer besides Python `.certify()`; the DuckDB extension is read-only (#446) and only *consumes* an `.ags.idx` (autodiscovery), never mints one.
+`certify` mints the `.ags.idx` validity certificate for an error-clean file (`laterite_ags4_trust::mint`, which runs the validation itself and refuses a file that still has errors). It is the only opt-in cert-*minting* layer besides Python `.certify()`; the DuckDB extension is read-only (#446) and only *consumes* an `.ags.idx` (autodiscovery), never mints one.
 
 `--dict-version`'s accepted set (`commands/common.rs::apply_dict_args`) asks the generated `DictVersion::from_edition`, not a hand-written `match` (fixed 2026-07-14) — until then its rejection *message* was generated from `DictVersion::ALL` while its match *arms* were not, so a newly bundled edition would have shipped a `lat` that rejects that edition with a message advertising it as valid. See [[edition-resolution]].
 
@@ -85,7 +85,6 @@ flowchart LR
   crawl[laterite-ags4-corpus-qa] --> ags4check[lat]
   crawl --> py[py-ags4-check-json]
   ags4check --> cliutil[laterite-cliutil]
-  ags5db[ags5db] --> cliutil
 ```
 
 See [[crate-map]] for the workspace dependency graph.

@@ -17,9 +17,8 @@ runs.
 | `laterite-mobile-design-system/` | The mobile design system — the 2a frozen-key + row-carousel editing model, the mobile page (`Demo Site Mobile.dc.html`), and the foundations artboard. Carries the same `_ds/` token bundle. |
 
 Both carry a `_ds/laterite-design-system-<uuid>/` directory holding
-`styles.css` + `tokens/*.css`. **Those token files are byte-identical** — one
-export of the same design system — so cite either. The two `readme.md` copies
-differ: only the mobile one carries the note that the fonts are now self-hosted.
+`styles.css` + `tokens/*.css`. **The two copies are byte-identical** — one
+export of the same design system — so cite either.
 
 The `.dc.html` files are interactive: open one in a browser and scroll inside a
 frame. They reference `_ds/` and `support.js` by relative path, which is why

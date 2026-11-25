@@ -216,8 +216,8 @@ the bundled crates' calls through an **uninitialised dispatch table** → a
 runtime panic *"DuckDB API not initialized"* (8 `laterite-ags5-db` tests fail).
 
 So while it briefly lived in-workspace, `laterite-duckdb` was **excluded from
-the workspace clippy / test / llvm-cov** — the same treatment
-`laterite-ags4-wasm` (a wasm32 cdylib) still gets — and built + tested **in
+the workspace clippy / test / llvm-cov** — the treatment
+`laterite-ags4-wasm` (a wasm32 cdylib) had at the time — and built + tested **in
 isolation**: `--exclude laterite-duckdb` on the `cargo clippy` / `cargo test` /
 `cargo llvm-cov` steps, plus a dedicated *"laterite-duckdb (clippy +
 load/read_ags E2E)"* step running `cargo clippy -p laterite-duckdb` + the
@@ -350,7 +350,9 @@ single-source stay in the monorepo).
   community; LOAD`.
 - `laterite-duckdb` joins `laterite-ags4-wasm` as a crate **excluded from the
   workspace** build/test and **isolated** in CI — a standing rule, not drift;
-  don't "fix" it back into `--workspace`.
+  don't "fix" it back into `--workspace`. *(Since then the wasm crates have been
+  brought into workspace clippy; they stay out of `cargo test --workspace` and
+  coverage.)*
 - It is **out of the wheel-weight split** entirely: it ships through Community
   Extensions from its **own dedicated repo** (`niko86/laterite-duckdb`, which
   takes its lib deps from crates.io — see Distribution), and it never reaches

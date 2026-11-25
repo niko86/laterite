@@ -497,9 +497,9 @@ published excel. (It did not stop there — `laterite-ags4-hostopts` joined
 2026-09-06; the standing membership lives in `PUBLISH_SET` in
 `tools/check_package_contents.py`, not in this page's arithmetic.)
 
-**The version gate changes shape at the jump.** `test_version_faithful` currently
-asserts the facade starts with `0.1.` and explains why. At parity that assertion
-inverts: the facade must equal PRODUCT, and the exemption becomes a parity
+**The version gate changes shape at the jump.** `test_version_faithful` asserted,
+until phase 8 landed (2026-09-04), that the facade starts with `0.1.`, and explained why. At parity that assertion
+inverted: the facade must equal PRODUCT, and the exemption becomes a parity
 assertion. It is a one-way door and should be its own reviewed change, not a
 side effect of the last capability landing.
 

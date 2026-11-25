@@ -32,10 +32,12 @@ sources: [spec-4.2]
   removed @4.2** (4.2 Foreword). See [[ERES]].
 
 ## Compounding repo-side finding
-> [!divergence] The repo's `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`
-> declares `ags_edition: 4.1` yet still contains **ERES** and **lacks
-> `ELRG`** — i.e. the repo's own model authority *also* failed to
-> track the 4.1 ERES→ELRG replacement. Double bookkeeping failure:
+> [!divergence] **Since fixed.** When this was written the repo's dictionary was
+> single-edition: it declared `ags_edition: 4.1` yet still contained **ERES** and
+> **lacked `ELRG`** — i.e. the repo's own model authority *also* failed to
+> track the 4.1 ERES→ELRG replacement. `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`
+> is now multi-edition and carries each group for the editions that define it:
+> ERES up to 4.1.1, ELRG from 4.1. Double bookkeeping failure:
 > the spec's Rule 15 example went stale, and the downstream dictionary
 > didn't apply the replacement either. (Phase B should confirm whether
 > the validator can therefore even *recognise* `ELRG`.)

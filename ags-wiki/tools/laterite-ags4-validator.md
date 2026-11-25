@@ -63,7 +63,7 @@ Entry points (`repo:rust-packages/laterite-ags4-validator/src/lib.rs`):
 `check_parsed_with_dict` (**the dictionary-resolving door**, added 2026-07-14 —
 either the [[O-28]] custom-`--dict` overlay path (`opts.custom_dict`, if a caller
 supplied one: `build_delta` + `Dictionary::layered` + `check_parsed`, then
-`emit_override_warnings` surfaces every override of a STANDARD group/heading as
+`emit_override_findings` surfaces every override of a STANDARD group/heading as
 a loud WARNING, honour + warn, KEY demotion loudest — laterite-dev#568) or the bundled path
 (`resolve_dict_version` + `guard_4_0_4`, the O-42 content guard, [[O-42]]) +
 `check_parsed` + the O-42 transparency FYI, for a caller holding an

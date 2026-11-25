@@ -76,7 +76,7 @@ it). Crucially this is
 Interface** (capsules), which is why abi3 still holds.
 
 The **emit path runs that boundary in reverse** (the AGS4-output feature,
-[[ags4-output]]): `laterite.emit_ags4(groups)` hands each frame's **Arrow
+[[ags4-output]]): `laterite.build_ags4(groups)` hands each frame's **Arrow
 C-stream PyCapsule** (`__arrow_c_stream__`) straight to `pyo3_arrow::PyTable`,
 which consumes it zero-copy in `emit_ags4_from_arrow`. polars exposes the
 capsule **pyarrow-free**, so emit stays a *base* feature.
@@ -102,7 +102,7 @@ them, is [[arrow-c-ffi-allocator-ownership]].
 
 Because the read boundary uses that **stable Arrow C Data Interface**, not
 pyo3-polars' per-CPython ABI coupling, the cdylib builds **abi3**
-(`abi3-py312` on the `pyo3` dep; `pyo3-arrow` 0.19 compiles clean under it):
+(`abi3-py312` on the `pyo3` dep; `pyo3-arrow` compiles clean under it):
 ONE `cp312-abi3` wheel per platform
 serves **Python 3.12+** (proven green on 3.12 / 3.13 / 3.14). The floor is
 **3.12**, not lower, because the 174 generated `#[pyclass(dict)]` typed-graph

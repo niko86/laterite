@@ -99,7 +99,10 @@ Consequences, verified against the workspace:
   `rust-packages/Cargo.toml` and rewrites *every* occurrence in that file. Inline
   versions would sit at the old number after a release and publish crates pinned to
   a version that was not the engine they shipped with; there, they bump in lockstep.
-  `test_workspace_dependency_versions_match` asserts it rather than trusting it.
+  `test_workspace_dependency_versions_match` asserted it rather than trusting it.
+  *(Overtaken by #781: the lockstep stamp is gone, `rust-packages/Cargo.toml` is
+  no longer a bumpversion file, and the test is now
+  `test_engine_dependency_versions_match_engine`, which asserts the per-crate pair.)*
 - Making a surface genuinely build from the registry requires *deleting* the `path`
   key, which costs the dev loop entirely (every engine edit needs a publish first).
   That trade only makes sense across a repo boundary — which is what

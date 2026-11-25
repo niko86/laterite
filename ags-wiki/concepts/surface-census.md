@@ -79,8 +79,8 @@ its **match arms** were not, so bundling `4.3` would have shipped a `lat` that
 rejects `4.3` with a message advertising `4.3`. Every launcher now asks the
 generated `from_edition` / `DictVersion::ALL`; the npx launcher keeps no table at
 all and passes the string to the engine, which is the ideal end state — nothing to
-drift. (The web app still hand-lists them in four places; it is not a `lat`
-launcher, so the census cannot probe it — that convergence is its own change.)
+drift. (The web app is not a `lat` launcher, so the census cannot probe it; it
+reads its editions from one generated module, `web/src/lib/editions.ts`.)
 
 ## Per-verb arguments
 

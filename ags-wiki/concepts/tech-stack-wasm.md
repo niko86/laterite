@@ -57,8 +57,9 @@ wasm-pack downloads rejects unless every feature is enabled.
 > also carries its own `*` ignore). They are **never committed, only
 > built** — so a fresh checkout has *no* bindings and `web/` won't
 > typecheck, build, or run until they're regenerated:
-> `wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir web/src/wasm`
-> (the exact command CI's `deploy-validator.yml` runs; do it once locally
+> `cd web && npm run build:wasm:all`
+> (the script CI's `deploy-validator.yml` runs — it builds the tier-1 engine, the
+> full engine and the tokenizer into three directories; do it once locally
 > after cloning). **Corollary:** a Rust-side `validate`/`parse` signature
 > change is invisible to `web/` — and to the `.d.ts` `tsc` checks against —
 > until the bindings are rebuilt. The Rust crate is the source of truth;
@@ -66,8 +67,9 @@ wasm-pack downloads rejects unless every feature is enabled.
 > `compute_fixes`/`apply_fixes` — live in the crate — were once missing from
 > an old checked-in `.d.ts` until it was regenerated).
 
-The crate exposes these `#[wasm_bindgen]` entry points — **ten** in every
-build, plus seven more behind the features described below
+The crate exposes these `#[wasm_bindgen]` entry points — the ungated ones in every
+build (the `features_required: []` rows of `modality.json`'s `wasm_exports`),
+plus more behind the features described below
 (one module per verb under `repo:rust-packages/laterite-ags4-wasm/src`):
 
 - `validate(bytes, opts)` → a `ValidationReport` JS object — the whole
@@ -206,7 +208,7 @@ for the phase table + the OSTN15 note (linked, not duplicated here).
 ## Why it matters
 
 The casting in `parse()` shares the [[laterite-ags4-types]] leaf crate, so the
-browser casts a file **identically** to a native `.ags5db` — parity by
+browser casts a file **identically** to the native and Python read paths — parity by
 construction, not a second implementation that can drift
 ([[dec-laterite-ags4-types-leaf]]). Arrow type mapping (off the file's TYPE row):
 [[DT]] → `Timestamp(µs)` (tz-naive; a time-of-day UNIT such as `hh:mm` →
@@ -222,7 +224,7 @@ The module is instantiated and called **inside a dedicated Web Worker**
 (`repo:web/src/lib/validator.worker.ts`, since Phase 1.5), not on the main
 thread — `validate()` is synchronous and can churn for tens of seconds on
 a dirty file, so running it off-thread is what keeps the UI from freezing.
-The main thread holds no wasm; it talks to the worker through an
+The main thread holds no engine wasm (only the small tokenizer); it talks to the worker through an
 id-correlated client. The "Download full report" path re-runs `validate`
 uncapped *in the worker* and gzips the JSON there (streaming
 `CompressionStream`), transferring back compressed bytes so the big string
@@ -269,8 +271,8 @@ module. Add one of the other four there and it stops typechecking, naming
 > ([[dec-duckdb-perf-architecture]]) — not the materialise itself.
 
 > [!todo] Deferred E2E parity
-> End-to-end value parity against a *live* native `.ags5db` was not run.
-> The "identical to `.ags5db`" claim rests on both sides calling the one
+> End-to-end value parity against a *live* native read was not run.
+> The "identical to native" claim rests on both sides calling the one
 > shared [[laterite-ags4-types]] crate; host unit tests prove the casting logic.
 > Tracked in [[validator-site]].
 

@@ -138,8 +138,8 @@ none. [[tech-stack-wasm]] carries the split and the measurements:
   `b` wins a KEY conflict, `on_type_clash` (`"error"` default / `"widen"` /
   `"promote"`) settles a TYPE disagreement — `"widen"` falls back to `X`
   instead of raising, `"promote"` keeps the greatest `nDP` precision and
-  zero-pads the coarser values — and `tran_issue`+`tran_date` (both) stamp a
-  synthesised merge-TRAN. The 2-file cap is a browser-UI choice; the
+  zero-pads the coarser values — and a supplied `tran` stamp (issue, date,
+  producer, recipient and status, all required) synthesises the merge-TRAN. The 2-file cap is a browser-UI choice; the
   CLI/Python/Node surfaces over the same leaf are N-ary. The **Tools → Merge**
   UI's checkbox is now a 3-way `<select>`
   (`repo:web/src/components/tools/MergeTool.tsx`). See

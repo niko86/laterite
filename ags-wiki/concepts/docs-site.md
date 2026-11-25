@@ -35,11 +35,11 @@ sources: []
 ## Definition
 
 The laterite suite's documentation website (#201): **MkDocs + Material**, sources
-under `repo:web/docs-site/`, published at **`/laterite/docs/`** on the *same*
-GitHub Pages artifact as the [[validator-site]] app — `mkdocs.yml` sets
+under `repo:web/docs-site/`, published at **`docs.laterite.dev`**, its own
+Cloudflare Worker, separate from the [[validator-site]] app — `mkdocs.yml` sets
 `site_dir: ../docs-dist`, so the static site lands in its **own** directory
-beside the app's rather than inside it, and the deploy step carries it to
-`/laterite/`. (This line said `../dist/docs` until #588, which is a directory
+beside the app's rather than inside it, and the deploy step publishes that
+directory (GitHub Pages is now a redirect shim only). (This line said `../dist/docs` until #588, which is a directory
 `mkdocs.yml` has not named for some time; the config is the authority.)
 
 Key facts:
@@ -412,13 +412,13 @@ Key facts:
     the python + CLI example gates in the `python` job (which has the compiled
     wheel + `lat`); `web/docs-site/examples/node/**` + the fixture also
     sit in the `node` filter so Node-snippet edits re-run the vitest gate. The
-    wasm tree has its own per-PR leg in the `web` job — `gen_doc_outputs.py
+    wasm tree has its own per-PR leg in the `ts-lint` job — `gen_doc_outputs.py
     --check --surface wasm` — on `web/**` + `rust-packages/**`. The duckdb
     gate's per-PR leg is include-check only (runtime is nightly + on-demand,
     above).
 - **Deploy.** The mkdocs build in
-  `repo:.github/workflows/deploy-validator.yml` deploys the docs to the public
-  Pages site (`/laterite/docs/`). The build is deliberately **non-strict** — a
+  `repo:.github/workflows/deploy-validator.yml` deploys the docs to their own
+  Worker (`docs.laterite.dev`). The build is deliberately **non-strict** — a
   docs link nit must never block the app deploy; the strict gate is the PR-time
   `docs` job above.
 - **Structure** (`mkdocs.yml` `nav`): Home · **Learn** (ordered tutorial) ·
@@ -539,8 +539,8 @@ A born-typed, fluent API is only as good as its discoverability. The example-led
 CI-gated design is the same "the authority enforces its own doc" philosophy as the
 dictionary-faithfulness and `OBSERVATIONS` gates: the docs **cannot drift** from
 the shipping API because every published snippet is executed in CI, and the strict
-link gate stops the prose from rotting. It is a public surface, so it deploys from
-the mirror only — keeping the private preview free of the docs.
+link gate stops the prose from rotting. It is a public surface, deployed to its own host by the same
+workflow run that deploys the app.
 
 ## Diagram
 
@@ -554,8 +554,7 @@ flowchart LR
   cd --> cgate["tests/test_groups_catalogue_faithful.py<br/>(dev satellite, python job)"]
   page --> strict["mkdocs build --strict<br/>(docs job, builds the wheel)"]
   strict --> art["web/docs-dist"]
-  vite["vite build → web/dist"] --> art
-  art -->|mirror only| pages["GitHub Pages /laterite/docs/"]
+  art -->|deploy-validator.yml| pages["docs.laterite.dev (Worker)"]
 ```
 
 ## Where it shows up
