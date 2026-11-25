@@ -39,9 +39,10 @@ numbers.
     fixable = [r["rule"] for r in laterite.list_rules() if r["fixable"]]
     ```
 
-    The `severity` field is `mixed` for rules that emit both errors and
-    information-only findings (Rule 1 character-set, Rule 16 ABBR pick-lists, Rule
-    18 dictionary references); everything else is a hard `error`.
+    The `severity` field is `mixed` for a rule whose number can also carry a
+    related warning or information-only finding (Rule 1 character-set, Rule 8
+    typed values, Rule 10c parent links, Rule 14 `TRAN`, Rule 16 ABBR pick-lists,
+    Rule 18 dictionary references); every other rule is a hard `error`.
 
 === "Node"
 

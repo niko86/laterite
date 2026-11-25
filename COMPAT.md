@@ -593,18 +593,18 @@ fixes.
 
 ## The full O-N catalogue
 
-39 entries total. The full text (5-field house style: observed /
+The full text of every entry (5-field house style: observed /
 spec / assessment / upstream-reportable / our decision) lives at
-[`OBSERVATIONS.md`](OBSERVATIONS.md).
+[`OBSERVATIONS.md`](OBSERVATIONS.md), which is also where to count them.
 
-A summary table by tag:
+Each entry carries one of four tags:
 
-| Tag | Count | Meaning |
-|---|---|---|
-| VARIANCE | 12 | Intentional impl-vs-spec divergence (not a defect) |
-| SPEC | 8 | Spec ambiguity / contradiction the AGS-DFWG could clarify |
-| BUG | 2 | Likely python-ags4 defect |
-| NOTE | 17 | Behavioural observation (internal documentation) |
+| Tag | Meaning |
+|---|---|
+| VARIANCE | Intentional impl-vs-spec divergence (not a defect) |
+| SPEC | Spec ambiguity / contradiction the AGS-DFWG could clarify |
+| BUG | Likely python-ags4 defect |
+| NOTE | Behavioural observation (internal documentation) |
 
 ### The 10 residual parity-test failures
 

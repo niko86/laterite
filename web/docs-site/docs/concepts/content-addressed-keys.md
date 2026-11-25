@@ -44,12 +44,12 @@ read anywhere yields the same `_id`/`_parent_id`.
 
 Two rules govern where you see them:
 
-- **The relational layer always carries them.** `ags.sql(...)` / `ags.at(...)`
-  expose `_id`/`_parent_id` on every group, so the content-addressed join above
-  needs no opt-in.
-- **Frames strip them by default.** `ags["LOCA"]` / `ags.table("LOCA")` return the
-  AGS columns only; the synthetic keys don't clutter a data frame. Ask for them
-  with `keys=True`:
+- **The relational layer always carries them.** `ags.sql(...)` exposes
+  `_id`/`_parent_id` on every group, so the content-addressed join above needs
+  no opt-in.
+- **Frames strip them by default.** `ags["LOCA"]` / `ags.table("LOCA")`, and the
+  frames of an `ags.at(...)` query, return the AGS columns only; the synthetic
+  keys don't clutter a data frame. Ask for them with `keys=True`:
 
 ```python
 --8<-- "python/ex21_synthetic_keys.py:code"

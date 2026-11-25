@@ -21,9 +21,10 @@ the safe default is to keep it as text: nothing is lost or silently dropped. The
 limit) comes back as `Float64` instead of `String`, so it sorts and averages
 without a per-column `.cast()`.
 
-Coercion is whole-column. If an `XN` column in your file carries a genuine
-non-numeric token, `xn="numeric"` will surface it (rather than quietly producing
-text). Keep the default `String` read for files where that's expected.
+Coercion is whole-column, and it is lossy. If an `XN` column in your file carries
+a genuine non-numeric token (`NP`, `<5`), `xn="numeric"` turns that cell into a
+null, with no error or warning, so the qualifier is gone. Keep the default
+`String` read for files where those tokens matter.
 
 The same example also queries the **registry**: `child_groups("LOCA")` and
 `inherited_key_names("SAMP")` walk the in-memory AGS group graph. That surface is

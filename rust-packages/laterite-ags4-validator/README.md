@@ -55,36 +55,46 @@ Working Group. Every phase appends to it.
 
 ## The rule set
 
-All 19 numbered rules plus the cross-file Rule 20 are implemented and shipped;
-the table is a reference to what each one covers, not a plan. They live in
-`src/rules/` (line_format, structure, naming, dictionary, typed_values,
-relational, groups, references), dispatched from `src/lib.rs`. The rule text is
-AGS4.1 §4.1.1 (Rules 1–18) and §4.1.4 (Rule 20).
+The engine reports findings under the rule ids below, all implemented and
+shipped. This is the engine's own catalogue of checks, not a restatement of the
+specification: the specification's Rules 12, 16a and 18a have no entry of their
+own here. The checks live in `src/rules/` (line_format, structure, naming,
+dictionary, typed_values, relational, groups, references), dispatched from
+`src/lib.rs`. The rule text is the AGS4 specification's CSV file rules
+(§4.1.1).
 
-| Rule | Family | Notes |
-|---|---|---|
-| 1 | Encoding / character set | ASCII (0–127) + extended (160–255). Encoding param defaults to UTF-8; cp1252 should be configurable. |
-| 2 | Group structure | GROUP / HEADING / UNIT / TYPE / DATA rows in order; blank line between groups. |
-| 2b | UNIT-immediately-above-TYPE | Sub-rule of 2; common to trip independently. |
-| 3 | Tag column 1 | Must be a valid descriptor. |
-| 4 | Quoting | Every cell `"..."` quoted; embedded `"` doubled to `""`. |
-| 5 | Field count | Consistent across rows of a group. |
-| 6 | Separator + line endings | Comma + CRLF. |
-| 7 | Heading order | Spec-mandated dictionary order; custom headings after standard (Rule 9). |
-| 8 | Typed values | DT / 2DP / YN / PA / PT etc. match TYPE + UNIT declarations. |
-| 9 | Custom headings | Vendor extensions must come after standard headings. |
-| 10a–c | KEYs + parent refs | Non-null KEYs; unique within group; child rows resolve to parent rows. |
-| 11 | Record Links | `RL` values use `GROUP\|key1\|...` and resolve. |
-| 12 | DICT cross-checks | Headings declared in DICT match data. |
-| 13 | PROJ singleton | Exactly 1 row. |
-| 14 | TRAN required | Transfer metadata group present. |
-| 15 | UNIT defs | Every used unit string declared in UNIT group. |
-| 16 | ABBR defs | Every PA / PT value declared in ABBR group. |
-| 16b | ABBR completeness | Sub-rule: ABBR_HDNG covered for every PA/PT heading. |
-| 17 | DICT entries | Non-standard headings have DICT rows. |
-| 18 | FILE refs | `FILE_FSET` references resolve in FILE group. |
-| 19 / 19a / 19b | Multi-group consistency | Dictionary alignment across groups in one file. |
-| 20 | Cross-file | Same headings/types/units across multiple deliveries. |
+`lat rules` prints the same catalogue with each rule's severity and whether it
+is fixable; `lat rules --json` adds a description of what each one checks.
+
+| Rule | Covers |
+|---|---|
+| 1 | Character Set |
+| 2 | Data Groups and Data Rows |
+| 2a | Line Termination |
+| 2b | Group Header Structure |
+| 3 | Data Descriptors |
+| 4 | Field Count and GROUP Row Format |
+| 5 | Quoted Fields |
+| 6 | Embedded Carriage Returns |
+| 7 | Heading Order and Duplicates |
+| 8 | Typed Values |
+| 9 | Dictionary Headings |
+| 10a | KEY Field Uniqueness |
+| 10b | REQUIRED Field Non-Emptiness |
+| 10c | Parent-Child Linkage |
+| 11a | Record-Link Delimiter |
+| 11b | Record-Link Concatenator |
+| 11c | Record-Link Resolution |
+| 13 | PROJ Group Presence and Row Count |
+| 14 | TRAN Group Presence and Row Count |
+| 15 | Unit Definitions |
+| 16 | Abbreviation Definitions |
+| 17 | Data Type Definitions |
+| 18 | DICT Group for Non-Standard Names |
+| 19 | GROUP Name Format |
+| 19a | HEADING Name Length and Character Set |
+| 19b | HEADING Name Structure and Cross-Group Borrowing |
+| 20 | File Attachments |
 
 ## Test corpus
 
