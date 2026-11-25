@@ -430,6 +430,12 @@ jobs:
       - name: crate cards match the manifests
         run: uv run --no-project python tools/gen_crate_graph.py --check
 
+      # The validator README ships to crates.io with a table of what each rule
+      # covers. Hand-written, it drifted until rows described a different rule
+      # from the one numbered, and nothing failed (#1226 fixed the prose).
+      - name: validator README rule table matches the rule catalogue
+        run: uv run --no-project python tools/gen_rule_table.py --check
+
       - name: install grid names only what we publish
         run: uv run --no-project python tools/gen_install_channels.py --check
 
