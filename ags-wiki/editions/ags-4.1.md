@@ -15,13 +15,13 @@ sources: [spec-4.1]
 # AGS 4.1
 
 ## Overview
-AGS **Edition 4.1 (new minor version)** — released 2020-12-08, status **deprecated**. Spec PDF: `spec:AGS4-4.1-*.pdf` (not vendored here — see the `sources/spec-*` page). New minor version. Data Dictionary is the JSON authority's baseline (ags5_dictionary.json ags_edition=4.1). Rule prose frozen.
+AGS **Edition 4.1 (new minor version)** — released 2020-12-08, status **deprecated**. Spec PDF: `spec:AGS4-4.1-*.pdf` (not vendored here — see the `sources/spec-*` page). New minor version. Its Data Dictionary is one of the editions carried in the JSON authority (`ags_dictionary.json`). Rule prose frozen.
 
 ## Support in this repo
 The validator resolves the dictionary edition from `TRAN_AGS` — see [[edition-resolution]] and [[O-30]] (bare `"4"`→4.0.4, AGS3 refusal). **Rule prose is identical to every other in-scope edition** ([[ags4-rules-frozen-dictionary-evolves]]); only the data model differs.
 
 ## Deltas vs adjacent editions
-Dictionary lineage: New minor version. Data Dictionary is the JSON authority's baseline (ags5_dictionary.json ags_edition=4.1). Rule prose frozen. The numbered Rules are identical to 4.2 (frozen — [[ags4-rules-frozen-dictionary-evolves]]); deltas vs adjacent editions are **dictionary-only** (group/heading/type additions, deprecations, retypes). Per-group deltas are filled on the `groups/*` pages.
+Dictionary lineage: New minor version. Its Data Dictionary is one of the editions carried in the JSON authority (`ags_dictionary.json`). Rule prose frozen. The numbered Rules are identical to 4.2 (frozen — [[ags4-rules-frozen-dictionary-evolves]]); deltas vs adjacent editions are **dictionary-only** (group/heading/type additions, deprecations, retypes). Per-group deltas are filled on the `groups/*` pages.
 
 ## Related
 [[edition-resolution]] · [[O-30]] · [[start-here]]

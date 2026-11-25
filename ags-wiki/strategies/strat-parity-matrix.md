@@ -38,7 +38,7 @@ sources: []
 > Both feed [[parity-cascade-unreconcilable]].
 
 ## Coverage (honest split)
-- **9 asserted-clean** (regression-guard the clean-room claim — must
+- **The asserted-clean rows** (the `assert_clean: true` entries in `parity.rs`; regression-guard the clean-room claim — must
   reconcile): Rule 1-invalid-byte (O-32), 2b, 3, 4, 7, 8, 13, 15 — all
   `AGREE`. **Rule 8's `AGREE` is scoped to `DT`** — see the note below.
 

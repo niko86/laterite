@@ -17,8 +17,9 @@ runs.
 | `laterite-mobile-design-system/` | The mobile design system — the 2a frozen-key + row-carousel editing model, the mobile page (`Demo Site Mobile.dc.html`), and the foundations artboard. Carries the same `_ds/` token bundle. |
 
 Both carry a `_ds/laterite-design-system-<uuid>/` directory holding
-`styles.css` + `tokens/*.css`. **The two copies are byte-identical** — one
-export of the same design system — so cite either.
+`styles.css` + `tokens/*.css`. **Those token files are byte-identical** — one
+export of the same design system — so cite either. The two `readme.md` copies
+differ: only the mobile one carries the note that the fonts are now self-hosted.
 
 The `.dc.html` files are interactive: open one in a browser and scroll inside a
 frame. They reference `_ds/` and `support.js` by relative path, which is why
@@ -40,8 +41,8 @@ short list so a reader comparing the two files is not left guessing.
   the geometric sans, not carried across.**
 - **`--accent` is maroon `#611a1e`, not brand brick `#9b3932`.** The design
   system sets brick; the site direction resolved links, headlines and active nav
-  to maroon, and that is the one that ships. Rust `#ce5640` is a separate token
-  (`--cta`) — maroon reads, rust acts.
+  to maroon, and that is the one that ships. The action colour is a separate token
+  (`--cta`, a rust-family literal outside the ramp) — maroon reads, rust acts.
 - **The fonts are self-hosted.** Both documents load theirs from the Google
   Fonts CDN, and a `fonts.googleapis.com` URL survives in the bundled
   `tokens/fonts.css` here. Nothing on any laterite surface fetches it: the apex's

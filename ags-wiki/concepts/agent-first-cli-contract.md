@@ -25,9 +25,9 @@ sources: []
 > + `--readme`; `--dry-run` mutates nothing; **typed exit codes in an
 > `after_help` epilog**; seedable RNG for reproducible runs. Embodied
 > by `repo:rust-packages/laterite-cliutil/src/lib.rs` (the shared UX
-> primitives) and the `repo:rust-packages/laterite-ags4-corpus-qa/src/cli.rs` /
-> `src/main.rs` / `src/output.rs` (`Ctx` + `Report` trait + `emit`)
-> pattern.
+> primitives and, in `src/report.rs`, the `Ctx` + `Report` trait + `emit`
+> scaffold) and the `repo:rust-packages/laterite-ags4-corpus-qa/src/cli.rs` /
+> `src/main.rs` pattern (its `src/output.rs` re-exports the scaffold).
 
 ## Why it matters
 The toolkit must "look and feel like one tool" and be
@@ -37,7 +37,7 @@ duplication across CLIs is resolved by **extracting a shared crate**,
 never a documented copy. The validator *library*'s lean dep-graph
 (no walkdir/rayon/ratatui) is a hard guarantee — shared UI stays
 bin-side. New CLIs ([laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)) inherit this verbatim; the
-`Ctx/Report/emit/Plan` layer is being lifted into [[laterite-cliutil]] so
+`Ctx/Report/emit/Plan` layer was lifted into [[laterite-cliutil]], so
 forge and [[laterite-ags4-corpus-qa]] share one report scaffold.
 
 "Look and feel like one tool" extends past a single binary's own UX
@@ -70,9 +70,10 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-cli]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)
+[[laterite-cli]], [[laterite-ags4-corpus-qa]] today; [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md)
 next. The shared primitives live in [[laterite-cliutil]]; the report-doc
-half of the contract is the [[laterite-ags4-corpus-qa]] `output.rs` pattern.
+half of the contract is [[laterite-cliutil]]'s `report.rs`, which
+[[laterite-ags4-corpus-qa]]'s `output.rs` re-exports.
 
 ## Related
-[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-cli]] · laterite-ags5-db · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[laterite-ags4-parity]] · [[surface-census]]
+[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-cli]] · [laterite-ags4-forge](https://github.com/niko86/laterite-forge/blob/main/docs/laterite-ags4-forge.md) · [[laterite-ags4-parity]] · [[surface-census]]
