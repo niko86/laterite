@@ -121,15 +121,15 @@ export const Post: Component = () => (
         </p>
 
         <P>
-          laterite started as a pet project to see if I could make AGS4 parsing
-          faster. It was also a way to learn how to use AI on something bigger
-          than a script or small helper library. For most AGS4 files speed isn't
-          a problem. python-ags4 feels instant on small files. But files are
-          getting bigger. On major land and offshore infrastructure projects
-          they already are, and AGS4 4.2 added 26 new groups, some of them very
-          data-heavy. The CPT groups are the obvious example. <C>CPTT</C> holds
-          cone readings every 10 to 20 mm over tens of metres of push, and a
-          site can have many tests.{" "}
+          I started laterite as a pet project to see if I could make AGS4
+          parsing faster. It was also a way to learn how to use AI on something
+          bigger than a script or small helper library. For most AGS4 files
+          speed isn't a problem, and python-ags4 feels instant on small ones.
+          That changes on major land and offshore infrastructure projects, where
+          the files are already large, and AGS4 4.2 added 26 new groups, some of
+          them very data-heavy. The CPT groups are the obvious example, with{" "}
+          <C>CPTT</C> holding cone readings every 10 to 20 mm over tens of
+          metres of push and many tests to a site.{" "}
           <A href="https://www.ags.org.uk/data-format/ags4-data-format/ags-l/">
             AGS-L
           </A>
@@ -138,12 +138,12 @@ export const Post: Component = () => (
         </P>
 
         <P>
-          I also had a second reason. I like pandas but I much prefer polars.
-          And Python is great, but it isn't the right tool for every job,
-          especially where performance matters. A lot of newer Python libraries
-          are written in Rust with a thin Python layer on top, using PyO3, so
-          you get Rust's speed and Python's ease of use. laterite is built the
-          same way.
+          My second reason was more personal. While I like pandas I much prefer
+          polars, and while Python is great it isn't the right tool for every
+          job, especially where performance matters. That is why a lot of newer
+          Python libraries are written in Rust with a thin Python layer on top,
+          using PyO3, which gives you Rust's speed with Python's ease of use. I
+          built laterite the same way.
         </P>
 
         <P>
@@ -175,24 +175,27 @@ export const Post: Component = () => (
           The DuckDB extension turned out to be more useful than I expected. If
           you want to use a language model with AGS data, SQL is what it knows
           best. It writes SQL better than pandas or polars code, and much better
-          than code for a library it has never seen. laterite loads AGS4
-          straight into DuckDB, so the model can just write SQL.
+          than code for a library it has never seen. With laterite an AGS4 file
+          loads straight into DuckDB, so the model can just write SQL. In DuckDB
+          itself that is <C>read_ags('site.ags', 'LOCA')</C>. In Python and Node
+          it is <C>.sql("SELECT ...")</C> on a file you have read, with every
+          group available as a table.
         </P>
 
         <H2>How it compares with python-ags4</H2>
         <P>
-          python-ags4 is the AGS Data Format Working Group's own library, and it
-          is what I checked laterite against. I wrote every rule from the
+          The python-ags4 library is the AGS Data Format Working Group's own,
+          and it is what I checked laterite against. I wrote every rule from the
           published AGS4 specification, not from anyone else's code, and then
           ran python-ags4's own test suite against my implementation.
         </P>
 
         <P>
-          If you only want the speed, change one import. <C>python_ags4</C>{" "}
-          becomes <C>laterite.compat</C>, and your existing code runs four to
-          five times faster. laterite's own read is about eleven times faster.
-          The benchmark generates its own test files, so you can run it
-          yourself. The{" "}
+          If you only want the speed, change one import so that{" "}
+          <C>python_ags4</C> becomes <C>laterite.compat</C>, and your existing
+          code runs four to five times faster. Using laterite's own read is
+          about eleven times faster. The benchmark generates its own test files,
+          so you can run it yourself. The{" "}
           <A href="https://docs.laterite.dev/cookbook/compat/">
             migration page
           </A>{" "}
@@ -200,8 +203,8 @@ export const Post: Component = () => (
         </P>
 
         <P>
-          You can check the compatibility yourself too. python-ags4 1.2.0's test
-          suite passes 121 of its 131 tests when run against{" "}
+          You can check the compatibility yourself too. The python-ags4 1.2.0
+          test suite passes 121 of its 131 tests when run against{" "}
           <C>laterite.compat</C>. I know why each of the other ten fails.
         </P>
 
@@ -225,8 +228,8 @@ export const Post: Component = () => (
         </P>
 
         <P>
-          Three are real differences in how a bad file is handled. laterite
-          refuses an AGS3 file and a non-CSV file, where python-ags4 validates
+          Three are real differences in how a bad file is handled. Where
+          python-ags4 validates an AGS3 file or a non-CSV file, laterite refuses
           them. And laterite reports an embedded carriage return under Rule 6,
           where python-ags4 reports other rules.
         </P>
