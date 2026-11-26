@@ -3743,6 +3743,12 @@ test("the masthead carries no verdict until the reader scrolls into the demo", a
   hasTouch,
 }) => {
   test.skip(hasTouch, "the masthead chip is the fine-pointer mount");
+  // The hero's file card is the witness that the engine has reported, and
+  // it only renders at desktop widths.
+  test.skip(
+    (page.viewportSize()?.width ?? 0) < 1024,
+    "the hero file card is a wide-viewport affordance",
+  );
   await page.goto("/");
   // The engine has reported: the hero's own file card shows the count. A
   // masthead that is merely still waiting would pass the absence check below.
