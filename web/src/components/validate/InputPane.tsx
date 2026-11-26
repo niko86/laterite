@@ -1,5 +1,6 @@
 import { createSignal, Show, type Component } from "solid-js";
 import { Button } from "@shared/components";
+import { isAgsFileName } from "../../lib/agsFileName";
 
 /** Read a dropped/selected file into bytes + its name. */
 async function readFile(
@@ -27,7 +28,7 @@ export const InputPane: Component<{
     if (!f) return;
     // Checked by NAME, after the pick, and not with an `accept` list on the
     // input — see the note there.
-    if (!f.name.toLowerCase().endsWith(".ags")) {
+    if (!isAgsFileName(f.name)) {
       setRefused(f.name);
       return;
     }

@@ -21,7 +21,7 @@
         "text": "**The web app's column option sits beside the findings it changes.** \"Aligned columns\" was in the settings above the editor and looked as if it should reformat the editor. It is now above the findings list, labelled \"Line up columns in the excerpts (display only)\"."
       },
       {
-        "text": "**The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. Pasting text is unchanged."
+        "text": "**The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. The Merge and Revision diff tools apply the same rule. Pasting text is unchanged."
       }
     ],
     "deprecated": [],

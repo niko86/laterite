@@ -44,7 +44,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 - **laterite.dev no longer opens with an error count in its top bar.** On a tall screen the demo's first table is already visible under the headline, so the masthead showed the demo file's error count before the reader had done anything. The count now appears there once the reader has scrolled into the demo; until then it stays on the file card beside the headline.
 - **Small web app tidy-ups.** Charts opens on the first group with a number to plot instead of an empty plot of the project row, the Export tab's dropdowns and buttons match the rest of the app, and a one-row group reads "1 row".
 - **The web app's column option sits beside the findings it changes.** "Aligned columns" was in the settings above the editor and looked as if it should reformat the editor. It is now above the findings list, labelled "Line up columns in the excerpts (display only)".
-- **The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. Pasting text is unchanged.
+- **The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. The Merge and Revision diff tools apply the same rule. Pasting text is unchanged.
 
 ### Fixed
 
