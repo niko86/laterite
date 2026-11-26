@@ -1,26 +1,17 @@
 /* The beta announcement, as a long-form page of laterite.dev.
  *
- * Its own header rather than the landing page's Masthead: that one carries the
- * demo's live scoreboard and in-page anchors, and importing it would pull the
- * demo's store into a page that has no demo. The lockup, the theme toggle, the
- * call to action and the strata rule are the same parts, so the two headers
- * read as one site.
+ * It wears the site's shared chrome (MastheadShell) with the verdict slot
+ * empty: there is no demo here, and leaving the slot empty is what keeps the
+ * demo's store out of this page's bundle.
  *
  * The measure is capped in characters, not pixels: this is a page for reading,
  * and a line that runs the full content width stops being one.
  */
 
-import { For, type Component, type JSX } from "solid-js";
-import { Button, ThemeToggle } from "@shared/components";
-import mark from "../../../assets/laterite-icon-128.png";
+import type { Component, JSX } from "solid-js";
+import { Button } from "@shared/components";
 import { Footer } from "../components/Footer";
-
-const NAV = [
-  { href: "/#file", label: "Demo" },
-  { href: "/#install", label: "Install" },
-  { href: "https://docs.laterite.dev/", label: "Docs" },
-  { href: "https://github.com/niko86/laterite", label: "Source" },
-];
+import { MastheadShell } from "../components/MastheadShell";
 
 const LINK =
   "text-accent underline underline-offset-2 decoration-1 transition-colors hover:decoration-2";
@@ -53,59 +44,9 @@ const Pre: Component<{ children: string }> = (props) => (
   </pre>
 );
 
-const Header: Component = () => (
-  <header class="sticky top-0 z-30 bg-surface">
-    <div class="flex items-center gap-4 px-4 py-2.5 sm:px-6">
-      <a
-        href="/"
-        class="flex items-center gap-2.5 no-underline"
-        aria-label="laterite home"
-      >
-        <img
-          src={mark}
-          alt=""
-          width="28"
-          height="28"
-          class="size-7 rounded-[5px] dark:bg-[var(--stone-50)] dark:p-[3px]"
-        />
-        <span class="font-display text-h3 font-extrabold tracking-(--track-tight) text-accent">
-          laterite
-        </span>
-      </a>
-      <nav class="ml-auto hidden items-center gap-5 min-[52rem]:flex">
-        <For each={NAV}>
-          {(item) => (
-            <a
-              href={item.href}
-              class="text-caption text-fg-soft no-underline transition-colors hover:text-accent hover:underline"
-            >
-              {item.label}
-            </a>
-          )}
-        </For>
-      </nav>
-      <div class="ml-auto flex items-center gap-2 min-[52rem]:ml-0">
-        <ThemeToggle />
-        <Button variant="primary" size="sm" href="https://app.laterite.dev/">
-          Open webapp
-        </Button>
-      </div>
-    </div>
-    <div
-      aria-hidden="true"
-      class="h-[3px] w-full"
-      style={{
-        background:
-          "linear-gradient(to right, var(--laterite-300), var(--laterite-400), " +
-          "var(--laterite-500), var(--laterite-600), var(--laterite-900))",
-      }}
-    />
-  </header>
-);
-
 export const Post: Component = () => (
   <div class="min-h-screen bg-canvas text-fg">
-    <Header />
+    <MastheadShell anchorBase="/" />
     <main>
       <article class="mx-auto max-w-[68ch] px-4 py-10 sm:px-6 sm:py-16">
         <p class="font-mono text-micro tracking-wide text-fg-muted uppercase">

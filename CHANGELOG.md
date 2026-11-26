@@ -35,6 +35,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 ## [Unreleased]
 
+### Added
+
+- **laterite.dev has a page announcing the beta, at `/beta/`.** It says what laterite is, how it compares with python-ags4, what beta means and where to send feedback, and it wears the same chrome and theme as the landing page.
+
 ## [0.17.1] — 2026-11-25
 
 ### Fixed
