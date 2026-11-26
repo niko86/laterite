@@ -22,13 +22,6 @@ const NAV = [
   { href: "https://github.com/niko86/laterite", label: "Source" },
 ];
 
-const INSTALL = [
-  "pip install laterite",
-  "npm i laterite",
-  "npm i @laterite/ags4-wasm",
-  "INSTALL laterite_ags4 FROM community;",
-];
-
 const LINK =
   "text-accent underline underline-offset-2 decoration-1 transition-colors hover:decoration-2";
 
@@ -46,12 +39,6 @@ const C: Component<{ children: JSX.Element }> = (props) => (
 
 const P: Component<{ children: JSX.Element }> = (props) => (
   <p class="mt-5 text-prose text-fg-soft">{props.children}</p>
-);
-
-const H2: Component<{ children: JSX.Element }> = (props) => (
-  <h2 class="mt-12 font-display text-h2 font-extrabold text-fg">
-    {props.children}
-  </h2>
 );
 
 const Pre: Component<{ children: string }> = (props) => (
@@ -122,76 +109,91 @@ export const Post: Component = () => (
           laterite is in beta
         </h1>
         <p class="mt-5 text-lead text-fg-soft">
-          laterite, an open-source toolkit for the AGS4 geotechnical data
-          format, is in public beta today as version 0.17.1.
+          I'm pleased after many months to finally be at the point where I feel
+          comfortable to post about laterite my open-source toolkit for the AGS4
+          data format, it's available in public beta as version 0.17.1.
         </p>
 
         <P>
-          It began as an itch. AGS4 parsing felt slower than it needed to be,
-          and I wanted to know how much faster it could go. That question has an
-          answer now, about sixteen times for validation, and it has turned out
-          to be the least interesting thing about it. For most of AGS4's life
-          the slowness was not much of a problem, because deliveries were small.
-        </P>
-
-        <H2>The files got bigger</H2>
-        <P>
-          Then the format changed shape. AGS4 4.2 introduced 26 new groups, and
-          they are the data-heavy ones: the whole CPT family (<C>CPTG</C>,{" "}
-          <C>CPTT</C>, <C>CPTM</C>, <C>CPTP</C>, <C>CPTZ</C>, plus cyclic
-          testing and pore-pressure dissipation), in-situ seismic, dilatometer
-          and pressuremeter testing. <C>CPTT</C> is the one to picture: cone
-          readings every 10 to 20 mm over tens of metres of push, with many
-          tests to a site. A format that was fine at small files stopped
-          producing small files.{" "}
+          laterite began as a pet project to make AGS4 parsing faster while
+          learning how to use AI for something larger. For most AGS4 files speed
+          isn't really an issue that needs solving, python-ags4 is fast enough
+          on small files to feel instant. However, moving to larger scale
+          projects such as major land and offshore infrastructure projects the
+          file sizes grow. With the release of AGS4 4.2 which introduced 26 new
+          groups, some of which are data-heavy such as the entire CPT family (
+          <C>CPTG</C>, <C>CPTT</C>, <C>CPTM</C>, <C>CPTP</C>, <C>CPTZ</C>, plus
+          cyclic testing and pore-pressure dissipation), in-situ seismic,
+          dilatometer and pressuremeter testing. For example, <C>CPTT</C> with
+          cone readings every 10–20 mm over tens of metres of push, many tests
+          to a site. That is how a format that was fine at small files stopped
+          producing small files, and{" "}
           <A href="https://www.ags.org.uk/data-format/ags4-data-format/ags-l/">
             AGS-L
           </A>
-          , the coming AGS extension for advanced laboratory testing, points the
+          , AGS's coming extension for advanced laboratory testing, points the
           same way.
         </P>
 
-        <H2>One engine, five ways in</H2>
         <P>
-          laterite is a Rust core with a thin Python library over it. Files come
-          back as polars frames with real types: a <C>2DP</C> heading is a float
-          and a <C>DT</C> heading is a datetime. Once the core existed, the
-          other surfaces followed: a Node library, a DuckDB extension, a
-          WebAssembly build for the browser, and the <C>lat</C> command line
-          tool. All five are in beta.
-        </P>
-        <Pre>{INSTALL.join("\n")}</Pre>
-        <P>
-          The DuckDB extension earns its place for a reason that did not exist
-          when I started. If you want a language model anywhere near a delivery,
-          SQL is the language it knows best. laterite reads AGS4 straight into
-          DuckDB, so the model writes SQL instead of guessing at a library it
-          has never seen.
+          There was a second reason, while I like the Python pandas library I
+          personally much prefer polars. Additionally, while Python, good as it
+          is, is not the right tool for every task especially where greater
+          performance might be needed and this is seen in many libraries being
+          created in Rust and having thin python libraries created using pyO3 to
+          get the best of both worlds rust performance and python ease of use.
         </P>
 
-        <H2>If you use python-ags4</H2>
+        <P>
+          laterite resolves both the way much of modern Python packaging now
+          does: a Rust core with a thin Python library over it. Files come back
+          as polars frames, born-typed: a <C>2DP</C> heading is a float, a{" "}
+          <C>DT</C> a datetime. Once the core existed, other surfaces followed
+          almost for free: a Node library, a DuckDB extension, a WebAssembly
+          build for the browser, the <C>lat</C> CLI. One engine, several
+          languages. laterite is in beta, all five of them:{" "}
+          <C>pip install laterite</C>, <C>npm i laterite</C>,{" "}
+          <C>npm i @laterite/ags4-wasm</C>,{" "}
+          <C>INSTALL laterite_ags4 FROM community</C>, and the <C>lat</C>{" "}
+          binary.
+        </P>
+
+        <P>
+          The DuckDB surface earns its keep for a reason that wasn't so obvious
+          to me when I started. If you want a language model anywhere near a
+          delivery, SQL is the language it actually knows, even better than
+          pandas or polars, and far better than laterite's own API. laterite
+          materialises AGS4 straight into DuckDB, so the model writes SQL, which
+          it is good at, instead of guessing at a bespoke library, which it is
+          not.
+        </P>
+
         <P>
           python-ags4, the AGS Data Format Working Group's own library, is what
-          laterite is checked against. Every rule here is written from the
-          published AGS4 specification, and python-ags4's test suite is run
-          against the result.
+          laterite is calibrated against: every rule here is written from the
+          published AGS4 specification, not adapted from anyone's source, and
+          running python-ags4's test suite against my implementation was the
+          benchmark.
         </P>
+
         <P>
-          That check is also a way in. Change one token, so that{" "}
-          <C>python_ags4</C> becomes <C>laterite.compat</C>, and your existing
-          code runs four to five times faster. laterite's own typed read is
-          about eleven times faster. The benchmark generates its own synthetic
-          files, so you can reproduce the figures. The{" "}
+          If speed is all you want, change one import in your python file,{" "}
+          <C>python_ags4</C> becomes <C>laterite.compat</C> and your existing
+          code runs four to five times faster. (laterite's native read is about
+          eleven times; the benchmark generates its own synthetic fixtures and
+          pins them by SHA-256, so the numbers are reproducible rather than
+          quoted.) The migration page is at{" "}
           <A href="https://docs.laterite.dev/cookbook/compat/">
-            migration page
-          </A>{" "}
-          has the details.
+            docs.laterite.dev/cookbook/compat
+          </A>
+          .
         </P>
+
         <P>
-          Here is what backs that claim. The test suite of python-ags4 1.2.0,
-          run against <C>laterite.compat</C>, passes 121 of 131 tests unchanged.
-          Five of the ten that fail do so because laterite declines to say it is
-          python-ags4:
+          You can check this yourself using python-ags4 1.2.0's own test suite,
+          run against <C>laterite.compat</C>, passes 121 of 131 unchanged, and
+          the ten that don't itemise cleanly. Five fail because the shim
+          declines to claim it <em>is</em> python-ags4:
         </P>
         <Pre>
           {[
@@ -200,84 +202,54 @@ export const Post: Component = () => (
             'compat.__version__          # "…+compat.python-ags4.1.2.0"',
           ].join("\n")}
         </Pre>
+
         <P>
-          Reporting <C>"1.2.0"</C> outright would have passed those five, and
-          anyone checking the version would then believe they were talking to
-          python-ags4. Two more are a choice of Python idiom: laterite raises an
-          exception where python-ags4 returns the error in a dictionary. The
-          last three are real differences in how a bad file is handled. laterite
-          refuses an AGS3 file and a file that is not CSV, where python-ags4
-          validates both as AGS4. It also reports a line break inside a quoted
-          field under Rule 6, where python-ags4 reports other rules. I intend to
-          keep the compatibility layer tracking future python-ags4 releases.
-          That is an intention and not a promise, because there is one of me.
+          Claiming <C>"1.2.0"</C> outright would have closed those five. I
+          didn't, because anyone or any system checking the version would then
+          silently believe they were talking to python-ags4. The other five are
+          the drop-in being honest about different implementation approaches.
+          Two are a Python-idiom choice - an exception where python-ags4 returns
+          an error as a dict. The last three are genuine divergences in how a
+          bad file is handled: laterite refuses an AGS3 file and a non-CSV file
+          where python-ags4 validates them, and it reports an embedded carriage
+          return under Rule 6 where python-ags4 reports other rules. I intend to
+          keep compat tracking future python-ags4 releases.
         </P>
 
-        <H2>Where the two disagree</H2>
         <P>
           Two independent implementations of one specification will disagree,
-          and I write every disagreement down. There are 61 so far, 27 of which
-          change what you see. Each is filed by kind: laterite differs from
-          python-ags4, both depart from the written specification, laterite
-          changed to match, or laterite adds a check python-ags4 has no
-          counterpart for. The{" "}
-          <A href="https://docs.laterite.dev/reference/divergences/">
-            divergences page
-          </A>{" "}
-          lists them. Three give the flavour:
-        </P>
-        <ul class="mt-5 list-disc space-y-3 pl-6 text-prose text-fg-soft">
-          <li>
-            python-ags4 raises <C>AGS4Error</C> on a duplicate <C>GROUP</C> or a
-            ragged <C>DATA</C> row before it returns any data, so the files most
-            in need of a findings list get none. laterite reports the problem
-            and keeps going.
-          </li>
-          <li>
-            <C>TRAN_AGS="4.0"</C> is ambiguous. python-ags4 picks the older
-            4.0.3 edition and over-reports Rule 10c on <C>PMTL</C>. laterite
-            resolves it to 4.0.4, which contains everything 4.0.3 does.
-          </li>
-          <li>
-            python-ags4's Rule 6 check is empty, so a carriage return inside a
-            quoted field is never reported as the Rule 6 fault it is.
-          </li>
-        </ul>
-        <P>
-          It cuts both ways. The comparison caught laterite missing an empty{" "}
-          <C>DT</C> unit and accepting the year <C>0018</C>, and both are fixed.
-          The findings worth reporting are going to the Working Group, who own
-          both the library and the specification. The aim is to complement
-          python-ags4, not to displace it.
+          there are 61 observations catalogued, 27 that change what you see,
+          each filed by whether laterite differs from python-ags4, both depart
+          from the written specification, laterite changed to match, or laterite
+          adds a check python-ags4 has no counterpart for.
         </P>
 
-        <H2>What beta means</H2>
         <P>
-          Before 1.0 a minor version may break your code, so read the changelog
-          before you upgrade. Expect the API to change. Do not expect the
-          platforms it runs on to change. Both rules are on the{" "}
+          The library is a beta, and pre-1.0 a minor version may break you, so
+          read the changelog before upgrading. The rule is on the{" "}
           <A href="https://docs.laterite.dev/reference/support/">
             support page
           </A>
-          .
+          . Expect churn in the API.
         </P>
 
-        <H2>The ask</H2>
         <P>
-          Point laterite at a delivery you already have and see what happens.
-          The most useful thing you can tell me is where it disagrees with
-          python-ags4. You never need to send data: the shape of the problem is
-          enough to build a synthetic file from.{" "}
+          While I feel the library is polished and working, it is new and there
+          will be issues. So please download the library and point laterite at a
+          delivery you already have and see what happens. If it works fine
+          that's great and please consider using laterite long term. I'm
+          extremely interested though in if things don't work, so if you can
+          tell me where it either doesn't work or disagrees with python-ags4 in
+          ways I haven't documented then please let me know through Github{" "}
           <A href="https://github.com/niko86/laterite/discussions">
             Discussions
           </A>{" "}
-          is the front door, and{" "}
-          <A href="https://github.com/niko86/laterite/issues">Issues</A> is
-          there if you already know what you have. I aim to read everything
-          weekly. That is a goal and not a promise, and it means a reply rather
-          than a fix. The{" "}
-          <A href="https://docs.laterite.dev/feedback/">feedback page</A> has
-          the details.
+          or <A href="https://github.com/niko86/laterite/issues">Issues</A> if
+          you already know what the problem is. You don't need to send your data
+          and I'd prefer and advise not to do so. I aim to read everything
+          weekly and reply. Fixes will be delivered in regular release cycles,
+          the regularity depending on my spare time. Details on the{" "}
+          <A href="https://docs.laterite.dev/feedback/">feedback page</A>.
         </P>
 
         <div class="mt-10 flex flex-wrap items-center gap-3">
