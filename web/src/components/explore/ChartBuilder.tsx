@@ -65,9 +65,19 @@ export const ChartBuilder: Component<{
   const codes = () => props.groups.map((g) => g.code);
   const [table, setTable] = createSignal<string>("");
   const [joinCode, setJoinCode] = createSignal(""); // "" = single-table
+  // Open on a table that can actually be plotted. A file's first group is
+  // PROJ — one row of text — and a scatter of two text columns is an empty
+  // frame, which reads as the chart being broken. So prefer the first group
+  // that has a number to put on the Y axis (the X seed below takes the first
+  // column, so the number has to come after it), and fall back to the first
+  // group only when no group has one.
   createEffect(() => {
-    const first = codes()[0];
-    if (!table() && first !== undefined) setTable(first);
+    if (table()) return;
+    const plottable = props.groups.find((g) =>
+      g.sql_types.slice(1).some((t) => isNumeric(t)),
+    );
+    const first = plottable?.code ?? codes()[0];
+    if (first !== undefined) setTable(first);
   });
 
   const baseMeta = () => props.groups.find((g) => g.code === table());

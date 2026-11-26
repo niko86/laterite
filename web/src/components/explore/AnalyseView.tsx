@@ -198,7 +198,9 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
               >
                 <Chevron open={open().has(g.code)} />
                 <span class="mono font-medium text-fg">{g.code}</span>
-                <span class="text-xs text-fg-dim">{g.total} rows</span>
+                <span class="text-xs text-fg-dim">
+                  {g.total} row{g.total === 1 ? "" : "s"}
+                </span>
                 <span
                   class={`ml-auto rounded-xs px-1.5 py-0.5 text-xs ${fillClass(g.overall)}`}
                 >
