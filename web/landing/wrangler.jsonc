@@ -15,7 +15,7 @@
 //
 // No `not_found_handling`: the default is an honest 404. The app's
 // single-page-application setting would answer every mistyped path with the
-// landing page, which is wrong for a site that is one real page.
+// landing page, which is wrong for a site of a few real pages.
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "laterite-site",

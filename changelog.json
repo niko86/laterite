@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**laterite.dev has a page announcing the beta, at `/beta/`.** It says what laterite is, how it compares with python-ags4, what beta means and where to send feedback, and it wears the same chrome and theme as the landing page."
+      }
+    ],
     "changed": [],
     "deprecated": [],
     "removed": [],

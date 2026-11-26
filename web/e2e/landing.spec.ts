@@ -3786,3 +3786,28 @@ test("the verdict rides the masthead rather than parking over the page", async (
   await chip.locator("button").click();
   await expect(page.locator("#findings")).toBeInViewport();
 });
+
+test("the beta announcement is a page of the same site", async ({ page }) => {
+  await page.goto("/beta/");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "laterite is in beta" }),
+  ).toBeVisible();
+
+  // The site's chrome, with its anchors pointing back at the landing page:
+  // on this page a bare "#install" would be a jump to nothing.
+  await expect(page.getByRole("link", { name: "laterite home" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "See it catch faults" }),
+  ).toHaveAttribute("href", "/#file");
+
+  // No demo here, so no verdict: the chrome is shared, the engine is not.
+  await expect(page.locator('[data-scoreboard="verdict"]')).toHaveCount(0);
+
+  // The landing page's two reader rules hold on every page of the site.
+  const text = await page.locator("body").innerText();
+  expect(text).not.toContain("\u2014");
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+});
