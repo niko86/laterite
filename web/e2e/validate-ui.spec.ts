@@ -170,3 +170,20 @@ test("the safe-fix list virtualizes — a window of cards, with the risky group 
   await expect(page.getByText(/Risky fixes \(1\)/)).toBeVisible();
   await expect(page.getByText(/Canonicalise datetime/)).toBeVisible();
 });
+
+test("a saved edition and encoding are what the dropdowns show after a reload", async ({
+  page,
+}) => {
+  // The setting survived a reload all along; the CONTROL did not show it. It
+  // came back reading its first option ("Auto", "UTF-8") while the app went on
+  // using the saved choice, so a file was validated against an edition the
+  // page said it was not using.
+  await ready(page);
+  await page.getByLabel("Dictionary edition").selectOption("4.2");
+  await page.getByLabel("Encoding").selectOption("windows-1252");
+
+  await page.reload();
+  await ready(page);
+  await expect(page.getByLabel("Dictionary edition")).toHaveValue("4.2");
+  await expect(page.getByLabel("Encoding")).toHaveValue("windows-1252");
+});

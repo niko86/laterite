@@ -46,6 +46,10 @@ export function arrowResult(
   table: Table,
   cap?: number,
   dropSynthKeys = false,
+  // Column name → the AGS TYPE the file declares for it. Only a caller that
+  // knows the columns ARE a group's headings passes this (the group browser);
+  // a free SQL result has computed columns with no declared type.
+  agsTypes?: ReadonlyMap<string, string>,
 ): ResultSet {
   // `dropSynthKeys` hides the content-addressed `_id`/`_parent_id` key columns —
   // the group-grid view passes it so those synthetic columns don't clutter a
@@ -71,7 +75,11 @@ export function arrowResult(
   // toArray() yields row proxies keyed by column name.
   for (const r of src.toArray()) {
     const row = r as Record<string, unknown>;
-    rows.push(columns.map((c) => formatCell(row[c.name], c.sqlType)));
+    rows.push(
+      columns.map((c) =>
+        formatCell(row[c.name], c.sqlType, agsTypes?.get(c.name)),
+      ),
+    );
   }
   return { columns, rows, total };
 }

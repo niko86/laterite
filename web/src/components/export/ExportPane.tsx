@@ -5,6 +5,7 @@
 
 import { createSignal, For, Show, type Component } from "solid-js";
 import { Card } from "../Card";
+import { Button, Select } from "@shared/components";
 import { toAgs4 } from "../../lib/validatorClient";
 import { downloadBlob } from "../../lib/download";
 import type { EmitMode, ExportResult } from "../../lib/validator";
@@ -138,27 +139,27 @@ export const ExportPane: Component = () => {
         <div class="flex flex-wrap gap-4">
           <label class="flex flex-col gap-1 text-xs text-fg-muted">
             Edition
-            <select
-              class="rounded-xs border border-line bg-surface px-2 py-1 text-sm text-fg"
+            <Select
+              width="w-auto"
               value={edition()}
               onInput={(e) => setEdition(e.currentTarget.value as Edition)}
             >
               <For each={EDITIONS}>
                 {(ed) => <option value={ed}>{ed}</option>}
               </For>
-            </select>
+            </Select>
           </label>
           <label class="flex flex-col gap-1 text-xs text-fg-muted">
             Mode
-            <select
-              class="rounded-xs border border-line bg-surface px-2 py-1 text-sm text-fg"
+            <Select
+              width="w-auto"
               value={mode()}
               onInput={(e) => setMode(e.currentTarget.value as EmitMode)}
             >
               <For each={MODES}>
                 {(m) => <option value={m.id}>{m.label}</option>}
               </For>
-            </select>
+            </Select>
           </label>
         </div>
 
@@ -174,25 +175,18 @@ export const ExportPane: Component = () => {
         </label>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            class="rounded-md border border-accent px-3 py-1.5 font-medium text-accent hover:bg-chip disabled:opacity-45"
+          <Button
+            variant="primary"
             disabled={busy()}
             onClick={() => void build(true)}
           >
             Build &amp; download .ags
-          </button>
-          <button
-            type="button"
-            class="rounded-md border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip disabled:opacity-45"
-            disabled={busy()}
-            onClick={() => void build(false)}
-          >
+          </Button>
+          <Button disabled={busy()} onClick={() => void build(false)}>
             Preview only
-          </button>
-          <button
-            type="button"
-            class="rounded-sm px-2 py-1.5 text-sm text-fg-muted hover:text-fg"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => {
               setJson(EXAMPLE);
               setResult(null);
@@ -200,7 +194,7 @@ export const ExportPane: Component = () => {
             }}
           >
             Reset example
-          </button>
+          </Button>
           <Show when={busy()}>
             <span class="text-xs text-fg-muted">Building…</span>
           </Show>

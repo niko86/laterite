@@ -38,6 +38,26 @@ export function scalarText(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** The decimal places an AGS TYPE declares — 2 for "2DP", 0 for "0DP" — or
+ *  null for every type that declares none. */
+export function declaredDecimals(agsType: string): number | null {
+  const m = /^(\d+)DP$/.exec(agsType.trim().toUpperCase());
+  return m ? Number(m[1]) : null;
+}
+
+/** A number shown to its column's declared decimal places. The column lands
+ *  as a DOUBLE, and a DOUBLE has no trailing zeros, so "25.00" came back as
+ *  "25" — the same number, but in AGS the zeros are part of what was
+ *  reported. This PADS and never rounds: a value carrying MORE places than
+ *  its type declares is a fault in the file, and rounding it for display
+ *  would hide the very digits a reader needs to see. */
+function padDecimals(value: number, dp: number): string {
+  const plain = String(value);
+  if (/e/i.test(plain)) return plain;
+  const have = plain.includes(".") ? plain.length - plain.indexOf(".") - 1 : 0;
+  return have >= dp ? plain : value.toFixed(dp);
+}
+
 /** Coerce one cell value (as Arrow JS / DuckDB-wasm hands it back) to a
  *  display string, driven by the column's DuckDB sql_type. Two values must
  *  never reach the DOM raw:
@@ -49,9 +69,17 @@ export function scalarText(value: unknown): string {
  *  This is the single audited place those are normalised; every grid runs
  *  cells through it. `null`/`undefined` → empty string (an em-dash is
  *  applied at the view layer if a placeholder is wanted). */
-export function formatCell(value: unknown, sqlType: string): string {
+export function formatCell(
+  value: unknown,
+  sqlType: string,
+  agsType?: string,
+): string {
   if (value === null || value === undefined) return "";
   const t = sqlType.toUpperCase();
+
+  const dp = agsType === undefined ? null : declaredDecimals(agsType);
+  if (dp !== null && typeof value === "number" && Number.isFinite(value))
+    return padDecimals(value, dp);
 
   if (t.startsWith("TIMESTAMP") || t.startsWith("DATE")) {
     // micros-since-epoch (bigint or number), or already a Date.
