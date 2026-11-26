@@ -125,10 +125,23 @@ export const Scoreboard: Component = () => {
  *  measured at 6 free pixels against a chip that needs eighty-odd — and the
  *  phone already renders findings under each table, so the verdict is not the
  *  only feedback there. */
-/** True while any table-bearing section is on screen. Shared by both mounts
- *  (#691), so the two can never disagree about when the verdict is live —
- *  IntersectionObserver over the sections rather than a scroll listener,
- *  because the browser already knows what is on screen. */
+/** True while any table-bearing section is on screen AND the headline has
+ *  left it. Shared by both mounts (#691), so the two can never disagree about
+ *  when the verdict is live — IntersectionObserver over the sections rather
+ *  than a scroll listener, because the browser already knows what is on screen.
+ *
+ *  The headline half is what keeps an error count off the page on arrival. On
+ *  a tall viewport the first table is already on screen under the hero, so "a
+ *  table is visible" alone lit the chip before the reader had done anything,
+ *  and a red count beside the wordmark reads as the site reporting a fault of
+ *  its own. While the headline is on screen the hero's file card carries the
+ *  verdict, in context; the chip takes over once the reader has scrolled into
+ *  the demo.
+ *
+ *  The headline, not the whole hero section: a reader with a table filling
+ *  the viewport and the hero's last few pixels still showing above it is in
+ *  the demo, and waiting for the section to leave entirely kept the chip from
+ *  them. */
 const useTablesOnScreen = () => {
   const [onScreen, setOnScreen] = createSignal(false);
   onMount(() => {
@@ -137,15 +150,19 @@ const useTablesOnScreen = () => {
     const els = SECTIONS.filter((sec) => sec.group || sec.id === "file")
       .map((sec) => document.getElementById(sec.id))
       .filter((el): el is HTMLElement => el !== null);
+    const hero = document.querySelector("#top h1");
     const seen = new Set<Element>();
+    let heroOnScreen = hero !== null;
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
-        if (e.isIntersecting) seen.add(e.target);
+        if (e.target === hero) heroOnScreen = e.isIntersecting;
+        else if (e.isIntersecting) seen.add(e.target);
         else seen.delete(e.target);
       }
-      setOnScreen(seen.size > 0);
+      setOnScreen(seen.size > 0 && !heroOnScreen);
     });
     for (const el of els) io.observe(el);
+    if (hero) io.observe(hero);
     onCleanup(() => {
       io.disconnect();
     });
