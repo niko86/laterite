@@ -319,7 +319,7 @@ type HeaderRow = {
 type FindingRowData = { kind: "finding"; f: FindingDto };
 type Row = HeaderRow | FindingRowData;
 
-export const FindingsView: Component<{
+type FindingsViewProps = {
   // The FILTERED groups to render (filtering happens in ValidatePane).
   report: ValidationReport;
   text: () => string;
@@ -334,7 +334,24 @@ export const FindingsView: Component<{
   /** Register an index-based scroll so the FilterBar jump can reach a rule
    *  even when its header is windowed out of the DOM. */
   registerJump?: (fn: (rule: string) => void) => void;
-}> = (props) => {
+};
+
+// The list exists only while there is something to list — and the virtualizer
+// has to live and die WITH its scroll element, which is why the guard sits out
+// here rather than around the markup inside. The virtualizer attaches to its
+// scroll element once, when the component that owns it mounts. Guarded from
+// the inside, a filter set that emptied the list removed that element and the
+// next non-empty set rendered a new one the virtualizer was never attached
+// to: it measured a detached node, got a zero-height viewport, and drew no
+// rows — a blank box under "showing 5 of 5 findings". A clean file followed by
+// a faulty one took the same path.
+export const FindingsView: Component<FindingsViewProps> = (props) => (
+  <Show when={props.report.findings.length > 0}>
+    <FindingsList {...props} />
+  </Show>
+);
+
+const FindingsList: Component<FindingsViewProps> = (props) => {
   const lines = createMemo(() => props.text().split(/\r?\n/));
 
   // Flatten respecting the parent-owned open-state; a closed group
@@ -423,116 +440,112 @@ export const FindingsView: Component<{
   });
 
   return (
-    <Show when={props.report.findings.length > 0} fallback={null}>
-      <div class="flex min-w-0 flex-col gap-3">
-        <div class="flex items-center gap-3 text-xs text-fg-muted">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              props.onExpandAll();
-            }}
-          >
-            Expand all
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              props.onCollapseAll();
-            }}
-          >
-            Collapse all
-          </Button>
-        </div>
-        <div
-          ref={scrollEl}
-          class="scroll-region rounded-lg border border-line bg-surface"
+    <div class="flex min-w-0 flex-col gap-3">
+      <div class="flex items-center gap-3 text-xs text-fg-muted">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            props.onExpandAll();
+          }}
         >
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: "100%",
-              position: "relative",
-            }}
-          >
-            <For each={virtualizer.getVirtualItems()}>
-              {(vi) => {
-                // Reactive row read (NOT `const row = rows()[vi.index]`):
-                // when the model changes but @tanstack reuses the
-                // VirtualItem for this index, a once-captured `row` would
-                // render stale content — the "values don't fully update"
-                // symptom. Reading rows()[vi.index] reactively re-renders
-                // the row when the model changes. Guard the index too: a
-                // collapse can shrink rows() below a still-mounted index.
-                const row = () => rows()[vi.index];
-                return (
-                  <Show when={row()}>
-                    {(r) => (
-                      <div
-                        data-index={vi.index}
-                        ref={(el) => {
-                          queueMicrotask(() => {
-                            virtualizer.measureElement(el);
-                          });
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: "100%",
-                          transform: `translateY(${vi.start}px)`,
-                        }}
+          Expand all
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            props.onCollapseAll();
+          }}
+        >
+          Collapse all
+        </Button>
+      </div>
+      <div
+        ref={scrollEl}
+        class="scroll-region rounded-lg border border-line bg-surface"
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          <For each={virtualizer.getVirtualItems()}>
+            {(vi) => {
+              // Reactive row read (NOT `const row = rows()[vi.index]`):
+              // when the model changes but @tanstack reuses the
+              // VirtualItem for this index, a once-captured `row` would
+              // render stale content — the "values don't fully update"
+              // symptom. Reading rows()[vi.index] reactively re-renders
+              // the row when the model changes. Guard the index too: a
+              // collapse can shrink rows() below a still-mounted index.
+              const row = () => rows()[vi.index];
+              return (
+                <Show when={row()}>
+                  {(r) => (
+                    <div
+                      data-index={vi.index}
+                      ref={(el) => {
+                        queueMicrotask(() => {
+                          virtualizer.measureElement(el);
+                        });
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${vi.start}px)`,
+                      }}
+                    >
+                      <Show
+                        when={r().kind === "header" ? (r() as HeaderRow) : null}
+                        fallback={
+                          <FindingRow
+                            f={(r() as FindingRowData).f}
+                            lines={lines}
+                            aligned={props.aligned}
+                          />
+                        }
                       >
-                        <Show
-                          when={
-                            r().kind === "header" ? (r() as HeaderRow) : null
-                          }
-                          fallback={
-                            <FindingRow
-                              f={(r() as FindingRowData).f}
-                              lines={lines}
-                              aligned={props.aligned}
-                            />
-                          }
-                        >
-                          {(h) => (
-                            /* A full-bleed virtualized list-row disclosure,
-                               not a toolbar control — the Button primitive's
-                               families are toolbar objects, so this row
-                               styles from the tokens directly (the same call
-                               Disclosure's summary makes). */
-                            <button
-                              type="button"
-                              id={ruleAnchor(h().rule)}
-                              onClick={() => {
-                                props.onToggle(h().rule);
-                              }}
-                              class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg"
+                        {(h) => (
+                          /* A full-bleed virtualized list-row disclosure,
+                             not a toolbar control — the Button primitive's
+                             families are toolbar objects, so this row
+                             styles from the tokens directly (the same call
+                             Disclosure's summary makes). */
+                          <button
+                            type="button"
+                            id={ruleAnchor(h().rule)}
+                            onClick={() => {
+                              props.onToggle(h().rule);
+                            }}
+                            class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg"
+                          >
+                            <Chevron open={h().open} class="self-center" />
+                            <Chip
+                              {...SEVERITY_CHIP[
+                                ruleSeverity().get(h().rule) ?? "fyi"
+                              ]}
                             >
-                              <Chevron open={h().open} class="self-center" />
-                              <Chip
-                                {...SEVERITY_CHIP[
-                                  ruleSeverity().get(h().rule) ?? "fyi"
-                                ]}
-                              >
-                                {shortRule(h().rule)}
-                              </Chip>
-                              <span class="ml-2 text-xs font-normal text-fg-faint">
-                                {h().count} finding{h().count === 1 ? "" : "s"}
-                              </span>
-                            </button>
-                          )}
-                        </Show>
-                      </div>
-                    )}
-                  </Show>
-                );
-              }}
-            </For>
-          </div>
+                              {shortRule(h().rule)}
+                            </Chip>
+                            <span class="ml-2 text-xs font-normal text-fg-faint">
+                              {h().count} finding{h().count === 1 ? "" : "s"}
+                            </span>
+                          </button>
+                        )}
+                      </Show>
+                    </div>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
         </div>
       </div>
-    </Show>
+    </div>
   );
 };

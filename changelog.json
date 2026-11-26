@@ -17,7 +17,11 @@
     ],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**The web app's findings list no longer goes blank.** Clearing every rule filter and turning them back on left an empty box under a count that said the findings were showing, and so did loading a faulty file straight after a clean one. The list now comes back each time."
+      }
+    ],
     "security": []
   },
   "releases": [
