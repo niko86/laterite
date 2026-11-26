@@ -13,7 +13,7 @@
 // millis produces a plausible-looking date in the year 1970 rather than an error.
 import { describe, expect, it } from "vitest";
 
-import { formatCell, scalarText } from "./duckTypes";
+import { declaredDecimals, formatCell, scalarText } from "./duckTypes";
 
 describe("scalarText", () => {
   it.each([
@@ -183,5 +183,30 @@ describe("formatCell with a non-temporal column", () => {
     for (const [value, sqlType] of cells) {
       expect(typeof formatCell(value, sqlType)).toBe("string");
     }
+  });
+});
+
+describe("formatCell with a declared-decimals AGS type", () => {
+  it("reads the places off an nDP type and nothing else", () => {
+    expect(declaredDecimals("2DP")).toBe(2);
+    expect(declaredDecimals("0DP")).toBe(0);
+    expect(declaredDecimals("2SF")).toBeNull();
+    expect(declaredDecimals("X")).toBeNull();
+  });
+
+  it("shows the trailing zeros the file reported", () => {
+    expect(formatCell(25, "DOUBLE", "2DP")).toBe("25.00");
+    expect(formatCell(18.5, "DOUBLE", "2DP")).toBe("18.50");
+    expect(formatCell(12.45, "DOUBLE", "2DP")).toBe("12.45");
+    expect(formatCell(3, "DOUBLE", "0DP")).toBe("3");
+  });
+
+  it("pads but never rounds a value with more places than declared", () => {
+    expect(formatCell(11.845, "DOUBLE", "2DP")).toBe("11.845");
+  });
+
+  it("leaves a number alone when no type, or no decimals, is declared", () => {
+    expect(formatCell(25, "DOUBLE")).toBe("25");
+    expect(formatCell(25, "DOUBLE", "2SF")).toBe("25");
   });
 });

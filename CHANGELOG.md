@@ -48,6 +48,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **The web app's findings list no longer goes blank.** Clearing every rule filter and turning them back on left an empty box under a count that said the findings were showing, and so did loading a faulty file straight after a clean one. The list now comes back each time.
 - **The web app's dropdowns show your saved choice after a reload.** An edition or encoding you had picked was still being used, but the dropdown came back reading its first option ("Auto", "UTF-8"), so the page could say one edition and validate against another.
+- **The web app's data explorer shows values to their declared decimal places.** A `2DP` value the file reports as `25.00` was displayed as `25`. The group browser now pads to the places the file's TYPE row declares, and never rounds a value that carries more.
 
 ## [0.17.1] — 2026-11-25
 

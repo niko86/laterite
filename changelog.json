@@ -26,6 +26,9 @@
       },
       {
         "text": "**The web app's dropdowns show your saved choice after a reload.** An edition or encoding you had picked was still being used, but the dropdown came back reading its first option (\"Auto\", \"UTF-8\"), so the page could say one edition and validate against another."
+      },
+      {
+        "text": "**The web app's data explorer shows values to their declared decimal places.** A `2DP` value the file reports as `25.00` was displayed as `25`. The group browser now pads to the places the file's TYPE row declares, and never rounds a value that carries more."
       }
     ],
     "security": []

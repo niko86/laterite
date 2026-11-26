@@ -44,7 +44,11 @@ export const DataTable: Component<{
       );
       // Hide the synthetic _id/_parent_id key columns from the group grid (they
       // stay in the engine for the SQL console's cross-group joins). (#303)
-      return arrowResult(t, undefined, true);
+      // The file's own TYPE row, so a 2DP column reads 25.00 as the file does.
+      const agsTypes = new Map(
+        props.meta.headings.map((h, i) => [h, props.meta.types[i] ?? ""]),
+      );
+      return arrowResult(t, undefined, true, agsTypes);
     },
   );
 
