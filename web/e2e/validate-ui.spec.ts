@@ -187,3 +187,50 @@ test("a saved edition and encoding are what the dropdowns show after a reload", 
   await expect(page.getByLabel("Dictionary edition")).toHaveValue("4.2");
   await expect(page.getByLabel("Encoding")).toHaveValue("windows-1252");
 });
+
+test("lining up the excerpt columns leaves the findings stacked, not overlapping", async ({
+  page,
+}) => {
+  // Lining up changes an excerpt's WIDTH and not its height, so no row
+  // reported a resize — and the list, having just forgotten every measured
+  // height, laid the rows out at its estimates, one finding on top of the
+  // next. Each row must start where the one above it ends.
+  await ready(page);
+  await load(page, "many_findings.ags");
+  const rows = page.locator(".scroll-region [data-index]");
+  await expect(rows.first()).toBeVisible();
+
+  await page.getByRole("checkbox", { name: /Line up columns/ }).check();
+  await expect
+    .poll(async () => {
+      const boxes = await rows.evaluateAll((els) =>
+        els
+          .map((el) => el.getBoundingClientRect())
+          .map((r) => ({ top: r.top, bottom: r.bottom }))
+          .sort((a, b) => a.top - b.top),
+      );
+      return boxes
+        .slice(1)
+        .filter((b, i) => Math.abs(b.top - boxes[i]!.bottom) > 1).length;
+    })
+    .toBe(0);
+});
+
+test("a file that is not .ags is refused by name, and says so", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "delivery.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from('"GROUP","PROJ"\r\n'),
+  });
+  await expect(
+    page.getByText(/"delivery\.txt" is not an \.ags file/),
+  ).toBeVisible();
+  await expect(page.getByText(/Load a file, paste AGS4 text/)).toBeVisible();
+
+  // The next accepted file clears the message.
+  await load(page, "many_findings.ags");
+  await expect(page.getByText(/is not an \.ags file/)).toHaveCount(0);
+});

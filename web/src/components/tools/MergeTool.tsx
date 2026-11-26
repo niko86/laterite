@@ -7,6 +7,7 @@ import {
   type Component,
 } from "solid-js";
 import { mergeFiles, type MergeConversion } from "../../lib/validatorClient";
+import { isAgsFileName } from "../../lib/agsFileName";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 import type { TypeClashMode } from "../../lib/validator";
@@ -231,27 +232,44 @@ const FilePicker: Component<{
   label: string;
   picked: Picked | null;
   onPick: (e: Event) => void;
-}> = (props) => (
-  <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-3 text-sm hover:border-accent">
-    <span class="font-medium text-fg-soft">{props.label}</span>
-    {/* Native file input inside the dashed drop-target label — the system's
+}> = (props) => {
+  // The name of a file that was refused — see lib/agsFileName.
+  const [refused, setRefused] = createSignal<string | null>(null);
+  return (
+    <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-3 text-sm hover:border-accent">
+      <span class="font-medium text-fg-soft">{props.label}</span>
+      {/* Native file input inside the dashed drop-target label — the system's
         drop-zone idiom; the ::file-selector-button pseudo is the one control
         no primitive can wrap. */}
-    <input
-      type="file"
-      accept=".ags,.txt,text/plain"
-      class="text-xs text-fg-muted file:mr-2 file:rounded-sm file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
-      onChange={(e) => {
-        props.onPick(e);
-      }}
-    />
-    <Show when={props.picked}>
-      {(picked) => (
-        <span class="mono truncate text-xs text-accent">{picked().name}</span>
-      )}
-    </Show>
-  </label>
-);
+      <input
+        type="file"
+        class="text-xs text-fg-muted file:mr-2 file:rounded-sm file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
+        onChange={(e) => {
+          const f = e.currentTarget.files?.[0];
+          if (f && !isAgsFileName(f.name)) {
+            setRefused(f.name);
+            e.currentTarget.value = "";
+            return;
+          }
+          setRefused(null);
+          props.onPick(e);
+        }}
+      />
+      <Show when={refused()}>
+        {(name) => (
+          <span role="alert" class="text-xs text-err">
+            "{name()}" is not an .ags file, so it was not loaded.
+          </span>
+        )}
+      </Show>
+      <Show when={props.picked}>
+        {(picked) => (
+          <span class="mono truncate text-xs text-accent">{picked().name}</span>
+        )}
+      </Show>
+    </label>
+  );
+};
 
 /** A TYPE clash offers a way out; a UNIT clash deliberately does NOT (no mode can
  *  absorb metres-vs-millimetres, and offering a button would send the user in a

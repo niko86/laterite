@@ -246,8 +246,6 @@ export const ValidatePane: Component = () => {
           onDictVersion={setDictVersion}
           encoding={encoding()}
           onEncoding={setEncoding}
-          aligned={aligned()}
-          onAligned={setAligned}
         />
         <Show when={replacementChars() > 0}>
           <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2 text-sm">
@@ -356,6 +354,7 @@ export const ValidatePane: Component = () => {
                     report={fr()}
                     text={text}
                     aligned={aligned}
+                    onAligned={setAligned}
                     isOpen={(rule) => openRules().has(rule)}
                     onToggle={(rule) =>
                       setOpenRules((prev) => {

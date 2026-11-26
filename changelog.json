@@ -16,6 +16,12 @@
       },
       {
         "text": "**Small web app tidy-ups.** Charts opens on the first group with a number to plot instead of an empty plot of the project row, the Export tab's dropdowns and buttons match the rest of the app, and a one-row group reads \"1 row\"."
+      },
+      {
+        "text": "**The web app's column option sits beside the findings it changes.** \"Aligned columns\" was in the settings above the editor and looked as if it should reformat the editor. It is now above the findings list, labelled \"Line up columns in the excerpts (display only)\"."
+      },
+      {
+        "text": "**The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. The Merge and Revision diff tools apply the same rule. Pasting text is unchanged."
       }
     ],
     "deprecated": [],
@@ -29,6 +35,9 @@
       },
       {
         "text": "**The web app's data explorer shows values to their declared decimal places.** A `2DP` value the file reports as `25.00` was displayed as `25`. The group browser now pads to the places the file's TYPE row declares, and never rounds a value that carries more."
+      },
+      {
+        "text": "**Lining up columns in the web app no longer piles the findings on top of each other.** Ticking the option redrew the list at guessed row heights, so one finding overlapped the next."
       }
     ],
     "security": []
