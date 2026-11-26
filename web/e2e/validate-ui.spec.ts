@@ -35,6 +35,27 @@ test("search filters the findings, and clearing the box restores them all", asyn
   );
 });
 
+test("the findings come back on screen after a filter has emptied the list", async ({
+  page,
+}) => {
+  // The count line is not the list. Emptying the filter set removes the
+  // list's scroll container, and the rows used to stay gone when it came back
+  // while "showing N of N" read as if nothing were wrong — which is why the
+  // test above, asserting only the count, never saw it. So this one asserts
+  // rows.
+  await ready(page);
+  await load(page, "many_findings.ags");
+  const rows = page.locator(".scroll-region [data-index]");
+  await expect(rows.first()).toBeVisible();
+
+  await page.getByRole("button", { name: "None", exact: true }).click();
+  await expect(showing(page)).toHaveText(/showing 0 of \d+/);
+  await expect(rows).toHaveCount(0);
+
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(rows.first()).toBeVisible();
+});
+
 test("severity chips show/hide findings of that severity", async ({ page }) => {
   await ready(page);
   await load(page, "mixed_error_fyi.ags"); // 1 error (Rule 9) + 1 FYI (Rule 1)

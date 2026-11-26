@@ -43,6 +43,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **laterite.dev no longer opens with an error count in its top bar.** On a tall screen the demo's first table is already visible under the headline, so the masthead showed the demo file's error count before the reader had done anything. The count now appears there once the reader has scrolled into the demo; until then it stays on the file card beside the headline.
 
+### Fixed
+
+- **The web app's findings list no longer goes blank.** Clearing every rule filter and turning them back on left an empty box under a count that said the findings were showing, and so did loading a faulty file straight after a clean one. The list now comes back each time.
+
 ## [0.17.1] — 2026-11-25
 
 ### Fixed
