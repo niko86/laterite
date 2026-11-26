@@ -1,4 +1,4 @@
-import { Button } from "@shared/components";
+import { Button, Checkbox } from "@shared/components";
 import {
   For,
   Show,
@@ -324,6 +324,7 @@ type FindingsViewProps = {
   report: ValidationReport;
   text: () => string;
   aligned: () => boolean;
+  onAligned: (v: boolean) => void;
   // Open-state is owned by ValidatePane so the FilterBar jump can force a
   // group open. `isOpen` reads it; `onToggle` flips one rule; the
   // expand/collapse-all setters take the full rule list themselves.
@@ -408,6 +409,15 @@ const FindingsList: Component<FindingsViewProps> = (props) => {
     virtualizer.measure();
     requestAnimationFrame(() => {
       virtualizer.measure();
+      // measure() only FORGETS the sizes; something has to supply them again.
+      // A row that is created gets measured as it mounts, and a row whose
+      // height changes is caught by the resize observer — but the rows already
+      // on screen whose height did NOT change get neither, and fall back to
+      // the estimate. Lining up columns is exactly that case (it changes an
+      // excerpt's width, not its height), so ticking the box laid every row
+      // out at the estimate and the findings drew on top of each other.
+      for (const el of scrollEl.querySelectorAll("[data-index]"))
+        virtualizer.measureElement(el);
     });
   });
 
@@ -460,6 +470,19 @@ const FindingsList: Component<FindingsViewProps> = (props) => {
         >
           Collapse all
         </Button>
+        {/* Here, beside the list, because the excerpts under each finding are
+            the only thing it changes. It used to sit in the settings card above
+            the editor, where it read as a control for the editor and appeared
+            to do nothing. */}
+        <Checkbox
+          label="Line up columns in the excerpts (display only)"
+          title="Pads each finding's excerpt so its columns line up. Your file is not changed."
+          checked={props.aligned()}
+          onChange={(e) => {
+            props.onAligned(e.currentTarget.checked);
+          }}
+          class="ml-auto"
+        />
       </div>
       <div
         ref={scrollEl}

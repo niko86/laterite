@@ -43,12 +43,15 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **laterite.dev no longer opens with an error count in its top bar.** On a tall screen the demo's first table is already visible under the headline, so the masthead showed the demo file's error count before the reader had done anything. The count now appears there once the reader has scrolled into the demo; until then it stays on the file card beside the headline.
 - **Small web app tidy-ups.** Charts opens on the first group with a number to plot instead of an empty plot of the project row, the Export tab's dropdowns and buttons match the rest of the app, and a one-row group reads "1 row".
+- **The web app's column option sits beside the findings it changes.** "Aligned columns" was in the settings above the editor and looked as if it should reformat the editor. It is now above the findings list, labelled "Line up columns in the excerpts (display only)".
+- **The web app only loads files named `.ags`.** Choosing or dropping any other file shows a message naming the file and loads nothing. Pasting text is unchanged.
 
 ### Fixed
 
 - **The web app's findings list no longer goes blank.** Clearing every rule filter and turning them back on left an empty box under a count that said the findings were showing, and so did loading a faulty file straight after a clean one. The list now comes back each time.
 - **The web app's dropdowns show your saved choice after a reload.** An edition or encoding you had picked was still being used, but the dropdown came back reading its first option ("Auto", "UTF-8"), so the page could say one edition and validate against another.
 - **The web app's data explorer shows values to their declared decimal places.** A `2DP` value the file reports as `25.00` was displayed as `25`. The group browser now pads to the places the file's TYPE row declares, and never rounds a value that carries more.
+- **Lining up columns in the web app no longer piles the findings on top of each other.** Ticking the option redrew the list at guessed row heights, so one finding overlapped the next.
 
 ## [0.17.1] — 2026-11-25
 
