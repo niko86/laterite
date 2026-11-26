@@ -288,7 +288,7 @@ test("fine: a refused run never renders as the all-clear", async ({
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
-  // The masthead verdict waits until the hero has scrolled away.
+  // The masthead verdict waits until the headline has scrolled away.
   await page.locator("section#loca").scrollIntoViewIfNeeded();
   const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
@@ -1888,6 +1888,11 @@ test("anchor jumps ease under normal motion, and stay instant under reduced", as
     );
   expect(await behavior()).toBe("smooth");
 
+  // Below the hero card's breakpoint the only pill is the floating one, and
+  // it waits for the headline to scroll away.
+  if (width(page) < 1024) {
+    await page.locator("section#loca").scrollIntoViewIfNeeded();
+  }
   await page
     .getByRole("button", { name: /jump to the findings panel/ })
     .first()
@@ -3372,7 +3377,7 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
-  // The masthead verdict waits until the hero has scrolled away.
+  // The masthead verdict waits until the headline has scrolled away.
   await page.locator("section#loca").scrollIntoViewIfNeeded();
   const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
