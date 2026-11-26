@@ -39,6 +39,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 - **laterite.dev has a page announcing the beta, at `/beta/`.** It says what laterite is, how it compares with python-ags4, what beta means and where to send feedback, and it wears the same chrome and theme as the landing page.
 
+### Changed
+
+- **laterite.dev no longer opens with an error count in its top bar.** On a tall screen the demo's first table is already visible under the headline, so the masthead showed the demo file's error count before the reader had done anything. The count now appears there once the reader has scrolled into the demo; until then it stays on the file card beside the headline.
+
 ## [0.17.1] — 2026-11-25
 
 ### Fixed

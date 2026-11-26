@@ -288,6 +288,8 @@ test("fine: a refused run never renders as the all-clear", async ({
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
+  // The masthead verdict waits until the hero has scrolled away.
+  await page.locator("section#loca").scrollIntoViewIfNeeded();
   const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
 
@@ -3370,6 +3372,8 @@ test("fine: the demo explains a divergence where the reader meets it (#660)", as
 }) => {
   test.skip(hasTouch, "drives the in-place editor (#525)");
   await page.goto("/");
+  // The masthead verdict waits until the hero has scrolled away.
+  await page.locator("section#loca").scrollIntoViewIfNeeded();
   const chip = page.locator('[data-scoreboard="verdict"]:visible');
   await expect(chip).toContainText("4 errors");
   const panel = page.locator("#findings");
@@ -3734,6 +3738,22 @@ test("a page dot is a small mark with a full-size target", async ({ page }) => {
 // scrolls a target into view before clicking, which lands it clear of a
 // viewport-fixed chip. The scoreboard test above clicks the very button the chip
 // used to cover, and passed throughout.
+test("the masthead carries no verdict until the reader scrolls into the demo", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the masthead chip is the fine-pointer mount");
+  await page.goto("/");
+  // The engine has reported: the hero's own file card shows the count. A
+  // masthead that is merely still waiting would pass the absence check below.
+  await expect(page.locator("section#top")).toContainText("4 errors");
+  const chip = page.locator('[data-scoreboard="verdict"]:visible');
+  await expect(chip).toHaveCount(0);
+
+  await page.locator("section#loca").scrollIntoViewIfNeeded();
+  await expect(chip).toContainText("4 errors");
+});
+
 test("the verdict rides the masthead rather than parking over the page", async ({
   page,
 }) => {
