@@ -116,12 +116,4 @@ from a map. The base style is one line to change: Carto's light and dark
 maps come with the package, and any MapLibre style address works, including
 one from your own tile server.
 
-## What I have and have not checked
-
-The notebook runs from top to bottom on the Crossrail file with no errors.
-In a browser, the boreholes draw in the right places with their tooltips, and
-clicking one changes the borehole shown below. I tested that on a machine
-that cannot reach a map tile server, with a plain background in place of the
-street map, so the one thing I have not seen is the street map itself.
-
 _Contains British Geological Survey materials ©NERC 2026. Run on laterite 0.17.1, marimo 0.26.0, maplibre 0.3.6._
