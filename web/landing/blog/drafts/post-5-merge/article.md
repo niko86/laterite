@@ -1,6 +1,6 @@
 # Seventeen files in, one file out
 
-_Post 5 of 5. Script: `merge_files.py`, beside this draft._
+_Post 5 of 5. Scripts: `merge_files.py` and `type_clash.py`, beside this draft._
 
 ![The site's soil units at its nine locations, west to east, from the merged file](site.png)
 
@@ -87,10 +87,45 @@ Seventeen errors, and they are one fault seventeen times: each input has a
 single character outside the permitted set in its LOCA row, and each one
 came through. Merging gathers what the inputs say. Cleaning is post 4.
 
-It also needs the inputs to agree about types. If one file declares a
-heading `2DP` and another `X`, merge stops and says so rather than choosing.
-`on_type_clash=` lets you decide. Two files that disagree about a unit always
-stop it, because there is no safe way to pick.
+## When two files disagree about a type
+
+The Fugro files all came from one contractor, so they agree. Yours may not.
+A common case on a phased project: one contractor declares depths to two
+decimal places (`2DP`) and the next to one (`1DP`). `type_clash.py` builds two
+such files and merges them three ways.
+
+By default merge stops and tells you, because either answer changes
+something:
+
+```python
+laterite.merge(phase_1, phase_2)
+# MergeConflictError: type conflict in LOCA.LOCA_FDEP: files declared ["1DP", "2DP"]
+```
+
+Then you choose:
+
+```python
+laterite.merge(phase_1, phase_2, on_type_clash="promote")
+# declared 2DP, read as [12.5, 8.5]
+
+laterite.merge(phase_1, phase_2, on_type_clash="widen")
+# declared X, read as ['12.50', '8.5']
+```
+
+- **`"promote"`** keeps the column a number, at the finer of the two
+  precisions. `8.5` is written out as `8.50`. No digit changes, and the
+  warnings list records that it happened. This is usually the one you want.
+- **`"widen"`** falls back to text and leaves every value exactly as it was
+  written. Nothing is touched, but the column is no longer a number, and you
+  are back to casting (post 2).
+
+Promote only works when every file declares decimal places. If one says
+`2DP` and another says `X`, there is no number to keep, and the column
+becomes text either way.
+
+A disagreement about a **unit** is different: merge always stops, whatever
+you pass. Metres in one file and feet in another cannot be settled by
+picking one, so that has to be fixed in the source.
 
 ## What you can do now
 
