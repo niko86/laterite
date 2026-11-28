@@ -36,6 +36,12 @@ Checking and cleaning were planned as two posts and are drafted as one.
 a file with `uvx` and the `lat` command with nothing installed, and running
 the series' scripts the same way.
 
+`extra-marimo-notebook` is a second companion: the same toolkit as a marimo
+notebook that queries the file through laterite's DuckDB connection, converts
+grid coordinates with pyproj, and puts the boreholes on a map. It ran end to
+end, but the base map and selecting on it were not seen: the machine it was
+built on cannot reach a tile server.
+
 ## What each post has to get right
 
 Found by running each post's code on a fresh install of the released wheel
