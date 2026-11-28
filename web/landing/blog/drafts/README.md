@@ -53,8 +53,8 @@ Post 0 is the opener and goes out first: it has the lowest barrier of
 anything here. Posts 1 to 5 keep their numbers and their "Post N of 5" headers.
 
 The plan is one post a day for a week: post 0 on the first day, posts 1 to 5
-on the next five, and the notebook on the seventh. The LinkedIn texts are
-written for that: post 0 says "this week", and post 5 closes it.
+on the next five, and the notebook on the seventh. No post says so: none of
+the texts mentions the schedule, so the order or pace can change freely.
 
 `extra-marimo-notebook` is the seventh day's piece: the same toolkit as a marimo
 notebook that queries the file through laterite's DuckDB connection, converts

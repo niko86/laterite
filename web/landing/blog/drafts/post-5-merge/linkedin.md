@@ -30,7 +30,7 @@ Every row accounted for. The picture is the whole site's soil units, drawn from 
 
 The full script, and what merge does not do for you: [link]
 
-That is the week: read one borehole, trust the types, join the groups, clean a real file, merge a site. All of it is `pip install laterite`.
+Read one borehole, trust the types, join the groups, clean a real file, merge a site. All of it is `pip install laterite`.
 
 Data: Netherlands Enterprise Agency (RVO) / Fugro.
 

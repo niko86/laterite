@@ -24,6 +24,6 @@ uvx --from laterite lat merge folder/*.AGS --out merged.ags
 
 It exits with an error when it finds a problem, so it can stop a bad file going out.
 
-This week I am posting one thing a day you can do with AGS data in Python. This is where to start: [link]
+How it works, and how to run a Python script the same way: [link]
 
 #AGS4 #geotechnics #python
