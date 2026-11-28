@@ -38,9 +38,10 @@ the series' scripts the same way.
 
 `extra-marimo-notebook` is a second companion: the same toolkit as a marimo
 notebook that queries the file through laterite's DuckDB connection, converts
-grid coordinates with pyproj, and puts the boreholes on a map. It ran end to
-end, but the base map and selecting on it were not seen: the machine it was
-built on cannot reach a tile server.
+grid coordinates with pyproj, and puts the boreholes on a MapLibre street map
+where clicking one draws its log. It ran end to end and the click was tested
+in a browser, but with a plain background: the machine it was built on cannot
+reach a tile server, so the street map itself was not seen.
 
 ## What each post has to get right
 

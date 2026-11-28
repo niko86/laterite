@@ -5,7 +5,7 @@ _An optional companion to the series. Notebook: `boreholes_on_a_map.py`, beside 
 The scripts in this series print tables. That is fine for checking a file and
 poor for exploring one. This is the same toolkit in a
 [marimo](https://marimo.io) notebook: query the file with SQL, put its
-boreholes on a map, pick one, and read its log.
+boreholes on a street map, click one, and read its log.
 
 ```
 uvx marimo edit --sandbox boreholes_on_a_map.py -- --file your_file.ags
@@ -79,25 +79,49 @@ An AGS file rarely says which grid it uses, so the notebook has a dropdown
 for it. The Fugro files from posts 2, 3 and 5 are in ETRS89 / UTM zone 31N,
 and the same three lines put them in the North Sea.
 
-## Pick a borehole
+## A real map, and a click
 
-The map is a Plotly map wrapped in `mo.ui.plotly`, which makes the selection
-available to Python. Draw a box round some boreholes, and the cells below
-update: the record set from post 1, its strata, and the borehole log.
+The map is a proper street map you can pan and zoom, not a chart: MapLibre,
+through the [maplibre](https://github.com/eoda-dev/py-maplibregl) package,
+with the free OpenFreeMap street style as its base. The boreholes are a layer
+on top of it, each with a tooltip.
+
+```python
+street_map = MapWidget(
+    MapOptions(style=OpenFreeMap.LIBERTY, center=(lon, lat), zoom=17),
+    height=480,
+)
+street_map.add_layer(
+    Layer(
+        id="boreholes",
+        type=LayerType.CIRCLE,
+        source=GeoJSONSource(data=boreholes_as_geojson),
+        paint={"circle-radius": 7, "circle-color": "#d1242f"},
+    )
+)
+hole_map = mo.ui.anywidget(street_map)
+```
+
+Wrapping it in `mo.ui.anywidget` is what connects the map to Python: the
+notebook can read where you last clicked. Click a borehole, and the cells
+below update: the record set from post 1, its strata, and the borehole log.
 
 ```python
 frames = ags.at("LOCA", [choice.value]).frames()
 plots.borehole_log(ags, choice.value)
 ```
 
-That is the fan-out from post 1 and the log from its figure, now one click
-away from a map.
+That is the fan-out from post 1 and the log from its figure, one click away
+from a map. The base style is one line to change: Carto's light and dark
+maps come with the package, and any MapLibre style address works, including
+one from your own tile server.
 
 ## What I have and have not checked
 
-The notebook runs from top to bottom on the Crossrail file with no errors,
-and the table, the conversion and the log are right. I built it on a machine
-that cannot reach a map tile server, so I have not seen the base map drawn
-or tried selecting on it by hand. Try that before relying on it.
+The notebook runs from top to bottom on the Crossrail file with no errors.
+In a browser, the boreholes draw in the right places with their tooltips, and
+clicking one changes the borehole shown below. I tested that on a machine
+that cannot reach a map tile server, with a plain background in place of the
+street map, so the one thing I have not seen is the street map itself.
 
-_Contains British Geological Survey materials ©NERC 2026. Run on laterite 0.17.1, marimo 0.26.0._
+_Contains British Geological Survey materials ©NERC 2026. Run on laterite 0.17.1, marimo 0.26.0, maplibre 0.3.6._

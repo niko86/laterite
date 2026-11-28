@@ -4,7 +4,7 @@
 #     "marimo",
 #     "laterite",
 #     "laterite-outcrop[laterite]>=0.1.1",
-#     "plotly",
+#     "maplibre",
 #     "pyproj",
 # ]
 # ///
@@ -27,12 +27,30 @@ app = marimo.App(width="medium")
 def _():
     import laterite
     import marimo as mo
-    import plotly.express as px
     import polars as pl
+    from maplibre import Layer, LayerType, MapOptions
+    from maplibre.basemaps import OpenFreeMap
+    from maplibre.controls import NavigationControl, ScaleControl
+    from maplibre.ipywidget import MapWidget
+    from maplibre.sources import GeoJSONSource
     from outcrop import ags as plots
     from pyproj import Transformer
 
-    return Transformer, laterite, mo, pl, plots, px
+    return (
+        GeoJSONSource,
+        Layer,
+        LayerType,
+        MapOptions,
+        MapWidget,
+        NavigationControl,
+        OpenFreeMap,
+        ScaleControl,
+        Transformer,
+        laterite,
+        mo,
+        pl,
+        plots,
+    )
 
 
 @app.cell
@@ -41,8 +59,8 @@ def _(mo):
     # Boreholes on a map
 
     Point this at an AGS4 file. laterite reads it, DuckDB queries it, pyproj
-    turns its grid coordinates into latitude and longitude, and the map lets
-    you pick a borehole to look at.
+    turns its grid coordinates into latitude and longitude, and a street map
+    lets you click a borehole to look at.
     """)
     return
 
@@ -137,51 +155,82 @@ def _(Transformer, grid, holes, pl):
 
 
 @app.cell
-def _(mo, on_map, px):
-    figure = px.scatter_map(
-        on_map,
-        lat="lat",
-        lon="lon",
-        hover_name="hole",
-        hover_data={
-            "type": True,
-            "depth_m": True,
-            "strata": True,
-            "lat": False,
-            "lon": False,
-        },
-        color="type",
-        zoom=15,
+def _(
+    GeoJSONSource,
+    Layer,
+    LayerType,
+    MapOptions,
+    MapWidget,
+    NavigationControl,
+    OpenFreeMap,
+    ScaleControl,
+    mo,
+    on_map,
+):
+    # A real street map you can pan and zoom, with the boreholes as a layer on it.
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [row["lon"], row["lat"]]},
+            "properties": {
+                key: row[key] for key in ("hole", "type", "depth_m", "strata")
+            },
+        }
+        for row in on_map.iter_rows(named=True)
+    ]
+    street_map = MapWidget(
+        MapOptions(
+            style=OpenFreeMap.LIBERTY,
+            center=(on_map["lon"].mean(), on_map["lat"].mean()),
+            zoom=17,
+        ),
         height=480,
-        map_style="open-street-map",
     )
-    figure.update_traces(marker={"size": 13})
-    figure.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
-    # Wrapped, the map reports what you select: use the box or lasso tool.
-    hole_map = mo.ui.plotly(figure)
+    street_map.add_control(NavigationControl())
+    street_map.add_control(ScaleControl(), position="bottom-left")
+    street_map.add_layer(
+        Layer(
+            id="boreholes",
+            type=LayerType.CIRCLE,
+            source=GeoJSONSource(
+                data={"type": "FeatureCollection", "features": features}
+            ),
+            paint={
+                "circle-radius": 7,
+                "circle-color": "#d1242f",
+                "circle-stroke-color": "white",
+                "circle-stroke-width": 2,
+            },
+        )
+    )
+    street_map.add_tooltip(
+        "boreholes", template="{{ hole }} ({{ type }}, {{ depth_m }} m)"
+    )
+    # Wrapped, the map tells Python where it was last clicked.
+    hole_map = mo.ui.anywidget(street_map)
     hole_map
     return (hole_map,)
 
 
 @app.cell
 def _(hole_map, mo, on_map):
-    # The map reports each selected point by its position, so match on that.
-    # Two holes drilled on the same spot are both picked.
-    spots = {
-        (round(point["lat"], 7), round(point["lon"], 7))
-        for point in (hole_map.points or [])
-        # Before anything is selected the widget can report a whole trace.
-        if isinstance(point.get("lat"), float) and isinstance(point.get("lon"), float)
-    }
-    picked = [
-        hole
-        for hole, lat, lon in on_map.select("hole", "lat", "lon").iter_rows()
-        if (round(lat, 7), round(lon, 7)) in spots
-    ]
+    # The borehole nearest the last click. Degrees are close enough to compare
+    # over a site; the hole is only taken if the click landed near it.
+    clicked = hole_map.value.get("clicked") or {}
+    nearest = None
+    if "lng" in clicked and "lat" in clicked:
+        hole, off = min(
+            (
+                (hole, (lon - clicked["lng"]) ** 2 + (lat - clicked["lat"]) ** 2)
+                for hole, lon, lat in on_map.select("hole", "lon", "lat").iter_rows()
+            ),
+            key=lambda pair: pair[1],
+        )
+        nearest = hole if off < 0.0005**2 else None
     choice = mo.ui.dropdown(
         options=on_map["hole"].to_list(),
-        value=picked[0] if picked else on_map["hole"][0],
-        label="Borehole" + (f" ({len(picked)} selected on the map)" if picked else ""),
+        value=nearest or on_map["hole"][0],
+        label="Borehole (click one on the map, or choose here)",
     )
     choice
     return (choice,)
