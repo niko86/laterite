@@ -2,6 +2,8 @@
 
 _Post 1 of 5. Script: `one_borehole.py`, beside this draft._
 
+![Borehole log of F1, drawn from the record set](log.png)
+
 An AGS4 file is a stack of tables. A borehole's story is spread across them:
 where it is (`LOCA`), what it went through (`GEOL`), what was taken from it
 (`SAMP`), what was tested in it (`ISPT`), and on through the lab groups. The

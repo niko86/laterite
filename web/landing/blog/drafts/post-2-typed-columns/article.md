@@ -2,6 +2,8 @@
 
 _Post 2 of 5. Script: `typed_columns.py`, beside this draft._
 
+![Plasticity chart of 53 Atterberg results](plasticity.png)
+
 Under every heading in an AGS4 file sit two more rows: its unit and its type.
 
 ```

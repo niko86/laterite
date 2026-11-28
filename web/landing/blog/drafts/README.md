@@ -7,7 +7,7 @@ in #1240; this folder is a holding place until that is decided.
 Each post has a folder holding a first draft: `linkedin.md` (the short post),
 `article.md` (the longer one) and the script the article quotes. Every script
 was run on the released wheel against the public data named below, and the
-output in the drafts is what it printed. The figures are not committed.
+output in the drafts is what it printed. `figures.py` draws every image into its post's folder.
 
 ## The shape of a post
 
@@ -27,7 +27,7 @@ output in the drafts is what it printed. The figures are not committed.
 | 2   | `post-2-typed-columns`     | Your depths are already numbers               | Frames typed as the file declares | Plasticity chart         |
 | 3   | `post-3-sql-across-groups` | A fan-out is not a join                       | `.sql()` across groups            | Chart coloured by unit   |
 | 4   | `post-4-clean-a-real-file` | What's wrong with the AGS file you were sent? | `.validate()`, `.fix()`, by hand  | Errors left after a step |
-| 5   | `post-5-merge`             | Seventeen files in, one file out              | `merge`                           | File and row counts      |
+| 5   | `post-5-merge`             | Seventeen files in, one file out              | `merge`                           | The whole site, one file |
 
 Checking and cleaning were planned as two posts and are drafted as one.
 

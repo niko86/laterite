@@ -1,6 +1,6 @@
 # Post 1: LinkedIn
 
-Image: the borehole log of F1.
+![Borehole log of F1, drawn from the record set](log.png)
 
 ---
 

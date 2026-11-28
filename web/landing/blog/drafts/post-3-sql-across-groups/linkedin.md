@@ -1,6 +1,6 @@
 # Post 3: LinkedIn
 
-Image: plasticity chart coloured by soil unit.
+![The same results coloured by soil unit](by_unit.png)
 
 ---
 

@@ -2,6 +2,8 @@
 
 _Post 5 of 5. Script: `merge_files.py`, beside this draft._
 
+![All seventeen boreholes from the merged file, side by side](site.png)
+
 Fugro's borehole campaign for site III of the Hollandse Kust (zuid) wind farm
 zone is published as seventeen AGS4 files, one per borehole. That is a
 sensible way to issue data and an awkward way to use it. Posts 2 and 3 asked

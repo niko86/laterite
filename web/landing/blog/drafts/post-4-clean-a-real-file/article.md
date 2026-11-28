@@ -2,6 +2,8 @@
 
 _Post 4 of 5. Scripts: `check.py` and `clean_recipe.py`, beside this draft._
 
+![Errors left after each cleaning step](steps.png)
+
 The file is a BGS export of twelve Crossrail boreholes at Farringdon: the
 same one as post 1. It reads fine, and post 1 drew a log from it. It is also
 a long way from valid AGS4.
@@ -40,6 +42,8 @@ by_rule = (
 | 16   | 5        | Abbreviation "HEADING" is not defined in ABBR                      |
 | 19a  | 5        | Heading "BGS_PROJ_ID" is more than 9 characters long               |
 | 7    | 4        | Heading order cannot be checked                                    |
+
+![Errors in the file as sent, by rule](by_rule.png)
 
 Now it is a different file. Ninety-four per cent of the findings are one
 fault: Unix line endings where the format wants Windows ones. The other 94

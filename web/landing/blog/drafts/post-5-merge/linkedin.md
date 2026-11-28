@@ -1,6 +1,6 @@
 # Post 5: LinkedIn
 
-Image: files and row counts, in and out.
+![All seventeen boreholes from the merged file, side by side](site.png)
 
 ---
 
@@ -25,7 +25,7 @@ GEOL   114 in   114 out
 SAMP   754 in   754 out
 ```
 
-Every row accounted for. From here the whole site is one file: one `.at()` for any hole, one SQL join across all seventeen, one plasticity chart.
+Every row accounted for. The picture is all seventeen boreholes drawn from that one file. From here the whole site is one read: one `.at()` for any hole, one SQL join across all seventeen, one plasticity chart.
 
 That is how the charts in the last two posts were made. The files are Fugro's borehole campaign for the Hollandse Kust (zuid) wind farm zone, published as one AGS file per borehole.
 

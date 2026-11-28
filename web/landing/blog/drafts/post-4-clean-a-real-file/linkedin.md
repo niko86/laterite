@@ -1,6 +1,8 @@
 # Post 4: LinkedIn
 
-Image: errors left after each step, or findings by rule.
+![Errors left after each cleaning step](steps.png)
+
+![Errors in the file as sent, by rule](by_rule.png)
 
 ---
 

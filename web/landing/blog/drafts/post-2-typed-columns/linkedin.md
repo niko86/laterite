@@ -1,6 +1,6 @@
 # Post 2: LinkedIn
 
-Image: plasticity chart of 53 results.
+![Plasticity chart of 53 Atterberg results](plasticity.png)
 
 ---
 

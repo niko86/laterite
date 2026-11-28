@@ -2,6 +2,8 @@
 
 _Post 3 of 5. Script: `sql_across_groups.py`, beside this draft._
 
+![The same results coloured by soil unit](by_unit.png)
+
 Post 1 pulled one borehole's groups out as separate frames. That is a
 fan-out: each group on its own, cut to the hole you asked for.
 
