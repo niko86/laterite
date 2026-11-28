@@ -19,14 +19,14 @@ rests on, and the one worked example that exists as code.
 
 ## The series
 
-| # | Hook | What laterite delivers | Image |
-|---|---|---|---|
-| 1 | One line gets you a whole borehole | `.at("LOCA", [...]).frames()` | A borehole log |
-| 2 | Your depths are already numbers | Frames typed as the file declares | Plasticity chart |
-| 3 | A fan-out is not a join | `.sql()` across groups | Chart coloured by stratum |
-| 4 | What's wrong with the AGS file you were sent? | `.validate()` and its report | Findings by rule |
-| 5 | Fix it without opening Excel | `.fix()`, then cleaning by hand | Errors before and after |
-| 6 | Seventeen files in, one file out | `merge` | File and row counts |
+| #   | Hook                                          | What laterite delivers            | Image                     |
+| --- | --------------------------------------------- | --------------------------------- | ------------------------- |
+| 1   | One line gets you a whole borehole            | `.at("LOCA", [...]).frames()`     | A borehole log            |
+| 2   | Your depths are already numbers               | Frames typed as the file declares | Plasticity chart          |
+| 3   | A fan-out is not a join                       | `.sql()` across groups            | Chart coloured by stratum |
+| 4   | What's wrong with the AGS file you were sent? | `.validate()` and its report      | Findings by rule          |
+| 5   | Fix it without opening Excel                  | `.fix()`, then cleaning by hand   | Errors before and after   |
+| 6   | Seventeen files in, one file out              | `merge`                           | File and row counts       |
 
 Posts 4 and 5 may be one post: check a real file, fix what is mechanical, then
 clean the rest by hand with reasons.
@@ -38,10 +38,12 @@ Found by running each post's code on a fresh install of the released wheel
 boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 
 **Post 1**
+
 - `PROJ` is not part of the fan-out. A log's header needs `ags["PROJ"]` as well.
 - A hole ID that is not in the file returns empty frames with no warning (#1246).
 
 **Post 2**
+
 - A column is typed as the file's TYPE row declares it, so the claim holds for
   a well-typed file and not for every file. Say so, and show how to check with
   `ags.types(group)`.
@@ -50,6 +52,7 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 - Use the Fugro data for this post.
 
 **Post 3**
+
 - `.pl()` and `.df()` on a `.sql()` result need pyarrow and pandas. On a base
   install use `pl.DataFrame(ags.sql(...))`.
 - On the BGS export the depth comparison fails to bind, because the depths are
@@ -57,6 +60,7 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 - On the Fugro file every sample lands in a stratum.
 
 **Posts 4 and 5**
+
 - `post-4-clean-a-real-file/clean_recipe.py` takes one BGS Crossrail file from
   its findings as sent to none, in eight steps. `.fix()` clears the line
   endings, which is most of them; the rest is seven small edits by hand.
@@ -73,11 +77,13 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
   `build_ags4` (#1244). Gaps this exposed: #1241, #1242, #1243.
 
 **Post 6**
+
 - Merging the seventeen Fugro files gives one file whose row counts equal the
   sum of the inputs.
 - `merge` warns that no TRAN stamp was supplied. Pass `tran=TranStamp(...)`.
 
 **All posts**
+
 - All 541 samples in the BGS Crossrail file have a blank `SAMP_ID`. The `None`
   warning and `by="_id"` behave as the cookbook says.
 - Checked on Python 3.12, 3.13 and 3.14 on Linux. Not checked on Windows or macOS.
