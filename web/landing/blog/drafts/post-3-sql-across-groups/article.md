@@ -233,7 +233,7 @@ Four lines more than before, and legend code `201` reads `CLAY`:
 ```
 
 One statement, three groups, and the table already tells you something the
-summary hid. Fourteen of the 53 results sit in strata logged as sand, and one
+summary hid. Thirteen of the 53 results sit in strata logged as sand, and one
 in a stratum with no legend code at all. Atterberg limits on a sand are worth
 a second look: clay laminae within it, or a sample depth sitting on a
 boundary. That is a question for the engineer, and the query is what put it
