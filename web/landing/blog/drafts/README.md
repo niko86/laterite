@@ -25,7 +25,7 @@ output in the drafts is what it printed. `figures.py` draws every image into its
 | --- | -------------------------- | --------------------------------------------- | --------------------------------- | ------------------------ |
 | 1   | `post-1-one-borehole`      | One line gets you a whole borehole            | `.at("LOCA", [...]).frames()`     | A borehole log           |
 | 2   | `post-2-typed-columns`     | Your depths are already numbers               | Frames typed as the file declares | Plasticity chart         |
-| 3   | `post-3-sql-across-groups` | A fan-out is not a join                       | `.sql()` across groups            | Chart coloured by unit   |
+| 3   | `post-3-sql-across-groups` | Ask the file a question                       | `.query()`, then `.sql()`         | Chart coloured by unit   |
 | 4   | `post-4-clean-a-real-file` | What's wrong with the AGS file you were sent? | `.validate()`, `.fix()`, by hand  | Errors left after a step |
 | 5   | `post-5-merge`             | Seventeen files in, one file out              | `merge`                           | The whole site, one file |
 
@@ -53,6 +53,10 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 
 **Post 3**
 
+- Leads with laterite's own `.query().filter().select()` on one group, then
+  steps up to a SQL join, then to a grouped summary. It says plainly that SQL
+  fluency is not needed: an LLM writes the query from the headings and a
+  plain-words question.
 - `.pl()` and `.df()` on a `.sql()` result need pyarrow and pandas. On a base
   install use `pl.DataFrame(ags.sql(...))`.
 - On the BGS export the depth comparison fails to bind, because the depths are
