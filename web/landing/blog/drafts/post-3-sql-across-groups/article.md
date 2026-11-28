@@ -186,6 +186,62 @@ Two more things to know:
   will not run as written. Cast inside the query:
   `TRY_CAST(l.SAMP_TOP AS DOUBLE) >= g.GEOL_TOP`.
 
+## One step further
+
+A little more SQL goes a long way. The summary above says how plastic each
+unit is. It does not say what the unit is made of. That is in the file too:
+each stratum carries a legend code, and the file's own abbreviation table,
+`ABBR`, says what the code means. Join it in as a third table:
+
+```python
+by_soil = ags.sql("""
+    SELECT g.GEOL_STAT              AS unit,
+           a.ABBR_DESC              AS soil,
+           count(*)                 AS tests,
+           round(avg(l.LLPL_LL), 1) AS mean_ll,
+           round(avg(l.LLPL_PI), 1) AS mean_pi
+    FROM LLPL l
+    JOIN GEOL g
+      ON g.LOCA_ID   = l.LOCA_ID
+     AND l.SAMP_TOP >= g.GEOL_TOP
+     AND l.SAMP_TOP <  g.GEOL_BASE
+    LEFT JOIN ABBR a
+      ON a.ABBR_HDNG = 'GEOL_LEG'
+     AND a.ABBR_CODE = g.GEOL_LEG
+    GROUP BY ALL
+    ORDER BY unit, tests DESC
+""")
+```
+
+Four lines more than before, and legend code `201` reads `CLAY`:
+
+```
+┌──────┬────────────┬───────┬─────────┬─────────┐
+│ unit ┆ soil       ┆ tests ┆ mean_ll ┆ mean_pi │
+╞══════╪════════════╪═══════╪═════════╪═════════╡
+│ B1   ┆ SAND       ┆ 2     ┆ 56.5    ┆ 32.5    │
+│ B2   ┆ CLAY       ┆ 8     ┆ 50.1    ┆ 25.5    │
+│ B2   ┆ Sandy CLAY ┆ 3     ┆ 36.0    ┆ 16.3    │
+│ B2   ┆ SAND       ┆ 1     ┆ 70.0    ┆ 38.0    │
+│ C2   ┆ CLAY       ┆ 18    ┆ 39.9    ┆ 20.2    │
+│ C2   ┆ Silty SAND ┆ 6     ┆ 37.0    ┆ 17.3    │
+│ C2   ┆ SAND       ┆ 4     ┆ 33.0    ┆ 14.8    │
+│ C2   ┆ Sandy CLAY ┆ 4     ┆ 32.5    ┆ 13.0    │
+│ C2   ┆ null       ┆ 1     ┆ 45.0    ┆ 27.0    │
+│ D    ┆ CLAY       ┆ 6     ┆ 44.3    ┆ 23.0    │
+└──────┴────────────┴───────┴─────────┴─────────┘
+```
+
+One statement, three groups, and the table already tells you something the
+summary hid. Fourteen of the 53 results sit in strata logged as sand, and one
+in a stratum with no legend code at all. Atterberg limits on a sand are worth
+a second look: clay laminae within it, or a sample depth sitting on a
+boundary. That is a question for the engineer, and the query is what put it
+in front of them.
+
+It is `LEFT JOIN` for `ABBR` so that a stratum with no legend code is kept
+and shows as `null`, not dropped.
+
 ## The figure
 
 The same chart as post 2, with the joined frame and one more argument:

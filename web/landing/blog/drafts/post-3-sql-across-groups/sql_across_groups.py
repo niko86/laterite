@@ -53,6 +53,27 @@ print(pl.DataFrame(by_unit))
 joined = sum(pl.DataFrame(by_unit)["tests"])
 print(f"{joined} of {ags['LLPL'].height} results matched a stratum")
 
+# 4. One step further: a third group. ABBR is the file's own table of codes,
+#    so it turns legend code 201 into CLAY.
+by_soil = ags.sql("""
+    SELECT g.GEOL_STAT              AS unit,
+           a.ABBR_DESC              AS soil,
+           count(*)                 AS tests,
+           round(avg(l.LLPL_LL), 1) AS mean_ll,
+           round(avg(l.LLPL_PI), 1) AS mean_pi
+    FROM LLPL l
+    JOIN GEOL g
+      ON g.LOCA_ID   = l.LOCA_ID
+     AND l.SAMP_TOP >= g.GEOL_TOP
+     AND l.SAMP_TOP <  g.GEOL_BASE
+    LEFT JOIN ABBR a
+      ON a.ABBR_HDNG = 'GEOL_LEG'
+     AND a.ABBR_CODE = g.GEOL_LEG
+    GROUP BY ALL
+    ORDER BY unit, tests DESC
+""")
+print(pl.DataFrame(by_soil))
+
 # What to paste into an LLM when you want it to write the SQL for you: each
 # group's headings, with the type the file declares for each.
 for code in ("LLPL", "GEOL"):
