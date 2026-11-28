@@ -8,92 +8,176 @@ export of Crossrail boreholes at Farringdon (project file 202002061142130.ags).
 Fetch the file with laterite-quarry:
     quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
 """
+
 import sys
+
 import laterite
 import polars as pl
 
-def count(a, label):
-    r = a.validate().report
-    rules = {k.replace("AGS Format Rule ", "R"): len(v) for k, v in sorted(r.by_rule().items()) if "Warning" not in k}
-    print(f"{label:<34} {r.errors:>5}  {rules}")
-    return r
+Frames = dict[str, pl.DataFrame]
+PerHeading = dict[str, dict[str, str]]
 
-raw = laterite.read(sys.argv[1]); count(raw, "as sent")
-safe = raw.fix(); count(safe, "1. fix()")
 
-frames = {g: safe[g] for g in safe.groups}
-units = {g: dict(zip(safe.headings(g), safe.units(g))) for g in safe.groups}
-types = {g: dict(zip(safe.headings(g), safe.types(g))) for g in safe.groups}
-def rebuild(label):
+def report(ags: laterite.Ags4File, label: str) -> laterite.Report:
+    """Print the error count and the findings per rule, and hand the report back."""
+    found = ags.validate().report
+    per_rule = {
+        rule.replace("AGS Format Rule ", "R"): len(rows)
+        for rule, rows in sorted(found.by_rule().items())
+        if "Warning" not in rule
+    }
+    print(f"{label:<38} {found.errors:>5}  {per_rule}")
+    return found
+
+
+def rebuild(frames: Frames, units: PerHeading, types: PerHeading) -> laterite.Ags4File:
+    """Write the groups back out as AGS4, keeping the source's own UNIT and TYPE rows.
+
+    Left to itself `build_ags4` fills UNIT and TYPE from the dictionary, which
+    is right for data you authored and wrong for a file whose declarations you
+    mean to keep.
+    """
     built = laterite.build_ags4(frames, units=units, types=types, mode="report")
-    out = laterite.read(built.text); return out, count(out, label)
+    return laterite.read(built.text)
 
-# 2. rows that say the same thing twice
-frames["ABBR"] = frames["ABBR"].unique(subset=["ABBR_HDNG", "ABBR_CODE"], keep="first", maintain_order=True)
-for g in ("BKFL", "WSTG"):
-    frames[g] = frames[g].unique(maintain_order=True)
-rebuild("2. duplicates removed")
 
-# 3. dates are ISO but declared dd/mm/yyyy: correct the declaration
-for h in ("LOCA_STAR", "LOCA_ENDD"):
-    units["LOCA"][h] = "yyyy-mm-dd"
-rebuild("3. date unit corrected")
+def add_rows(frames: Frames, group: str, rows: list[dict[str, str | None]]) -> None:
+    """Append rows to a group, leaving every heading not named blank."""
+    blank = dict.fromkeys(frames[group].columns)
+    full = [{**blank, **row} for row in rows]
+    extra = pl.DataFrame(full, schema=frames[group].schema)
+    frames[group] = pl.concat([frames[group], extra], how="vertical")
 
-# 4. units: describe or drop
-used = {u for g in units.values() for u in g.values() if u}
-u = frames["UNIT"]
-blank = u.filter(pl.col("UNIT_DESC").is_null() | (pl.col("UNIT_DESC") == ""))["UNIT_UNIT"].to_list()
-print("   blank-description units used in this file:", [x for x in blank if x in used])
-frames["UNIT"] = u.filter(~pl.col("UNIT_UNIT").is_in([x for x in blank if x not in used]))
-out, rep = rebuild("4. unused, undescribed units dropped")
-print("   R10a now:", rep.findings.filter(pl.col("rule") == "AGS Format Rule 10a").select("group", "line", "desc").rows())
 
-# 5. the record-link characters the file never declared, so "CP+RC" reads as CP and RC
-frames["TRAN"] = frames["TRAN"].with_columns(TRAN_DLIM=pl.lit("|"), TRAN_RCON=pl.lit("+"))
-units["TRAN"] |= {"TRAN_DLIM": "", "TRAN_RCON": ""}; types["TRAN"] |= {"TRAN_DLIM": "X", "TRAN_RCON": "X"}
-rebuild("5. TRAN_DLIM and TRAN_RCON declared")
+def main(source: str, target: str) -> None:
+    raw = laterite.read(source)
+    report(raw, "as sent")
 
-# 6. codes used but never defined
-def add_rows(group, rows):
-    frames[group] = pl.concat([frames[group], pl.DataFrame(rows, schema=frames[group].schema)], how="vertical")
-blank = dict.fromkeys(frames["ABBR"].columns)
-add_rows("ABBR", [
-    {**blank, "ABBR_HDNG": "DICT_TYPE", "ABBR_CODE": "HEADING", "ABBR_DESC": "Flag: heading"},
-    {**blank, "ABBR_HDNG": "DICT_STAT", "ABBR_CODE": "KEY", "ABBR_DESC": "Key"},
-    {**blank, "ABBR_HDNG": "DICT_STAT", "ABBR_CODE": "OTHER", "ABBR_DESC": "Other"},
-    {**blank, "ABBR_HDNG": "GEOL_LEG", "ABBR_CODE": "407", "ABBR_DESC": "Legend code 407 (undefined in the source)"},
-])
-# and the units laterite supplied from the dictionary where the file's UNIT row was blank
-add_rows("UNIT", [
-    {"UNIT_UNIT": "bar", "UNIT_DESC": "bar"},
-    {"UNIT_UNIT": "hh:mm:ss", "UNIT_DESC": "hours minutes seconds"},
-    {"UNIT_UNIT": "yyyy-mm-ddThh:mm", "UNIT_DESC": "year month day hours minutes"},
-])
-rebuild("6. codes and units defined")
+    # 1. The mechanical part. On this file that is the line endings, which is
+    #    most of what the validator found.
+    safe = raw.fix()
+    report(safe, "1. fix()")
 
-# 7. BGS's added columns: give them conforming names and say what they are
-renames = {"PROJ": {"BGS_PROJ_ID": "PROJ_BGS"}, "LOCA": {"BGS_LOCA_ID": "LOCA_BGS"},
-           "BKFL": {"BKFL_TOP_TEXT": "BKFL_TOPT", "BKFL_BASE_TEXT": "BKFL_BAST"}, "CDIA": {"CDIA_DIAM_TEXT": "CDIA_DIAT"}}
-said = {"PROJ_BGS": "BGS project identifier", "LOCA_BGS": "BGS location identifier", "BKFL_TOPT": "Top of backfill, as text",
-        "BKFL_BAST": "Base of backfill, as text", "CDIA_DIAT": "Casing diameter, as text"}
-dblank = dict.fromkeys(frames["DICT"].columns)
-for g, m in renames.items():
-    m = {a: b for a, b in m.items() if a in frames[g].columns}
-    frames[g] = frames[g].rename(m)
-    for a, b in m.items():
-        units[g][b] = units[g].pop(a); types[g][b] = types[g].pop(a)
-        add_rows("DICT", [{**dblank, "DICT_TYPE": "HEADING", "DICT_GRP": g, "DICT_HDNG": b, "DICT_STAT": "OTHER", "DICT_DTYP": "X", "DICT_DESC": said[b]}])
-out, rep = rebuild("7. BGS columns renamed and declared")
+    frames: Frames = {g: safe[g] for g in safe.groups}
+    units: PerHeading = {
+        g: dict(zip(safe.headings(g), safe.units(g), strict=True)) for g in safe.groups
+    }
+    types: PerHeading = {
+        g: dict(zip(safe.headings(g), safe.types(g), strict=True)) for g in safe.groups
+    }
 
-# 8. a stale dictionary row: BKFL's key was HOLE_ID in AGS3; the file now uses LOCA_ID
-frames["DICT"] = frames["DICT"].filter(~((pl.col("DICT_GRP") == "BKFL") & (pl.col("DICT_HDNG") == "HOLE_ID")))
-out, rep = rebuild("8. stale DICT key row removed")
-for row in rep.findings.filter(~pl.col("rule").str.contains("Warning")).select("rule", "group", "line", "desc").rows(): print("   left:", row)
-print("   warnings:", rep.warnings)
-out.save(sys.argv[2]); print("   saved", sys.argv[2])
+    # 2. Rows that say the same thing twice. ABBR defines some codes twice, the
+    #    second copy differing only in a remark, so the first is kept. BKFL and
+    #    WSTG repeat whole rows.
+    frames["ABBR"] = frames["ABBR"].unique(
+        subset=["ABBR_HDNG", "ABBR_CODE"], keep="first", maintain_order=True
+    )
+    for group in ("BKFL", "WSTG"):
+        frames[group] = frames[group].unique(maintain_order=True)
+    report(rebuild(frames, units, types), "2. duplicates removed")
 
-# what changed, by laterite's own key-aware diff, and what did not
-d = raw.diff(out)
-print("   diff:", type(d).__name__, [a for a in dir(d) if not a.startswith("_")][:14])
-for g in ("LOCA", "GEOL", "SAMP", "ISPT"):
-    print("   rows", g, raw[g].height, "->", out[g].height, "| same values:", raw[g].drop([c for c in raw[g].columns if c.startswith("BGS_")]).equals(out[g].drop([c for c in out[g].columns if c.endswith("_BGS")])))
+    # 3. The dates are written 2009-02-18 and declared dd/mm/yyyy. The values
+    #    are unambiguous, so it is the declaration that is corrected.
+    for heading in ("LOCA_STAR", "LOCA_ENDD"):
+        units["LOCA"][heading] = "yyyy-mm-dd"
+    report(rebuild(frames, units, types), "3. date unit corrected")
+
+    # 4. UNIT rows with no description. None of them is used in this file, so
+    #    they are dropped; a unit that was used would need describing instead.
+    used = {unit for per_group in units.values() for unit in per_group.values() if unit}
+    undescribed = pl.col("UNIT_DESC").is_null() | (pl.col("UNIT_DESC") == "")
+    unused = undescribed & ~pl.col("UNIT_UNIT").is_in(sorted(used))
+    frames["UNIT"] = frames["UNIT"].filter(~unused)
+    report(rebuild(frames, units, types), "4. unused, undescribed units dropped")
+
+    # 5. TRAN never declares the record-link characters. With "+" declared as
+    #    the concatenator, "CP+RC" reads as CP and RC, both of which ABBR defines.
+    frames["TRAN"] = frames["TRAN"].with_columns(
+        TRAN_DLIM=pl.lit("|"), TRAN_RCON=pl.lit("+")
+    )
+    units["TRAN"] |= {"TRAN_DLIM": "", "TRAN_RCON": ""}
+    types["TRAN"] |= {"TRAN_DLIM": "X", "TRAN_RCON": "X"}
+    report(rebuild(frames, units, types), "5. TRAN_DLIM and TRAN_RCON declared")
+
+    # 6. Codes and units that are used but never defined. The GEOL_LEG
+    #    description is a placeholder: the source does not say what 407 is.
+    add_rows(
+        frames,
+        "ABBR",
+        [
+            {
+                "ABBR_HDNG": "DICT_TYPE",
+                "ABBR_CODE": "HEADING",
+                "ABBR_DESC": "Flag: heading",
+            },
+            {"ABBR_HDNG": "DICT_STAT", "ABBR_CODE": "KEY", "ABBR_DESC": "Key"},
+            {"ABBR_HDNG": "DICT_STAT", "ABBR_CODE": "OTHER", "ABBR_DESC": "Other"},
+            {
+                "ABBR_HDNG": "GEOL_LEG",
+                "ABBR_CODE": "407",
+                "ABBR_DESC": "Undefined in the source",
+            },
+        ],
+    )
+    # The rebuild gives a blank unit the dictionary's, so those need a UNIT row.
+    add_rows(
+        frames,
+        "UNIT",
+        [
+            {"UNIT_UNIT": "bar", "UNIT_DESC": "bar"},
+            {"UNIT_UNIT": "hh:mm:ss", "UNIT_DESC": "hours minutes seconds"},
+            {
+                "UNIT_UNIT": "yyyy-mm-ddThh:mm",
+                "UNIT_DESC": "year month day hours minutes",
+            },
+        ],
+    )
+    report(rebuild(frames, units, types), "6. codes and units defined")
+
+    # 7. The columns BGS added have names the format does not allow. Give each
+    #    a conforming name and a DICT row saying what it is.
+    renames = {
+        "PROJ": {"BGS_PROJ_ID": ("PROJ_BGS", "BGS project identifier")},
+        "LOCA": {"BGS_LOCA_ID": ("LOCA_BGS", "BGS location identifier")},
+        "BKFL": {
+            "BKFL_TOP_TEXT": ("BKFL_TOPT", "Top of backfill, as text"),
+            "BKFL_BASE_TEXT": ("BKFL_BAST", "Base of backfill, as text"),
+        },
+        "CDIA": {"CDIA_DIAM_TEXT": ("CDIA_DIAT", "Casing diameter, as text")},
+    }
+    for group, columns in renames.items():
+        for old, (new, meaning) in columns.items():
+            if old not in frames[group].columns:
+                continue
+            frames[group] = frames[group].rename({old: new})
+            units[group][new] = units[group].pop(old)
+            types[group][new] = types[group].pop(old)
+            declared = {
+                "DICT_TYPE": "HEADING",
+                "DICT_GRP": group,
+                "DICT_HDNG": new,
+                "DICT_STAT": "OTHER",
+                "DICT_DTYP": "X",
+                "DICT_DESC": meaning,
+            }
+            add_rows(frames, "DICT", [declared])
+    report(rebuild(frames, units, types), "7. BGS columns renamed and declared")
+
+    # 8. A stale dictionary row: BKFL's key was HOLE_ID in AGS3, and the file
+    #    now keys it on LOCA_ID.
+    stale = (pl.col("DICT_GRP") == "BKFL") & (pl.col("DICT_HDNG") == "HOLE_ID")
+    frames["DICT"] = frames["DICT"].filter(~stale)
+    clean = rebuild(frames, units, types)
+    left = report(clean, "8. stale DICT key row removed")
+
+    for finding in left.findings.filter(
+        ~pl.col("rule").str.contains("Warning")
+    ).iter_rows(named=True):
+        print("   left:", finding["rule"], finding["group"], finding["desc"])
+    print(f"   {left.warnings} warning(s) remain")
+    clean.save(target)
+    print(f"   saved {target}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2])
