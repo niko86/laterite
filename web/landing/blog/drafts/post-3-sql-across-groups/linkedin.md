@@ -6,9 +6,7 @@
 
 ---
 
-Which of these results are high plasticity?
-
-That is a question about one table, and laterite has its own way to ask it. Say which rows, say which columns:
+Which of these results are high plasticity? That is a question about one table, and laterite has its own query for it:
 
 ```python
 import laterite
@@ -22,11 +20,7 @@ high = (
 )
 ```
 
-Ten of the 53. No casting, because the columns are already numbers.
-
-The next question is harder: which soil unit did each one come from? AGS does not say. The lab result knows its borehole and depth; the stratum knows its top and base. You have to match them.
-
-That is where laterite hands you the full power of SQL. Every group in the file is a table, named by its four-letter code, and you can join them:
+Which soil unit did each one come from? AGS does not say. A lab result knows its borehole and depth; a stratum knows its top and base. Matching them takes a join, so laterite makes every group a SQL table:
 
 ```sql
 SELECT g.GEOL_STAT AS unit, count(*) AS tests,
@@ -48,7 +42,7 @@ C2       33     37.8     18.3
 D         6     44.3     23.0
 ```
 
-If you do not write SQL, that should not stop you. I am not fluent either. This is the kind of thing an LLM is very good at: give it the column names, ask the question in plain words, and it writes the query. The article shows what to paste in, and how to check the answer it gives you: [link]
+Not fluent in SQL? Nor am I. An LLM writes this well if you give it the column names and ask in plain words. What to paste in, and how to check the answer: [link]
 
 Data: Netherlands Enterprise Agency (RVO) / Fugro.
 

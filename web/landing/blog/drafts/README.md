@@ -52,11 +52,26 @@ Checking and cleaning were planned as two posts and are drafted as one.
 Post 0 is the opener and goes out first: it has the lowest barrier of
 anything here. Posts 1 to 5 keep their numbers and their "Post N of 5" headers.
 
-`extra-marimo-notebook` is an optional companion, not one of the series: the same toolkit as a marimo
+The plan is one post a day for a week: post 0 on the first day, posts 1 to 5
+on the next five, and the notebook on the seventh. The LinkedIn texts are
+written for that: post 0 says "this week", and post 5 closes it.
+
+`extra-marimo-notebook` is the seventh day's piece: the same toolkit as a marimo
 notebook that queries the file through laterite's DuckDB connection, converts
 grid coordinates with pyproj, and puts the boreholes on a MapLibre street map
 where clicking one draws its log. The street map itself has not been seen
 drawn yet; run the notebook on a local machine before the post goes out.
+
+## The older tour notebook
+
+`examples/laterite_tour.py` is an earlier marimo notebook that tours the whole
+toolkit on the sample file. Checked while writing these drafts: it still runs
+from top to bottom in its own sandbox, and a release gate keeps its laterite
+pin current. But no job runs it, and nothing in the README, the docs site or
+the landing page links to it. Its map uses folium with CartoDB tiles, which
+folium now warns need an API key. It is not used by this series. Whether to
+retire it, link it, or fold the new notebook's map into it is undecided; if it
+goes, `ags-wiki/design/reliquary.md` is where that is recorded first.
 
 ## Fix in laterite first
 

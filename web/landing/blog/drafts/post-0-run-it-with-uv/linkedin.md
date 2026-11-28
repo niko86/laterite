@@ -12,9 +12,9 @@ You can check an AGS file with one line and nothing installed:
 uvx --from laterite lat validate your_file.ags
 ```
 
-`uvx` fetches the tool, runs it, and leaves your machine as it found it. No environment to set up, nothing added to your Python.
+`uvx` fetches the tool, runs it, and leaves your machine as it found it.
 
-The same one-liner shape reads a group out as CSV, applies the safe fixes, merges a folder of files, or diffs two issues of a delivery:
+The same shape reads a group out as CSV, applies the safe fixes, or merges a folder of files:
 
 ```
 uvx --from laterite lat read your_file.ags LOCA --csv
@@ -22,10 +22,8 @@ uvx --from laterite lat fix your_file.ags --fix-out fixed.ags
 uvx --from laterite lat merge folder/*.AGS --out merged.ags
 ```
 
-It exits with an error status when it finds a problem, so it can sit in front of a delivery and stop a bad file going out.
+It exits with an error when it finds a problem, so it can stop a bad file going out.
 
-If you use it every day, `uv tool install laterite` puts `lat` on your PATH for good.
-
-How it works, and how to run the scripts from this series the same way: [link]
+This week I am posting one thing a day you can do with AGS data in Python. This is where to start: [link]
 
 #AGS4 #geotechnics #python

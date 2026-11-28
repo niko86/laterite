@@ -6,7 +6,7 @@
 
 ---
 
-Someone sends you an AGS file with a dozen boreholes in it. You want one of them: its strata, its samples, its SPTs.
+Someone sends you an AGS file with a dozen boreholes in it. You want one: its strata, its samples, its SPTs.
 
 In laterite that is one line.
 
@@ -17,8 +17,6 @@ ags = laterite.read("your_file.ags")
 frames = ags.at("LOCA", ["F1"]).frames()
 ```
 
-`frames` is a dict of polars frames, one per group, each cut down to that hole:
-
 ```
 LOCA     1 rows
 GEOL    20 rows
@@ -26,13 +24,11 @@ ISPT    20 rows
 SAMP   100 rows
 ```
 
-No loop over groups, no filter written eight times, no key columns to remember. laterite reads which groups hang off the hole from the file itself.
+No loop over groups, no filter written eight times. laterite works out which groups hang off the hole from the file itself.
 
-The log below is borehole F1 from Crossrail's Farringdon investigation, drawn from those frames: made ground and alluvium over London Clay, the Lambeth Group, and Thanet Sand from 33.7 m.
+The log is borehole F1 from Crossrail's Farringdon investigation, drawn from those frames.
 
-The full script, and the two things to watch for, are in the article: [link]
-
-`pip install laterite`
+The full script, and two things to watch for: [link]
 
 Contains British Geological Survey materials ©NERC 2026.
 

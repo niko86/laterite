@@ -10,7 +10,7 @@
 
 I validated a real AGS file from a public archive. 1,488 errors.
 
-That number looks worse than it is, and working out why is most of the job.
+It is not as bad as it looks. The findings come back as a table, so you can count them:
 
 ```python
 import laterite
@@ -20,19 +20,15 @@ report = ags.validate().report
 report.findings.group_by("rule").len()
 ```
 
-The findings come back as a table, so you can count them instead of scrolling through them. 1,394 of the 1,488 are one thing: the line endings. Every line in the file trips the same rule.
+1,394 of the 1,488 are one thing: line endings.
 
 ```python
 fixed = ags.fix()
 ```
 
-94 left. `.fix()` only makes repairs that cannot change what the data says, so it stops there.
+94 left. The rest took seven small edits by hand, each one a decision. Then the file validates clean, and not one borehole, stratum or sample value has changed.
 
-The rest took seven small edits by hand, each one a decision: dates written one way and declared another, rows repeated, codes used but never defined, columns with names the format does not allow. About a hundred lines of polars, then the file is rebuilt and validates clean.
-
-Not one borehole, stratum or sample value changed. Nearly everything wrong was in the file's bookkeeping.
-
-The file is a BGS export of Crossrail boreholes at Farringdon. The article walks through all eight steps and is honest about which ones laterite should be doing for you: [link]
+All eight steps, and which of them laterite should be doing for you: [link]
 
 Contains British Geological Survey materials ©NERC 2026.
 
