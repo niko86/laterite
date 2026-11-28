@@ -26,9 +26,9 @@ fixed = ags.fix()
 
 94 left. `.fix()` only makes repairs that cannot change what the data says, so it stops there.
 
-The rest took seven small edits by hand, each one a decision: dates written one way and declared another, rows repeated, codes used but never defined, columns with names the format does not allow. About sixty lines of polars, then the file is rebuilt and validates clean.
+The rest took seven small edits by hand, each one a decision: dates written one way and declared another, rows repeated, codes used but never defined, columns with names the format does not allow. About a hundred lines of polars, then the file is rebuilt and validates clean.
 
-Not one borehole, stratum or sample value changed. Everything wrong was in the file's bookkeeping.
+Not one borehole, stratum or sample value changed. Nearly everything wrong was in the file's bookkeeping.
 
 The file is a BGS export of Crossrail boreholes at Farringdon. The article walks through all eight steps and is honest about which ones laterite should be doing for you: [link]
 

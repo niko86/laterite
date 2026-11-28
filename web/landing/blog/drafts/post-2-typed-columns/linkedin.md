@@ -10,6 +10,7 @@ An AGS file has a TYPE row under every heading: `2DP`, `1DP`, `DT`, `X`. laterit
 
 ```python
 import laterite
+import polars as pl
 
 ags = laterite.read("your_file.ags")
 limits = ags["LLPL"]

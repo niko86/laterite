@@ -20,7 +20,7 @@ print(f"{report.errors} errors, {report.warnings} warnings")
 # 1488 errors, 13 warnings
 ```
 
-A file of 1,393 lines with 1,488 errors. Before anyone panics, count them by
+A file of 1,394 lines with 1,488 errors. Before anyone panics, count them by
 rule. The findings are a polars frame:
 
 ```python
@@ -90,18 +90,21 @@ Three of those are worth reading closely, because the judgement is the point.
 
 **Step 3: fix the declaration, not the data.** The dates are written
 `2009-02-18` and the UNIT row says `dd/mm/yyyy`. There are two ways to make
-them agree. The values are unambiguous ISO dates, so the declaration is the
-thing that is wrong:
+them agree. Every value is written year first, which can only be read one
+way, so the declaration is the thing that is wrong. (`units` holds the file's
+own UNIT rows, built as shown further down.)
 
 ```python
 for heading in ("LOCA_STAR", "LOCA_ENDD"):
     units["LOCA"][heading] = "yyyy-mm-dd"
 ```
 
-Two lines clear 24 findings, and no date is touched.
+Two lines clear 24 findings, and no date is touched. Whether the dates are
+_right_ is a separate question, and the answer further down is: not all of
+them.
 
-**Step 2: which duplicate do you keep?** BKFL and WSTG repeat whole rows, and
-dropping the copy is safe. ABBR is different: it defines some codes twice,
+**Step 2: which duplicate do you keep?** WSTG repeats whole rows, and dropping the
+copy is safe. ABBR is different: it defines some codes twice,
 the second time with an extra remark. That is a choice, and the script makes
 it where you can see it:
 
@@ -134,15 +137,19 @@ clean = laterite.read(built.text)
 
 ## What changed, and what did not
 
-Every finding was in the file's bookkeeping: UNIT, ABBR, DICT, TRAN, a unit
-declaration, five column names. The boreholes, strata, samples and SPTs come
-out with exactly the values they went in with. That is the test of a clean:
-the validator is satisfied and the ground has not moved.
+Almost every finding was in the file's bookkeeping: UNIT, ABBR, DICT, TRAN,
+a unit declaration, five column names. The one change to data is three
+water-strike rows in WSTG that were exact copies of the row above them. The
+boreholes, strata, samples and SPTs come out with exactly the values they
+went in with. That is the test of a clean: the validator is satisfied and the
+ground has not moved.
 
 ## What a valid file is not
 
 Valid means the file obeys the format. It does not mean the data is right.
-Borehole F1 in this file started on 4 December 1992 and finished on 15 April 1992. No AGS rule objects to that, and neither does this recipe.
+Borehole F1 in this file started on 4 December 1992 and finished on 15 April 1992. Somewhere upstream a day and a month were probably swapped. No AGS rule
+objects to a hole that finishes before it starts, and neither does this
+recipe.
 
 The recipe is also for this file only. It leaves a finding or three on the
 neighbouring Crossrail files and fails outright on other projects, whose

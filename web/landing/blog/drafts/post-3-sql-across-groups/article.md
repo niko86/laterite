@@ -9,7 +9,8 @@ numbers. This post is about asking questions, starting with an easy one and
 ending with one that AGS makes surprisingly hard.
 
 The data is the Fugro campaign from post 2: 53 Atterberg results from the
-Hollandse Kust (zuid) wind farm zone.
+Hollandse Kust (zuid) wind farm zone, as one file. (It arrives as seventeen.
+Post 5 merges them.)
 
 ## A question about one group
 
@@ -20,6 +21,7 @@ this. You say which rows you want and which columns:
 
 ```python
 import laterite
+import polars as pl
 
 ags = laterite.read("your_file.ags")
 
@@ -249,6 +251,14 @@ The same chart as post 2, with the joined frame and one more argument:
 ```python
 import outcrop
 
+frame = pl.DataFrame(ags.sql("""
+    SELECT l.LLPL_LL, l.LLPL_PI, g.GEOL_STAT AS unit
+    FROM LLPL l
+    JOIN GEOL g
+      ON g.LOCA_ID   = l.LOCA_ID
+     AND l.SAMP_TOP >= g.GEOL_TOP
+     AND l.SAMP_TOP <  g.GEOL_BASE
+"""))
 outcrop.plasticity_chart(frame, by="unit")
 ```
 

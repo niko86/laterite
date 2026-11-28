@@ -11,6 +11,7 @@ Copying and pasting groups between AGS files is how headings drift, units disagr
 ```python
 import laterite
 
+# files: the seventeen paths. stamp: who is issuing the merged file, and when.
 result = laterite.merge(*files, tran=stamp)
 merged = laterite.read(result.bytes)
 ```
@@ -27,7 +28,7 @@ SAMP   754 in   754 out
 
 Every row accounted for. The picture is the site's soil units at its nine locations, west to east, drawn from that one file with a single query. From here the whole site is one read: one `.at()` for any hole, one SQL join across all seventeen, one plasticity chart.
 
-That is how the charts in the last two posts were made. The files are Fugro's borehole campaign for the Hollandse Kust (zuid) wind farm zone, published as one AGS file per borehole.
+That is how the charts in posts 2 and 3 were made. The files are Fugro's borehole campaign for the Hollandse Kust (zuid) wind farm zone, published as one AGS file per borehole.
 
 Full script, and what merge does not do for you: [link]
 

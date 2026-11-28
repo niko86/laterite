@@ -11,25 +11,30 @@ output in the drafts is what it printed. `figures.py` draws every image into its
 
 ## The shape of a post
 
-- A short LinkedIn post: one image, a few lines of code, a link.
+- A short LinkedIn post: an image, a few lines of code, a link.
 - A longer article on laterite.dev with the full runnable script.
 - Each post is about one thing laterite does, on the reader's own AGS4 file.
-  It opens with `laterite.read("your_file.ags")`.
+  It starts from `laterite.read("your_file.ags")`, or for the merge post, a
+  folder of them.
 - A closing line may point to `niko86/laterite-quarry` for readers with no
   file to hand. Figures may be drawn with `niko86/laterite-outcrop`. Neither
   is the subject of a post.
 
 ## The series
 
-| #   | Folder                     | Hook                                          | What laterite delivers            | Image                    |
-| --- | -------------------------- | --------------------------------------------- | --------------------------------- | ------------------------ |
-| 1   | `post-1-one-borehole`      | One line gets you a whole borehole            | `.at("LOCA", [...]).frames()`     | A borehole log           |
-| 2   | `post-2-typed-columns`     | Your depths are already numbers               | Frames typed as the file declares | Plasticity chart         |
-| 3   | `post-3-sql-across-groups` | Ask the file a question                       | `.query()`, then `.sql()`         | Chart coloured by unit   |
-| 4   | `post-4-clean-a-real-file` | What's wrong with the AGS file you were sent? | `.validate()`, `.fix()`, by hand  | Errors left after a step |
-| 5   | `post-5-merge`             | Seventeen files in, one file out              | `merge`                           | The whole site, one file |
+| #   | Folder                     | Hook                                           | What laterite delivers            | Image                    |
+| --- | -------------------------- | ---------------------------------------------- | --------------------------------- | ------------------------ |
+| 1   | `post-1-one-borehole`      | One line gets you a whole borehole             | `.at("LOCA", [...]).frames()`     | A borehole log           |
+| 2   | `post-2-typed-columns`     | Your depths are already numbers                | Frames typed as the file declares | Plasticity chart         |
+| 3   | `post-3-sql-across-groups` | Ask the file a question                        | `.query()`, then `.sql()`         | Chart coloured by unit   |
+| 4   | `post-4-clean-a-real-file` | What is wrong with the AGS file you were sent? | `.validate()`, `.fix()`, by hand  | Errors left after a step |
+| 5   | `post-5-merge`             | Seventeen files in, one file out               | `merge`                           | The whole site, one file |
 
 Checking and cleaning were planned as two posts and are drafted as one.
+
+`extra-run-it-with-uv` is an optional companion, not one of the five: checking
+a file with `uvx` and the `lat` command with nothing installed, and running
+the series' scripts the same way.
 
 ## What each post has to get right
 
@@ -48,7 +53,8 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
   a well-typed file and not for every file. Say so, and show how to check with
   `ags.types(group)`.
 - The Fugro files declare depths `2DP`: numbers. The BGS export declares most
-  columns `X` and its depths `U`: text (#1245).
+  columns `X` and some depths `U`, so its sample and final depths are text,
+  though its stratum depths are numbers (#1245).
 - Use the Fugro data for this post.
 
 **Post 3**
@@ -71,10 +77,11 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 - It is a worked example for that file, not a general cleaner. On the other
   two Crossrail files it leaves one and three findings; on files from other
   projects it fails, because their groups differ.
-- Two descriptions in it are placeholders (for a legend code the source never
+- One description in it is a placeholder (for a legend code the source never
   defines). A real clean needs the right text.
-- The data groups come back with identical values. What changes is the file's
-  own bookkeeping: UNIT, DICT, ABBR and TRAN.
+- The borehole, stratum, sample and SPT rows come back with identical values.
+  Three repeated water-strike rows are dropped; everything else that changes
+  is the file's own bookkeeping: UNIT, DICT, ABBR and TRAN.
 - The safe fix does nothing on the Fugro files, which are nearly clean. Use the
   BGS file.
 - The manual steps need the file's own units and types passed back into
@@ -91,8 +98,9 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 - All 541 samples in the BGS Crossrail file have a blank `SAMP_ID`. The `None`
   warning and `by="_id"` behave as the cookbook says.
 - Checked on Python 3.12, 3.13 and 3.14 on Linux. Not checked on Windows or macOS.
-- `laterite-outcrop` and `laterite-quarry` are on PyPI at 0.1.0. The figure
-  lines and the closing pointers were run from those releases.
+- `laterite-quarry` 0.1.0 and `laterite-outcrop` 0.1.1 are on PyPI. Every script,
+  figure line and closing pointer was run from those releases, each by the
+  usage line in its own docstring.
 - Each post's code should be a script that a gate runs against a small
   committed fixture, as the docs examples are (an open question in #1240).
 

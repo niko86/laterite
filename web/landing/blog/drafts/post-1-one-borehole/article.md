@@ -93,9 +93,10 @@ no complaint. Until laterite warns about this itself (it is on the list),
 check first:
 
 ```python
+hole = "F01"
 holes = ags["LOCA"]["LOCA_ID"].to_list()
 if hole not in holes:
-    sys.exit(f"{hole} is not in this file. It holds: {', '.join(holes)}")
+    raise SystemExit(f"{hole} is not in this file. It holds: {', '.join(holes)}")
 ```
 
 ## It is a fan-out, not a join
@@ -107,10 +108,10 @@ that is post 3.
 
 ## The figure
 
-The log at the top is drawn from `frames` with
+The log at the top is the same record set, drawn with
 [laterite-outcrop](https://github.com/niko86/laterite-outcrop), a small
 plotting library I am building alongside this series
-(`pip install "laterite-outcrop[laterite]"`):
+(`pip install "laterite-outcrop[laterite]>=0.1.1"`):
 
 ```python
 from outcrop import ags as plots

@@ -3,10 +3,10 @@
 A worked example, not a general cleaner: the steps are specific to one BGS
 export of Crossrail boreholes at Farringdon (project file 202002061142130.ags).
 
-    python clean_recipe.py <as-sent.ags> <cleaned.ags>
+uv run --with laterite clean_recipe.py as_sent.ags cleaned.ags
 
 Fetch the file with laterite-quarry:
-    quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
+uvx --from laterite-quarry quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
 """
 
 import sys
@@ -55,15 +55,17 @@ def main(source: str, target: str) -> None:
 
     # 1. The mechanical part. On this file that is the line endings, which is
     #    most of what the validator found.
-    safe = raw.fix()
-    report(safe, "1. fix()")
+    fixed = raw.fix()
+    report(fixed, "1. fix()")
 
-    frames: Frames = {g: safe[g] for g in safe.groups}
+    frames: Frames = {g: fixed[g] for g in fixed.groups}
     units: PerHeading = {
-        g: dict(zip(safe.headings(g), safe.units(g), strict=True)) for g in safe.groups
+        g: dict(zip(fixed.headings(g), fixed.units(g), strict=True))
+        for g in fixed.groups
     }
     types: PerHeading = {
-        g: dict(zip(safe.headings(g), safe.types(g), strict=True)) for g in safe.groups
+        g: dict(zip(fixed.headings(g), fixed.types(g), strict=True))
+        for g in fixed.groups
     }
 
     # 2. Rows that say the same thing twice. ABBR defines some codes twice, the

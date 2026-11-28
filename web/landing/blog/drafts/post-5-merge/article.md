@@ -91,8 +91,8 @@ came through. Merging gathers what the inputs say. Cleaning is post 4.
 
 The Fugro files all came from one contractor, so they agree. Yours may not.
 A common case on a phased project: one contractor declares depths to two
-decimal places (`2DP`) and the next to one (`1DP`). `type_clash.py` builds two
-such files and merges them three ways.
+decimal places (`2DP`) and the next to one (`1DP`). `type_clash.py` builds
+small files like that in memory and merges them each way.
 
 By default merge stops and tells you, because either answer changes
 something:
@@ -122,7 +122,8 @@ laterite.merge(phase_1, phase_2, on_type_clash="widen")
 Promote only works when every file declares decimal places. If one says
 `2DP` and another says `X`, there is no number to keep, and the column
 becomes text under either setting. Watch for this one, because it happens
-quietly: the warnings list comes back empty.
+quietly: the warnings list comes back empty. Here `phase_3` is a third file
+that declares its depth as text.
 
 ```python
 quiet = laterite.merge(phase_1, phase_3, on_type_clash="promote")

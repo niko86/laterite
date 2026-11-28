@@ -2,7 +2,7 @@
 
 uv run --with laterite type_clash.py
 
-Builds two one-borehole files in memory, so it needs no data.
+Builds its one-borehole files in memory, so it needs no data.
 """
 
 import laterite
