@@ -1,6 +1,6 @@
 """Draw the image each post carries, into that post's folder.
 
-    uv run --with laterite --with "laterite-outcrop[laterite]" figures.py \
+    uv run --with laterite --with "laterite-outcrop[laterite]>=0.1.1" figures.py \
         <crossrail.ags> <fugro-merged.ags>
 
 The first file is the BGS Crossrail export posts 1 and 4 use; the second is
@@ -101,8 +101,18 @@ def bare(ax: plt.Axes) -> None:
     ax.tick_params(length=0, colors=INK)
 
 
+# The Crossrail file uses these unit codes and never spells them out.
+CROSSRAIL_UNITS = {
+    "MG": "Made Ground",
+    "AL": "Alluvium",
+    "LC": "London Clay",
+    "LG": "Lambeth Group",
+    "TS": "Thanet Sand",
+}
+
+
 def post_1(crossrail: laterite.Ags4File) -> None:
-    fig = plots.borehole_log(crossrail, "F1")
+    fig = plots.borehole_log(crossrail, "F1", unit_names=CROSSRAIL_UNITS)
     fig.savefig(HERE / "post-1-one-borehole" / "log.png", dpi=110)
     plt.close(fig)
 

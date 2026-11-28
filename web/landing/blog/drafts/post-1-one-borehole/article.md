@@ -118,6 +118,10 @@ from outcrop import ags as plots
 plots.borehole_log("your_file.ags", "F1").savefig("F1.pdf")
 ```
 
+The Geology column brackets the strata that share a unit and names it once.
+This file gives its units as codes (`LC`, `TS`) and never spells them out, so
+the figure passes the names in: `unit_names={"LC": "London Clay", ...}`.
+
 ## No file to hand?
 
 Everything above runs on your own AGS4 file. If you want the one used here,

@@ -26,7 +26,7 @@ SAMP   100 rows
 
 No loop over groups, no filter written eight times, no key columns to remember. laterite reads which groups hang off the hole from the file itself.
 
-The log below is borehole F1 from Crossrail's Farringdon investigation, drawn from those frames: made ground over London Clay, the Woolwich and Reading Beds, and Thanet Sand from 33.7 m.
+The log below is borehole F1 from Crossrail's Farringdon investigation, drawn from those frames: made ground and alluvium over London Clay, the Lambeth Group, and Thanet Sand from 33.7 m.
 
 The full script, and the two things to watch for, are in the article: [link]
 
