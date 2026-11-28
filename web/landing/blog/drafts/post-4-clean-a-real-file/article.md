@@ -162,8 +162,14 @@ dull ones should be one call.
 
 ## No file to hand?
 
-`quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522` with
 [laterite-quarry](https://github.com/niko86/laterite-quarry) fetches this
-file.
+file:
+
+```
+uvx --from laterite-quarry quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
+```
+
+The pull arrives in three pieces. The file used here is the first,
+`bgs/farringdon/cell000/202002061142130.ags`.
 
 _Contains British Geological Survey materials ©NERC 2026. Run on laterite 0.17.1._

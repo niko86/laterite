@@ -102,8 +102,11 @@ merged.sql("SELECT … FROM LLPL l JOIN GEOL g …")  # post 3
 
 ## No file to hand?
 
-`quarry rvo pull hkz-wfs3-bh` with
 [laterite-quarry](https://github.com/niko86/laterite-quarry) fetches the
-seventeen files.
+seventeen files:
+
+```
+uvx --from "laterite-quarry[rvo]" quarry rvo pull hkz-wfs3-bh
+```
 
 _Data: Netherlands Enterprise Agency (RVO) / Fugro. Run on laterite 0.17.1._

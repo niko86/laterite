@@ -107,7 +107,8 @@ that is post 3.
 
 The log at the top is drawn from `frames` with
 [laterite-outcrop](https://github.com/niko86/laterite-outcrop), a small
-plotting library I am building alongside this series:
+plotting library I am building alongside this series
+(`pip install "laterite-outcrop[laterite]"`):
 
 ```python
 from outcrop import ags as plots
@@ -122,7 +123,10 @@ Everything above runs on your own AGS4 file. If you want the one used here,
 command-line tool that fetches public AGS data politely:
 
 ```
-quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
+uvx --from laterite-quarry quarry bgs pull farringdon --bbox -0.108,51.518,-0.102,51.522
 ```
+
+The pull arrives in three pieces. The file used here is the first,
+`bgs/farringdon/cell000/202002061142130.ags`.
 
 _Contains British Geological Survey materials ©NERC 2026. Run on laterite 0.17.1._

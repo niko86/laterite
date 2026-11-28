@@ -110,8 +110,11 @@ plots.plasticity_chart("your_file.ags")
 
 ## No file to hand?
 
-`quarry rvo pull hkz-wfs3-bh` with
 [laterite-quarry](https://github.com/niko86/laterite-quarry) fetches the
-files used here.
+files used here:
+
+```
+uvx --from "laterite-quarry[rvo]" quarry rvo pull hkz-wfs3-bh
+```
 
 _Data: Netherlands Enterprise Agency (RVO) / Fugro. Run on laterite 0.17.1._

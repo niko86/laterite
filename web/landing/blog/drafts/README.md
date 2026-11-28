@@ -87,8 +87,8 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 - All 541 samples in the BGS Crossrail file have a blank `SAMP_ID`. The `None`
   warning and `by="_id"` behave as the cookbook says.
 - Checked on Python 3.12, 3.13 and 3.14 on Linux. Not checked on Windows or macOS.
-- `laterite-outcrop` and `laterite-quarry` are not on PyPI yet. Until they are,
-  a reader cannot run a post that draws a figure with one line.
+- `laterite-outcrop` and `laterite-quarry` are on PyPI at 0.1.0. The figure
+  lines and the closing pointers were run from those releases.
 - Each post's code should be a script that a gate runs against a small
   committed fixture, as the docs examples are (an open question in #1240).
 
