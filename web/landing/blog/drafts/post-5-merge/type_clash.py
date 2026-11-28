@@ -40,3 +40,24 @@ print(
 
 # widen: fall back to text, every value exactly as it was written.
 print("widen:  ", depth_column(laterite.merge(phase_1, phase_2, on_type_clash="widen")))
+
+# A number against text has no number to keep, so both settings give text, and
+# neither says so in the warnings. Compare the types yourself.
+phase_3 = one_hole("BH03", "about 9", "X")  # and one typed its depths as text
+quiet = laterite.merge(phase_1, phase_3, on_type_clash="promote")
+print("promote, number against text:", depth_column(quiet))
+print("warnings:", [warning["kind"] for warning in quiet.warnings])
+
+
+def types_changed(before: str, after: laterite.Ags4File) -> list[str]:
+    """Headings whose declared type in ``after`` is not what ``before`` declared."""
+    source = laterite.read(before)
+    changed = []
+    for group in source.groups:
+        was = dict(zip(source.headings(group), source.types(group), strict=True))
+        now = dict(zip(after.headings(group), after.types(group), strict=True))
+        changed += [f"{h}: {was[h]} -> {now[h]}" for h in was if now.get(h) != was[h]]
+    return changed
+
+
+print("changed:", types_changed(phase_1, laterite.read(quiet.bytes)))

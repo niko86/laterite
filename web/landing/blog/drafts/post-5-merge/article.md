@@ -121,7 +121,27 @@ laterite.merge(phase_1, phase_2, on_type_clash="widen")
 
 Promote only works when every file declares decimal places. If one says
 `2DP` and another says `X`, there is no number to keep, and the column
-becomes text either way.
+becomes text under either setting. Watch for this one, because it happens
+quietly: the warnings list comes back empty.
+
+```python
+quiet = laterite.merge(phase_1, phase_3, on_type_clash="promote")
+# declared X, read as ['12.50', 'about 9']
+print([warning["kind"] for warning in quiet.warnings])
+# []
+```
+
+So after any merge where you passed `on_type_clash`, compare the types that
+came out with the types that went in. `type_clash.py` has a short function
+for it:
+
+```python
+print(types_changed(phase_1, laterite.read(quiet.bytes)))
+# ['LOCA_FDEP: 2DP -> X']
+```
+
+I have raised the missing warning as an issue on laterite. Until it is
+settled, the check is yours to make.
 
 A disagreement about a **unit** is different: merge always stops, whatever
 you pass. Metres in one file and feet in another cannot be settled by
