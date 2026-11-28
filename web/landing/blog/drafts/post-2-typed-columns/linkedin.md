@@ -1,5 +1,7 @@
 # Post 2: LinkedIn
 
+![The code in this post, drawn as an image](code.png)
+
 ![Plasticity chart of 53 Atterberg results](plasticity.png)
 
 ---

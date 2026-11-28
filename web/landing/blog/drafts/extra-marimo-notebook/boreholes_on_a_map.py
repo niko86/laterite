@@ -4,7 +4,8 @@
 #     "marimo",
 #     "laterite",
 #     "laterite-outcrop[laterite]>=0.1.1",
-#     "maplibre",
+#     "maplibre[anywidget]",
+#     "polars",
 #     "pyproj",
 # ]
 # ///

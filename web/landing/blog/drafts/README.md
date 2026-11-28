@@ -7,11 +7,27 @@ in #1240; this folder is a holding place until that is decided.
 Each post has a folder holding a first draft: `linkedin.md` (the short post),
 `article.md` (the longer one) and the script the article quotes. Every script
 was run on the released wheel against the public data named below, and the
-output in the drafts is what it printed. `figures.py` draws every image into its post's folder.
+output in the drafts is what it printed.
+
+## Before a post goes out
+
+```
+uv run check_posts.py
+```
+
+One command, on a local machine. It fetches the two datasets, runs every
+script and the notebook, and redraws the images to compare with the committed
+ones. It ends by listing what it cannot check, which is to be done by hand.
+
+`figures.py` draws each post's figure and `code_cards.py` draws its code as an
+image; both write into the post's folder.
 
 ## The shape of a post
 
-- A short LinkedIn post: an image, a few lines of code, a link.
+- A short LinkedIn post: a few lines of text, two images and a link. LinkedIn
+  shows code as plain text, so the fenced blocks in `linkedin.md` are not
+  posted as text: `code_cards.py` draws them as `code.png`, which goes out as
+  the first image, with the figure second.
 - A longer article on laterite.dev with the full runnable script.
 - Each post is about one thing laterite does, on the reader's own AGS4 file.
   It starts from `laterite.read("your_file.ags")`, or for the merge post, a
@@ -24,6 +40,7 @@ output in the drafts is what it printed. `figures.py` draws every image into its
 
 | #   | Folder                     | Hook                                           | What laterite delivers            | Image                    |
 | --- | -------------------------- | ---------------------------------------------- | --------------------------------- | ------------------------ |
+| 0   | `post-0-run-it-with-uv`    | Check a file with nothing installed            | `uvx` and the `lat` command       | The code card only       |
 | 1   | `post-1-one-borehole`      | One line gets you a whole borehole             | `.at("LOCA", [...]).frames()`     | A borehole log           |
 | 2   | `post-2-typed-columns`     | Your depths are already numbers                | Frames typed as the file declares | Plasticity chart         |
 | 3   | `post-3-sql-across-groups` | Ask the file a question                        | `.query()`, then `.sql()`         | Chart coloured by unit   |
@@ -32,15 +49,30 @@ output in the drafts is what it printed. `figures.py` draws every image into its
 
 Checking and cleaning were planned as two posts and are drafted as one.
 
-`extra-run-it-with-uv` is an optional companion, not one of the five: checking
-a file with `uvx` and the `lat` command with nothing installed, and running
-the series' scripts the same way.
+Post 0 is the opener and goes out first: it has the lowest barrier of
+anything here. Posts 1 to 5 keep their numbers and their "Post N of 5" headers.
 
-`extra-marimo-notebook` is a second companion: the same toolkit as a marimo
+`extra-marimo-notebook` is an optional companion, not one of the series: the same toolkit as a marimo
 notebook that queries the file through laterite's DuckDB connection, converts
 grid coordinates with pyproj, and puts the boreholes on a MapLibre street map
 where clicking one draws its log. The street map itself has not been seen
 drawn yet; run the notebook on a local machine before the post goes out.
+
+## Fix in laterite first
+
+These posts carry caveats for gaps in laterite. The plan is to close the gaps
+before posting, then take the caveat out and re-run `check_posts.py`, which
+will fail on any number that changed.
+
+| Issue | Post | What comes out when it is fixed                              |
+| ----- | ---- | ------------------------------------------------------------ |
+| #1246 | 1    | The warning about an unknown hole ID returning empty frames  |
+| #1245 | 2    | The note that type `U` depths in the BGS export read as text |
+| #1241 | 4    | Step 3 by hand: ISO dates under a `dd/mm/yyyy` unit          |
+| #1242 | 4    | Step 2 by hand, for rows identical in every field            |
+| #1243 | 4    | Step 5 by hand: the undeclared concatenator                  |
+| #1244 | 4    | Passing the file's units and types back into `build_ags4`    |
+| #1249 | 5    | The types check after a merge that turned a number into text |
 
 ## What each post has to get right
 
@@ -114,6 +146,9 @@ boreholes from RVO, and a BGS export of Crossrail boreholes at Farringdon.
 
 - RVO: site content is CC0 unless a document states otherwise. Credit
   "Netherlands Enterprise Agency (RVO) / Fugro".
+- BGS holds and shares this data; it did not produce it. The owner is whoever
+  commissioned the investigation (here, Crossrail). So faults in the data are
+  not BGS's, except what its export adds: the `BGS_` columns.
 - BGS: Open Government Licence v3.0. Credit "Contains British Geological
   Survey materials ©NERC" with the year.
 - No data file is committed here.

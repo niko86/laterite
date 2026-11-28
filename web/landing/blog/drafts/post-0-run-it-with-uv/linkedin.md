@@ -1,6 +1,6 @@
-# Optional post: LinkedIn
+# Post 0, the opener: LinkedIn
 
-No image planned. A screenshot of the terminal output would do.
+![The code in this post, drawn as an image](code.png)
 
 ---
 

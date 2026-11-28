@@ -1,10 +1,11 @@
 """Draw the image each post carries, into that post's folder.
 
     uv run --with laterite --with "laterite-outcrop[laterite]>=0.1.1" figures.py \
-        <crossrail.ags> <fugro-merged.ags>
+        <crossrail.ags> <fugro-merged.ags> [output-folder]
 
 The first file is the BGS Crossrail export posts 1 and 4 use; the second is
-the seventeen Fugro files merged by post 5's script.
+the seventeen Fugro files merged by post 5's script. With an output folder the
+images go there, under the same post folders, and the committed ones are left alone.
 """
 
 import sys
@@ -208,7 +209,12 @@ def post_5(fugro: laterite.Ags4File) -> None:
     save(fig, "post-5-merge", "site.png")
 
 
-def main(crossrail_path: str, fugro_path: str) -> None:
+def main(crossrail_path: str, fugro_path: str, out: str | None = None) -> None:
+    global HERE  # the one place every image's folder is set
+    if out:
+        HERE = Path(out)
+        for post in Path(__file__).parent.glob("post-*"):
+            (HERE / post.name).mkdir(parents=True, exist_ok=True)
     crossrail = laterite.read(crossrail_path)
     fugro = laterite.read(fugro_path)
     post_1(crossrail)
@@ -219,4 +225,4 @@ def main(crossrail_path: str, fugro_path: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(*sys.argv[1:4])

@@ -1,9 +1,9 @@
 # Check an AGS file without installing anything
 
-_An optional companion to the series. Every command here was run as written._
+_The opener: read this before post 1. Every command here was run as written._
 
-Every post in this series has a script, and every script starts the same way:
-"first, install laterite". For a lot of people that is where it stops. Which
+This series is about working with AGS files in Python, and every post has a
+script. Normally that starts with "first, install laterite". For a lot of people that is where it stops. Which
 Python? Which environment? Will it break the other thing?
 
 There is now a way round all of that. [uv](https://docs.astral.sh/uv/) is a

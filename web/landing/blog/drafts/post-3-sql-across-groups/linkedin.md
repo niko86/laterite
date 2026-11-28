@@ -1,5 +1,7 @@
 # Post 3: LinkedIn
 
+![The code in this post, drawn as an image](code.png)
+
 ![The same results coloured by soil unit](by_unit.png)
 
 ---
@@ -25,6 +27,18 @@ Ten of the 53. No casting, because the columns are already numbers.
 The next question is harder: which soil unit did each one come from? AGS does not say. The lab result knows its borehole and depth; the stratum knows its top and base. You have to match them.
 
 That is where laterite hands you the full power of SQL. Every group in the file is a table, named by its four-letter code, and you can join them:
+
+```sql
+SELECT g.GEOL_STAT AS unit, count(*) AS tests,
+       round(avg(l.LLPL_LL), 1) AS mean_ll,
+       round(avg(l.LLPL_PI), 1) AS mean_pi
+FROM LLPL l
+JOIN GEOL g
+  ON g.LOCA_ID   = l.LOCA_ID
+ AND l.SAMP_TOP >= g.GEOL_TOP
+ AND l.SAMP_TOP <  g.GEOL_BASE
+GROUP BY ALL ORDER BY unit
+```
 
 ```
 unit  tests  mean_ll  mean_pi

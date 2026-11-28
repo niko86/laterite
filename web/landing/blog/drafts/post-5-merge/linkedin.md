@@ -1,5 +1,7 @@
 # Post 5: LinkedIn
 
+![The code in this post, drawn as an image](code.png)
+
 ![The site's soil units at its nine locations, west to east, from the merged file](site.png)
 
 ---

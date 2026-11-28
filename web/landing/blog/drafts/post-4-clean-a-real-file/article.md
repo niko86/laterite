@@ -118,7 +118,7 @@ for group in ("BKFL", "WSTG"):
 
 **Step 6: do not invent what the source does not say.** `GEOL_LEG` uses code
 `407` and ABBR never defines it. The validator wants a description. I do not
-know what BGS meant by 407, so the script writes "Undefined in the source"
+know what whoever produced the data meant by 407, so the script writes "Undefined in the source"
 and says so in a comment. A file that validates because someone made up a
 description is worse than one that fails.
 

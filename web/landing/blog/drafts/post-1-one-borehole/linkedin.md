@@ -1,5 +1,7 @@
 # Post 1: LinkedIn
 
+![The code in this post, drawn as an image](code.png)
+
 ![Borehole log of F1, drawn from the record set](log.png)
 
 ---

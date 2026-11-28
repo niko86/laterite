@@ -1,5 +1,7 @@
 # Post 4: LinkedIn
 
+![The code in this post, drawn as an image](code.png)
+
 ![Errors left after each cleaning step](steps.png)
 
 ![Errors in the file as sent, by rule](by_rule.png)
