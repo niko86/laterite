@@ -2,7 +2,7 @@
 
 _Post 5 of 5. Script: `merge_files.py`, beside this draft._
 
-![All seventeen boreholes from the merged file, side by side](site.png)
+![The site's soil units at its nine locations, west to east, from the merged file](site.png)
 
 Fugro's borehole campaign for site III of the Hollandse Kust (zuid) wind farm
 zone is published as seventeen AGS4 files, one per borehole. That is a
@@ -100,6 +100,23 @@ Everything from the earlier posts, across the whole site:
 merged.at("LOCA", ["HKZ3-BH04-SA"]).frames()   # post 1
 merged["LLPL"]                                  # post 2: all 53 results
 merged.sql("SELECT … FROM LLPL l JOIN GEOL g …")  # post 3
+```
+
+## The figure
+
+The seventeen boreholes sit at nine locations: most were drilled two or three
+times a few metres apart. Drawing all seventeen shows the same ground again
+and again, so the figure keeps the deepest hole at each location and orders
+them west to east. That choice is one query on the merged file (`figures.py`
+has it in full):
+
+```sql
+SELECT LOCA_ID,
+       row_number() OVER (
+           PARTITION BY regexp_extract(LOCA_ID, 'BH([0-9]+)', 1)
+           ORDER BY LOCA_FDEP DESC
+       ) AS deepest_first
+FROM LOCA
 ```
 
 ## No file to hand?

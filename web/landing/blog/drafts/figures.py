@@ -58,17 +58,34 @@ IN_STRATUM = """
 """
 
 
-# Each stratum with the principal soil its legend code stands for.
-PRINCIPAL_SOIL = """
-    SELECT g.LOCA_ID, g.GEOL_TOP, g.GEOL_BASE,
-           CASE WHEN a.ABBR_DESC LIKE '%CLAY' THEN 'Clay'
-                WHEN a.ABBR_DESC LIKE '%SAND' THEN 'Sand'
-                ELSE 'Other or not given' END AS soil
-    FROM GEOL g
-    LEFT JOIN ABBR a
-      ON a.ABBR_HDNG = 'GEOL_LEG' AND a.ABBR_CODE = g.GEOL_LEG
+# The site is 17 boreholes at 9 locations: most were drilled two or three times
+# a few metres apart. Drawing all 17 shows the same ground again and again, so
+# this keeps the deepest hole at each location, ordered west to east.
+SITE_UNITS = """
+    WITH hole AS (
+        SELECT LOCA_ID, LOCA_NATE,
+               regexp_extract(LOCA_ID, 'BH([0-9]+)', 1) AS place,
+               row_number() OVER (
+                   PARTITION BY regexp_extract(LOCA_ID, 'BH([0-9]+)', 1)
+                   ORDER BY LOCA_FDEP DESC
+               ) AS deepest_first
+        FROM LOCA
+    )
+    SELECT h.place, h.LOCA_NATE AS easting, g.GEOL_STAT AS unit,
+           g.GEOL_TOP AS top, g.GEOL_BASE AS base
+    FROM hole h
+    JOIN GEOL g USING (LOCA_ID)
+    WHERE h.deepest_first = 1
+    ORDER BY easting, top
 """
-SOILS = {"Sand": "#e0a530", "Clay": "#2f6fb0", "Other or not given": "#9aa1ab"}
+# Fugro's soil units, shallowest first, each with its own colour.
+UNITS = {
+    "A": "#257de0",
+    "B1": "#f47230",
+    "B2": "#00b894",
+    "C2": "#f2a600",
+    "D": "#ee7fac",
+}
 
 
 def save(fig: plt.Figure, post: str, name: str, dpi: int = 140) -> None:
@@ -143,37 +160,40 @@ def post_4(crossrail: laterite.Ags4File) -> None:
 
 
 def post_5(fugro: laterite.Ags4File) -> None:
-    """Every borehole in the merged file, side by side on one depth scale."""
-    strata = pl.DataFrame(fugro.sql(PRINCIPAL_SOIL))
-    holes = sorted(strata["LOCA_ID"].unique().to_list())
-    column = {hole: x for x, hole in enumerate(holes)}
-    fig, ax = plt.subplots(figsize=(11, 5.6))
-    for soil, colour in SOILS.items():
-        rows = strata.filter(pl.col("soil") == soil)
-        ax.bar(
-            [column[hole] for hole in rows["LOCA_ID"]],
-            rows["GEOL_BASE"] - rows["GEOL_TOP"],
-            bottom=rows["GEOL_TOP"],
-            width=0.5,
-            color=colour,
-            edgecolor="white",
-            linewidth=0.6,
-            label=soil,
-        )
+    """The site's soil units at each location, west to east, on one depth scale."""
+    strata = pl.DataFrame(fugro.sql(SITE_UNITS))
+    places = list(dict.fromkeys(strata["place"]))
+    fig, ax = plt.subplots(figsize=(9, 5.6))
+    for x, place in enumerate(places):
+        here = strata.filter(pl.col("place") == place)
+        # One block per run of the same unit: sand over sand in one unit is one block.
+        runs: list[list] = []
+        for unit, top, base in here.select("unit", "top", "base").iter_rows():
+            if runs and runs[-1][0] == unit:
+                runs[-1][2] = base
+            else:
+                runs.append([unit, top, base])
+        for unit, top, base in runs:
+            ax.bar(
+                x, base - top, bottom=top, width=0.62, color=UNITS[unit],
+                edgecolor="white", linewidth=1.5,
+            )  # fmt: skip
+            if base - top >= 3:
+                ax.text(
+                    x, (top + base) / 2, unit, ha="center", va="center",
+                    color=INK, fontsize=9,
+                )  # fmt: skip
     ax.invert_yaxis()
-    ax.set_ylabel("Depth (m)", color=INK)
-    ax.set_xticks(range(len(holes)))
-    names = [hole.removeprefix("HKZ3-") for hole in holes]
-    ax.set_xticklabels(names, rotation=45, ha="left", fontsize=9)
+    ax.set_ylabel("Depth below seabed (m)", color=INK)
+    ax.set_xticks(range(len(places)))
+    ax.set_xticklabels([f"BH{place}" for place in places], fontsize=10)
     ax.xaxis.tick_top()
+    ax.set_xlabel("west to east", color=MUTED, fontsize=9)
     bare(ax)
     ax.spines["bottom"].set_visible(False)
     ax.grid(axis="y", color=RULE, linewidth=0.5)
     ax.set_axisbelow(True)
-    ax.legend(
-        frameon=False, ncols=len(SOILS), loc="lower left", bbox_to_anchor=(0, -0.1)
-    )
-    title = f"One merged file: {len(holes)} boreholes, {strata.height} strata"
+    title = f"One merged file: the site's soil units at {len(places)} locations"
     ax.set_title(title, loc="left", color=INK, fontsize=12, pad=14)
     save(fig, "post-5-merge", "site.png")
 
